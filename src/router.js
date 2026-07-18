@@ -4,7 +4,7 @@
    Centralized navigation — modules call navigate(), never history directly.
 ═══════════════════════════════════════════════════════════════════ */
 
-import { dlog, callerInfo } from './debuglog.js'
+import { dlog, dstack, callerInfo } from './debuglog.js'
 
 const routes = new Map()
 let notFoundHandler = null
@@ -29,7 +29,7 @@ export function registerNotFound(handler) {
  * @param {object} options - { replace: boolean } to use replaceState instead
  */
 export function navigate(path, options = {}) {
-  dlog('router.navigate', `ENTRY path=${path} opts=${JSON.stringify(options)} currentPath=${currentPath} caller=[${callerInfo()}]`)
+  dstack('router.navigate', `ENTRY path=${path} opts=${JSON.stringify(options)} currentPath=${currentPath}`)
   const url = new URL(path, window.location.origin)
   const pathname = url.pathname
 

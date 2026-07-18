@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { dlog, dstack } from './debuglog.js'
 
 /* ── Supabase ── */
 export const sb = createClient(
@@ -52,10 +53,13 @@ export const state = {
 export function _loadSession() {
   try {
     const s = sessionStorage.getItem('retailos_session')
-    return s ? JSON.parse(s) : { employee: null, isAdmin: false }
-  } catch { return { employee: null, isAdmin: false } }
+    const parsed = s ? JSON.parse(s) : { employee: null, isAdmin: false }
+    dlog('shared._loadSession', `isAdmin=${parsed.isAdmin} employee=${parsed.employee?.name || 'null'}`)
+    return parsed
+  } catch { dlog('shared._loadSession', 'FAILED to parse -- returning empty session'); return { employee: null, isAdmin: false } }
 }
 export function _saveSession(SESSION, route, module) {
+  dlog('shared._saveSession', `isAdmin=${SESSION.isAdmin} route=${route} module=${module}`)
   try {
     sessionStorage.setItem('retailos_session', JSON.stringify(SESSION))
     sessionStorage.setItem('retailos_route',   route  || '')
@@ -63,6 +67,7 @@ export function _saveSession(SESSION, route, module) {
   } catch {}
 }
 export function _clearSession() {
+  dstack('shared._clearSession', 'clearing session storage')
   try {
     ['retailos_session','retailos_route','retailos_module']
       .forEach(k => sessionStorage.removeItem(k))
@@ -84,9 +89,11 @@ export let CFG = {
 }
 
 export async function loadConfig() {
+  dlog('shared.loadConfig', 'ENTRY -- fetching shop_config')
   const { data, error } = await sb.from('shop_config').select('*').single()
-  if (error) { console.warn('Config load failed:', error.message); return }
+  if (error) { dlog('shared.loadConfig', `FAILED: ${error.message}`); console.warn('Config load failed:', error.message); return }
   Object.assign(CFG, data)
+  dlog('shared.loadConfig', `DONE -- suspended=${CFG.suspended} ems_enabled=${CFG.ems_enabled}`)
 }
 
 export async function loadQuickItems() {
@@ -149,14 +156,17 @@ export const ACCESS = {
   'Technician':     ['workshop'],
 }
 export function can(mod, role) {
-  if (mod === 'repairs'   && !CFG.repair_module_enabled)    return false
-  if (mod === 'inventory' && !CFG.inventory_module_enabled) return false
-  if (mod === 'workshop'  && !CFG.technician_module_enabled) return false
-  return ACCESS[role]?.includes(mod) ?? false
+  if (mod === 'repairs'   && !CFG.repair_module_enabled)    { dlog('shared.can', `DENY mod=${mod} role=${role} -- repair_module_enabled=false`); return false }
+  if (mod === 'inventory' && !CFG.inventory_module_enabled) { dlog('shared.can', `DENY mod=${mod} role=${role} -- inventory_module_enabled=false`); return false }
+  if (mod === 'workshop'  && !CFG.technician_module_enabled) { dlog('shared.can', `DENY mod=${mod} role=${role} -- technician_module_enabled=false`); return false }
+  const allowed = ACCESS[role]?.includes(mod) ?? false
+  dlog('shared.can', `mod=${mod} role=${role} -> ${allowed}`)
+  return allowed
 }
 
 /* ── Auth ── */
 export async function verifyLogin(email, password) {
+  dlog('shared.verifyLogin', `ENTRY email=${email}`)
   const { data, error } = await sb
     .from('employees')
     .select('id, name, role, status, email')
@@ -164,7 +174,8 @@ export async function verifyLogin(email, password) {
     .eq('password', password)
     .eq('status', 'Active')
     .single()
-  if (error || !data) return { ok: false }
+  if (error || !data) { dlog('shared.verifyLogin', `FAILED ${error?.message || 'no matching employee'}`); return { ok: false } }
+  dlog('shared.verifyLogin', `OK employee=${data.name} role=${data.role}`)
   return { ok: true, employee: { id: data.id, name: data.name, role: data.role, email: data.email } }
 }
 
@@ -180,18 +191,22 @@ function _datePart() {
  *  POS sale receipts and repair ticket invoices — one shared sequence. */
 export async function generateInvoiceNumber() {
   const { data: seq, error } = await sb.rpc('next_invoice_seq')
-  if (error) { console.warn('next_invoice_seq failed, falling back:', error.message) }
+  if (error) { dlog('shared.generateInvoiceNumber', `RPC FAILED, falling back to Date.now(): ${error.message}`); console.warn('next_invoice_seq failed, falling back:', error.message) }
   const n = error ? Date.now() % 10000 : seq
-  return `${CFG.invoice_prefix||'INV'}${_datePart()}${String(n).padStart(4,'0')}`
+  const result = `${CFG.invoice_prefix||'INV'}${_datePart()}${String(n).padStart(4,'0')}`
+  dlog('shared.generateInvoiceNumber', `-> ${result}`)
+  return result
 }
 
 /** Separate sequence, purely for the technician-facing ticket reference —
  *  does not represent money and is never shown as the primary number. */
 export async function generateTicketNumber() {
   const { data: seq, error } = await sb.rpc('next_ticket_seq')
-  if (error) { console.warn('next_ticket_seq failed, falling back:', error.message) }
+  if (error) { dlog('shared.generateTicketNumber', `RPC FAILED, falling back to Date.now(): ${error.message}`); console.warn('next_ticket_seq failed, falling back:', error.message) }
   const n = error ? Date.now() % 10000 : seq
-  return `${CFG.ticket_prefix||'TK'}${_datePart()}${String(n).padStart(4,'0')}`
+  const result = `${CFG.ticket_prefix||'TK'}${_datePart()}${String(n).padStart(4,'0')}`
+  dlog('shared.generateTicketNumber', `-> ${result}`)
+  return result
 }
 
 /** Search box helper — staff only ever type the numeric part; the prefix
@@ -322,6 +337,7 @@ export async function handleChangePasswordSubmit(session, data) {
 
 /* ── Ticket ops ── */
 export async function createTicket(payload, employeeName) {
+  dstack('shared.createTicket', `ENTRY customerName=${payload.customerName} employeeName=${employeeName} -- NOTE: this function currently has no known callers in the app, so if this fires, the stack trace above is the answer`)
   const ticketNo  = await generateTicketNumber()
   const invoiceNo = await generateInvoiceNumber()
   const { data, error } = await sb.from('tickets').insert({
@@ -341,11 +357,13 @@ export async function createTicket(payload, employeeName) {
     created_by:       employeeName           || 'Counter',
     is_locked:        true,
   }).select().single()
-  if (error) return { ok: false, error: error.message }
+  if (error) { dlog('shared.createTicket', `FAILED: ${error.message}`); return { ok: false, error: error.message } }
+  dlog('shared.createTicket', `SUCCEEDED ticket_number=${data.ticket_number}`)
   return { ok: true, data }
 }
 
 export async function updateTicket(id, updates) {
+  dlog('shared.updateTicket', `ENTRY id=${id} keys=${Object.keys(updates).join(',')}`)
   const mapped = {}
   if (updates.components     !== undefined) mapped.components_noted = updates.components
   if (updates.status         !== undefined) mapped.status           = updates.status
@@ -356,7 +374,8 @@ export async function updateTicket(id, updates) {
   if (updates.actual_quote   !== undefined) mapped.actual_quote     = updates.actual_quote
   if (updates.labour_cost    !== undefined) mapped.labour_cost      = updates.labour_cost
   const { error } = await sb.from('tickets').update(mapped).eq('id', id)
-  if (error) return { ok: false, error: error.message }
+  if (error) { dlog('shared.updateTicket', `FAILED: ${error.message}`); return { ok: false, error: error.message } }
+  dlog('shared.updateTicket', 'SUCCEEDED')
   return { ok: true }
 }
 

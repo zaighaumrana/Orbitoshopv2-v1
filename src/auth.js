@@ -2,10 +2,12 @@ import {
   state, CFG, _saveSession, _clearSession,
   verifyLogin, applyBranding, currentTenant
 } from './shared.js'
+import { dlog, dstack } from './debuglog.js'
 
 let _onLoginSuccess = null
 
 export function renderLogin(onSuccess) {
+  dstack('auth.renderLogin', '*** #app REWRITE *** (login screen)')
   _onLoginSuccess = onSuccess
   const app = document.getElementById('app')
   app.innerHTML = `
@@ -116,6 +118,7 @@ async function submitLogin() {
     email.toLowerCase() === CFG.owner_email.toLowerCase() &&
     pass === CFG.owner_password
   ) {
+    dlog('auth.submitLogin', `OWNER LOGIN matched -- calling _onLoginSuccess`)
     const SESSION = { employee: { name: 'Admin', role: 'Business Owner', email }, isAdmin: true }
     _saveSession(SESSION, 'admin', 'dashboard')
     _onLoginSuccess && _onLoginSuccess(SESSION)
@@ -125,6 +128,7 @@ async function submitLogin() {
   // 2. Employee login
   const res = await verifyLogin(email, pass)
   if (res.ok) {
+    dlog('auth.submitLogin', `EMPLOYEE LOGIN ok role=${res.employee.role} -- calling _onLoginSuccess`)
     const SESSION = { employee: res.employee, isAdmin: false }
     const role    = res.employee.role
     const route   = (role === 'Technician') ? 'workshop' : (role === 'Business Owner' || role === 'Manager') ? 'admin' : 'pos'
