@@ -21,7 +21,7 @@ import {
 } from '../shared.js'
 
 import { navigate } from '../router.js'
-import { dlog, callerInfo } from '../debuglog.js'
+import { dlog, dstack, callerInfo } from '../debuglog.js'
 
 /* ── POS-only state ── */
 const posState = {
@@ -86,7 +86,7 @@ async function load() {
 
 /* ── Render ── */
 function render() {
-  dlog('POS.render', `*** #app REWRITE *** caller=[${callerInfo()}]`)
+  dstack('POS.render', `*** #app REWRITE ***`)
   if (!SESSION.employee) { navigate('/login'); return }
   if (CFG.suspended) {
     document.getElementById('app').innerHTML = `

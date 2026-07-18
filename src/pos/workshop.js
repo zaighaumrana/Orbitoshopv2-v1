@@ -18,6 +18,7 @@ import {
 } from '../shared.js'
 
 import { navigate } from '../router.js'
+import { dlog, dstack, callerInfo } from '../debuglog.js'
 
 /* ── Workshop state ── */
 const wsState = {
@@ -30,6 +31,7 @@ let _eventsAttached = false
 
 /* ── Load ── */
 async function load() {
+  dlog('WORKSHOP.load', 'ENTRY')
   await loadConfig()
   const [tickets, repairComponents] = await Promise.all([
     sb.from('tickets')
@@ -41,11 +43,13 @@ async function load() {
   state.data.tickets          = tickets.data          || []
   state.data.repairComponents = repairComponents.data || []
   applyBranding()
+  dlog('WORKSHOP.load', 'DATA READY -- calling render()')
   render()
 }
 
 /* ── Render ── */
 function render() {
+  dstack('WORKSHOP.render', '*** #app REWRITE ***')
   if (!SESSION.employee) { navigate('/login'); return }
 
   const tenant = currentTenant()
@@ -496,6 +500,7 @@ function renderModal() {
 ═══════════════════════════════════════════════════════════════════ */
 function attachEvents() {
   const app = document.getElementById('app')
+  dlog('WORKSHOP.attachEvents', 'listeners attached to #app (click + submit + input)')
 
   /* ── Helpers to read the sub-invoice draft from the DOM ── */
   function readDraftCompsFromDOM() {
@@ -525,6 +530,7 @@ function attachEvents() {
       e.target.classList.contains('modal-backdrop') &&
       !e.target.hasAttribute('data-no-backdrop-close')
     ) {
+      dlog('WORKSHOP.click', `BACKDROP-CLOSE fired -- state.modal was type=${state.modal?.type}`)
       state.modal = null; render(); return
     }
 
@@ -534,6 +540,7 @@ function attachEvents() {
       '[data-draft-comp-remove],[data-mark-not-needed],[data-pp-key]'
     )
     if (!el) return
+    dlog('WORKSHOP.click', `el MATCHED selector -- action=${el.dataset.action} close=${el.dataset.close} tag=${el.tagName}`)
 
     /* PIN numpad */
     if (el.dataset.ppKey !== undefined) {
@@ -541,7 +548,10 @@ function attachEvents() {
     }
 
     /* Close */
-    if (el.dataset.close !== undefined) { state.modal = null; render(); return }
+    if (el.dataset.close !== undefined) {
+      dlog('WORKSHOP.click', `DATA-CLOSE branch firing -- state.modal was type=${state.modal?.type} -- about to call WORKSHOP.render()`)
+      state.modal = null; render(); return
+    }
 
     /* Status filter tabs */
     if (el.dataset.statusFilter !== undefined) {
@@ -731,6 +741,7 @@ function attachEvents() {
     e.preventDefault()
     const form = e.target
     const data = Object.fromEntries(new FormData(form).entries())
+    dlog('WORKSHOP.submit', `ENTRY form.dataset.form=${form.dataset.form}`)
     if (form.dataset.form === 'leave-request') {
       const result = await submitLeaveRequest(SESSION, data)
       if (!result.ok) { alert('Error: ' + result.error); return }
@@ -804,6 +815,7 @@ async function verifyAdminLocal(pin) {
    PUBLIC ENTRY POINT
 ═══════════════════════════════════════════════════════════════════ */
 export async function initWorkshop(sess) {
+  dlog('WORKSHOP.initWorkshop', `ENTRY isAdmin=${sess.isAdmin} caller=[${callerInfo()}]`)
   SESSION          = sess
   state.role       = sess.isAdmin ? 'Business Owner' : (sess.employee?.role || 'Technician')
   wsState.filter   = ''
