@@ -1,6 +1,8 @@
 import { CFG, money } from '../shared.js'
+import { dlog, dstack } from '../debuglog.js'
 
 export function printThermal(html) {
+  dstack('print.printThermal', `ENTRY -- NOTE: window.print() fires ~400ms later INSIDE the iframe's own JS context, which is a separate window from the page and cannot be captured by this logger. This log marks the moment printThermal() itself was called.`)
   const old = document.getElementById('thermal-frame')
   if (old) old.remove()
   const iframe = document.createElement('iframe')
@@ -19,6 +21,7 @@ export function printThermal(html) {
 }
 
 export function buildTicketSlip(ticket) {
+  dlog('print.buildTicketSlip', `ENTRY ticket_number=${ticket?.ticket_number}`)
   const comps = ticket.components_noted || []
   return `
     ${CFG.shop_logo ? `<div class="c"><img src="${CFG.shop_logo}" style="max-width:140px;max-height:50px;object-fit:contain"></div>` : ''}
@@ -57,6 +60,7 @@ export function buildTicketSlip(ticket) {
 }
 
 export function buildReceiptSlip(sale, isReprint = false) {
+  dlog('print.buildReceiptSlip', `ENTRY receiptNo=${sale?.receiptNo} isReprint=${isReprint}`)
   const items = sale.items || []
   return `
     ${isReprint ? `<div style="text-align:center;font-size:16px;font-weight:900;border:3px solid #000;padding:4px 8px;margin-bottom:6px;letter-spacing:2px">★ DUPLICATE / REPRINT ★</div>` : ''}
