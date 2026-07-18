@@ -9,6 +9,7 @@ import {
   _clearSession,
 } from '../shared.js'
 import { navigate } from '../router.js'
+import { dlog, dstack } from '../debuglog.js'
 
 /* ── EMS state ── */
 const emsState = {
@@ -31,16 +32,19 @@ let _eventsAttached = false
    If not needed it calls onProceed() immediately.
 ════════════════════════════════════════════════════════════════ */
 export async function checkClockIn(sess, cfg, onProceed) {
+  dlog('EMS.checkClockIn', `ENTRY isAdmin=${sess.isAdmin} role=${sess.employee?.role} ems_enabled=${cfg.ems_enabled}`)
   SESSION    = sess
   _onProceed = onProceed
 
   // Owner never needs to clock in
   if (sess.isAdmin || sess.employee?.role === 'Business Owner') {
+    dlog('EMS.checkClockIn', 'Owner branch -- calling onProceed() immediately')
     onProceed(); return
   }
 
   // EMS not enabled for this client
   if (!cfg.ems_enabled) {
+    dlog('EMS.checkClockIn', 'ems_enabled=false -- calling onProceed() immediately')
     onProceed(); return
   }
 
@@ -58,10 +62,10 @@ export async function checkClockIn(sess, cfg, onProceed) {
   if (record && !record.clock_out) {
     // Already clocked in today
     if (cfg.ems_track_breaks) {
-      // Break tracking ON — show break/proceed screen
+      dlog('EMS.checkClockIn', 'already clocked in, break-tracking ON -- showing break gate')
       renderBreakGate(sess, record)
     } else {
-      // Break tracking OFF — pass straight through
+      dlog('EMS.checkClockIn', 'already clocked in, break-tracking OFF -- calling onProceed()')
       onProceed()
     }
     return
@@ -69,6 +73,7 @@ export async function checkClockIn(sess, cfg, onProceed) {
 
   if (record && record.clock_out) {
     // Clocked out — need to clock back in
+    dlog('EMS.checkClockIn', 'clocked out already today -- showing clock-in screen (isReturn)')
     if (cfg.ems_track_breaks) {
       renderClockInScreen(sess, true) // isReturn = true
     } else {
@@ -80,11 +85,13 @@ export async function checkClockIn(sess, cfg, onProceed) {
   }
 
   // No record today — first clock-in of the day
+  dlog('EMS.checkClockIn', 'no attendance record today -- showing clock-in screen')
   renderClockInScreen(sess, false)
 }
 
 /* ── Clock-in screen ── */
 function renderClockInScreen(sess, isReturn) {
+  dstack('EMS.renderClockInScreen', `*** #app REWRITE *** isReturn=${isReturn}`)
   const now  = new Date()
   const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   const date = now.toLocaleDateString(undefined, { weekday:'long', day:'numeric', month:'long', year:'numeric' })
@@ -151,6 +158,7 @@ function renderClockInScreen(sess, isReturn) {
 
 /* ── Break gate (ems_track_breaks = true, already clocked in) ── */
 function renderBreakGate(sess, record) {
+  dstack('EMS.renderBreakGate', '*** #app REWRITE ***')
   const clockedInAt  = new Date(record.clock_in)
   const elapsed      = Math.floor((Date.now() - clockedInAt) / 60000) // minutes
   const elapsedStr   = elapsed >= 60
@@ -600,6 +608,7 @@ export function leaveRequestHTML() {
 
 /* ── Submit leave request (called from pos.js / workshop.js submit handler) ── */
 export async function submitLeaveRequest(sess, formData) {
+  dlog('EMS.submitLeaveRequest', `ENTRY employee=${sess.employee?.name}`)
   const from = formData.from_date
   const to   = formData.to_date
   if (!from || !to) return { ok: false, error: 'Please select dates.' }
@@ -613,7 +622,8 @@ export async function submitLeaveRequest(sess, formData) {
     reason:      formData.reason || '',
     status:      'Pending',
   })
-  if (error) return { ok: false, error: error.message }
+  if (error) { dlog('EMS.submitLeaveRequest', `FAILED: ${error.message}`); return { ok: false, error: error.message } }
+  dlog('EMS.submitLeaveRequest', 'SUCCEEDED')
   return { ok: true }
 }
 
@@ -626,7 +636,8 @@ export function clockOutButtonHTML() {
 }
 
 export async function handleClockOut(sess, onComplete) {
-  if (!confirm('Clock out and end your shift?')) return
+  dlog('EMS.handleClockOut', `ENTRY employee=${sess.employee?.name}`)
+  if (!confirm('Clock out and end your shift?')) { dlog('EMS.handleClockOut', 'user cancelled confirm()'); return }
   const today = new Date().toISOString().slice(0, 10)
   const { data } = await sb.from('attendance')
     .select('id')
@@ -639,6 +650,7 @@ export async function handleClockOut(sess, onComplete) {
       .update({ clock_out: new Date().toISOString() })
       .eq('id', data[0].id)
   }
+  dlog('EMS.handleClockOut', 'DONE -- calling onComplete()')
   onComplete && onComplete()
 }
 

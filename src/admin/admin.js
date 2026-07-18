@@ -10,7 +10,7 @@ import {
   matchesInvoiceSearch,
   getSubInvoices, createSubInvoice, markComponentNotNeeded,
 } from '../shared.js'
-import { dlog, callerInfo } from '../debuglog.js'
+import { dlog, dstack, callerInfo } from '../debuglog.js'
 
 
 const ADMIN_MODULES = [
@@ -97,7 +97,7 @@ async function load() {
 let _eventsAttached = false
 
 function render() {
-  dlog('ADMIN.render', `*** #app REWRITE *** adminModule=${adminState.adminModule} caller=[${callerInfo()}]`)
+  dstack('ADMIN.render', `*** #app REWRITE *** adminModule=${adminState.adminModule}`)
   const tenant = currentTenant()
   if (!can(adminState.adminModule, state.role)) adminState.adminModule = 'dashboard'
   const _modalScroll = document.querySelector('.modal')?.scrollTop || 0
