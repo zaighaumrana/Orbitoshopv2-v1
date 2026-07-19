@@ -18,6 +18,10 @@ const logs = []
 let panel = null
 let seq = 0
 let paused = false
+let minimized = false
+
+const EXPANDED_HEIGHT = '42vh'
+const MINIMIZED_HEIGHT = '26px'
 
 function ensurePanel() {
   if (!document.body) return null
@@ -25,35 +29,59 @@ function ensurePanel() {
   panel = document.createElement('div')
   panel.id = '__dbg_panel'
   panel.style.cssText =
-    'position:fixed;bottom:0;left:0;right:0;max-height:42vh;overflow-y:auto;' +
+    `position:fixed;bottom:0;left:0;right:0;max-height:${EXPANDED_HEIGHT};overflow-y:auto;` +
     'background:rgba(0,0,0,0.92);color:#39ff6a;font:11px/1.45 monospace;' +
     'z-index:2147483647;padding:6px 8px;white-space:pre-wrap;pointer-events:auto;' +
-    'border-top:2px solid #39ff6a'
+    'border-top:2px solid #39ff6a;transition:max-height 0.15s ease'
+  panel.title = 'Click to expand/collapse'
+  panel.addEventListener('click', () => { setMinimized(!minimized) })
 
   const btnBar = document.createElement('div')
-  btnBar.style.cssText = 'position:fixed;bottom:42vh;right:0;z-index:2147483647;display:flex;gap:4px'
+  btnBar.style.cssText = `position:fixed;bottom:${EXPANDED_HEIGHT};right:0;z-index:2147483647;display:flex;gap:4px;transition:bottom 0.15s ease`
   const mkBtn = (label, onClick) => {
     const b = document.createElement('button')
     b.textContent = label
     b.style.cssText = 'background:#111;color:#39ff6a;border:1px solid #39ff6a;font:10px monospace;padding:2px 6px;cursor:pointer'
-    b.onclick = onClick
+    b.onclick = (e) => { e.stopPropagation(); onClick() }
     return b
   }
-  const pauseBtn = mkBtn('⏸ pause', function () {
+  const pauseBtn = mkBtn('⏸ pause', () => {
     paused = !paused
-    this.textContent = paused ? '▶ resume' : '⏸ pause'
+    pauseBtn.textContent = paused ? '▶ resume' : '⏸ pause'
   })
+  const minBtn = mkBtn('🗕 minimize', () => setMinimized(!minimized))
   btnBar.appendChild(mkBtn('✕ clear', () => { logs.length = 0; flush() }))
   btnBar.appendChild(pauseBtn)
+  btnBar.appendChild(minBtn)
 
   document.body.appendChild(panel)
   document.body.appendChild(btnBar)
+  panel._btnBar = btnBar
+  panel._minBtn = minBtn
   return panel
+}
+
+function setMinimized(next) {
+  minimized = next
+  if (!panel) return
+  panel.style.maxHeight = minimized ? MINIMIZED_HEIGHT : EXPANDED_HEIGHT
+  panel.style.overflowY = minimized ? 'hidden' : 'auto'
+  if (panel._btnBar) panel._btnBar.style.bottom = minimized ? MINIMIZED_HEIGHT : EXPANDED_HEIGHT
+  if (panel._minBtn) panel._minBtn.textContent = minimized ? '🗖 expand' : '🗕 minimize'
+  flush()
 }
 
 function flush() {
   const p = ensurePanel()
   if (!p) return
+  // Recording never stops while minimized -- record()/logs keep filling
+  // in the background regardless of what the panel currently displays.
+  if (minimized) {
+    const last = logs[logs.length - 1] || ''
+    const lastLine = last.split('\n')[0]
+    p.textContent = `▸ ${logs.length} logs captured (still recording) -- click to expand -- last: ${lastLine}`
+    return
+  }
   p.textContent = logs.slice(-100).join('\n')
   p.scrollTop = p.scrollHeight
 }
