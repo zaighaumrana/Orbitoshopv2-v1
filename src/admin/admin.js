@@ -1718,7 +1718,12 @@ function attachEvents() {
       state.modal = null; await load(); return
     }
 
-    state.modal = null; await load()
+    // Unrecognized form type -- this listener is intentionally global for
+    // the session (see attachEvents() comment), so it keeps receiving
+    // submit events even after navigating away from /admin. A form it
+    // doesn't own (e.g. pos.js's own "repair" form) bubbling through the
+    // shared #app element must be a no-op here, not assumed to be ours.
+    dlog('ADMIN.submit', `type=${type} not recognized by this listener -- no-op`)
   })
 
   // Keyboard
