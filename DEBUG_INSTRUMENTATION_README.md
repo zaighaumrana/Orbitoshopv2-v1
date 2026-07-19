@@ -58,11 +58,20 @@ call — restore each to a plain single-statement line, e.g.:
 
 ---
 
-## 5. `src/admin/admin.js` — remove 1 import + 11 log lines
+## 5. `src/admin/admin.js` — remove 1 import + 12 log lines
 
 **Import (line 13):** `import { dlog, dstack, callerInfo } from '../debuglog.js'`
 
-Lines: 45, 75, 100, 1091, 1098, 1110, 1114, 1118, 1615, 1765
+Lines: 45, 75, 100, 1091, 1098, 1110, 1114, 1118, 1615, 1726, 1770
+
+**IMPORTANT — this file also has a real bug fix, not just logging, at what is now line ~1721.** The
+old unconditional fallback `state.modal = null; await load()` at the end of the submit listener was
+the actual root cause of the Admin→Dashboard redirect bug — it fired for ANY unrecognized
+`data-form` value (e.g. pos.js's own "repair" form bubbling through the shared `#app` element),
+not just admin's own forms. It's been replaced with a no-op (just a `dlog(...)` call, no `load()`).
+**When removing debug instrumentation, only delete the `dlog(...)` line — keep the no-op behavior,
+do not restore the old fallback.** See the code comment left in place at that spot for the full
+explanation.
 
 ---
 
