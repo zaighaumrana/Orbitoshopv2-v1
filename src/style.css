@@ -11,6 +11,14 @@
   --success: #1b8354;
   --warning: #b7791f;
   --shadow: 0 12px 30px rgba(23, 32, 38, 0.09);
+  /* ── Spacing scale — use these instead of new hand-picked px values.
+     Existing hand-typed values are left as-is; migrate opportunistically. ── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
   color-scheme: light;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -293,6 +301,24 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
   display: grid;
   gap: 14px;
 }
+/* ── Modal size scale — replaces one-off inline max-width:Npx values.
+   Pick the closest tier rather than adding a new arbitrary number. ── */
+.modal-xs { width: min(360px, 100%); }
+.modal-sm { width: min(480px, 100%); }
+.modal-md { width: min(600px, 100%); }
+.modal-lg { width: min(720px, 100%); }
+
+/* ── Short viewports (13" laptops etc): the width-based breakpoints above
+   don't help here -- a 1440px-wide, 800px-tall laptop window is "desktop"
+   by width but content-dense modals (e.g. the repair ticket form) still
+   run out of vertical room. Tighten padding/gaps instead of relying only
+   on the scrollbar. ── */
+@media (max-height: 760px) {
+  .modal { padding: 12px; gap: 10px; }
+  .modal h2 { font-size: 17px; }
+  .field { gap: 4px; }
+  .field input, .field select, .field textarea { min-height: 36px; padding: 7px 9px; }
+}
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
 .plain-form { box-shadow: none; border: 0; padding: 0; background: transparent; }
 .checkbox-field label { display: flex; gap: 8px; align-items: center; color: var(--text); }
@@ -445,6 +471,15 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
   display: flex; align-items: center; gap: 10px;
 }
 
+/* ── Small laptops (13–14"): taper density before the full 1180px collapse.
+   Audit finding: kpi-grid technically fit at 1366px (850px needed vs
+   1042px available) but with almost no breathing room; nothing tapered
+   between full-desktop and the 1180px breakpoint below. ── */
+@media (max-width: 1366px) {
+  .kpi-grid { grid-template-columns: repeat(4, minmax(120px, 1fr)); }
+  .pos-layout { grid-template-columns: minmax(0, 1fr) 320px; }
+}
+
 @media (max-width: 1180px) {
   .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .pos-layout, .two-col { grid-template-columns: 1fr; }
@@ -494,10 +529,15 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
    MOBILE RESPONSIVE — RetailOS POS
    Targets phones (≤768px) and tablets (≤1024px)
    No pinch-zoom needed — everything stacks and scales
-════════════════════════════════════════════════════════ */
 
-/* ── Topbar: wrap gracefully on small screens ── */
+   NOTE: previously this was ~14 separate `@media (max-width: 768px)`
+   blocks scattered through the file (same breakpoint value, repeated
+   over and over). Consolidated into one block below -- every rule and
+   comment is unchanged, only the wrapper boundaries were merged, so
+   there is exactly one place to look for "what happens at 768px".
+════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
+  /* ── Topbar: wrap gracefully on small screens ── */
   .topbar {
     flex-wrap: wrap;
     padding: 10px 12px;
@@ -556,10 +596,8 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
 
   h1 { font-size: 20px; }
   h2 { font-size: 16px; }
-}
 
-/* ── POS Layout: single column on mobile ── */
-@media (max-width: 768px) {
+  /* ── POS Layout: single column on mobile ── */
   .pos-layout {
     grid-template-columns: 1fr;
     gap: 12px;
@@ -611,21 +649,14 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
     font-size: 18px !important;
     min-height: 48px !important;
   }
-}
 
-/* ── KPI Grid: 2 columns on tablet, 1 on phone ── */
-@media (max-width: 768px) {
+  /* ── KPI Grid: 2 columns on tablet, 1 on phone ── */
   .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .kpi { min-height: 90px; padding: 12px; }
   .kpi .value { font-size: 20px; }
   .kpi .label { font-size: 12px; }
-}
-@media (max-width: 400px) {
-  .kpi-grid { grid-template-columns: 1fr; }
-}
 
-/* ── Tables: horizontal scroll on mobile ── */
-@media (max-width: 768px) {
+  /* ── Tables: horizontal scroll on mobile ── */
   .table-wrap {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -640,10 +671,8 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
     font-size: 12px;
     padding: 6px 10px;
   }
-}
 
-/* ── Modals: full screen on mobile ── */
-@media (max-width: 768px) {
+  /* ── Modals: full screen on mobile ── */
   .modal-backdrop {
     padding: 0;
     display: flex;
@@ -671,10 +700,8 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
 
   /* Form grid single column in modals */
   .modal .form-grid { grid-template-columns: 1fr; }
-}
 
-/* ── Repair ticket queue on POS: larger tap rows ── */
-@media (max-width: 768px) {
+  /* ── Repair ticket queue on POS: larger tap rows ── */
   .list-row {
     padding: 12px;
     gap: 10px;
@@ -684,20 +711,16 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
     min-width: 72px;
     font-size: 13px;
   }
-}
 
-/* ── Technician bench: stack ticket cards ── */
-@media (max-width: 768px) {
+  /* ── Technician bench: stack ticket cards ── */
   /* Status buttons wrap and are finger-sized */
   div[style*="display:flex;gap:8px;flex-wrap:wrap"] > button {
     min-height: 42px;
     font-size: 13px;
     flex: 1 1 auto;
   }
-}
 
-/* ── Settings tabs: scroll horizontally ── */
-@media (max-width: 768px) {
+  /* ── Settings tabs: scroll horizontally ── */
   .settings-tabs {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -711,10 +734,8 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
     padding: 8px 12px;
     flex-shrink: 0;
   }
-}
 
-/* ── Buttons: always finger-friendly minimum ── */
-@media (max-width: 768px) {
+  /* ── Buttons: always finger-friendly minimum ── */
   .primary-button,
   .secondary-button,
   .danger-button {
@@ -725,37 +746,27 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
     min-height: 44px;
   }
   .search { min-height: 44px; }
-}
 
-/* ── Two column grids: single on mobile ── */
-@media (max-width: 768px) {
+  /* ── Two column grids: single on mobile ── */
   .two-col { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
   .three-col { grid-template-columns: 1fr; }
-}
 
-/* ── Admin back office header ── */
-@media (max-width: 768px) {
+  /* ── Admin back office header ── */
   .admin-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
     padding: 12px;
   }
-}
 
-/* ── Reports page KPIs ── */
-@media (max-width: 768px) {
+  /* ── Reports page KPIs ── */
   .reports .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-}
 
-/* ── Badge: readable on mobile ── */
-@media (max-width: 768px) {
+  /* ── Badge: readable on mobile ── */
   .badge { font-size: 11px; padding: 3px 7px; }
-}
 
-/* ── Toolbar: stack on mobile ── */
-@media (max-width: 768px) {
+  /* ── Toolbar: stack on mobile ── */
   .toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -770,6 +781,9 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
     width: 100%;
   }
   .search { min-width: 0; width: 100%; }
+}
+@media (max-width: 400px) {
+  .kpi-grid { grid-template-columns: 1fr; }
 }
 
 /* ── iOS safe area support (notch/home bar) ── */

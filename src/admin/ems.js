@@ -574,7 +574,7 @@ function slipsTab(emsData) {
 export function leaveRequestHTML() {
   return `
     <div class="modal-backdrop">
-      <form class="modal" data-form="leave-request" style="max-width:460px">
+      <form class="modal modal-sm" data-form="leave-request">
         <h2>Apply for Leave</h2>
         <div class="form-grid">
           <label class="field"><span>Leave Type</span>

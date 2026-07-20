@@ -453,7 +453,7 @@ function repairTicketFormHTML() {
   const hasItemized = draft.components.length > 0 || Number(draft.labour||0) > 0
 
   return `<div class="modal-backdrop">
-    <form class="modal" data-form="repair" style="max-width:720px;max-height:92vh;overflow-y:auto">
+    <form class="modal modal-lg" data-form="repair">
       <h2>New Repair Ticket</h2>
 
       <div class="form-grid">
@@ -566,7 +566,7 @@ function repairTicketFormHTML() {
 /* ── Component tag picker (sub-modal) ── */
 function compTagPickerHTML(name) {
   return `<div class="modal-backdrop" data-no-backdrop-close>
-    <div class="modal" style="max-width:380px">
+    <div class="modal modal-xs">
       <h2>${name}</h2>
       <p class="muted" style="font-size:13px">What's the issue?</p>
       <div style="display:grid;gap:8px;margin-top:10px">
@@ -598,7 +598,7 @@ function repairCollectionHTML() {
     .sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
 
   return `<div class="modal-backdrop">
-    <div class="modal" style="max-width:600px;max-height:85vh;overflow-y:auto">
+    <div class="modal modal-md" style="max-height:85vh;overflow-y:auto">
       <h2>Repair Collection</h2>
       <input class="search" placeholder="Search name, phone, device, IMEI, ticket #…"
         data-repair-search value="${posState.repairSearch}"
@@ -620,7 +620,7 @@ function ticketPaymentModalHTML(ticket) {
   const parentBalance = Math.max(0, total - paid)
   const { subs, subBalance, total: combinedTotal } = combinedBalance(ticket)
   return `<div class="modal-backdrop">
-    <div class="modal" style="max-width:480px">
+    <div class="modal modal-sm">
       <h2>${ticket.invoice_number || ticket.ticket_number}</h2>
       <p class="muted">${ticket.customer_name} · ${ticket.device_brand} ${ticket.device_model}</p>
       <div style="display:grid;gap:6px;padding:12px;background:var(--surface-2);border-radius:8px;margin:12px 0">
@@ -689,7 +689,7 @@ function renderModal() {
 
     return `
       <div class="modal-backdrop" data-no-backdrop-close>
-        <div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto">
+        <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
           <h2 style="margin-bottom:4px">${tk.customer_name}</h2>
           <p class="muted" style="font-size:13px;margin-bottom:16px">
             ${tk.invoice_number || tk.ticket_number}
@@ -755,7 +755,7 @@ function renderModal() {
     const c  = tk?.components_noted?.[state.modal.index]
     if (!tk || !c) return ''
     return `<div class="modal-backdrop" data-no-backdrop-close>
-      <div class="modal" style="max-width:400px">
+      <div class="modal modal-xs">
         <h2>Mark "${c.name}" Not Needed</h2>
         <p class="muted" style="font-size:13px">E.g. "Only needed cleaning, no repair required." This stays visible on the ticket, it's not deleted.</p>
         <label class="field"><span>Reason</span><textarea id="not-needed-reason" style="min-height:56px"></textarea></label>
@@ -779,7 +779,7 @@ function renderModal() {
 
     return `
       <div class="modal-backdrop" data-no-backdrop-close>
-        <div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto">
+        <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
           <h2 style="margin-bottom:4px">Create Sub-Invoice</h2>
           <p class="muted" style="font-size:13px;margin-bottom:16px">
             Linked to ${tk.invoice_number} — ${tk.customer_name}, ${tk.device_brand} ${tk.device_model}
@@ -847,7 +847,7 @@ function renderModal() {
     const { compName } = state.modal
     return `
       <div class="modal-backdrop" data-no-backdrop-close>
-        <div class="modal" style="max-width:360px">
+        <div class="modal modal-xs">
           <h2>${compName}</h2>
           <p class="muted" style="font-size:13px">What's the issue?</p>
           <div style="display:grid;gap:8px;margin-top:10px">
@@ -865,7 +865,7 @@ function renderModal() {
   }
 
   if (type === 'shiftStats') return `<div class="modal-backdrop">
-    <div class="modal" style="max-width:480px">
+    <div class="modal modal-sm">
       <h2>Shift Stats</h2>
       <div class="shift-print-wrap">${buildShiftStats()}</div>
       <div class="modal-actions">
@@ -900,7 +900,7 @@ function renderModal() {
     </form></div>`
   }
 
-  if (type === 'udharInfo') return `<div class="modal-backdrop"><form class="modal" data-form="udharInfo" style="max-width:420px">
+  if (type === 'udharInfo') return `<div class="modal-backdrop"><form class="modal modal-sm" data-form="udharInfo">
     <h2>Credit Sale — Customer Details</h2>
     <div class="form-grid">${fld('Customer Name','udharName')}${fld('Customer Phone','udharPhone','','tel')}</div>
     ${modalActions()}
@@ -908,7 +908,7 @@ function renderModal() {
 
   if (type === 'udharList') {
     const outstanding = (state.data.udhar||[]).filter(u => u.status !== 'Settled')
-    return `<div class="modal-backdrop"><div class="modal" style="max-width:640px">
+    return `<div class="modal-backdrop"><div class="modal modal-lg">
       <h2>Outstanding Credits</h2>
       ${outstanding.length===0?`<div class="empty">No outstanding credits.</div>`:`<div style="display:grid;gap:10px">
         ${outstanding.map(u => `
@@ -942,7 +942,7 @@ function renderModal() {
     const sale = receiptInput
       ? (state.data.sales||[]).find(s => matchesInvoiceSearch(s.invoice_number, receiptInput, CFG.invoice_prefix))
       : null
-    if (!sale) return `<div class="modal-backdrop"><form class="modal" data-form="return-lookup" style="max-width:440px">
+    if (!sale) return `<div class="modal-backdrop"><form class="modal modal-sm" data-form="return-lookup">
       <h2>Process Return</h2>
       <p class="muted">Enter the invoice number from the original receipt (just the numbers — the "${CFG.invoice_prefix||'INV'}" prefix is added automatically).</p>
       ${fld('Invoice No.','receiptNo',receiptInput)}
@@ -950,7 +950,7 @@ function renderModal() {
       <div class="modal-actions"><button class="secondary-button" data-close>Cancel</button><button class="primary-button">Look Up</button></div>
     </form></div>`
     const items = sale.items_sold||[]
-    return `<div class="modal-backdrop"><form class="modal" data-form="return-confirm" style="max-width:560px">
+    return `<div class="modal-backdrop"><form class="modal modal-md" data-form="return-confirm">
       <h2>Return — ${sale.invoice_number}</h2>
       <p class="muted">${sale.customer_name||'Walk-in'} · ${new Date(sale.created_at).toLocaleDateString()}</p>
       <div style="display:grid;gap:8px;margin:10px 0">
@@ -972,7 +972,7 @@ function renderModal() {
 
   if (type === 'qitem-pick') {
     const { name, prices } = state.modal
-    return `<div class="modal-backdrop"><div class="modal" style="max-width:340px">
+    return `<div class="modal-backdrop"><div class="modal modal-xs">
       <h2>${name}</h2><p class="muted">Select price:</p>
       <div style="display:grid;gap:8px;margin-top:8px">
         ${(prices||[]).map((p,i)=>`<button class="secondary-button" style="font-size:16px;min-height:48px" data-pick-price="${i}">${p.name ? `${p.name} — ${money(p.price)}` : money(p.price)}</button>`).join('')}

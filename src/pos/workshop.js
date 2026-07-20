@@ -302,7 +302,7 @@ function renderModal() {
 
     return `
       <div class="modal-backdrop" data-no-backdrop-close>
-        <div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto">
+        <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
           <h2 style="margin-bottom:4px">${tk.customer_name}</h2>
           <p class="muted" style="font-size:13px;margin-bottom:16px">
             ${tk.invoice_number || tk.ticket_number}
@@ -368,7 +368,7 @@ function renderModal() {
     const c  = tk?.components_noted?.[state.modal.index]
     if (!tk || !c) return ''
     return `<div class="modal-backdrop" data-no-backdrop-close>
-      <div class="modal" style="max-width:400px">
+      <div class="modal modal-xs">
         <h2>Mark "${c.name}" Not Needed</h2>
         <p class="muted" style="font-size:13px">E.g. "Only needed cleaning, no repair required." This stays visible on the ticket, it's not deleted.</p>
         <label class="field"><span>Reason</span><textarea id="not-needed-reason" style="min-height:56px"></textarea></label>
@@ -392,7 +392,7 @@ function renderModal() {
 
     return `
       <div class="modal-backdrop" data-no-backdrop-close>
-        <div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto">
+        <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
           <h2 style="margin-bottom:4px">Create Sub-Invoice</h2>
           <p class="muted" style="font-size:13px;margin-bottom:16px">
             Linked to ${tk.invoice_number} — ${tk.customer_name}, ${tk.device_brand} ${tk.device_model}
@@ -460,7 +460,7 @@ function renderModal() {
     const { compName } = state.modal
     return `
       <div class="modal-backdrop" data-no-backdrop-close>
-        <div class="modal" style="max-width:360px">
+        <div class="modal modal-xs">
           <h2>${compName}</h2>
           <p class="muted" style="font-size:13px">What's the issue?</p>
           <div style="display:grid;gap:8px;margin-top:10px">

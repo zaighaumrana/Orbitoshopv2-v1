@@ -669,7 +669,7 @@ function renderModal() {
   if (type === 'myAccount') return myAccountModalHTML(SESSION)
 
   if (type === 'addQuickItem') {
-    return `<div class="modal-backdrop"><form class="modal" data-form="add-quick-item" style="max-width:480px">
+    return `<div class="modal-backdrop"><form class="modal modal-sm" data-form="add-quick-item">
       <h2>Add Quick Item</h2>
       <div class="form-grid">
         ${fld('Item Name','itemName')}
@@ -685,7 +685,7 @@ function renderModal() {
 
   if (type === 'passwordResets') {
     const reqs = state.modal.requests || []
-    return `<div class="modal-backdrop"><div class="modal" style="max-width:520px">
+    return `<div class="modal-backdrop"><div class="modal modal-sm">
       <h2>Pending Password Resets</h2>
       ${!reqs.length ? `<p class="muted">No pending requests.</p>` : `
         <div style="display:grid;gap:10px;max-height:50vh;overflow-y:auto">
@@ -718,7 +718,7 @@ function renderModal() {
   if (type === 'employee') {
     if (state.modal.editMode) {
       const e = state.modal
-      return `<div class="modal-backdrop"><form class="modal" data-form="edit-employee" style="max-width:420px" data-emp-id="${e.id}">
+      return `<div class="modal-backdrop"><form class="modal modal-sm" data-form="edit-employee" data-emp-id="${e.id}">
         <h2>Edit Employee</h2>
         <div class="form-grid">
           <label class="field"><span>Name</span><input name="name" value="${e.name||''}" required></label>
@@ -741,7 +741,7 @@ function renderModal() {
         </div>
       </form></div>`
     }
-    return `<div class="modal-backdrop"><form class="modal" data-form="employee" style="max-width:440px">
+    return `<div class="modal-backdrop"><form class="modal modal-sm" data-form="employee">
       <h2>Add Employee</h2>
       <div class="form-grid">
         ${fld('Full Name','name')}
@@ -766,7 +766,7 @@ function renderModal() {
     const tk = (state.data.tickets||[]).find(t => String(t.id) === String(id))
     if (!tk) return `<div class="modal-backdrop"><div class="modal"><p class="muted">Not found.</p><div class="modal-actions"><button class="secondary-button" data-close>Close</button></div></div></div>`
     const sc = {'Pending':'warn','In Progress':'warn','Ready':'good','Delivered':'good','Declined':'bad'}
-    return `<div class="modal-backdrop"><div class="modal" style="max-width:600px">
+    return `<div class="modal-backdrop"><div class="modal modal-md">
       <h2>${tk.ticket_number} <span class="badge ${sc[tk.status]||'warn'}" style="margin-left:8px">${tk.status}</span></h2>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:14px;margin-bottom:14px;padding:12px;background:var(--surface-2);border-radius:8px">
         <div><span class="muted">Customer</span><br><strong>${tk.customer_name}</strong></div>
@@ -809,7 +809,7 @@ function renderModal() {
               `<option ${s===tk.status?'selected':''}>${s}</option>`).join('')}
           </select>
           <input type="number" step="any" min="0" id="td-actual-quote" placeholder="Actual price" value="${tk.actual_quote||''}"
-            style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);width:180px">
+            style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);min-width:140px;flex:1">
         </div>
         <textarea id="td-note" placeholder="Add a note…"
           style="width:100%;margin-top:8px;min-height:60px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);box-sizing:border-box">${tk.update_note||''}</textarea>
@@ -827,7 +827,7 @@ function renderModal() {
     const c  = tk?.components_noted?.[state.modal.index]
     if (!tk || !c) return ''
     return `<div class="modal-backdrop" data-no-backdrop-close>
-      <div class="modal" style="max-width:400px">
+      <div class="modal modal-xs">
         <h2>Mark "${c.name}" Not Needed</h2>
         <p class="muted" style="font-size:13px">E.g. "Only needed cleaning, no repair required." This stays visible on the ticket, it's not deleted.</p>
         <label class="field"><span>Reason</span><textarea id="not-needed-reason" style="min-height:56px"></textarea></label>
@@ -851,7 +851,7 @@ function renderModal() {
 
     return `
       <div class="modal-backdrop" data-no-backdrop-close>
-        <div class="modal" style="max-width:560px;max-height:90vh;overflow-y:auto">
+        <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
           <h2 style="margin-bottom:4px">Create Sub-Invoice</h2>
           <p class="muted" style="font-size:13px;margin-bottom:16px">
             Linked to ${tk.invoice_number} — ${tk.customer_name}, ${tk.device_brand} ${tk.device_model}
@@ -919,7 +919,7 @@ function renderModal() {
     const { compName } = state.modal
     return `
       <div class="modal-backdrop" data-no-backdrop-close>
-        <div class="modal" style="max-width:360px">
+        <div class="modal modal-xs">
           <h2>${compName}</h2>
           <p class="muted" style="font-size:13px">What's the issue?</p>
           <div style="display:grid;gap:8px;margin-top:10px">
@@ -942,7 +942,7 @@ function renderModal() {
 
   if (type === 'udharList') {
     const outstanding = (state.data.udhar||[]).filter(u => u.status !== 'Settled')
-    return `<div class="modal-backdrop"><div class="modal" style="max-width:640px">
+    return `<div class="modal-backdrop"><div class="modal modal-lg">
       <h2>Outstanding Credits</h2>
       ${outstanding.length === 0 ? `<div class="empty">No outstanding credits.</div>` : `
         <div style="display:grid;gap:10px">
@@ -992,7 +992,7 @@ function renderModal() {
     const hasNext = idx < filtered.length - 1
     return `
       <div class="modal-backdrop" data-no-backdrop-close>
-        <div class="modal" style="max-width:600px;max-height:90vh;overflow-y:auto">
+        <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
             <h2 style="margin:0">${s.invoice_number||`INV-${s.id}`}</h2>
             <button class="icon-button" data-close style="font-size:20px;line-height:1">×</button>
