@@ -14,8 +14,10 @@ import {
   _clearSession, money, fld, modalActions,
   openPinPrompt, pinPromptHTML, handlePpKey,
   myAccountModalHTML, handleChangePasswordSubmit,
-  getSubInvoices, createSubInvoice, markComponentNotNeeded,
 } from '../shared.js'
+import {
+  getSubInvoices, createSubInvoice, markComponentNotNeeded,
+} from '../features/repairs/api.js'
 
 import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
