@@ -8,8 +8,10 @@ import {
   myAccountModalHTML, handleChangePasswordSubmit,
   generateTempPassword, listPendingResetRequests, resolvePasswordReset,
   matchesInvoiceSearch,
-  getSubInvoices, createSubInvoice, markComponentNotNeeded,
 } from '../shared.js'
+import {
+  getSubInvoices, createSubInvoice, markComponentNotNeeded,
+} from '../features/repairs/api.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
 
 
