@@ -33,8 +33,7 @@ function ensurePanel() {
     'background:rgba(0,0,0,0.92);color:#39ff6a;font:11px/1.45 monospace;' +
     'z-index:2147483647;padding:6px 8px;white-space:pre-wrap;pointer-events:auto;' +
     'border-top:2px solid #39ff6a;transition:max-height 0.15s ease'
-  panel.title = 'Click to expand/collapse'
-  panel.addEventListener('click', () => { setMinimized(!minimized) })
+  panel.title = ''
 
   const btnBar = document.createElement('div')
   btnBar.style.cssText = `position:fixed;bottom:${EXPANDED_HEIGHT};right:0;z-index:2147483647;display:flex;gap:4px;transition:bottom 0.15s ease`
@@ -79,7 +78,7 @@ function flush() {
   if (minimized) {
     const last = logs[logs.length - 1] || ''
     const lastLine = last.split('\n')[0]
-    p.textContent = `▸ ${logs.length} logs captured (still recording) -- click to expand -- last: ${lastLine}`
+    p.textContent = `▸ ${logs.length} logs captured (still recording) -- press 🗖 expand -- last: ${lastLine}`
     return
   }
   p.textContent = logs.slice(-100).join('\n')
