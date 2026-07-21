@@ -1,4 +1,4 @@
-// supabase/functions/login/index.ts
+// supabase/functions/login/index.ts 
 //
 // Replaces the client-side login check that used to live in src/auth.js +
 // src/shared.js's verifyLogin(). Both the owner comparison and the employee
