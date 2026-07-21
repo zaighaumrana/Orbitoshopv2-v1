@@ -21,6 +21,9 @@ import {
 import {
   generateTicketNumber, getSubInvoices, createSubInvoice, markComponentNotNeeded,
 } from '../features/repairs/api.js'
+import {
+  combinedBalance, repairRowHTML, compTagPickerHTML, ticketSlipPreview,
+} from '../features/repairs/render.js'
 
 import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
@@ -324,12 +327,6 @@ function recentRepairPanel() {
 }
 
 /* Combined balance across a parent ticket and any sub-invoices under it */
-function combinedBalance(t) {
-  const subs = (state.data.tickets||[]).filter(s => String(s.parent_ticket_id) === String(t.id))
-  const subBalance = subs.reduce((s,x) => s + Number(x.balance_due||0), 0)
-  return { subs, subBalance, parentBalance: Number(t.balance_due||0), total: Number(t.balance_due||0) + subBalance }
-}
-
 /* ── Sub-invoice draft helpers (workshop-off POS fallback) ── */
 function readSubInvCompsFromDOM() {
   const comps = [...(state.modal?.draftComponents || [])]
@@ -359,31 +356,6 @@ function _addComponentToDraft(name, tag, customText) {
   ]
   state.modal = { type: 'create-sub-invoice', parentId, draftComponents, draftLabour: state.modal._draftLabour || 0 }
   render()
-}
-
-function repairRowHTML(t) {
-  const { subs, subBalance, parentBalance, total } = combinedBalance(t)
-  const balanceLine = subs.length
-    ? `Balance: ${money(parentBalance)} (original) + ${money(subBalance)} (${subs.length} additional) = ${money(total)} total`
-    : `Balance: ${money(total)}`
-  return `
-    <div class="list-row" style="margin-bottom:6px">
-      <div>
-        <strong>${t.customer_name}</strong>
-        <span class="badge warn" style="margin-left:6px">${t.status}</span><br>
-        <small class="muted">${t.invoice_number || t.ticket_number} · ${t.device_brand} ${t.device_model}</small>
-        ${total > 0 ? `<br><small class="muted">${balanceLine}</small>` : ''}
-      </div>
-      <div style="display:flex;gap:6px">
-        ${!CFG.technician_module_enabled ? `
-          <button class="secondary-button" style="font-size:12px;padding:6px 10px" data-action="pos-edit-ticket" data-ticket-id="${t.id}">
-            Edit
-          </button>` : ''}
-        <button class="primary-button" style="font-size:12px;padding:6px 10px" data-collect-ticket="${t.id}">
-          ${t.is_locked ? 'Collect' : 'Place Order'}
-        </button>
-      </div>
-    </div>`
 }
 
 /* ── Shift stats ── */
@@ -566,27 +538,6 @@ function repairTicketFormHTML() {
 }
 
 /* ── Component tag picker (sub-modal) ── */
-function compTagPickerHTML(name) {
-  return `<div class="modal-backdrop" data-no-backdrop-close>
-    <div class="modal modal-xs">
-      <h2>${name}</h2>
-      <p class="muted" style="font-size:13px">What's the issue?</p>
-      <div style="display:grid;gap:8px;margin-top:10px">
-        <button type="button" class="secondary-button" style="font-size:15px;min-height:48px" data-tag-pick="Broken">Broken</button>
-        <button type="button" class="secondary-button" style="font-size:15px;min-height:48px" data-tag-pick="Not Working">Not Working</button>
-        <button type="button" class="secondary-button" style="font-size:15px;min-height:48px" data-tag-pick="Custom">Custom…</button>
-        <div id="tag-custom-wrap" class="hidden" style="display:grid;gap:8px">
-          <input id="tag-custom-text" class="search" placeholder="Describe the issue">
-          <button type="button" class="primary-button" data-action="confirm-custom-tag">Add</button>
-        </div>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="secondary-button" data-close>Cancel</button>
-      </div>
-    </div>
-  </div>`
-}
-
 /* ── Repair Collection modal — unified dynamic search ── */
 function repairCollectionHTML() {
   const search = posState.repairSearch.toLowerCase()
@@ -1002,37 +953,6 @@ function receiptPreview(sale) {
     ${sale.tax>0?`Tax: ${money(sale.tax)}<br>`:''}
     <strong>Total: ${money(sale.total)}</strong><br>Payment: ${sale.payment||'—'}
     ${sale.payment==='Cash'&&sale.cashTendered>0?`<br>Cash Received: <strong>${money(sale.cashTendered)}</strong><br>Change Given: <strong>${money(sale.changeGiven||0)}</strong>`:''}
-    <hr>
-    <center>${t.receiptFooter||''}</center>
-  </div>`
-}
-
-function ticketSlipPreview(ticket) {
-  if (!ticket) return ''
-  const t = currentTenant()
-  const comps = ticket.components_noted || []
-  return `<div class="receipt-preview">
-    <center>${t.logo?`<img src="${t.logo}" style="max-width:120px;max-height:44px;object-fit:contain;margin-bottom:6px"><br>`:''}
-    <strong>${t.name}</strong><br>${t.address||''}<br>${t.phone||''}</center>
-    <hr>
-    <center><strong>REPAIR TICKET</strong><br>${ticket.invoice_number||ticket.ticket_number}<br><span style="font-size:11px;color:#888">Ticket: ${ticket.ticket_number}</span></center>
-    <hr>
-    Customer: ${ticket.customer_name}<br>
-    Phone: ${ticket.customer_phone}<br>
-    Device: ${ticket.device_brand} ${ticket.device_model}<br>
-    ${ticket.imei ? `IMEI: <small>${ticket.imei}</small><br>` : ''}
-    Date: ${new Date(ticket.created_at||Date.now()).toLocaleString()}
-    <hr>
-    <strong>Issues Noted:</strong><br>
-    ${comps.length ? comps.map(c => {
-      const label = c.tag === 'Custom' ? (c.customText || '') : (c.tag || '')
-      return `· ${c.name}${label?` (${label})`:''}${Number(c.price)>0?` — ${money(c.price)}`:''}`
-    }).join('<br>') : 'No components noted.'}
-    <hr>
-    ${ticket.technician_note ? `<strong>Technician Note:</strong><br>${ticket.technician_note}<hr>` : ''}
-    ${Number(ticket.labour_cost)>0 ? `Labour Fee: <strong>${money(ticket.labour_cost)}</strong><br>` : ''}
-    Estimated Quote: <strong>${money(ticket.estimated_quote)}</strong><br>
-    ${Number(ticket.advance_payment)>0 ? `Advance Paid: <strong>${money(ticket.advance_payment)}</strong>${ticket.advance_method?` (${ticket.advance_method})`:''}<br>` : ''}
     <hr>
     <center>${t.receiptFooter||''}</center>
   </div>`
