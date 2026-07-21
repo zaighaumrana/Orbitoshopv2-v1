@@ -16,9 +16,11 @@ import {
   openPinPrompt, pinPromptHTML, handlePpKey,
   logBillEvent,
   myAccountModalHTML, handleChangePasswordSubmit,
-  generateInvoiceNumber, generateTicketNumber, matchesInvoiceSearch,
-  getSubInvoices, createSubInvoice, markComponentNotNeeded,
+  generateInvoiceNumber, matchesInvoiceSearch,
 } from '../shared.js'
+import {
+  generateTicketNumber, getSubInvoices, createSubInvoice, markComponentNotNeeded,
+} from '../features/repairs/api.js'
 
 import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
