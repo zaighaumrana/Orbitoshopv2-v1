@@ -527,6 +527,13 @@ function attachEvents() {
 
   /* ── Click ── */
   app.addEventListener('click', async e => {
+    // Route guard: see the matching comment in admin.js's attachEvents()
+    // for the full explanation -- this is the listener whose collision
+    // with admin.js's own sub-invoice actions (same data-action strings,
+    // both permanently bound to #app) caused the "modal closes on any
+    // click" bug. Only act when /workshop is truly the current route.
+    if (!window.location.pathname.startsWith('/workshop')) return
+
     // Backdrop close
     if (
       e.target.classList.contains('modal-backdrop') &&
@@ -740,6 +747,7 @@ function attachEvents() {
 
   /* ── Submit ── */
   app.addEventListener('submit', async e => {
+    if (!window.location.pathname.startsWith('/workshop')) return
     e.preventDefault()
     const form = e.target
     const data = Object.fromEntries(new FormData(form).entries())
