@@ -1094,6 +1094,15 @@ function attachEvents() {
 
   // Click delegation
   app.addEventListener('click', async e => {
+    // Route guard: this listener is permanently attached to #app for the
+    // rest of the session once /admin has been visited once, even after
+    // navigating to /pos or /workshop. Without this check, a click on a
+    // button whose data-action string happens to also exist in another
+    // view (e.g. workshop.js's own "open-create-sub-invoice") would run
+    // BOTH views' handlers and call ADMIN's own render() over whatever
+    // the other view had on screen. Only act when /admin is truly current.
+    if (!window.location.pathname.startsWith('/admin')) return
+
     // Backdrop click — close modal only if backdrop itself was clicked
     // and it's not flagged as "no backdrop close" (e.g. receipt modal)
     if (e.target.classList.contains('modal-backdrop') && !e.target.hasAttribute('data-no-backdrop-close')) {
@@ -1610,6 +1619,7 @@ function attachEvents() {
 
   // Submit
   app.addEventListener('submit', async e => {
+    if (!window.location.pathname.startsWith('/admin')) return
     e.preventDefault()
     const form = e.target
     const data = Object.fromEntries(new FormData(form).entries())
