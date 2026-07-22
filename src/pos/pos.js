@@ -1178,6 +1178,12 @@ function attachEvents() {
 
   /* ── Click ── */
   app.addEventListener('click', async e => {
+    // Route guard: see the matching comment in admin.js's attachEvents()
+    // for the full explanation -- this listener stays attached for the
+    // rest of the session once /pos has been visited, even after
+    // navigating elsewhere. Only act when /pos is truly the current route.
+    if (!window.location.pathname.startsWith('/pos')) return
+
     // Backdrop close — only when backdrop itself is the target
     if (e.target.classList.contains('modal-backdrop') && !e.target.hasAttribute('data-no-backdrop-close')) {
       dlog('POS.click', `BACKDROP-CLOSE fired -- state.modal was type=${state.modal?.type}`)
@@ -1622,6 +1628,7 @@ function attachEvents() {
 
   /* ── Submit ── */
   app.addEventListener('submit', async e => {
+    if (!window.location.pathname.startsWith('/pos')) return
     e.preventDefault()
     const form = e.target
     const data = Object.fromEntries(new FormData(form).entries())
