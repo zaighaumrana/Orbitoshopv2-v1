@@ -29,6 +29,7 @@ import {
   getDraft, resetDraft, calcDraftTotal, calcDraftPaid,
 } from '../features/repairs/state.js'
 import { receiptPreview } from '../features/checkout/render.js'
+import { settleUdhar, finalizeCheckout } from '../features/checkout/api.js'
 
 import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
@@ -787,25 +788,6 @@ function removeCartItem(productId) {
   render()
 }
 
-/* ── Settle Udhar ── */
-async function settleUdhar(udharId, amount, method) {
-  const rec = state.data.udhar.find(u=>u.id===udharId)
-  if (!rec) return
-  const history = rec.payment_history||[]
-  history.push({ date: new Date().toISOString().slice(0,10), paid: amount, method })
-  const newPaid    = Number(rec.amount_paid)+Number(amount)
-  const newBalance = Math.max(0,Number(rec.total_amount)-newPaid)
-  const { error } = await sb.from('udhar').update({
-    amount_paid:newPaid, balance_due:newBalance, payment_history:history,
-    status:newBalance<=0?'Settled':'Partial',
-    settled_at:newBalance<=0?new Date().toISOString():null,
-  }).eq('id',udharId)
-  if (error) { alert('Settle error: '+error.message); return }
-  await load()
-  state.modal = { type:'udharList' }
-  render()
-}
-
 /* ── Place Order: lock the ticket, create the invoice ── */
 async function placeOrder() {
   dlog('POS.placeOrder', 'ENTRY')
@@ -928,56 +910,25 @@ async function doCheckout() {
 }
 
 async function _finalizeCheckout() {
-  const isUdhar  = posState.checkoutPayment === 'Udhar (Credit)'
-  const subtotal = posState.cart.reduce((s,i)=>s+i.soldPrice*i.qty,0)
-  const discount = posState.cart.reduce((s,i)=>s+(i.originalPrice-i.soldPrice)*i.qty,0)
-  const tax      = subtotal*(Number(CFG.tax_rate||0)/100)
-  const total    = subtotal+tax
-
-  const invoiceNumber = await generateInvoiceNumber()
-
-  const { data:saleData, error:saleErr } = await sb.from('sales').insert({
-    ticket_id:      null,
-    invoice_number: invoiceNumber,
-    customer_name:  posState.udharName||'',
-    items_sold:     posState.cart.map(i=>({ name:i.name, variant_name:i.variantName||'', qty:i.qty, original_price:i.originalPrice, sold_price:i.soldPrice, discount:i.discount, reason:i.reason||'' })),
-    discount,
-    tax,
-    total_bill:     Math.max(0,total),
-    payment_method: isUdhar?'Udhar':posState.checkoutPayment,
-    employee_id:    SESSION.employee?.id||null,
-    employee_name:  SESSION.employee?.name||'',
-    cash_tendered:  posState.checkoutPayment==='Cash'?(posState.cashTendered||0):0,
-    change_given:   posState.checkoutPayment==='Cash'?Math.max(0,(posState.cashTendered||0)-Math.max(0,total)):0,
-  }).select().single()
-  if (saleErr) { alert('Sale error: '+saleErr.message); return }
-
-  if (isUdhar) {
-    const paidNow  = Math.min(Number(posState.udharPaidNow||0), Math.max(0,total))
-    const balance  = Math.max(0, total - paidNow)
-    await sb.from('udhar').insert({
-      sale_id:saleData.id, customer_name:posState.udharName, customer_phone:posState.udharPhone,
-      total_amount:Math.max(0,total), amount_paid:paidNow, balance_due:balance,
-      payment_history: paidNow>0 ? [{ amount:paidNow, method:'Cash', date:new Date().toISOString(), note:'Paid at time of sale' }] : [],
-      status: balance<=0 ? 'Settled' : 'Outstanding',
-    })
-  }
-
-  const sale = {
-    receiptNo:saleData.invoice_number, date:saleData.created_at,
-    cashier:SESSION.employee?.name||'Counter', customer:posState.udharName||'Walk-in',
-    items:posState.cart.map(i=>({...i})), tax, discount,
-    total:Math.max(0,total), payment:isUdhar?'Udhar':posState.checkoutPayment,
-    cashTendered:posState.checkoutPayment==='Cash'?(posState.cashTendered||0):0,
-    changeGiven:posState.checkoutPayment==='Cash'?Math.max(0,(posState.cashTendered||0)-Math.max(0,total)):0,
-  }
+  dlog('POS._finalizeCheckout', 'ENTRY -- calling checkout.finalizeCheckout()')
+  const res = await finalizeCheckout({
+    cart: posState.cart,
+    checkoutPayment: posState.checkoutPayment,
+    cashTendered: posState.cashTendered,
+    udharName: posState.udharName,
+    udharPhone: posState.udharPhone,
+    udharPaidNow: posState.udharPaidNow,
+    employeeId: SESSION.employee?.id,
+    employeeName: SESSION.employee?.name,
+  })
+  if (!res.ok) { dlog('POS._finalizeCheckout', `FAILED: ${res.error}`); alert('Sale error: ' + res.error); return }
 
   posState.cart=[]
   posState.cashTendered=0
   posState.udharName=''; posState.udharPhone=''; posState.udharPaidNow=0; posState.checkoutPayment='Cash'
-  state.modal = { type:'receipt', sale }
-  await logBillEvent()
+  state.modal = { type:'receipt', sale: res.sale }
   await load()
+  dlog('POS._finalizeCheckout', `DONE receiptNo=${res.sale.receiptNo}`)
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1374,7 +1325,12 @@ function attachEvents() {
       if (!amount||amount<=0) { alert('Enter a valid amount.'); return }
       openPinPrompt('settle', async (verified) => {
         if (!verified) return
-        await settleUdhar(udharId, amount, method)
+        const rec = state.data.udhar.find(u => u.id === udharId)
+        const res = await settleUdhar(rec, amount, method)
+        if (!res.ok) { alert('Settle error: ' + res.error); return }
+        await load()
+        state.modal = { type:'udharList' }
+        render()
       }, render); return
     }
   })
