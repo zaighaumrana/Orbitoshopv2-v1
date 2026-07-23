@@ -24,6 +24,9 @@ import {
 import {
   combinedBalance, repairRowHTML, compTagPickerHTML, ticketSlipPreview,
 } from '../features/repairs/render.js'
+import {
+  getDraft, resetDraft,
+} from '../features/repairs/state.js'
 
 import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
@@ -392,18 +395,6 @@ function buildShiftStats() {
 }
 
 /* ── Helpers for new ticket form draft state ── */
-function getDraft() {
-  if (!state.modal._draft) {
-    state.modal._draft = {
-      components: [],   // [{name, tag, customText, price}]
-      payments:   [],   // [{amount, method}]
-      labour:     0,
-      overridePrice: null,
-    }
-  }
-  return state.modal._draft
-}
-
 function calcDraftTotal(draft) {
   if (draft.overridePrice !== null && draft.overridePrice !== '') {
     return Number(draft.overridePrice) || 0
@@ -1213,7 +1204,10 @@ function attachEvents() {
     }
 
     /* Modal openers */
-    if (el.dataset.modal) { state.modal = { type: el.dataset.modal, id: el.dataset.id }; render(); return }
+    if (el.dataset.modal) {
+      if (el.dataset.modal === 'repair') resetDraft() // starting a genuinely new ticket, not a mid-flow modal switch
+      state.modal = { type: el.dataset.modal, id: el.dataset.id }; render(); return
+    }
 
     /* ── Top-bar ── */
     if (el.dataset.action === 'go-admin') {
@@ -1486,13 +1480,13 @@ function attachEvents() {
       if (form) {
         state.modal._info = Object.fromEntries(new FormData(form).entries())
       }
-      state.modal = { type:'comp-tag-picker', name:el.dataset.pickComp, _draft:state.modal?._draft, _info:state.modal?._info }
+      state.modal = { type:'comp-tag-picker', name:el.dataset.pickComp, _info:state.modal?._info }
       render(); return
     }
     if (el.dataset.tagPick) {
       const tag      = el.dataset.tagPick
       const compName = state.modal.name
-      const parentDraft = state.modal._draft
+      const parentDraft = getDraft()
       const parentInfo  = state.modal._info
       if (tag === 'Custom') {
         document.getElementById('tag-custom-wrap')?.classList.remove('hidden')
@@ -1500,17 +1494,17 @@ function attachEvents() {
       }
       if (!parentDraft) { state.modal = null; render(); return }
       parentDraft.components.push({ name:compName, tag, customText:'', price:0 })
-      state.modal = { type:'repair', _draft:parentDraft, _info:parentInfo }
+      state.modal = { type:'repair', _info:parentInfo }
       render(); return
     }
     if (el.dataset.action === 'confirm-custom-tag') {
       const text     = document.getElementById('tag-custom-text')?.value?.trim()
       const compName = state.modal.name
-      const parentDraft = state.modal._draft
+      const parentDraft = getDraft()
       const parentInfo  = state.modal._info
       if (!text) { alert('Describe the issue.'); return }
       parentDraft.components.push({ name:compName, tag:'Custom', customText:text, price:0 })
-      state.modal = { type:'repair', _draft:parentDraft, _info:parentInfo }
+      state.modal = { type:'repair', _info:parentInfo }
       render(); return
     }
 
