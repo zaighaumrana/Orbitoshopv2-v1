@@ -14,12 +14,12 @@ import {
   _clearSession,
   money, fld, modalActions,
   openPinPrompt, pinPromptHTML, handlePpKey,
-  logBillEvent,
   myAccountModalHTML, handleChangePasswordSubmit,
-  generateInvoiceNumber, matchesInvoiceSearch,
+  matchesInvoiceSearch,
 } from '../shared.js'
 import {
-  generateTicketNumber, getSubInvoices, createSubInvoice, markComponentNotNeeded,
+  getSubInvoices, createSubInvoice, markComponentNotNeeded,
+  insertNewTicketFromCart, collectTicketPayment,
 } from '../features/repairs/api.js'
 import {
   combinedBalance, repairRowHTML, compTagPickerHTML, ticketSlipPreview,
@@ -795,91 +795,32 @@ async function placeOrder() {
   if (!ticketItem) { dlog('POS.placeOrder', 'no ticketItem in cart -- abort'); return }
 
   if (ticketItem.isNewTicket) {
-    dlog('POS.placeOrder', 'isNewTicket branch -- inserting into tickets table now')
-    // Brand new ticket being placed for the first time
-    const draft = ticketItem.draftData
-    const total = calcDraftTotal(draft)
-    const paid  = calcDraftPaid(draft)
-
-    const ticketNumber  = await generateTicketNumber()
-    const invoiceNumber = await generateInvoiceNumber()
-    const { data, error } = await sb.from('tickets').insert({
-      ticket_number:     ticketNumber,
-      invoice_number:    invoiceNumber,
-      customer_name:      ticketItem.customerName,
-      customer_phone:     ticketItem.customerPhone,
-      device_brand:       ticketItem.deviceBrand,
-      device_model:       ticketItem.deviceModel,
-      imei:                ticketItem.imei,
-      components_noted:   draft.components,
-      labour_cost:         Number(draft.labour||0),
-      estimated_quote:     total,
-      final_total:         total,
-      amount_paid:         paid,
-      balance_due:         Math.max(0, total - paid),
-      payment_history:     draft.payments,
-      advance_payment:     paid,
-      advance_method:      [...new Set(draft.payments.map(p=>p.method))].join(' + '),
-      status:              'Pending',
-      technician_note:     ticketItem.technicianNote || '',
-      created_by:          SESSION.employee?.name || 'Counter',
-      is_locked:           true,
-      placed_at:           new Date().toISOString(),
-    }).select().single()
-
-    if (error) { dlog('POS.placeOrder', `INSERT FAILED: ${error.message}`); alert('Error placing order: ' + error.message); return }
-    dlog('POS.placeOrder', `INSERT SUCCEEDED ticket_number=${data.ticket_number} id=${data.id} -- calling load() next`)
-
-    await logBillEvent()
+    dlog('POS.placeOrder', 'isNewTicket branch -- calling repairs.insertNewTicketFromCart()')
+    const res = await insertNewTicketFromCart(ticketItem, SESSION.employee?.name)
+    if (!res.ok) { dlog('POS.placeOrder', `INSERT FAILED: ${res.error}`); alert('Error placing order: ' + res.error); return }
+    dlog('POS.placeOrder', `INSERT SUCCEEDED ticket_number=${res.data.ticket_number} id=${res.data.id} -- calling load() next`)
 
     posState.cart = posState.cart.filter(i => !i.isTicket)
     posState.cartTicketId = null
     posState.cartIsNewTicket = false
     await load()
     dlog('POS.placeOrder', 'load() returned -- setting state.modal=receipt and calling render() explicitly')
-    state.modal = { type:'receipt', isTicketSlip:true, ticket: data }
+    state.modal = { type:'receipt', isTicketSlip:true, ticket: res.data }
     render()
     dlog('POS.placeOrder', 'DONE -- receipt modal should now be visible')
     return
   }
 
   // Existing ticket — this is a top-up payment being added via cart.
-  // Applied parent-first, then oldest-to-newest across any sub-invoices,
-  // so the original balance is always cleared before sub-invoice balances.
   const ticketId = ticketItem.ticketId
   const ticket = state.data.tickets.find(t => t.id === ticketId)
   if (!ticket) return
 
   const payAmount = ticketItem.topupAmount
   const payMethod = ticketItem.topupMethod
-  const { subs } = combinedBalance(ticket)
-  const orderedTickets = [ticket, ...subs.sort((a,b) => new Date(a.created_at) - new Date(b.created_at))]
-
-  let remaining = payAmount
-  for (const t of orderedTickets) {
-    const tTotal   = Number(t.final_total || t.estimated_quote || 0)
-    const tBalance = Math.max(0, tTotal - Number(t.amount_paid||0))
-    if (tBalance <= 0 || remaining <= 0) continue
-
-    const applied = Math.min(remaining, tBalance)
-    remaining -= applied
-
-    const history = [...(t.payment_history||[]), { amount: applied, method: payMethod, date: new Date().toISOString() }]
-    const newPaid = Number(t.amount_paid||0) + applied
-    const newBalance = Math.max(0, tTotal - newPaid)
-
-    const { error } = await sb.from('tickets').update({
-      amount_paid: newPaid,
-      balance_due: newBalance,
-      payment_history: history,
-      status: newBalance <= 0 ? 'Ready' : t.status,
-      collected_at: newBalance <= 0 ? new Date().toISOString() : null,
-    }).eq('id', t.id)
-
-    if (error) { alert('Error recording payment: ' + error.message); return }
-  }
-
-  await logBillEvent()
+  dlog('POS.placeOrder', 'existing-ticket branch -- calling repairs.collectTicketPayment()')
+  const res = await collectTicketPayment(ticket, payAmount, payMethod)
+  if (!res.ok) { alert('Error recording payment: ' + res.error); return }
 
   posState.cart = posState.cart.filter(i => !i.isTicket)
   posState.cartTicketId = null
