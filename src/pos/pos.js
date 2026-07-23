@@ -58,7 +58,7 @@ async function load() {
   dlog('POS.load', 'ENTRY')
   await loadConfig()
   if (CFG.inventory_module_enabled && !_inv) {
-    _inv = await import('../inventory.js')
+    _inv = await import('../features/inventory/index.js')
   }
   const fetchInv = CFG.inventory_module_enabled
     ? sb.from('inventory').select('*').order('name')
