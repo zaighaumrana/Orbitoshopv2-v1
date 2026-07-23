@@ -47,7 +47,7 @@ async function load() {
   dlog('ADMIN.load', `ENTRY adminModule=${adminState.adminModule}`)
   await loadConfig()
   if (CFG.inventory_module_enabled && !_inv) {
-    _inv = await import('../inventory.js')
+    _inv = await import('../features/inventory/index.js')
   }
   const fetchInv = CFG.inventory_module_enabled
     ? sb.from('inventory').select('*').order('name')
