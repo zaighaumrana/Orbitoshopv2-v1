@@ -338,6 +338,7 @@ export async function handleChangePasswordSubmit(session, data) {
 }
 
 /* ── PIN prompt shared state ── */
+export let ppBuffer   = ''
 export let ppPurpose  = ''
 export let ppCallback = null
 
