@@ -44,3 +44,15 @@ export function getDraft() {
 export function resetDraft() {
   draft = null
 }
+
+export function calcDraftTotal(draft) {
+  if (draft.overridePrice !== null && draft.overridePrice !== '') {
+    return Number(draft.overridePrice) || 0
+  }
+  const partsTotal = draft.components.reduce((s,c) => s + Number(c.price||0), 0)
+  return partsTotal + Number(draft.labour||0)
+}
+
+export function calcDraftPaid(draft) {
+  return draft.payments.reduce((s,p) => s + Number(p.amount||0), 0)
+}
