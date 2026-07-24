@@ -29,7 +29,7 @@ async function boot() {
   }
 
   // EMS gate on refresh/revisit too
-  const { checkClockIn } = await import('./admin/ems.js')
+  const { checkClockIn } = await import('./features/ems/index.js')
   checkClockIn(SESSION, CFG, () => {
     setupRoutes(SESSION)
     startRouter()
@@ -75,7 +75,7 @@ async function onLoginSuccess(SESSION) {
   dlog('main.onLoginSuccess', `ENTRY role=${role}`)
 
   // EMS clock-in gate — fires before any view loads
-  const { checkClockIn } = await import('./admin/ems.js')
+  const { checkClockIn } = await import('./features/ems/index.js')
   checkClockIn(SESSION, CFG, async () => {
     dlog('main.onLoginSuccess', `checkClockIn proceed-callback firing`)
     setupRoutes(SESSION)
