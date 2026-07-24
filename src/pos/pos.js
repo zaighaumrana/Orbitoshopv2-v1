@@ -7,7 +7,7 @@ import {
   leaveRequestHTML,
   submitLeaveRequest,
   handleClockOut,
-} from '../admin/ems.js'
+} from '../features/ems/index.js'
 
 import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
@@ -1052,7 +1052,7 @@ function attachEvents() {
       applyBranding(); render(); return
     }
     if (el.dataset.action === 'ems-clock-out') {
-      const { handleClockOut } = await import('../admin/ems.js')
+      const { handleClockOut } = await import('../features/ems/index.js')
       handleClockOut(SESSION, async () => {
         if (!confirm('Clocked out. Log out now?')) return
         _clearSession(); navigate('/login')
