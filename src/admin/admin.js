@@ -77,7 +77,7 @@ async function load() {
   dlog('ADMIN.load', `DATA READY (queries resolved) adminModule=${adminState.adminModule}`)
 
   if (adminState.adminModule === 'ems') {
-    const { loadEMSData, emsView, attachEMSEvents } = await import('./ems.js')
+    const { loadEMSData, emsView, attachEMSEvents } = await import('../features/ems/index.js')
     const emsData = await loadEMSData()
     adminState._emsData = emsData
     adminState._emsHTML = emsView(emsData, SESSION)
