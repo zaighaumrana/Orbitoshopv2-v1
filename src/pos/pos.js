@@ -19,17 +19,19 @@ import {
 } from '../shared.js'
 import {
   getSubInvoices, createSubInvoice, markComponentNotNeeded,
-  insertNewTicketFromCart, collectTicketPayment,
 } from '../features/repairs/api.js'
+import {
+  insertNewTicketFromCart, collectTicketPayment,
+} from '../features/pos/repairs/api.js'
 import {
   combinedBalance, repairRowHTML, compTagPickerHTML, ticketSlipPreview,
   repairTicketFormHTML, repairCollectionHTML,
-} from '../features/repairs/render.js'
+} from '../features/pos/repairs/render.js'
 import {
   getDraft, resetDraft, calcDraftTotal, calcDraftPaid,
-} from '../features/repairs/state.js'
-import { receiptPreview } from '../features/checkout/render.js'
-import { settleUdhar, finalizeCheckout } from '../features/checkout/api.js'
+} from '../features/pos/repairs/state.js'
+import { receiptPreview } from '../features/pos/checkout/render.js'
+import { settleUdhar, finalizeCheckout } from '../features/pos/checkout/api.js'
 
 import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
@@ -58,7 +60,7 @@ async function load() {
   dlog('POS.load', 'ENTRY')
   await loadConfig()
   if (CFG.inventory_module_enabled && !_inv) {
-    _inv = await import('../features/inventory/index.js')
+    _inv = await import('../features/pos/inventory/render.js')
   }
   const fetchInv = CFG.inventory_module_enabled
     ? sb.from('inventory').select('*').order('name')
