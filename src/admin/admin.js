@@ -47,7 +47,7 @@ async function load() {
   dlog('ADMIN.load', `ENTRY adminModule=${adminState.adminModule}`)
   await loadConfig()
   if (CFG.inventory_module_enabled && !_inv) {
-    _inv = await import('../features/inventory/index.js')
+    _inv = await import('../features/admin/inventory/index.js')
   }
   const fetchInv = CFG.inventory_module_enabled
     ? sb.from('inventory').select('*').order('name')
@@ -77,7 +77,7 @@ async function load() {
   dlog('ADMIN.load', `DATA READY (queries resolved) adminModule=${adminState.adminModule}`)
 
   if (adminState.adminModule === 'ems') {
-    const { loadEMSData, emsView, attachEMSEvents } = await import('../features/ems/index.js')
+    const { loadEMSData, emsView, attachEMSEvents } = await import('../features/admin/ems/index.js')
     const emsData = await loadEMSData()
     adminState._emsData = emsData
     adminState._emsHTML = emsView(emsData, SESSION)
