@@ -1,120 +1,28 @@
 /* ═══════════════════════════════════════════════════════════════════
    features/repairs/api.js
-   All Supabase-facing operations for repair tickets. Moved out of
-   shared.js during the Repairs extraction (see architecture refactor).
+   The genuinely shared slice of Repairs' Supabase operations --
+   verified by actual caller, not assumed by domain name. Every
+   function here is called from pos.js, admin.js, AND workshop.js.
 
-   Ownership test applied: "if deleting the Repairs feature would also
-   delete this function, it belongs here." generateInvoiceNumber() and
-   matchesInvoiceSearch() stayed in shared.js instead, because Checkout
-   needs them too — see shared.js's own comment on generateInvoiceNumber.
+   POS-exclusive repairs logic (insertNewTicketFromCart,
+   collectTicketPayment, generateTicketNumber, and the render/state
+   layers) lives in features/pos/repairs/ instead -- see that folder
+   for the reasoning. createTicket()/updateTicket() have zero current
+   callers anywhere (dead code, same as when this was first flagged in
+   shared.js) -- kept here as the generic ticket-ops home; createTicket
+   takes ticketNumber as a parameter now rather than generating one
+   itself, since that logic lives in the POS-only folder and a shared
+   file importing from a view-owned one would invert the intended
+   dependency direction.
 ═══════════════════════════════════════════════════════════════════ */
-import { sb, CFG, _datePart, generateInvoiceNumber, logBillEvent } from '../../shared.js'
+import { sb, generateInvoiceNumber } from '../../shared.js'
 import { dlog, dstack } from '../../debuglog.js'
-import { calcDraftTotal, calcDraftPaid } from './state.js'
-import { combinedBalance } from './render.js'
 
-/**
- * Inserts a brand-new ticket from a cart line's draft data. Pure data
- * operation -- returns {ok, data, error}; caller (pos.js's placeOrder())
- * handles cart cleanup, state.modal, and render(). Moved here from
- * pos.js -- originally mis-categorized as Checkout in the first Task 3
- * investigation, but it only ever touches the tickets table.
- */
-export async function insertNewTicketFromCart(ticketItem, employeeName) {
-  dlog('repairs.insertNewTicketFromCart', `ENTRY customerName=${ticketItem.customerName}`)
-  const draft = ticketItem.draftData
-  const total = calcDraftTotal(draft)
-  const paid  = calcDraftPaid(draft)
-
-  const ticketNumber  = await generateTicketNumber()
-  const invoiceNumber = await generateInvoiceNumber()
-  const { data, error } = await sb.from('tickets').insert({
-    ticket_number:     ticketNumber,
-    invoice_number:    invoiceNumber,
-    customer_name:      ticketItem.customerName,
-    customer_phone:     ticketItem.customerPhone,
-    device_brand:       ticketItem.deviceBrand,
-    device_model:       ticketItem.deviceModel,
-    imei:                ticketItem.imei,
-    components_noted:   draft.components,
-    labour_cost:         Number(draft.labour||0),
-    estimated_quote:     total,
-    final_total:         total,
-    amount_paid:         paid,
-    balance_due:         Math.max(0, total - paid),
-    payment_history:     draft.payments,
-    advance_payment:     paid,
-    advance_method:      [...new Set(draft.payments.map(p=>p.method))].join(' + '),
-    status:              'Pending',
-    technician_note:     ticketItem.technicianNote || '',
-    created_by:          employeeName || 'Counter',
-    is_locked:           true,
-    placed_at:           new Date().toISOString(),
-  }).select().single()
-
-  if (error) { dlog('repairs.insertNewTicketFromCart', `FAILED: ${error.message}`); return { ok: false, error: error.message } }
-  await logBillEvent()
-  dlog('repairs.insertNewTicketFromCart', `SUCCEEDED ticket_number=${data.ticket_number} id=${data.id}`)
-  return { ok: true, data }
-}
-
-/**
- * Applies a top-up payment to an existing ticket, parent-first then
- * oldest-to-newest across any sub-invoices, so the original balance is
- * always cleared before sub-invoice balances. Pure data operation --
- * returns {ok, error}; caller handles cart cleanup, load(), and the
- * confirmation alert.
- */
-export async function collectTicketPayment(ticket, payAmount, payMethod) {
-  dlog('repairs.collectTicketPayment', `ENTRY ticketId=${ticket.id} amount=${payAmount}`)
-  const { subs } = combinedBalance(ticket)
-  const orderedTickets = [ticket, ...subs.sort((a,b) => new Date(a.created_at) - new Date(b.created_at))]
-
-  let remaining = payAmount
-  for (const t of orderedTickets) {
-    const tTotal   = Number(t.final_total || t.estimated_quote || 0)
-    const tBalance = Math.max(0, tTotal - Number(t.amount_paid||0))
-    if (tBalance <= 0 || remaining <= 0) continue
-
-    const applied = Math.min(remaining, tBalance)
-    remaining -= applied
-
-    const history = [...(t.payment_history||[]), { amount: applied, method: payMethod, date: new Date().toISOString() }]
-    const newPaid = Number(t.amount_paid||0) + applied
-    const newBalance = Math.max(0, tTotal - newPaid)
-
-    const { error } = await sb.from('tickets').update({
-      amount_paid: newPaid,
-      balance_due: newBalance,
-      payment_history: history,
-      status: newBalance <= 0 ? 'Ready' : t.status,
-      collected_at: newBalance <= 0 ? new Date().toISOString() : null,
-    }).eq('id', t.id)
-
-    if (error) { dlog('repairs.collectTicketPayment', `FAILED on ticket ${t.id}: ${error.message}`); return { ok: false, error: error.message } }
-  }
-  await logBillEvent()
-  dlog('repairs.collectTicketPayment', 'SUCCEEDED')
-  return { ok: true }
-}
-
-/** Separate sequence, purely for the technician-facing ticket reference —
- *  does not represent money and is never shown as the primary number. */
-export async function generateTicketNumber() {
-  const { data: seq, error } = await sb.rpc('next_ticket_seq')
-  if (error) { dlog('repairs.generateTicketNumber', `RPC FAILED, falling back to Date.now(): ${error.message}`); console.warn('next_ticket_seq failed, falling back:', error.message) }
-  const n = error ? Date.now() % 10000 : seq
-  const result = `${CFG.ticket_prefix||'TK'}${_datePart()}${String(n).padStart(4,'0')}`
-  dlog('repairs.generateTicketNumber', `-> ${result}`)
-  return result
-}
-
-export async function createTicket(payload, employeeName) {
+export async function createTicket(payload, employeeName, ticketNumber) {
   dstack('repairs.createTicket', `ENTRY customerName=${payload.customerName} employeeName=${employeeName} -- NOTE: this function currently has no known callers in the app, so if this fires, the stack trace above is the answer`)
-  const ticketNo  = await generateTicketNumber()
   const invoiceNo = await generateInvoiceNumber()
   const { data, error } = await sb.from('tickets').insert({
-    ticket_number:    ticketNo,
+    ticket_number:    ticketNumber,
     invoice_number:   invoiceNo,
     customer_name:    payload.customerName   || '',
     customer_phone:   payload.customerPhone  || '',
@@ -152,7 +60,8 @@ export async function updateTicket(id, updates) {
   return { ok: true }
 }
 
-/** All sub-invoices that already exist under a parent ticket, oldest first. */
+/** All sub-invoices that already exist under a parent ticket, oldest first.
+ *  Called by pos.js, admin.js, AND workshop.js -- genuinely shared. */
 export async function getSubInvoices(parentId) {
   const { data, error } = await sb.from('tickets')
     .select('*').eq('parent_ticket_id', parentId).order('created_at', { ascending: true })
@@ -165,6 +74,7 @@ export async function getSubInvoices(parentId) {
  * parent's own components/labour/quote. Automatically credits whatever is
  * left of the parent's advance payment (after accounting for any earlier
  * sub-invoices that already drew on it) against this new sub's total.
+ * Called by pos.js, admin.js, AND workshop.js -- genuinely shared.
  */
 export async function createSubInvoice(parentTicket, components, labourCost, note, employeeName) {
   const existingSubs = await getSubInvoices(parentTicket.id)
@@ -217,6 +127,7 @@ export async function createSubInvoice(parentTicket, components, labourCost, not
  * one component as not needed (e.g. turned out to just need cleaning).
  * Never deletes it; the parent keeps showing the full original list with
  * the reason attached. Caller is responsible for PIN-gating this first.
+ * Called by pos.js, admin.js, AND workshop.js -- genuinely shared.
  */
 export async function markComponentNotNeeded(ticketId, componentsNoted, index, reason, employeeName) {
   const updated = [...componentsNoted]
