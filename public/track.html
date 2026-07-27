@@ -422,9 +422,25 @@
 
   /* ── Load shop branding ── */
   async function loadBranding() {
-    const { data } = await sb.from('shop_config').select(
-      'shop_name, shop_logo, shop_phone, shop_address, terms_text, primary_color, live_tracking_enabled'
-    ).single()
+    let data
+    try {
+      const res = await sb.from('shop_config').select(
+        'shop_name, shop_logo, shop_phone, shop_address, terms_text, primary_color, live_tracking_enabled'
+      ).single()
+      if (res.error) throw res.error
+      data = res.data
+    } catch (e) {
+      document.body.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;
+                    justify-content:center;height:100vh;gap:12px;text-align:center;padding:24px">
+          <div style="font-size:48px">⚠️</div>
+          <h2>Unable to Load</h2>
+          <p style="color:#64748b;max-width:320px">
+            Something went wrong loading this page. Please check your connection and try again.
+          </p>
+        </div>`
+      return
+    }
     if (!data) return
 
     if (!data.live_tracking_enabled) {
@@ -510,12 +526,33 @@
     errEl.style.display = 'none'
     resEl.style.display = 'none'
 
-    // Search by ticket_number OR invoice_number OR customer_phone
-    const { data, error } = await sb.from('tickets')
-      .select('*')
-      .or(`ticket_number.ilike.%${raw}%,invoice_number.ilike.%${raw}%,customer_phone.ilike.%${raw}%`)
-      .order('created_at', { ascending: false })
-      .limit(1)
+    // Strip characters that would break PostgREST's .or() filter syntax
+    // (commas/parens are filter-clause separators, not part of any real
+    // ticket number or phone) so malformed input degrades to "no results"
+    // instead of a query error.
+    const safe = raw.replace(/[,()]/g, '')
+    if (!safe) {
+      btn.disabled = false
+      btn.textContent = 'Track'
+      errEl.textContent = 'Please enter a valid ticket number or phone number.'
+      errEl.style.display = 'block'
+      return
+    }
+
+    let data, error
+    try {
+      // Only the columns this page actually renders -- narrower than
+      // select('*') so a looser-than-intended RLS policy on `tickets`
+      // exposes less than it otherwise would.
+      const res = await sb.from('tickets')
+        .select('ticket_number, invoice_number, customer_name, device_brand, device_model, imei, status, created_at, estimated_quote, final_total, components_noted, technician_note')
+        .or(`ticket_number.ilike.%${safe}%,invoice_number.ilike.%${safe}%,customer_phone.ilike.%${safe}%`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+      data = res.data; error = res.error
+    } catch (e) {
+      error = e
+    }
 
     btn.disabled = false
     btn.textContent = 'Track'
