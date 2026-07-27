@@ -155,14 +155,10 @@ Lines: 114, 119, 123, 128, 136, 141, 148 are standalone. Lines 120, 122, 134, 14
 
 ---
 
-## 13. `public/sw.js` — remove 3 `console.log` lines
+## 13. `public/sw.js` — ✅ DONE, removed
 
-Lines: 4 (`console.log('[SW] install')`), 9 (`console.log('[SW] activate')`), 16 (`console.log('[SW] fetch fallback to cache for', e.request.url)`).
-
-**Note:** the service worker runs in its own execution context (no DOM), so
-these logs only ever appeared in DevTools → Application → Service Workers,
-never in the on-screen panel from `debuglog.js`. Safe to remove independently
-of everything else.
+Was: lines 4/9/16, `console.log('[SW] install')` / `'[SW] activate'` / `'[SW] fetch fallback to cache for', e.request.url`.
+Removed already -- sw.js is back to its original clean state, no action needed here.
 
 ---
 
