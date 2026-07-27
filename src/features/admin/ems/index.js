@@ -536,7 +536,7 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess) {
       const emsData  = getEMSData()
       const slip     = emsData.slips.find(s => s.id === slipId)
       if (!slip) return
-      const { printThermal } = await import('../print/print.js')
+      const { printThermal } = await import('../../../print/print.js')
       printThermal(buildSalarySlipHTML(slip, slip.employees?.name || '—', CFG.shop_name))
       return
     }
