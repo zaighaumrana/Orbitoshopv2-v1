@@ -14,6 +14,7 @@ import {
 } from '../features/repairs/api.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
 import { reportsPage } from './pages/reports.js'
+import { catalogPage, qiVariantRowHTML } from '../features/admin/catalog/render.js'
 
 
 const ADMIN_MODULES = [
@@ -425,84 +426,8 @@ function settings() {
 }
 
 function catalog() {
-  if (state.role !== 'Business Owner' && !SESSION.isAdmin && state.role !== 'Manager')
-    return `<div class="card"><p class="muted">Catalog is available to Managers and the Business Owner only.</p></div>`
-  const tabs = { quickitems:'Quick Items', components:'Components' }
-  return `
-    ${tit('Catalog','Quick sale items and repair components.','')}
-    <div class="settings-tabs">
-      ${Object.entries(tabs).map(([k,l]) =>
-        `<button class="settings-tab ${adminState.catalogTab===k?'active':''}" data-catalog-tab="${k}">${l}</button>`
-      ).join('')}
-    </div>
-    ${catalogTabContent()}`
-}
-
-function catalogTabContent() {
-  if (adminState.catalogTab === 'components') {
-    const comps = state.data.repairComponents || []
-    return `
-      <div class="card" style="display:grid;gap:14px">
-        <div><h2>Quick-Tap Components</h2></div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px">
-          ${comps.map((c) => `
-            <div style="display:flex;align-items:center;gap:6px;background:var(--surface-2);
-                        border:1px solid var(--border);border-radius:8px;padding:6px 10px">
-              <span style="font-size:13px">${c.name}</span>
-              <button type="button" data-remove-quick="${c.id}"
-                style="color:var(--danger);background:none;border:none;
-                       font-size:16px;line-height:1;padding:0 2px;cursor:pointer">×</button>
-            </div>`).join('')}
-        </div>
-        <div style="display:flex;gap:8px">
-          <input id="new-comp-input" class="search" placeholder="New component name" style="flex:1">
-          <button class="primary-button" data-action="add-quick-comp">Add</button>
-        </div>
-      </div>`
-  }
-
-  if (adminState.catalogTab === 'quickitems') {
-    const items = state.data.quickItems || []
-    return `
-      <div class="card" style="display:grid;gap:16px">
-        <div><h2>Quick Sale Items</h2></div>
-        ${items.map((item,i) => `
-          <div style="padding:12px;background:var(--surface-2);border-radius:8px;display:grid;gap:8px">
-            <div style="display:flex;justify-content:space-between;align-items:center">
-              <strong>${item.name}</strong>
-              <button type="button" data-remove-qitem="${i}"
-                style="color:var(--danger);background:none;border:none;font-size:18px;cursor:pointer">×</button>
-            </div>
-            <div style="font-size:13px;color:var(--muted)">
-              Prices: ${(item.prices||[]).map((p,pi) => {
-                const pv = (typeof p === 'object' && p !== null) ? p : { name:'', price:p }
-                return `
-                <span style="display:inline-flex;align-items:center;gap:4px;margin-right:6px">
-                  ${pv.name ? `<strong>${pv.name}</strong>:` : ''} ${money(pv.price)}
-                  <button type="button" data-remove-qprice="${i}-${pi}"
-                    style="color:var(--danger);background:none;border:none;font-size:14px;cursor:pointer;padding:0">×</button>
-                </span>`
-              }).join('')}
-            </div>
-            <div style="display:flex;gap:8px">
-              <input class="search" placeholder="Brand/Variant name (optional)" id="qvariant-name-${i}" style="flex:2;min-width:0">
-              <input type="number" step="any" min="0" placeholder="Price" id="qprice-input-${i}"
-                style="flex:1;min-width:0;border:1px solid var(--border);border-radius:6px;
-                       padding:7px 9px;background:var(--surface);color:var(--text)">
-              <button type="button" class="secondary-button" data-add-qprice="${i}">+ Add</button>
-            </div>
-          </div>`).join('')}
-        <button class="primary-button" data-action="open-add-quick-item">+ Add Quick Item</button>
-      </div>`
-  }
-}
-
-function qiVariantRowHTML() {
-  return `<div data-variant-row style="display:flex;gap:8px;margin-bottom:8px">
-    <input class="search" name="variantName[]" placeholder="Brand/Variant name (optional)" style="flex:2;min-width:0">
-    <input type="number" step="any" min="0" name="variantPrice[]" placeholder="Price" class="search" style="flex:1;min-width:0">
-    <button type="button" class="secondary-button" data-action="remove-variant-row" style="color:var(--danger)">×</button>
-  </div>`
+  const isAllowed = state.role === 'Business Owner' || SESSION.isAdmin || state.role === 'Manager'
+  return catalogPage({ tit, adminState, isAllowed })
 }
 
 function settingsTabContent() {
