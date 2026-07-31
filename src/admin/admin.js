@@ -13,8 +13,12 @@ import {
 } from '../features/repairs/api.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
 import { reportsPage } from './pages/reports.js'
-import { catalogPage, qiVariantRowHTML } from '../features/admin/catalog/render.js'
-import { receiptsPage } from '../features/admin/checkout/render.js'
+import { catalogPage, qiVariantRowHTML, addQuickItemModalHTML } from '../features/admin/catalog/render.js'
+import { receiptsPage, udharListModalHTML, receiptDetailModalHTML } from '../features/admin/checkout/render.js'
+import {
+  ticketCreatedModalHTML, ticketDetailModalHTML, markNotNeededModalHTML,
+  createSubInvoiceModalHTML, addCompTagModalHTML,
+} from '../features/admin/repairs/render.js'
 
 
 const ADMIN_MODULES = [
@@ -478,20 +482,7 @@ function renderModal() {
 
   if (type === 'myAccount') return myAccountModalHTML(SESSION)
 
-  if (type === 'addQuickItem') {
-    return `<div class="modal-backdrop"><form class="modal modal-sm" data-form="add-quick-item">
-      <h2>Add Quick Item</h2>
-      <div class="form-grid">
-        ${fld('Item Name','itemName')}
-      </div>
-      <p class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px">
-        Variants (brand/name optional, price required)
-      </p>
-      <div id="qi-variant-rows">${qiVariantRowHTML()}</div>
-      <button type="button" class="secondary-button" data-action="add-variant-row">+ Add Another Variant</button>
-      ${modalActions()}
-    </form></div>`
-  }
+  if (type === 'addQuickItem') return addQuickItemModalHTML()
 
   if (type === 'passwordResets') {
     const reqs = state.modal.requests || []
@@ -512,18 +503,8 @@ function renderModal() {
     </div></div>`
   }
 
-  if (type === 'receipt') return `<div class="modal-backdrop" data-no-backdrop-close>
-    <div class="modal">
-      <h2>Repair Ticket Created</h2>
-      <div style="text-align:center;padding:12px 0">
-        <div style="font-size:15px;font-weight:700">${state.modal.ticket.invoice_number || state.modal.ticket.ticket_number}</div>
-        <div class="muted" style="font-size:12px">Ticket: ${state.modal.ticket.ticket_number}</div>
-      </div>
-      <div class="modal-actions">
-        <button class="secondary-button" data-close>Close</button>
-        <button class="primary-button" data-action="print-ticket-slip">Print Receipt</button>
-      </div>
-    </div></div>`
+
+  if (type === 'receipt') return ticketCreatedModalHTML(state.modal)
 
   if (type === 'employee') {
     if (state.modal.editMode) {
@@ -572,324 +553,23 @@ function renderModal() {
     </form></div>`
   }
 
-  if (type === 'ticketDetail') {
-    const tk = (state.data.tickets||[]).find(t => String(t.id) === String(id))
-    if (!tk) return `<div class="modal-backdrop"><div class="modal"><p class="muted">Not found.</p><div class="modal-actions"><button class="secondary-button" data-close>Close</button></div></div></div>`
-    const sc = {'Pending':'warn','In Progress':'warn','Ready':'good','Delivered':'good','Declined':'bad'}
-    return `<div class="modal-backdrop"><div class="modal modal-md">
-      <h2>${tk.ticket_number} <span class="badge ${sc[tk.status]||'warn'}" style="margin-left:8px">${tk.status}</span></h2>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:14px;margin-bottom:14px;padding:12px;background:var(--surface-2);border-radius:8px">
-        <div><span class="muted">Customer</span><br><strong>${tk.customer_name}</strong></div>
-        <div><span class="muted">Phone</span><br><strong>${tk.customer_phone||'—'}</strong></div>
-        <div><span class="muted">Device</span><br><strong>${tk.device_brand} ${tk.device_model}</strong></div>
-        <div><span class="muted">IMEI</span><br><strong>${tk.imei||'—'}</strong></div>
-        <div><span class="muted">Quote</span><br><strong>${money(tk.estimated_quote||0)}</strong></div>
-        <div><span class="muted">Advance</span><br><strong>${money(tk.advance_payment||0)}${tk.advance_method?' ('+tk.advance_method+')':''}</strong></div>
-      </div>
-      ${tk.technician_note ? `<div style="background:color-mix(in srgb,var(--warning) 10%,var(--surface));border-left:3px solid var(--warning);padding:10px 14px;border-radius:0 8px 8px 0;margin-bottom:12px;font-size:14px"><strong>Note:</strong> ${tk.technician_note}</div>` : ''}
-      ${(tk.components_noted||[]).length ? `
-        <div style="display:grid;gap:6px;margin-bottom:12px">
-          ${tk.components_noted.map((c,i) => `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface-2);border-radius:8px;font-size:14px;${c.removed?'opacity:.55':''}">
-              <span>
-                <strong style="${c.removed?'text-decoration:line-through':''}">${c.name}</strong>
-                <span class="badge warn" style="font-size:11px">${c.tag||c.condition||''}</span>
-                ${c.removed ? `<br><span class="muted" style="font-size:11px">Not needed: ${c.removedReason||''}</span>` : ''}
-              </span>
-              <span style="display:flex;align-items:center;gap:8px">
-                <span>${c.price>0 ? money(c.price) : '<span class="muted">Not priced</span>'}</span>
-                ${!c.removed ? `<button type="button" class="secondary-button" style="font-size:11px;padding:4px 8px" data-mark-not-needed="${i}">Not Needed</button>` : ''}
-              </span>
-            </div>`).join('')}
-        </div>` : ''}
-      ${(state.modal.subInvoices||[]).length ? `
-        <div style="margin-bottom:12px">
-          <strong style="font-size:13px">Sub-Invoices</strong>
-          <div style="display:grid;gap:6px;margin-top:6px">
-            ${state.modal.subInvoices.map(s => `
-              <div style="display:flex;justify-content:space-between;font-size:12px;padding:8px 10px;background:var(--surface-2);border-radius:6px">
-                <span>${s.invoice_number}</span><span>${money(s.estimated_quote)} · Bal: ${money(s.balance_due)}</span>
-              </div>`).join('')}
-          </div>
-        </div>` : ''}
-      <div style="border-top:1px solid var(--border);padding-top:12px">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <select id="td-status" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);flex:1">
-            ${['Pending','In Progress','Ready','Delivered','Declined'].map(s =>
-              `<option ${s===tk.status?'selected':''}>${s}</option>`).join('')}
-          </select>
-          <input type="number" step="any" min="0" id="td-actual-quote" placeholder="Actual price" value="${tk.actual_quote||''}"
-            style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);min-width:140px;flex:1">
-        </div>
-        <textarea id="td-note" placeholder="Add a note…"
-          style="width:100%;margin-top:8px;min-height:60px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);box-sizing:border-box">${tk.update_note||''}</textarea>
-      </div>
-      <div class="modal-actions">
-        <button class="secondary-button" data-close>Close</button>
-        <button class="secondary-button" data-action="open-create-sub-invoice" data-ticket-id="${tk.id}">+ Create Sub-Invoice</button>
-        <button class="primary-button" data-action="save-ticket-detail" data-id="${tk.id}">Save Update</button>
-      </div>
-    </div></div>`
-  }
 
-  if (type === 'mark-not-needed') {
-    const tk = (state.data.tickets||[]).find(t => String(t.id) === String(state.modal.ticketId))
-    const c  = tk?.components_noted?.[state.modal.index]
-    if (!tk || !c) return ''
-    return `<div class="modal-backdrop" data-no-backdrop-close>
-      <div class="modal modal-xs">
-        <h2>Mark "${c.name}" Not Needed</h2>
-        <p class="muted" style="font-size:13px">E.g. "Only needed cleaning, no repair required." This stays visible on the ticket, it's not deleted.</p>
-        <label class="field"><span>Reason</span><textarea id="not-needed-reason" style="min-height:56px"></textarea></label>
-        <div class="modal-actions">
-          <button type="button" class="secondary-button" data-close>Cancel</button>
-          <button type="button" class="primary-button" data-action="confirm-not-needed">Confirm (PIN required)</button>
-        </div>
-      </div>
-    </div>`
-  }
+  if (type === 'ticketDetail') return ticketDetailModalHTML(id, state.modal)
 
-  if (type === 'create-sub-invoice') {
-    const parentId = state.modal.parentId
-    const tk = (state.data.tickets||[]).find(t => String(t.id) === String(parentId))
-    if (!tk) return ''
-    const draft      = state.modal.draftComponents || []
-    const labour     = state.modal.draftLabour ?? 0
-    const compDefs   = state.data.repairComponents || []
-    const partsTotal = draft.reduce((s,c) => s + Number(c.price||0), 0)
-    const total      = partsTotal + labour
+  if (type === 'mark-not-needed') return markNotNeededModalHTML(state.modal)
 
-    return `
-      <div class="modal-backdrop" data-no-backdrop-close>
-        <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
-          <h2 style="margin-bottom:4px">Create Sub-Invoice</h2>
-          <p class="muted" style="font-size:13px;margin-bottom:16px">
-            Linked to ${tk.invoice_number} — ${tk.customer_name}, ${tk.device_brand} ${tk.device_model}
-          </p>
+  if (type === 'create-sub-invoice') return createSubInvoiceModalHTML(state.modal)
 
-          <div style="display:grid;gap:8px;margin-bottom:14px">
-            <strong style="font-size:13px">Additional Components</strong>
-            ${draft.length ? draft.map((c,i) => `
-              <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
-                <div>
-                  <span style="font-size:13px"><strong>${c.name}</strong></span>
-                  <span class="badge warn" style="font-size:11px;margin-left:6px">${c.tag || ''}</span>
-                  ${c.customText ? `<span class="muted" style="font-size:12px"> — ${c.customText}</span>` : ''}
-                </div>
-                <input type="number" step="any" min="0" value="${c.price || ''}" placeholder="Price"
-                  data-subinv-comp-price="${i}"
-                  style="width:110px;border:1px solid var(--border);border-radius:6px;
-                         padding:6px 8px;background:var(--surface);color:var(--text);font-size:13px">
-                <button type="button" data-subinv-comp-remove="${i}"
-                  style="color:var(--danger);background:none;border:none;font-size:18px;cursor:pointer;padding:0 4px">×</button>
-              </div>`).join('') : `<p class="muted" style="font-size:13px">No components added yet.</p>`}
-          </div>
-
-          <div style="margin-bottom:12px">
-            <p class="muted" style="font-size:12px;margin-bottom:6px">Add component:</p>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-              ${compDefs.map(c => `<button type="button" class="secondary-button" style="font-size:12px;padding:5px 12px"
-                data-add-draft-comp-name="${c.name}">${c.name}</button>`).join('')}
-            </div>
-            <div style="display:flex;gap:8px">
-              <input id="custom-comp-name" class="search" placeholder="Custom component name" style="flex:1">
-              <button type="button" class="secondary-button" data-action="add-custom-draft-comp">+ Add</button>
-            </div>
-          </div>
-
-          <label style="display:flex;justify-content:space-between;align-items:center;padding:10px;
-                        background:var(--surface-2);border-radius:8px;margin-bottom:8px;gap:12px">
-            <span style="font-size:13px;font-weight:500">Labour Charge</span>
-            <input type="number" step="any" min="0" value="${labour || ''}" placeholder="0" data-subinv-labour
-              style="width:120px;border:1px solid var(--border);border-radius:6px;
-                     padding:6px 8px;background:var(--surface);color:var(--text);font-size:13px">
-          </label>
-
-          <label class="field" style="margin-bottom:12px">
-            <span>Note</span>
-            <textarea id="sub-invoice-note" style="min-height:56px" placeholder="What was found / done…"></textarea>
-          </label>
-
-          <div style="display:flex;justify-content:space-between;font-weight:600;padding:10px;
-                      background:var(--surface-2);border-radius:8px;margin-bottom:16px;font-size:15px">
-            <span>Sub-Invoice Total</span><span id="subinv-draft-total">${money(total)}</span>
-          </div>
-
-          <div class="modal-actions">
-            <button type="button" class="secondary-button" data-close>Cancel</button>
-            <button type="button" class="primary-button" data-action="submit-sub-invoice" data-parent-id="${parentId}">
-              Create & Print
-            </button>
-          </div>
-        </div>
-      </div>`
-  }
-
-  if (type === 'add-comp-tag') {
-    const { compName } = state.modal
-    return `
-      <div class="modal-backdrop" data-no-backdrop-close>
-        <div class="modal modal-xs">
-          <h2>${compName}</h2>
-          <p class="muted" style="font-size:13px">What's the issue?</p>
-          <div style="display:grid;gap:8px;margin-top:10px">
-            <button type="button" class="secondary-button" style="font-size:15px;min-height:48px" data-tag-select="Broken">Broken</button>
-            <button type="button" class="secondary-button" style="font-size:15px;min-height:48px" data-tag-select="Not Working">Not Working</button>
-            <button type="button" class="secondary-button" style="font-size:15px;min-height:48px" data-tag-select="Custom">Custom…</button>
-            <div id="custom-tag-wrap" class="hidden" style="display:grid;gap:8px">
-              <input id="custom-tag-text" class="search" placeholder="Describe the issue">
-              <button type="button" class="primary-button" data-action="confirm-draft-custom-tag">Add</button>
-            </div>
-          </div>
-          <div class="modal-actions"><button class="secondary-button" data-close>Cancel</button></div>
-        </div>
-      </div>`
-  }
+  if (type === 'add-comp-tag') return addCompTagModalHTML(state.modal)
 
   if (type === 'inv-add' || type === 'inv-edit') {
     return _inv ? _inv.inventoryModalHTML(type, id) : ''
   }
 
-  if (type === 'udharList') {
-    const outstanding = (state.data.udhar||[]).filter(u => u.status !== 'Settled')
-    return `<div class="modal-backdrop"><div class="modal modal-lg">
-      <h2>Outstanding Credits</h2>
-      ${outstanding.length === 0 ? `<div class="empty">No outstanding credits.</div>` : `
-        <div style="display:grid;gap:10px">
-          ${outstanding.map(u => `
-            <div style="padding:12px;background:var(--surface-2);border-radius:8px;display:grid;gap:8px">
-              <div style="display:flex;justify-content:space-between">
-                <div><strong>${u.customer_name}</strong> · ${u.customer_phone}<br>
-                  <small class="muted">INV-${u.sale_id} · ${new Date(u.created_at).toLocaleDateString()}</small></div>
-                <span class="badge ${u.status==='Settled'?'good':'bad'}">${u.status}</span>
-              </div>
-              <div style="display:flex;justify-content:space-between">
-                <span>Balance: <strong>${money(u.balance_due)}</strong></span>
-                <span class="muted">Total: ${money(u.total_amount)}</span>
-              </div>
-              <div style="display:flex;gap:8px;align-items:center">
-                <input type="number" step="any" min="0" placeholder="Amount to settle" data-settle-amount="${u.id}"
-                  style="flex:1;border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text)">
-                <select data-settle-method="${u.id}" style="border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text)">
-                  ${['Cash','Raast','JazzCash','EasyPaisa','Bank Transfer'].map(m => `<option>${m}</option>`).join('')}
-                </select>
-                <button class="primary-button" data-settle-id="${u.id}">Settle</button>
-              </div>
-            </div>`).join('')}
-        </div>`}
-      <div class="modal-actions"><button class="secondary-button" data-close>Close</button></div>
-    </div></div>`
-  }
 
-  if (type === 'receipt-detail') {
-    const allSales  = state.data.sales || []
-    const search    = adminState.receiptSearch  || ''
-    const dateFrom  = adminState.receiptDateFrom || ''
-    const dateTo    = adminState.receiptDateTo   || ''
-    const filtered  = allSales.filter(s => {
-      const matchText = (`${s.customer_name||''} ${s.payment_method||''} ${s.employee_name||''}`)
-        .toLowerCase().includes(search.toLowerCase())
-      const sDate     = (s.created_at||'').slice(0,10)
-      const matchFrom = !dateFrom || sDate >= dateFrom
-      const matchTo   = !dateTo   || sDate <= dateTo
-      return matchText && matchFrom && matchTo
-    })
-    const idx  = adminState.receiptModalIdx ?? 0
-    const s    = filtered[idx]
-    if (!s) return ''
-    const items = Array.isArray(s.items_sold) ? s.items_sold : []
-    const hasPrev = idx > 0
-    const hasNext = idx < filtered.length - 1
-    return `
-      <div class="modal-backdrop" data-no-backdrop-close>
-        <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-            <h2 style="margin:0">${s.invoice_number||`INV-${s.id}`}</h2>
-            <button class="icon-button" data-close style="font-size:20px;line-height:1">×</button>
-          </div>
+  if (type === 'udharList') return udharListModalHTML()
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;
-                      padding:12px;background:var(--surface-2);border-radius:10px;
-                      font-size:13px;margin-bottom:16px">
-            <div><span class="muted">Date</span><br>
-              <strong>${new Date(s.created_at).toLocaleString()}</strong></div>
-            <div><span class="muted">Customer</span><br>
-              <strong>${s.customer_name||'Walk-in'}</strong></div>
-            <div><span class="muted">Cashier</span><br>
-              <strong>${s.employee_name||'—'}</strong></div>
-            <div><span class="muted">Payment</span><br>
-              <strong>${s.payment_method}</strong></div>
-            ${s.ticket_id ? `<div><span class="muted">Linked Ticket</span><br><strong>#${s.ticket_id}</strong></div>` : ''}
-          </div>
-
-          <div style="margin-bottom:16px">
-            <p style="font-size:12px;font-weight:600;color:var(--muted);
-                       text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Items</p>
-            ${items.length ? `
-              <div style="display:grid;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden">
-                <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;
-                            padding:8px 12px;background:var(--surface-2);
-                            font-size:12px;font-weight:600;color:var(--muted)">
-                  <span>Item</span><span>Qty</span><span>Total</span>
-                </div>
-                ${items.map(i => `
-                  <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;
-                              padding:10px 12px;border-top:1px solid var(--border);font-size:13px">
-                    <div>
-                      <strong>${i.name||'Item'}</strong>
-                      <br><span class="muted">${money(i.soldPrice||i.sold_price||0)} each
-                      ${(i.discount||0) > 0 ? ` · disc ${money(i.discount)}` : ''}</span>
-                    </div>
-                    <span style="text-align:right">${i.qty||1}</span>
-                    <span style="text-align:right"><strong>${money((i.soldPrice||i.sold_price||0)*(i.qty||1))}</strong></span>
-                  </div>`).join('')}
-              </div>` :
-              `<p class="muted" style="font-size:13px">No item breakdown recorded.</p>`}
-          </div>
-
-          <div style="border-top:1px solid var(--border);padding-top:12px;
-                      display:grid;gap:6px;font-size:13px">
-            ${Number(s.labour_cost||0) > 0 ? `
-              <div style="display:flex;justify-content:space-between">
-                <span>Labour</span><span>${money(s.labour_cost)}</span>
-              </div>` : ''}
-            ${Number(s.discount||0) > 0 ? `
-              <div style="display:flex;justify-content:space-between;color:var(--success)">
-                <span>Discount</span><span>− ${money(s.discount)}</span>
-              </div>` : ''}
-            ${Number(s.tax||0) > 0 ? `
-              <div style="display:flex;justify-content:space-between">
-                <span>Tax</span><span>${money(s.tax)}</span>
-              </div>` : ''}
-            <div style="display:flex;justify-content:space-between;
-                        font-size:18px;font-weight:700;padding-top:6px;
-                        border-top:1px solid var(--border)">
-              <span>Total</span><span>${money(s.total_bill)}</span>
-            </div>
-            ${s.cash_tendered > 0 ? `
-              <div style="display:flex;justify-content:space-between;color:var(--muted)">
-                <span>Cash Received</span><span>${money(s.cash_tendered)}</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;color:var(--muted)">
-                <span>Change Given</span><span>${money(s.change_given||0)}</span>
-              </div>` : ''}
-          </div>
-
-          <div style="display:flex;justify-content:space-between;align-items:center;
-                      margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
-            <div style="display:flex;gap:8px">
-              <button class="secondary-button" ${!hasPrev?'disabled':''} data-action="receipt-prev">← Prev</button>
-              <button class="secondary-button" ${!hasNext?'disabled':''} data-action="receipt-next">Next →</button>
-            </div>
-            <div style="display:flex;gap:8px">
-              <button class="secondary-button" data-close>Close</button>
-              <button class="primary-button"
-                data-action="reprint-receipt" data-sale-id="${s.id}">Reprint</button>
-            </div>
-          </div>
-        </div>
-      </div>`
-  }
+  if (type === 'receipt-detail') return receiptDetailModalHTML(adminState)
 
   return ''
 }
