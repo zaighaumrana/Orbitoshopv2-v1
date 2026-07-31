@@ -18,7 +18,7 @@
    from admin.js -- same pattern as adminInventoryPage({filter, tit})
    and reportsPage({tit}).
 ═══════════════════════════════════════════════════════════════════ */
-import { state, money } from '../../../shared.js'
+import { state, money, fld, modalActions } from '../../../shared.js'
 
 export function catalogPage({ tit, adminState, isAllowed }) {
   if (!isAllowed)
@@ -99,4 +99,19 @@ export function qiVariantRowHTML() {
     <input type="number" step="any" min="0" name="variantPrice[]" placeholder="Price" class="search" style="flex:1;min-width:0">
     <button type="button" class="secondary-button" data-action="remove-variant-row" style="color:var(--danger)">×</button>
   </div>`
+}
+
+export function addQuickItemModalHTML() {
+  return `<div class="modal-backdrop"><form class="modal modal-sm" data-form="add-quick-item">
+    <h2>Add Quick Item</h2>
+    <div class="form-grid">
+      ${fld('Item Name','itemName')}
+    </div>
+    <p class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px">
+      Variants (brand/name optional, price required)
+    </p>
+    <div id="qi-variant-rows">${qiVariantRowHTML()}</div>
+    <button type="button" class="secondary-button" data-action="add-variant-row">+ Add Another Variant</button>
+    ${modalActions()}
+  </form></div>`
 }
