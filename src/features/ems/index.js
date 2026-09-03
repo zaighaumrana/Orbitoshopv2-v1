@@ -207,7 +207,7 @@ function renderBreakGate(sess, record) {
   document.getElementById('shiftend-btn').addEventListener('click', async () => {
     if (!confirm('End your shift and log out?')) return
     await _clockOut(sess, record.id)
-    _clearSession()
+    await _clearSession()
     navigate('/login')
   })
 }
