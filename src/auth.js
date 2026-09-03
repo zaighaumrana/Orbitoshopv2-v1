@@ -5,13 +5,113 @@ import {
 import { dlog, dstack } from './debuglog.js'
 
 let _onLoginSuccess = null
+let _turnstileWidgetId = null
+let _loginMode = 'shop'
+
+function setLoginMode(mode) {
+  _loginMode =
+    mode === 'support'
+      ? 'support'
+      : 'shop'
+
+  const title =
+    document.getElementById('login-title')
+
+  const subtitle =
+    document.getElementById('login-subtitle')
+
+  const badge =
+    document.getElementById('support-mode-badge')
+
+  const supportBtn =
+    document.getElementById('support-access-btn')
+
+  const forgotBtn =
+    document.getElementById('forgot-btn')
+
+  const loginBtn =
+    document.getElementById('login-btn')
+
+  const emailEl =
+    document.getElementById('login-email')
+
+  const passEl =
+    document.getElementById('login-password')
+
+  const errEl =
+    document.getElementById('login-error')
+
+  if (_loginMode === 'support') {
+    if (title)
+      title.textContent =
+        'Orbito Support Access'
+
+    if (subtitle)
+      subtitle.textContent =
+        'Platform super admin authentication'
+
+    badge?.classList.remove('hidden')
+
+    if (supportBtn)
+      supportBtn.textContent =
+        '← Shop login'
+
+    forgotBtn?.classList.add('hidden')
+
+    if (loginBtn)
+      loginBtn.textContent =
+        'Enter Support Mode'
+
+    if (emailEl)
+      emailEl.placeholder =
+        'Platform admin email'
+  } else {
+    if (title)
+      title.textContent =
+        CFG.shop_name || 'RetailOS'
+
+    if (subtitle)
+      subtitle.textContent =
+        'Sign in to continue'
+
+    badge?.classList.add('hidden')
+
+    if (supportBtn)
+      supportBtn.textContent =
+        'Orbito Support'
+
+    forgotBtn?.classList.remove('hidden')
+
+    if (loginBtn)
+      loginBtn.textContent =
+        'Login'
+
+    if (emailEl)
+      emailEl.placeholder =
+        'your@email.com'
+  }
+
+  if (emailEl)
+    emailEl.value = ''
+
+  if (passEl)
+    passEl.value = ''
+
+  errEl?.classList.add('hidden')
+
+  resetTurnstile()
+
+  emailEl?.focus()
+}
 
 export function renderLogin(onSuccess) {
+  _loginMode = 'shop'
+
   dstack('auth.renderLogin', '*** #app REWRITE *** (login screen)')
   _onLoginSuccess = onSuccess
   const app = document.getElementById('app')
   app.innerHTML = `
-    <div style="min-height:100vh;display:grid;place-items:center;background:var(--bg);padding:16px">
+    <div style="min-height:100vh;display:grid;place-items:center;background:var(--bg);padding:16px;position:relative">
       <div class="card" style="width:min(400px,95vw);display:grid;gap:20px;padding:32px">
         <div style="text-align:center;display:grid;gap:8px">
           <div class="logo" style="margin:0 auto 8px;width:72px;height:72px;font-size:20px;overflow:hidden">
@@ -19,8 +119,25 @@ export function renderLogin(onSuccess) {
               ? `<img src="${CFG.shop_logo}" style="width:100%;height:100%;object-fit:contain;border-radius:inherit">`
               : CFG.shop_name?.slice(0,2).toUpperCase() || 'FP'}
           </div>
-          <h2 style="margin:0">${CFG.shop_name || 'RetailOS'}</h2>
-          <p class="muted" style="font-size:13px;margin:0">Sign in to continue</p>
+          <div
+           id="support-mode-badge"
+           class="badge warn hidden"
+           style="width:fit-content;margin:0 auto 2px"
+          >
+           Support session
+          </div>
+
+          <h2 id="login-title" style="margin:0">
+           ${CFG.shop_name || 'RetailOS'}
+          </h2>
+
+          <p
+           id="login-subtitle"
+           class="muted"
+          style="font-size:13px;margin:0"
+          >
+           Sign in to continue
+          </p>
         </div>
         <div style="display:grid;gap:10px">
           <label class="field"><span>Email</span>
@@ -48,51 +165,121 @@ export function renderLogin(onSuccess) {
             Login
           </button>
         </div>
-        <p class="muted" style="text-align:center;font-size:12px;margin:0">
+                <p class="muted" style="text-align:center;font-size:12px;margin:0">
           ${CFG.shop_address || ''}
         </p>
       </div>
+
+      <button
+        type="button"
+        id="support-access-btn"
+        style="
+          position:fixed;
+right:16px;
+top:14px;
+background:none;
+border:none;
+color:var(--muted);
+font-size:11px;
+opacity:.60;
+cursor:pointer;
+padding:6px 8px;
+z-index:100
+        "
+      >
+        Orbito Support
+      </button>
     </div>`
 
-  // Mount Turnstile — only on production
-  const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  const wrap  = document.getElementById('cf-turnstile-wrap')
-  const btn   = document.getElementById('login-btn')
+    // Turnstile is required in every environment.
+  // localhost must be added to the allowed hostnames in Cloudflare.
+  const wrap = document.getElementById('cf-turnstile-wrap')
+  const btn  = document.getElementById('login-btn')
 
-  if (!isDev) {
-    // Lock the button immediately — do NOT wait for window.turnstile to exist first.
-    // The Turnstile script loads async from a CDN; on a slow connection it may not
-    // be ready by the time this renders, and skipping the lock in that window let
-    // the login button stay fully clickable with no verification at all.
-    if (btn) btn.disabled = true
+  if (btn) btn.disabled = true
 
-    let attempts = 0
-    const mountTurnstile = () => {
-      if (wrap && window.turnstile) {
-        window.turnstile.render(wrap, {
-          sitekey: '0x4AAAAAADl87EDGnxcg5eJZ',
-          theme:   state.theme === 'dark' ? 'dark' : 'light',
-          callback: () => { if (btn) btn.disabled = false },
-          'error-callback': () => { if (btn) btn.disabled = true },
-        })
-      } else if (attempts++ < 75) {
-        // Script not loaded yet — keep checking (up to ~15s). Button stays locked throughout.
-        setTimeout(mountTurnstile, 200)
-      } else if (wrap) {
-        wrap.innerHTML = `<p style="color:var(--danger);font-size:12px;text-align:center">
-          Verification failed to load. Check your connection (or disable any ad-blocker) and refresh the page.
+  _turnstileWidgetId = null
+  let attempts = 0
+
+  const mountTurnstile = () => {
+    if (wrap && window.turnstile) {
+      _turnstileWidgetId = window.turnstile.render(wrap, {
+        sitekey:
+          import.meta.env.VITE_TURNSTILE_SITE_KEY ||
+          '0x4AAAAAADl87EDGnxcg5eJZ',
+
+        theme:
+          state.theme === 'dark'
+            ? 'dark'
+            : 'light',
+
+        callback: () => {
+          if (btn) btn.disabled = false
+        },
+
+        'expired-callback': () => {
+          if (btn) btn.disabled = true
+        },
+
+        'error-callback': () => {
+          if (btn) btn.disabled = true
+        },
+      })
+    } else if (attempts++ < 75) {
+      setTimeout(mountTurnstile, 200)
+    } else if (wrap) {
+      wrap.innerHTML = `
+        <p style="color:var(--danger);font-size:12px;text-align:center">
+          Verification failed to load.
+          Check your connection or ad-blocker and refresh.
         </p>`
-      }
     }
-    mountTurnstile()
   }
-  // On localhost login button stays enabled
+
+  mountTurnstile()
 
   document.getElementById('login-btn').addEventListener('click', submitLogin)
   document.getElementById('forgot-btn').addEventListener('click', forgotPassword)
+  document
+  .getElementById('support-access-btn')
+  .addEventListener('click', () => {
+    setLoginMode(
+      _loginMode === 'support'
+        ? 'shop'
+        : 'support'
+    )
+  })
   document.getElementById('login-password').addEventListener('keydown', e => {
     if (e.key === 'Enter') submitLogin()
   })
+}
+
+function resetTurnstile() {
+  const btn = document.getElementById('login-btn')
+
+  if (btn) btn.disabled = true
+
+  if (
+    window.turnstile &&
+    _turnstileWidgetId !== null
+  ) {
+    try {
+      window.turnstile.reset(_turnstileWidgetId)
+    } catch {}
+  }
+}
+
+function cleanupTurnstile() {
+  if (
+    window.turnstile &&
+    _turnstileWidgetId !== null
+  ) {
+    try {
+      window.turnstile.remove(_turnstileWidgetId)
+    } catch {}
+  }
+
+  _turnstileWidgetId = null
 }
 
 async function submitLogin() {
@@ -114,23 +301,52 @@ async function submitLogin() {
 
   const turnstileToken = document.querySelector('[name="cf-turnstile-response"]')?.value || ''
 
-  const res = await loginViaEdgeFunction(email, pass, turnstileToken)
+  const res = await loginViaEdgeFunction(
+   email,
+   pass,
+   turnstileToken,
+   _loginMode
+  )
   if (res.ok) {
     dlog('auth.submitLogin', `LOGIN ok isAdmin=${res.isAdmin} role=${res.employee?.role} -- calling _onLoginSuccess`)
-    const SESSION = { employee: res.employee, isAdmin: !!res.isAdmin }
-    const role    = res.employee.role
-    const route   = (role === 'Technician') ? 'workshop' : (role === 'Business Owner' || role === 'Manager') ? 'admin' : 'pos'
+    cleanupTurnstile()
+    const SESSION = {
+  employee: res.employee,
+  isAdmin: !!res.isAdmin,
+  isSupportAdmin: !!res.isSupportAdmin,
+}
+    const role = res.employee.role
+
+const route = res.isSupportAdmin
+  ? 'admin'
+  : role === 'Technician'
+    ? 'workshop'
+    : (role === 'Business Owner' || role === 'Manager')
+      ? 'admin'
+      : 'pos'
     _saveSession(SESSION, route, 'dashboard')
     _onLoginSuccess && _onLoginSuccess(SESSION)
   } else {
     dlog('auth.submitLogin', `LOGIN FAILED: ${res.error}`)
-    if (btn) { btn.disabled = false; btn.textContent = 'Login' }
+    if (btn) {
+  btn.disabled = false
+  btn.textContent =
+    _loginMode === 'support'
+      ? 'Enter Support Mode'
+      : 'Login'
+}
     if (errEl) { errEl.textContent = res.error || 'Incorrect email or password.'; errEl.classList.remove('hidden') }
-    if (passEl) { passEl.value = ''; passEl.focus() }
+    if (passEl) {
+  passEl.value = ''
+  passEl.focus()
+}
+
+resetTurnstile()
   }
 }
 
 async function forgotPassword() {
+  if (_loginMode === 'support') return
   const email = document.getElementById('login-email')?.value?.trim()
   if (!email) { alert('Enter your email address first.'); return }
   const isOwner = CFG.owner_email && email.toLowerCase() === CFG.owner_email.toLowerCase()

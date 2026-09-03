@@ -116,7 +116,12 @@ export function startRouter() {
       resolve(window.location.pathname, window.location.search)
     })
   }
-  resolve(window.location.pathname, window.location.search)
+    if (currentPath !== window.location.pathname) {
+    resolve(
+      window.location.pathname,
+      window.location.search
+    )
+  }
 }
 
 /**

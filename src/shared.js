@@ -165,7 +165,12 @@ export function can(mod, role) {
 }
 
 /* ── Auth ── */
-export async function loginViaEdgeFunction(email, password, turnstileToken) {
+export async function loginViaEdgeFunction(
+  email,
+  password,
+  turnstileToken,
+  mode = 'shop'
+) {
   dlog('shared.loginViaEdgeFunction', `ENTRY email=${email}`)
   const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/login`
   let res
@@ -177,7 +182,12 @@ export async function loginViaEdgeFunction(email, password, turnstileToken) {
         'apikey': import.meta.env.VITE_SUPABASE_ANON,
         'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON}`,
       },
-      body: JSON.stringify({ email, password, turnstileToken }),
+      body: JSON.stringify({
+        email,
+        password,
+        turnstileToken,
+        mode,
+      }),
     })
   } catch (e) {
     dlog('shared.loginViaEdgeFunction', `NETWORK ERROR: ${e.message}`)
