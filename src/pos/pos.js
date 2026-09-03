@@ -1057,13 +1057,13 @@ function attachEvents() {
       const { handleClockOut } = await import('../features/ems/index.js')
       handleClockOut(SESSION, async () => {
         if (!confirm('Clocked out. Log out now?')) return
-        await _clearSession(); navigate('/login')
+        await _clearSession()
       })
       return
     }
     if (el.dataset.action === 'logout') {
       if (!confirm('Log out?')) return
-      await _clearSession(); navigate('/login'); return
+      await _clearSession(); return
     }
     if (el.dataset.action === 'install' && state.installPrompt) {
       state.installPrompt.prompt(); state.installPrompt = null; render(); return

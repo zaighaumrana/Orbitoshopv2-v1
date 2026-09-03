@@ -36,6 +36,18 @@ function normalizeEmail(value: string) {
   return value.toLowerCase().trim()
 }
 
+function clientSupportEmail() {
+  let projectRef = ''
+  try {
+    projectRef = new URL(SUPABASE_URL).hostname.split('.')[0] ?? ''
+  } catch {
+    throw new Error('Client Supabase project identity is invalid.')
+  }
+  projectRef = projectRef.toLowerCase().replace(/[^a-z0-9-]/g, '')
+  if (!projectRef) throw new Error('Client Supabase project identity is unavailable.')
+  return `orbitosupport+${projectRef}@support.orbito.internal`
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -117,6 +129,16 @@ async function findAppProfile(admin: ReturnType<typeof createClient>, email: str
     .eq('email', email)
     .maybeSingle()
   if (error) throw new Error('Application identity lookup failed.')
+  return data as AppProfile | null
+}
+
+async function findSupportProfile(admin: ReturnType<typeof createClient>): Promise<AppProfile | null> {
+  const { data, error } = await admin
+    .from('app_users')
+    .select('auth_user_id, employee_id, email, display_name, role, status')
+    .eq('role', 'Orbito Support')
+    .maybeSingle()
+  if (error) throw new Error('Support identity lookup failed.')
   return data as AppProfile | null
 }
 
@@ -290,39 +312,60 @@ async function bootstrapSupportSession(
   admin: ReturnType<typeof createClient>,
   auth: ReturnType<typeof createClient>,
   platformUserId: string,
-  email: string,
+  platformEmail: string,
   userAgent: string | null,
 ) {
-  let profile = await findAppProfile(admin, email)
+  const supportEmail = clientSupportEmail()
+  let profile = await findSupportProfile(admin)
   let newlyCreatedUserId: string | null = null
-  if (profile && profile.role !== 'Orbito Support') {
-    return { ok: false, error: 'Support identity collides with a shop account.' }
+
+  if (profile && normalizeEmail(profile.email) !== supportEmail) {
+    return { ok: false, error: 'Client support identity requires administrator recovery.' }
   }
 
   if (!profile) {
-    if (await findAuthUserByEmail(admin, email)) {
-      return { ok: false, error: 'Support identity requires administrator recovery.' }
+    const emailProfile = await findAppProfile(admin, supportEmail)
+    if (emailProfile) {
+      return { ok: false, error: 'Client support identity conflicts with an application account.' }
     }
-    const { data: created, error: createError } = await admin.auth.admin.createUser({ email, email_confirm: true })
-    if (createError || !created.user) return { ok: false, error: 'Support session could not be created.' }
-    newlyCreatedUserId = created.user.id
+
+    let authUser = await findAuthUserByEmail(admin, supportEmail)
+    if (!authUser) {
+      const { data: created, error: createError } = await admin.auth.admin.createUser({
+        email: supportEmail,
+        email_confirm: true,
+        app_metadata: { app_identity: 'orbito_client_support' },
+      })
+      if (createError || !created.user) return { ok: false, error: 'Support session could not be created.' }
+      newlyCreatedUserId = created.user.id
+      authUser = created.user
+    }
+
     profile = {
-      auth_user_id: created.user.id,
+      auth_user_id: authUser.id,
       employee_id: null,
-      email,
+      email: supportEmail,
       display_name: 'Orbito Support',
       role: 'Orbito Support',
       status: 'Active',
     }
     const { error: mappingError } = await admin.from('app_users').insert(profile)
     if (mappingError) {
-      await admin.auth.admin.deleteUser(created.user.id)
+      if (newlyCreatedUserId) await admin.auth.admin.deleteUser(newlyCreatedUserId)
       return { ok: false, error: 'Support session could not be created.' }
+    }
+  } else {
+    const authUser = await findAuthUserByEmail(admin, supportEmail)
+    if (!authUser || authUser.id !== profile.auth_user_id || profile.employee_id !== null) {
+      return { ok: false, error: 'Client support identity requires administrator recovery.' }
     }
   }
 
   if (profile.status !== 'Active') return { ok: false, error: 'Support access is inactive.' }
-  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({ type: 'magiclink', email })
+  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+    type: 'magiclink',
+    email: supportEmail,
+  })
   const tokenHash = linkData?.properties?.hashed_token
   if (linkError || !tokenHash) {
     if (newlyCreatedUserId) {
@@ -332,7 +375,7 @@ async function bootstrapSupportSession(
     return { ok: false, error: 'Support session could not be created.' }
   }
 
-  const { data: verified, error: verifyError } = await auth.auth.verifyOtp({ token_hash: tokenHash, type: 'magiclink' })
+  const { data: verified, error: verifyError } = await auth.auth.verifyOtp({ token_hash: tokenHash, type: 'email' })
   if (verifyError || !verified.session || !verified.user || verified.user.id !== profile.auth_user_id) {
     if (newlyCreatedUserId) {
       await admin.from('app_users').delete().eq('auth_user_id', newlyCreatedUserId)
@@ -343,7 +386,7 @@ async function bootstrapSupportSession(
 
   const { error: auditError } = await admin.from('support_access_log').insert({
     platform_user_id: platformUserId,
-    platform_email: email,
+    platform_email: platformEmail,
     client_auth_user_id: profile.auth_user_id,
     event: 'support_login',
     user_agent: userAgent,

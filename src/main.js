@@ -30,8 +30,16 @@ async function boot() {
 }
 
 function showLogin() {
-  registerNotFound(() => renderLogin(onLoginSuccess))
-  renderLogin(onLoginSuccess)
+  const render = () => renderLogin(onLoginSuccess)
+  registerRoute('/login', render)
+  registerNotFound(() => navigate('/login', { replace: true }))
+
+  if (window.location.pathname !== '/login') {
+    navigate('/login', { replace: true })
+  } else if (!document.getElementById('login-title')) {
+    navigate('/login', { replace: true })
+  }
+  startRouter()
 }
 
 function setupRoutes(session) {
@@ -106,7 +114,7 @@ sb.auth.onAuthStateChange((event) => {
     sessionStorage.removeItem('retailos_route')
     sessionStorage.removeItem('retailos_module')
   } catch {}
-  if (window.location.pathname !== '/login') navigate('/login', { force: true })
+  showLogin()
 })
 
 window.addEventListener('online',  () => { state.online = true })

@@ -23,7 +23,6 @@ import {
   sb, state, CFG, money,
   _clearSession,
 } from '../../shared.js'
-import { navigate } from '../../router.js'
 import { dlog, dstack } from '../../debuglog.js'
 
 let SESSION         = {}
@@ -208,7 +207,6 @@ function renderBreakGate(sess, record) {
     if (!confirm('End your shift and log out?')) return
     await _clockOut(sess, record.id)
     await _clearSession()
-    navigate('/login')
   })
 }
 

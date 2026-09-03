@@ -805,8 +805,7 @@ function attachEvents() {
     if (el.dataset.action === 'logout') {
       if (!confirm('Log out?')) return
       await _clearSession()
-      const { navigate } = await import('../router.js')
-      navigate('/login', { force: true }); return
+      return
     }
 
     if (el.dataset.action === 'go-employees-tab') {

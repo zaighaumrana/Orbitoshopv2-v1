@@ -301,6 +301,9 @@ export function generateTempPassword() {
 
 /** Logged-in user changes their own password (owner or employee). */
 export async function changeOwnPassword(session, oldPassword, newPassword) {
+  if (session?.isSupportAdmin) {
+    return { ok: false, error: 'Support sessions are issued through platform authentication.' }
+  }
   const err = validatePassword(newPassword)
   if (err) return { ok: false, error: err }
   const email = session.employee?.email
@@ -364,6 +367,7 @@ export async function verifyCurrentStepUpPin(pin) {
 /** Shared "My Account" modal — used by pos.js, workshop.js and admin.js. */
 export function myAccountModalHTML(session) {
   const isOwnerLike = session.isAdmin || session.employee?.role === 'Business Owner'
+  const isSupport = session.isSupportAdmin === true
   return `<div class="modal-backdrop"><div class="modal" style="max-width:420px">
     <h2>My Account</h2>
     ${state.installPrompt ? `
@@ -377,7 +381,15 @@ export function myAccountModalHTML(session) {
         <button type="button" class="secondary-button" data-action="open-leave-request" style="width:100%">📋 Request Leave</button>
       </div>
     ` : ''}
-    <form data-form="change-password">
+    ${isSupport ? `
+      <p class="muted" style="font-size:13px">
+        This support session was issued through Orbito platform authentication.
+        The client-project support identity has no reusable password.
+      </p>
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" data-close>Close</button>
+      </div>
+    ` : `<form data-form="change-password">
       <p class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Change Password</p>
       <div class="form-grid">
         <label class="field"><span>Current Password</span><input name="oldPassword" type="password" required autocomplete="current-password"></label>
@@ -389,7 +401,7 @@ export function myAccountModalHTML(session) {
         <button type="button" class="secondary-button" data-close>Close</button>
         <button class="primary-button">Update Password</button>
       </div>
-    </form>
+    </form>`}
   </div></div>`
 }
 
