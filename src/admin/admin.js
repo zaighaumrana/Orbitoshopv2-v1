@@ -1,12 +1,13 @@
 import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
-  _loadSession, _saveSession, _clearSession,
+  _clearSession,
   can, ACCESS, validatePassword,
   money, fld, modalActions, statusBadge,
-  openPinPrompt, pinPromptHTML, handlePpKey,
+  openPinPrompt, pinPromptHTML, handlePpKey, verifyCurrentStepUpPin,
   logBillEvent,
   myAccountModalHTML, handleChangePasswordSubmit,
   generateTempPassword, listPendingResetRequests, resolvePasswordReset,
+  invokeAccountAdmin,
 } from '../shared.js'
 import {
   getSubInvoices, createSubInvoice, markComponentNotNeeded,
@@ -55,19 +56,27 @@ async function load() {
   if (CFG.inventory_module_enabled && !_inv) {
     _inv = await import('../features/admin/inventory/index.js')
   }
-  const fetchInv = CFG.inventory_module_enabled
-    ? sb.from('inventory').select('*').order('name')
-    : Promise.resolve({ data: [] })
-
+  const mod = adminState.adminModule
+  const needs = {
+    tickets: ['dashboard','repairs','reports','receipts'].includes(mod),
+    sales: ['dashboard','reports','receipts'].includes(mod),
+    employees: ['dashboard','employees'].includes(mod),
+    udhar: ['dashboard','reports','receipts'].includes(mod),
+    returns: ['reports','receipts'].includes(mod),
+    inventory: mod === 'inventory' && CFG.inventory_module_enabled,
+    quickItems: mod === 'catalog',
+    repairComponents: mod === 'catalog' || mod === 'repairs',
+  }
+  const skip = { data: [] }
   const [tickets, sales, employees, udhar, returns_, inv, quickItems, repairComponents] = await Promise.all([
-    sb.from('tickets').select('*').order('id', { ascending: false }),
-    sb.from('sales').select('*').order('id', { ascending: false }),
-    sb.from('employees').select('id, name, role, status, email').order('name'),
-    sb.from('udhar').select('*').order('id', { ascending: false }),
-    sb.from('returns').select('*').order('id', { ascending: false }),
-    fetchInv,
-    sb.from('quick_items').select('*').order('sort_order'),
-    sb.from('repair_components').select('*').order('sort_order'),
+    needs.tickets ? sb.from('tickets').select('*').order('id', { ascending: false }) : skip,
+    needs.sales ? sb.from('sales').select('*').order('id', { ascending: false }) : skip,
+    needs.employees ? sb.from('employees').select('id, name, role, status, email').order('name') : skip,
+    needs.udhar ? sb.from('udhar').select('*').order('id', { ascending: false }) : skip,
+    needs.returns ? sb.from('returns').select('*').order('id', { ascending: false }) : skip,
+    needs.inventory ? sb.from('inventory').select('*').order('name') : skip,
+    needs.quickItems ? sb.from('quick_items').select('*').order('sort_order') : skip,
+    needs.repairComponents ? sb.from('repair_components').select('*').order('sort_order') : skip,
   ])
   state.data = {
     tickets:          tickets.data          || [],
@@ -322,22 +331,16 @@ function employees() {
               <td>${e.role}</td>
               <td><span class="badge ${e.status==='Active'?'good':'bad'}">${e.status}</span></td>
               <td style="display:flex;gap:6px">
-                <button class="secondary-button" style="font-size:12px"
+                ${state.role !== 'Manager' || ['Cashier','Technician'].includes(e.role) ? `<button class="secondary-button" style="font-size:12px"
                   data-action="edit-employee"
                   data-emp-id="${e.id}" data-emp-name="${e.name}"
                   data-emp-role="${e.role}" data-emp-status="${e.status}"
-                  data-emp-email="${e.email||''}">Edit</button>
-                ${state.role === 'Business Owner' || SESSION.isAdmin ? `
-                  <button class="secondary-button" style="font-size:12px;color:var(--danger)"
-                    data-action="remove-employee"
-                    data-emp-id="${e.id}" data-emp-name="${e.name}"
-                    data-emp-can-delete="true">Remove</button>
-                ` : `
+                  data-emp-email="${e.email||''}">Edit</button>` : ''}
+                ${state.role !== 'Manager' || ['Cashier','Technician'].includes(e.role) ? `
                   <button class="secondary-button" style="font-size:12px;color:var(--warning)"
                     data-action="remove-employee"
                     data-emp-id="${e.id}" data-emp-name="${e.name}"
-                    data-emp-can-delete="false">Deactivate</button>
-                `}
+                    data-emp-can-delete="false">Deactivate</button>` : ''}
               </td>
             </tr>`).join('')}
           </tbody>
@@ -351,7 +354,7 @@ function receipts() {
 }
 
 function settings() {
-  if (state.role !== 'Business Owner' && !SESSION.isAdmin)
+  if (state.role !== 'Business Owner' && state.role !== 'Orbito Support')
     return `<div class="card"><p class="muted">Settings are available to Business Owner only.</p></div>`
   const t = currentTenant()
   const tabs = { branding:'Branding', contact:'Contact', receipt:'Receipt & Tax', staff:'Staff & Security' }
@@ -437,10 +440,9 @@ function settingsTabContent() {
       <div style="display:grid;gap:16px">
         <div class="card" style="display:grid;gap:14px">
           <h2>Owner Login</h2>
-          <p class="muted" style="font-size:13px">Email and password used by the shop owner to sign in.</p>
+          <p class="muted" style="font-size:13px">The owner email stays synchronized with Supabase Auth. Owners change their own password from My Account.</p>
           <form class="form-grid" data-form="owner-login">
-            ${fld('Owner Email','owner_email',CFG.owner_email||'','email')}
-            ${fld('New Password (blank = keep)','owner_password','','password')}
+            ${fld('Owner Email','owner_email',SESSION.employee?.role === 'Business Owner' ? SESSION.employee.email : '','email')}
             <div class="modal-actions" style="grid-column:1/-1">
               <button class="primary-button">Save Owner Login</button>
             </div>
@@ -517,7 +519,7 @@ function renderModal() {
           <label class="field"><span>New Password (blank = keep)</span><input name="password" type="password" autocomplete="off" placeholder="Leave blank to keep"></label>
           <label class="field"><span>Role</span>
             <select name="role">
-              ${['Business Owner','Manager','Cashier','Technician'].map(r =>
+              ${(state.role === 'Manager' ? ['Cashier','Technician'] : ['Manager','Cashier','Technician']).map(r =>
                 `<option ${r===e.role?'selected':''}>${r}</option>`).join('')}
             </select></label>
           <label class="field"><span>Status</span>
@@ -545,7 +547,7 @@ function renderModal() {
         </label>
         <label class="field"><span>Role</span>
           <select name="role">
-            <option>Cashier</option><option>Technician</option><option>Manager</option>
+            <option>Cashier</option><option>Technician</option>${state.role === 'Manager' ? '' : '<option>Manager</option>'}
           </select></label>
       </div>
       <p class="muted" style="font-size:12px;margin-top:-6px">Share this password with the employee yourself — no invite email is sent.</p>
@@ -802,7 +804,7 @@ function attachEvents() {
     }
     if (el.dataset.action === 'logout') {
       if (!confirm('Log out?')) return
-      _clearSession()
+      await _clearSession()
       const { navigate } = await import('../router.js')
       navigate('/login', { force: true }); return
     }
@@ -825,45 +827,17 @@ function attachEvents() {
     if (el.dataset.action === 'remove-employee') {
       const name      = el.dataset.empName || 'this employee'
       const empId     = el.dataset.empId
-      const canDelete = el.dataset.empCanDelete === 'true'
-
-      // Determine action before opening PIN prompt
-      let chosenAction = 'deactivate'  // default for Managers
-      if (canDelete) {
-        const choice = confirm(
-          `What would you like to do with ${name}?\n\n` +
-          `OK = Permanently Delete\n` +
-          `Cancel = Make Inactive only`
-        )
-        chosenAction = choice ? 'delete' : 'deactivate'
-      }
+      if (!confirm(`Make ${name} inactive? Historical records will be preserved.`)) return
 
       openPinPrompt('admin', async (verified) => {
-        // Security guard — only proceed if PIN was actually verified
         if (!verified) return
-
-        if (chosenAction === 'delete') {
-          const { error } = await sb.from('employees').delete().eq('id', empId)
-          if (error) {
-            if (error.message.includes('foreign key') || error.message.includes('violates')) {
-              // Has transaction history — fall back to deactivate
-              const { error: deactErr } = await sb.from('employees')
-                .update({ status: 'Inactive' }).eq('id', empId)
-              if (deactErr) { alert('Error: ' + deactErr.message); return }
-              alert(`${name} has transaction history and cannot be permanently deleted.\nSet to Inactive instead.`)
-            } else {
-              alert('Error deleting employee: ' + error.message); return
-            }
-          }
-        } else {
-          // Deactivate only
-          const { error } = await sb.from('employees')
-            .update({ status: 'Inactive' }).eq('id', empId)
-          if (error) { alert('Error deactivating: ' + error.message); return }
-        }
-
-        // Clear active sessions regardless of action
-        await sb.from('active_sessions').delete().eq('employee_id', String(empId))
+        const found = state.data.employees.find(e => String(e.id) === String(empId))
+        if (!found) return
+        const result = await invokeAccountAdmin('update-employee', {
+          employeeId: Number(empId), name: found.name, email: found.email,
+          role: found.role, status: 'Inactive',
+        })
+        if (!result.ok) { alert('Error deactivating: ' + result.error); return }
         await load()
       }, render); return
     }
@@ -1143,25 +1117,28 @@ function attachEvents() {
 
     if (type === 'edit-employee') {
       const empId   = form.dataset.empId
-      const updates = { name:data.name, role:data.role, status:data.status, email:(data.email||'').toLowerCase().trim() }
+      const updates = { employeeId:Number(empId), name:data.name, role:data.role, status:data.status, email:(data.email||'').toLowerCase().trim() }
       if (data.password?.trim()) {
         const err = validatePassword(data.password)
         if (err) { alert(err); return }
-        updates.password = data.password
       }
-      const { error } = await sb.from('employees').update(updates).eq('id', empId)
-      if (error) { alert('Error updating: '+error.message); return }
+      const result = await invokeAccountAdmin('update-employee', updates)
+      if (!result.ok) { alert('Error updating: '+result.error); return }
+      if (data.password?.trim()) {
+        const reset = await invokeAccountAdmin('reset-password', { email: updates.email, newPassword: data.password })
+        if (!reset.ok) { alert('Employee details were saved, but password reset failed: ' + reset.error); return }
+      }
       state.modal = null; await load(); return
     }
 
     if (type === 'employee') {
       const pwErr = validatePassword(data.password||'')
       if (pwErr) { alert(pwErr); return }
-      const { error } = await sb.from('employees').insert({
+      const result = await invokeAccountAdmin('create-employee', {
         name:data.name, email:(data.email||'').toLowerCase().trim(),
-        password:data.password, role:data.role||'Cashier', status:'Active',
+        password:data.password, role:data.role||'Cashier',
       })
-      if (error) { alert('Error saving employee: '+error.message); return }
+      if (!result.ok) { alert('Error saving employee: '+result.error); return }
       state.modal = null; await load(); return
     }
 
@@ -1185,30 +1162,24 @@ function attachEvents() {
       if (data.ticketPrefix)        updates.ticket_prefix    = data.ticketPrefix.trim().toUpperCase()
       if (data.receiptFooter)       updates.terms_text       = data.receiptFooter
       if (data.businessDescription) updates.shop_description = data.businessDescription
-      const { error } = await sb.from('shop_config').update(updates).eq('id',1)
-      if (error) { alert('Settings error: '+error.message); return }
+      const result = await invokeAccountAdmin('update-config', { updates })
+      if (!result.ok) { alert('Settings error: '+result.error); return }
       state.modal = null; await load(); return
     }
 
     if (type === 'owner-login') {
-      const updates = {}
-      if (data.owner_email?.trim())    updates.owner_email    = data.owner_email.toLowerCase().trim()
-      if (data.owner_password?.trim()) {
-        const err = validatePassword(data.owner_password)
-        if (err) { alert(err); return }
-        updates.owner_password = data.owner_password
-      }
-      if (!Object.keys(updates).length) { alert('Nothing to update.'); return }
-      const { error } = await sb.from('shop_config').update(updates).eq('id',1)
-      if (error) { alert('Error: '+error.message); return }
-      Object.assign(CFG, updates); alert('Owner login updated.'); return
+      const email = data.owner_email?.toLowerCase().trim()
+      if (!email) { alert('Enter an owner email.'); return }
+      const result = await invokeAccountAdmin('update-owner', { email })
+      if (!result.ok) { alert('Error: '+result.error); return }
+      alert('Owner email updated.'); return
     }
 
     if (type === 'override-pin') {
       if (!data.override_pin?.trim()) { alert('Enter a PIN.'); return }
-      const { error } = await sb.from('shop_config').update({ override_pin:data.override_pin }).eq('id',1)
-      if (error) { alert('Error: '+error.message); return }
-      CFG.override_pin = data.override_pin; alert('Override PIN updated.'); return
+      const result = await invokeAccountAdmin('set-pin', { pin:data.override_pin })
+      if (!result.ok) { alert('Error: '+result.error); return }
+      alert('Override PIN updated.'); return
     }
 
     if ((type === 'inv-add' || type === 'inv-edit') && _inv) {
@@ -1261,15 +1232,20 @@ function _addComponentToDraft(name, tag, customText) {
 }
 
 async function verifyAdminLocal(pin) {
-  return String(pin) === String(CFG.override_pin)
-    ? { ok: true } : { ok: false }
+  return verifyCurrentStepUpPin(pin)
 }
 
 /* ── Public ── */
 export async function initAdmin(sess, module, query) {
   dlog('ADMIN.initAdmin', `ENTRY module=${module} _eventsAttached=${_eventsAttached} caller=[${callerInfo()}]`)
   SESSION    = sess
-  state.role = sess.isAdmin ? 'Business Owner' : (sess.employee?.role || 'Manager')
+  state.role = sess.employee?.role || null
+  const requestedModule = module || 'dashboard'
+  if (!can(requestedModule, state.role)) {
+    const { navigate } = await import('../router.js')
+    navigate(state.role === 'Technician' ? '/workshop' : '/pos', { replace: true })
+    return
+  }
   if (module) adminState.adminModule = module
   if (module === 'settings' && query?.tab) adminState.settingsTab = query.tab
   if (module === 'catalog'  && query?.tab) adminState.catalogTab  = query.tab
