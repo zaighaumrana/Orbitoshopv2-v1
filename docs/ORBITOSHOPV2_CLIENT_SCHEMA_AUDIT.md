@@ -782,3 +782,14 @@ Added the first post-baseline migration:
 - Fixed duplicate route resolution after login.
 - Added Turnstile widget cleanup during successful authentication.
 
+### Phase 2 authentication/RLS stabilization
+
+Phase 2 work is tracked in `docs/PHASE2_AUTH_RLS_FORENSIC.md`.
+
+The DEV database now has the additive canonical `app_users` identity layer,
+server-only hash vault, server-only shop security, short-lived step-up records,
+safe configuration RPCs, and the Auth/administration/PIN/reset/public-tracking
+Edge Functions. Legacy passwords and PIN data were hashed and their old
+plaintext locations were nulled. The final authenticated RLS migration is kept
+local until the mandated real Owner/employee/Support session gate passes.
+
