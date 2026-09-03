@@ -134,12 +134,11 @@ create policy repair_components_update_admin
   on public.repair_components for update to authenticated
   using ((select app_private.current_client_access_allowed()) and (select app_private.current_app_role()) in ('Business Owner', 'Manager', 'Orbito Support'))
   with check ((select app_private.current_client_access_allowed()) and (select app_private.current_app_role()) in ('Business Owner', 'Manager', 'Orbito Support'));
-create policy repair_components_delete_step_up
+create policy repair_components_delete_admin
   on public.repair_components for delete to authenticated
   using (
     (select app_private.current_client_access_allowed())
     and (select app_private.current_app_role()) in ('Business Owner', 'Manager', 'Orbito Support')
-    and (select app_private.has_step_up('remove-component'))
   );
 
 create policy tickets_select_staff

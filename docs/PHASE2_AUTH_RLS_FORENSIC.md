@@ -139,7 +139,7 @@ separate migration; the compatibility column remains.
 | `employees` | Owner/Support/Manager roster; employee own row | none; `account-admin` only |
 | `inventory` | Cashier/Manager/Owner/Support | Manager/Owner/Support |
 | `quick_items` | all active application roles | Manager/Owner/Support |
-| `repair_components` | all active application roles | Manager/Owner/Support; delete needs `remove-component` step-up |
+| `repair_components` | all active application roles | Manager/Owner/Support |
 | `tickets` | all active application roles | counter insert; staff update |
 | `sales` | Cashier/Manager/Owner/Support | counter insert; discount/Udhar variants require matching step-up |
 | `returns` | Cashier/Manager/Owner/Support | insert requires `return` step-up |
@@ -190,7 +190,9 @@ or exposing credentials:
 
 - Ticket updates remain row-authorized but not column/transition-specific because
   existing repair payment/status logic spans several direct updates. Tightening
-  those invariants belongs with the repair/accounting stabilization phase.
+  those invariants belongs with the repair/accounting stabilization phase. The
+  UI verifies `remove-component`, but the subsequent JSON ticket update cannot
+  yet require that purpose without also blocking unrelated ticket updates.
 - Step-up rows are reusable for their short lifetime rather than transaction-
   consumed. They are bound to Auth user and exact purpose and expire after about
   75 seconds.
@@ -218,4 +220,3 @@ of the old plaintext column.
 Phase 2 is not yet safe to merge. The real-session gate and live RLS cutover are
 still pending. The final migration ledger and final schema comparison must be
 recorded after that cutover.
-

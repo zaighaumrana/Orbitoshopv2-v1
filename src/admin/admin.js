@@ -455,7 +455,7 @@ function settingsTabContent() {
             Not a login PIN — an authorization PIN for protected operations.
           </p>
           <form class="form-grid" data-form="override-pin">
-            ${fld('New Override PIN','override_pin','','password')}
+            ${fld('New Override PIN','new_pin','','password')}
             <div class="modal-actions" style="grid-column:1/-1">
               <button class="primary-button">Save PIN</button>
             </div>
@@ -1176,8 +1176,8 @@ function attachEvents() {
     }
 
     if (type === 'override-pin') {
-      if (!data.override_pin?.trim()) { alert('Enter a PIN.'); return }
-      const result = await invokeAccountAdmin('set-pin', { pin:data.override_pin })
+      if (!data.new_pin?.trim()) { alert('Enter a PIN.'); return }
+      const result = await invokeAccountAdmin('set-pin', { pin:data.new_pin })
       if (!result.ok) { alert('Error: '+result.error); return }
       alert('Override PIN updated.'); return
     }
