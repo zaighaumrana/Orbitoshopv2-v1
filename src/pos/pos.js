@@ -799,7 +799,7 @@ async function placeOrder() {
 
   if (ticketItem.isNewTicket) {
     dlog('POS.placeOrder', 'isNewTicket branch -- calling repairs.insertNewTicketFromCart()')
-    const res = await insertNewTicketFromCart(ticketItem, SESSION.employee?.name)
+    const res = await insertNewTicketFromCart(ticketItem)
     if (!res.ok) { dlog('POS.placeOrder', `INSERT FAILED: ${res.error}`); alert('Error placing order: ' + res.error); return }
     dlog('POS.placeOrder', `INSERT SUCCEEDED ticket_number=${res.data.ticket_number} id=${res.data.id} -- calling load() next`)
 
@@ -822,7 +822,7 @@ async function placeOrder() {
   const payAmount = ticketItem.topupAmount
   const payMethod = ticketItem.topupMethod
   dlog('POS.placeOrder', 'existing-ticket branch -- calling repairs.collectTicketPayment()')
-  const res = await collectTicketPayment(ticket, payAmount, payMethod)
+  const res = await collectTicketPayment(ticket, payAmount, payMethod, ticketItem.requestId)
   if (!res.ok) { alert('Error recording payment: ' + res.error); return }
 
   posState.cart = posState.cart.filter(i => !i.isTicket)
@@ -1127,6 +1127,7 @@ function attachEvents() {
         ticketId:      ticket.id,
         topupAmount:   amount,
         topupMethod:   method,
+        requestId:     crypto.randomUUID(),
       })
       posState.cartTicketId = ticket.id
       state.modal = null
@@ -1376,6 +1377,7 @@ function attachEvents() {
         reason:        '',
         isTicket:      true,
         isNewTicket:   true,
+        requestId:     crypto.randomUUID(),
         customerName:  data.customerName,
         customerPhone: data.customerPhone,
         deviceBrand:   data.deviceBrand,

@@ -967,3 +967,23 @@ Applied `20260904210000_phase3_atomic_retail_checkout.sql` to DEV.
 - Advisor review found only the intentionally callable authenticated transaction
   RPC plus documented baseline notices; no new missing-FK-index finding.
 
+### Phase 3E atomic repair transactions
+
+Applied `20260904220000_phase3_atomic_repair_transactions.sql` to DEV.
+
+- Added unique non-null `tickets.request_id` and `tickets.invoice_number`
+  indexes plus the previously missing repair-family parent index.
+- Added `create_repair_ticket`, which atomically assigns the ticket/invoice
+  numbers, locks the original invoice, and records initial payment/allocation.
+- Added `record_repair_payment`, which locks one root family, validates its
+  current obligation and allocates each tender parent-first/oldest-first.
+- Compatibility `amount_paid`, `balance_due` and `payment_history` are derived
+  from canonical allocations. Payment never changes repair status or delivery
+  timestamps.
+- POS new-ticket placement and collection now use retry-safe UUID-backed RPCs.
+- Rollback-only tests passed no-advance, advance, duplicate create/payment,
+  Cash change, parent/child allocation and denial cases. No fixture remained.
+- Anonymous execution is denied; Technician payment is denied by the canonical
+  role check. Advisor output added only the expected reviewed RPC notices and no
+  new missing-FK-index finding.
+

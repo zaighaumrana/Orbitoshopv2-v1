@@ -265,6 +265,7 @@ Applied migration:
 | `20260904200000_phase3_ledger_foundation.sql` | Nine canonical ledger/audit tables, constraints, indexed foreign keys, RLS and read-only role policies | applied |
 | `20260904203000_phase3_deterministic_backfill.sql` | Guarded normalization of deterministic legacy sale lines, payments, allocations, Udhar approval and Inventory opening balances | applied |
 | `20260904210000_phase3_atomic_retail_checkout.sql` | Idempotent retail-sale RPC, canonical lines/tenders/allocations/Udhar and atomic Inventory decrement | applied |
+| `20260904220000_phase3_atomic_repair_transactions.sql` | Idempotent original repair creation/advance and parent-first repair-family payment allocation | applied |
 
 Post-apply verification:
 
@@ -293,9 +294,17 @@ lines, payments, allocations, credit approval, compatibility Udhar row and
 Inventory movement together. Its caller supplies `crypto.randomUUID()` and a
 retry returns the original committed receipt.
 
-Later PostgreSQL transaction RPCs will own repair creation, repair payment,
-additional-work decision, repair adjustment, cancellation/refund, delivery,
-retail return and Inventory adjust/restock.
+`create_repair_ticket` now commits the locked original repair invoice and every
+initial tender/allocation together. The full quote becomes the obligation
+immediately; an unpaid balance at intake needs no Udhar approval while the shop
+still holds the device. `record_repair_payment` accepts one root family,
+validates tender/change and current outstanding, then allocates parent-first and
+oldest-child-first. It updates only derived compatibility paid/balance/history
+fields and never changes operational status or `collected_at`.
+
+Later PostgreSQL transaction RPCs will own additional-work decisions, repair
+adjustment, cancellation/refund, delivery, retail return and Inventory
+adjust/restock.
 
 No direct browser mutation of ledger tables will be granted. Platform BILL
 logging will remain semantically unchanged and occur only after a successful
@@ -321,6 +330,10 @@ inserts `sales` and then `udhar` in separate browser requests. Cart lines retain
 their Inventory or Quick Item identity, and a failed request retains its UUID so
 a retry is idempotent. Successful checkout clears the UUID. Existing one-method
 UX remains unchanged; the RPC already accepts optional split tenders.
+
+Phase 3E changed new-ticket placement and repair collection to the atomic repair
+RPCs. Request UUIDs are attached to cart actions and retained until the action
+succeeds. Existing simple intake and collect-payment screens remain in place.
 
 Planned UX keeps the existing short workflows while moving writes to atomic
 RPCs. It adds optional split tender, explicit Udhar authorization, partial
@@ -362,6 +375,20 @@ Phase 3D rollback-only database/RPC matrix passed:
 - all probes were rolled back; retained test sales: 0, canonical backfill counts
   remain 12 payments, 12 allocations and 2 opening movements
 
+Phase 3E rollback-only database/RPC matrix passed:
+
+- repair with no advance and repair with a 3,000 advance
+- original 10,000 quote remained the obligation; paid/balance became
+  3,000/7,000 at creation and 5,000/5,000 after a later payment
+- advance appeared once in `payments` and once in allocations
+- duplicate create and duplicate payment each retained one event
+- Cash 2,000 tendered as 2,500 recorded 500 change
+- a 6,000 family payment allocated 5,000 to the parent then 1,000 to its child
+- payment left `Pending` unchanged and did not populate `collected_at`
+- advance greater than invoice, non-Cash overpay, short Cash tender and
+  Technician payment were denied
+- all fixtures were rolled back; retained test tickets/payments: 0
+
 Not yet run: later Phase 3 RPCs and full real-browser regression.
 
 Security advisor baseline has no critical Phase 3 finding. Existing Phase 2
@@ -386,8 +413,9 @@ It did delete the six explicitly authorized DEV-only rows described above. That
 cleanup has no migration rollback and is recoverable only from an available
 Supabase backup/PITR source.
 
-Phase 3B was additive, Phase 3C populated canonical ledger history, and Phase 3D
-made the new retail writer canonical. Dropping the nine tables is now forbidden.
+Phase 3B was additive, Phase 3C populated canonical ledger history, Phase 3D
+made the new retail writer canonical, and Phase 3E cut original repair creation
+and collection to transactional RPCs. Dropping the nine tables is now forbidden.
 Any rollback must switch readers/writers while
 retaining the backfilled financial and Inventory-opening records; it must not
 touch any legacy table or Phase 2 helper.
@@ -405,6 +433,8 @@ stage requires dry-run, DEV-only apply, verification, advisors and documentation
 - Legacy direct financial mutation paths remain until a later staged cutover.
 - Retail split-tender input is supported by the RPC but its optional UI is still
   pending Phase 3J.
+- Direct legacy ticket INSERT remains temporarily available for the existing
+  sub-invoice flow; Phase 3F must replace and remove that alternate path.
 - Existing `SECURITY DEFINER`, leaked-password-plan and unindexed-FK notices
   remain documented Phase 2/baseline risks.
 
