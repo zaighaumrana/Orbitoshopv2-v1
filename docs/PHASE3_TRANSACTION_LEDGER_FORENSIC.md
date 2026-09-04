@@ -267,6 +267,9 @@ Applied migration:
 | `20260904210000_phase3_atomic_retail_checkout.sql` | Idempotent retail-sale RPC, canonical lines/tenders/allocations/Udhar and atomic Inventory decrement | applied |
 | `20260904220000_phase3_atomic_repair_transactions.sql` | Idempotent original repair creation/advance and parent-first repair-family payment allocation | applied |
 | `20260904230000_phase3_additional_work_and_adjustments.sql` | Durable additional-work decisions/child invoices, immutable PIN-authorized adjustments and closure of direct ticket INSERT | applied |
+| `20260905000000_phase3_repair_cancellation_and_delivery.sql` | PIN-authorized cancellation/refund, explicit paid-or-Udhar delivery and protected ticket financial fields | applied |
+| `20260905010000_phase3_retail_returns_and_inventory_adjustments.sql` | Partial retail returns, actual-refund calculation, optional restock and audited Inventory create/adjust RPCs | applied |
+| `20260905011000_phase3_return_line_invariant.sql` | Deferred invariant preventing an empty return header from committing | applied |
 
 Post-apply verification:
 
@@ -282,8 +285,7 @@ Post-apply verification:
   equals current quantity 50
 - no refund, return-line, invoice-adjustment or additional-work history was
   invented
-- local/remote migration ledger includes `20260904200000` and
-  `20260904203000`
+- local/remote migration ledger matches through `20260905011000`
 
 ## 8. Planned transaction and idempotency boundaries
 
@@ -454,6 +456,42 @@ Phase 3G rollback-only database/RPC matrix passed:
 The deployed `verify-pin` Edge Function is version 2 with JWT verification
 enabled and accepts the new exact `repair-refund` purpose.
 
+Phase 3H rollback-only database/RPC matrix passed:
+
+- a tax-inclusive fully paid Quick Item return reduced the full 110 obligation,
+  refunded 110 Cash and created no stock movement
+- an Inventory quantity-5 line returned 2 with restock and then 1 without
+  restock; the first added exactly 2 sellable units and one movement, while the
+  second changed no stock
+- the return context reported sold 5, already returned 3 and remaining 2; an
+  attempted quantity 3 was denied
+- replaying the first partial-return request created no duplicate header,
+  refund, line or stock movement
+- a damaged/non-sellable Inventory return refunded correctly without changing
+  stock
+- for a 1,000 sale with only 200 paid, returning value 500 produced no refund
+  and reduced Udhar from 800 to 300
+- for a 1,000 sale with 800 paid, returning value 500 refunded exactly 300 by
+  the persisted Raast method and settled the credit compatibility state
+- Inventory item creation with quantity 4 created one opening movement;
+  restock +3 and manual correction -2 reconciled to quantity 5
+- duplicate stock adjustment was idempotent and a correction that would create
+  negative stock was denied
+- missing/wrong/expired return step-up, Technician return/lookup/stock change,
+  direct return INSERT and direct Inventory quantity UPDATE were denied
+- a SQL NULL line-array probe was rejected by the deferred return-line
+  invariant with no header retained
+- every probe rolled back: zero `P3H` sales/Inventory rows, zero returns,
+  return lines or refunds remain; live counts remain 12 payments and 2 opening
+  Inventory movements
+
+The POS return flow now shows every canonical sale line with sold, previously
+returned and remaining quantity, asks the restock question only for tracked
+Inventory, previews the commercial reduction and actual refund, and retains
+the familiar PIN/print workflow. Admin Inventory separates catalog editing from
+audited Restock/Manual Correction operations; non-zero creation quantity is an
+opening movement.
+
 Not yet run: later Phase 3 RPCs and full real-browser regression.
 
 Security advisor baseline has no critical Phase 3 finding. Existing Phase 2
@@ -461,15 +499,14 @@ notices remain: deliberately closed RLS/no-policy service tables, deliberately
 callable reviewed `SECURITY DEFINER` configuration/sequence functions, and
 leaked-password protection unavailable below Supabase Pro.
 
-Performance advisor baseline reports 11 existing unindexed foreign keys,
-including `returns.original_sale_id`, `sales.employee_id`, `sales.ticket_id`,
-`tickets.parent_ticket_id` and `udhar.sale_id`. New Phase 3 foreign keys will be
-indexed; unrelated old indexes remain separately scoped unless needed by the
-new transaction queries.
+The performance advisor initially reported 11 existing unindexed foreign keys.
+Phase 3E added the repair-family parent index and Phase 3H added both return
+header indexes. The current remaining notices are seven unrelated baseline
+foreign keys across attendance, leave, salary, sales and support audit data.
 
-The Phase 3B through Phase 3G advisor reruns reported no unexpected security
+The Phase 3B through Phase 3H advisor reruns reported no unexpected security
 finding and no missing-index finding for a new Phase 3 foreign key. The Phase
-3G callable transaction RPC notices are intentional and protected by their
+3 transaction RPC notices are intentional and protected by their
 internal Auth/role/suspension/step-up checks. Fresh actor indexes report unused
 until application traffic exercises them.
 
@@ -484,7 +521,9 @@ Phase 3B was additive, Phase 3C populated canonical ledger history, Phase 3D
 made the new retail writer canonical, Phase 3E cut original repair creation and
 collection to transactional RPCs, Phase 3F closed direct ticket INSERT, and
 Phase 3G made cancellation/refund and physical delivery dedicated guarded
-transactions.
+transactions. Phase 3H removed direct return and Inventory creation paths,
+protected current quantity, and made partial return/refund/restock plus manual
+stock changes atomic and auditable.
 Dropping the nine tables is now forbidden.
 Any rollback must switch readers/writers while
 retaining the backfilled financial and Inventory-opening records; it must not
@@ -500,8 +539,7 @@ stage requires dry-run, DEV-only apply, verification, advisors and documentation
 
 - Historical Inventory movements/restock cannot be reconstructed.
 - Two legacy Ready timestamps are not physical-delivery evidence.
-- Legacy return, Inventory-adjustment and Udhar-settlement mutation paths remain
-  until their later staged cutovers.
+- Legacy Udhar-settlement mutation remains until the Phase 3I cutover.
 - Retail split-tender input is supported by the RPC but its optional UI is still
   pending Phase 3J.
 - Pending/Declined additional-work controls and repair-adjustment UI are not yet

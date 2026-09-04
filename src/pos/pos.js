@@ -20,6 +20,7 @@ import {
 import {
   getSubInvoices, createSubInvoice, markComponentNotNeeded, deliverRepair,
 } from '../features/repairs/api.js'
+import { getRetailReturnContext, createRetailReturn } from '../features/pos/returns/api.js'
 import {
   insertNewTicketFromCart, collectTicketPayment,
 } from '../features/pos/repairs/api.js'
@@ -735,34 +736,54 @@ function renderModal() {
 
   if (type === 'returnFlow') {
     const receiptInput = state.modal.receiptNo||''
-    const sale = receiptInput
-      ? (state.data.sales||[]).find(s => matchesInvoiceSearch(s.invoice_number, receiptInput, CFG.invoice_prefix))
-      : null
-    if (!sale) return `<div class="modal-backdrop"><form class="modal modal-sm" data-form="return-lookup">
+    const context = state.modal.context
+    if (!context) return `<div class="modal-backdrop"><form class="modal modal-sm" data-form="return-lookup">
       <h2>Process Return</h2>
       <p class="muted">Enter the invoice number from the original receipt (just the numbers — the "${CFG.invoice_prefix||'INV'}" prefix is added automatically).</p>
       ${fld('Invoice No.','receiptNo',receiptInput)}
       ${state.modal.notFound?`<p style="color:var(--danger);font-size:13px">Invoice not found.</p>`:''}
       <div class="modal-actions"><button class="secondary-button" data-close>Cancel</button><button class="primary-button">Look Up</button></div>
     </form></div>`
-    const items = sale.items_sold||[]
+    const sale = context.sale
+    const items = (context.lines||[]).filter(line => Number(line.remainingQuantity)>0)
+    const financial = context.financial||{}
+    const currentObligation = Number(financial.originalObligation||0)-Number(financial.commercialReduction||0)
+    const netPaid = Number(financial.paymentsReceived||0)-Number(financial.refundsPaid||0)
+    const currentOutstanding = Math.max(0,currentObligation-netPaid)
     return `<div class="modal-backdrop"><form class="modal modal-md" data-form="return-confirm">
-      <h2>Return — ${sale.invoice_number}</h2>
-      <p class="muted">${sale.customer_name||'Walk-in'} · ${new Date(sale.created_at).toLocaleDateString()}</p>
+      <h2>Return — ${sale.invoiceNumber}</h2>
+      <p class="muted">${sale.customerName||'Walk-in'} · ${new Date(sale.createdAt).toLocaleDateString()}</p>
       <div style="display:grid;gap:8px;margin:10px 0">
-        ${items.map((item,i)=>`
-          <label style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface-2);border-radius:8px">
-            <input type="checkbox" name="ret_${i}" value="${i}" checked>
-            <span style="flex:1">${item.name} × ${item.qty}</span>
-            <strong>${money((item.sold_price||item.soldPrice||0)*item.qty)}</strong>
-          </label>`).join('')}
+        ${items.length ? items.map(item=>`
+          <div style="padding:10px;background:var(--surface-2);border-radius:8px;display:grid;gap:8px">
+            <div style="display:flex;justify-content:space-between;gap:8px">
+              <span><strong>${item.name}</strong>${item.variantName?` · ${item.variantName}`:''}<br>
+                <small class="muted">Sold ${item.soldQuantity} · already returned ${item.alreadyReturned}</small></span>
+              <strong>${money(item.remainingValue)} remaining</strong>
+            </div>
+            <div class="form-grid">
+              <label class="field"><span>Return quantity (max ${item.remainingQuantity})</span>
+                <input type="number" name="qty_${item.saleLineId}" min="0" max="${item.remainingQuantity}" step="1" value="0"
+                  data-return-qty="${item.saleLineId}"></label>
+              ${item.itemKind==='inventory'?`<label class="field"><span>Return to sellable stock?</span>
+                <select name="restock_${item.saleLineId}"><option value="true">Yes</option><option value="false">No — damaged/non-sellable</option></select>
+              </label>`:''}
+            </div>
+          </div>`).join('') : '<div class="empty">All quantities on this invoice have already been returned.</div>'}
       </div>
       <label class="field"><span>Refund Method</span>
         <select name="refundMethod">${['Cash','Raast','JazzCash','EasyPaisa','Bank Transfer'].map(m => `<option>${m}</option>`).join('')}</select>
       </label>
-      <label class="field"><span>Notes</span><textarea name="notes"></textarea></label>
+      <label class="field"><span>Reason</span><textarea name="notes" required></textarea></label>
+      <div style="padding:10px;background:var(--surface-2);border-radius:8px;display:grid;gap:4px">
+        <div style="display:flex;justify-content:space-between"><span>Current obligation</span><strong>${money(currentObligation)}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Net paid</span><strong>${money(netPaid)}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Current outstanding</span><strong>${money(currentOutstanding)}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Return value</span><strong id="return-value-preview">${money(0)}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Actual refund due</span><strong id="refund-due-preview">${money(0)}</strong></div>
+      </div>
       <input type="hidden" name="saleId" value="${sale.id}">
-      <div class="modal-actions"><button class="secondary-button" data-close>Cancel</button><button class="primary-button">Process Return</button></div>
+      <div class="modal-actions"><button class="secondary-button" data-close>Cancel</button><button class="primary-button" ${items.length?'':'disabled'}>Process Return</button></div>
     </form></div>`
   }
 
@@ -796,6 +817,48 @@ function removeCartItem(productId) {
     posState.cartIsNewTicket = false
   }
   render()
+}
+
+function retailReturnSelection(context) {
+  const selected = []
+  let reduction = 0
+  for (const line of context?.lines||[]) {
+    const input = document.querySelector(`[data-return-qty="${line.saleLineId}"]`)
+    const quantity = Number(input?.value||0)
+    if (!Number.isInteger(quantity) || quantity<=0) continue
+    const remaining = Number(line.remainingQuantity||0)
+    if (quantity>remaining) return { error:`Return quantity for ${line.name} exceeds ${remaining}.` }
+    const lineReduction = quantity===remaining
+      ? Number(line.remainingValue||0)
+      : Math.round((Number(line.grossLineValue||0)*quantity/Number(line.soldQuantity||1))*100)/100
+    reduction += lineReduction
+    selected.push({
+      saleLineId:Number(line.saleLineId), quantity,
+      restock:line.itemKind==='inventory'
+        ? document.querySelector(`[name="restock_${line.saleLineId}"]`)?.value==='true'
+        : false,
+      name:line.name, sold_price:lineReduction/quantity,
+    })
+  }
+  const financial = context?.financial||{}
+  const currentObligation = Number(financial.originalObligation||0)-Number(financial.commercialReduction||0)
+  const netPaid = Number(financial.paymentsReceived||0)-Number(financial.refundsPaid||0)
+  const newObligation = Math.max(0,currentObligation-reduction)
+  return {
+    lines:selected,
+    reduction:Math.round(reduction*100)/100,
+    refundDue:Math.round(Math.max(0,netPaid-newObligation)*100)/100,
+  }
+}
+
+function refreshRetailReturnPreview() {
+  if (state.modal?.type!=='returnFlow' || !state.modal.context) return
+  const preview = retailReturnSelection(state.modal.context)
+  if (preview.error) return
+  const reductionEl = document.getElementById('return-value-preview')
+  const refundEl = document.getElementById('refund-due-preview')
+  if (reductionEl) reductionEl.textContent=money(preview.reduction)
+  if (refundEl) refundEl.textContent=money(preview.refundDue)
 }
 
 /* ── Place Order: lock the ticket, create the invoice ── */
@@ -1333,6 +1396,7 @@ function attachEvents() {
     }
     if (t.dataset.invSearch !== undefined)    { posState.invSearch = t.value; render() }
     if (t.dataset.repairSearch !== undefined) { posState.repairSearch = t.value; render() }
+    if (t.dataset.returnQty !== undefined) refreshRetailReturnPreview()
     if (t.dataset.draftCompPrice !== undefined) {
       const idx = Number(t.dataset.draftCompPrice)
       const draft = getDraft()
@@ -1430,27 +1494,35 @@ function attachEvents() {
 
     if (type === 'return-lookup') {
       const found = (state.data.sales||[]).find(s => matchesInvoiceSearch(s.invoice_number, data.receiptNo, CFG.invoice_prefix))
-      state.modal = found
-        ? { type:'returnFlow', receiptNo:found.invoice_number }
-        : { type:'returnFlow', notFound:true, receiptNo:data.receiptNo }
+      if (!found) {
+        state.modal = { type:'returnFlow', notFound:true, receiptNo:data.receiptNo }
+        render(); return
+      }
+      const lookup = await getRetailReturnContext(found.id)
+      if (!lookup.ok) { alert('Return lookup failed: '+lookup.error); return }
+      state.modal = { type:'returnFlow', receiptNo:found.invoice_number, context:lookup.data }
       render(); return
     }
 
     if (type === 'return-confirm') {
       const saleId   = Number(data.saleId)
-      const sale     = (state.data.sales||[]).find(s=>s.id===saleId)
-      const items    = sale?.items_sold||[]
-      const returned = items.filter((_,i)=>data[`ret_${i}`]!==undefined)
-      const refund   = returned.reduce((s,it)=>s+(it.sold_price||it.soldPrice||0)*it.qty,0)
+      const context  = state.modal?.context
+      const preview  = retailReturnSelection(context)
+      if (preview.error) { alert(preview.error); return }
+      if (!preview.lines.length) { alert('Enter a return quantity for at least one item.'); return }
+      const reason = String(data.notes||'').trim()
+      if (!reason) { alert('Enter a return reason.'); return }
       openPinPrompt('return', async (verified) => {
         if (!verified) return
-        const { error } = await sb.from('returns').insert({
-          original_sale_id:saleId, returned_items:returned,
-          refund_amount:refund, processed_by:SESSION.employee?.id||null, notes:data.notes||''
-        })
-        if (error) { alert('Return error: '+error.message); return }
+        const result = await createRetailReturn(saleId,preview.lines.map(({saleLineId,quantity,restock}) => ({saleLineId,quantity,restock})),data.refundMethod,reason)
+        if (!result.ok) { alert('Return error: '+result.error); return }
+        const refund = Number(result.data?.return?.refund_amount||0)
         const { buildReturnSlip, printThermal } = await import('../print/print.js')
-        printThermal(buildReturnSlip({ invoiceNumber: sale?.invoice_number||`#${saleId}`, items:returned, refund, method:data.refundMethod }))
+        printThermal(buildReturnSlip({
+          invoiceNumber:context?.sale?.invoiceNumber||`#${saleId}`,
+          items:preview.lines.map(line => ({ name:line.name, qty:line.quantity, sold_price:line.sold_price })),
+          refund, method:refund>0?data.refundMethod:'No cash refund',
+        }))
         state.modal = null; await load()
       }, render); return
     }

@@ -1032,3 +1032,35 @@ Applied `20260905000000_phase3_repair_cancellation_and_delivery.sql` to DEV.
 - Advisor review found only the expected reviewed transaction-RPC and baseline
   notices; no new missing-index finding for a Phase 3 foreign key.
 
+### Phase 3H retail returns and Inventory movements
+
+Applied `20260905010000_phase3_retail_returns_and_inventory_adjustments.sql`
+and the defensive `20260905011000_phase3_return_line_invariant.sql` follow-up
+to DEV.
+
+- Added idempotent request identity and persisted refund method to return
+  headers, plus the missing source-sale and processor indexes.
+- Added `get_retail_return_context` and PIN-protected `create_retail_return`.
+  The transaction validates cumulative quantities, allocates tax to line
+  reductions, reduces unpaid debt before money-out, persists an actual refund
+  only when due, updates credit compatibility state, and optionally restocks
+  tracked Inventory with an immutable movement.
+- Removed direct authenticated return INSERT and Inventory INSERT. A trigger
+  prevents direct current-quantity updates while existing authorized catalog
+  metadata edits remain available.
+- Added idempotent `create_inventory_item` and `adjust_inventory_stock`; opening
+  quantity, restock and manual correction all create movement history and
+  negative stock is rejected.
+- POS now supports per-line partial quantities, prior-return visibility,
+  Inventory restock Yes/No, reason, refund method and live actual-refund
+  preview. Admin Inventory now separates catalog editing from Adjust Stock.
+- The complete rollback-only return/Inventory matrix passed, including paid,
+  partially unpaid, repeated partial, tax-inclusive, Quick Item, restock and
+  no-restock cases. Direct and Technician mutation probes were denied.
+- The follow-up deferred constraint proved even a SQL NULL line-array cannot
+  commit an empty return header.
+- No fixture remained. Live counts remain 0 returns, 0 return lines, 0 refunds,
+  12 payments and 2 Inventory opening movements.
+- Advisors show no unexpected Phase 3 security finding and no missing index on
+  a new Phase 3 foreign key; the prior return FK notices are resolved.
+

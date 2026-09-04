@@ -564,7 +564,7 @@ function renderModal() {
 
   if (type === 'add-comp-tag') return addCompTagModalHTML(state.modal)
 
-  if (type === 'inv-add' || type === 'inv-edit') {
+  if (type === 'inv-add' || type === 'inv-edit' || type === 'inv-adjust') {
     return _inv ? _inv.inventoryModalHTML(type, id) : ''
   }
 
@@ -604,7 +604,7 @@ function attachEvents() {
       'button,[data-modal],[data-close],[data-action],' +
       '[data-settings-tab],[data-catalog-tab],[data-kpi-target],[data-pp-key],' +
       '[data-remove-quick],[data-remove-qitem],[data-add-qprice],[data-remove-qprice],' +
-      '[data-inv-edit],[data-inv-delete],[data-settle-id],[data-view-ticket],' +
+      '[data-inv-edit],[data-inv-adjust],[data-inv-delete],[data-settle-id],[data-view-ticket],' +
       '[data-mark-not-needed],[data-subinv-comp-remove],[data-add-draft-comp-name],[data-tag-select]'
     )
     if (!el) return
@@ -988,6 +988,7 @@ function attachEvents() {
     }
 
     if (el.dataset.invEdit && _inv) { _inv.handleInvEdit(el); render(); return }
+    if (el.dataset.invAdjust && _inv) { _inv.handleInvAdjust(el); render(); return }
     if (el.dataset.invDelete && _inv) {
       const { deleted } = await _inv.handleInvDelete(el)
       if (deleted) await load()
@@ -1179,8 +1180,9 @@ function attachEvents() {
       alert('Override PIN updated.'); return
     }
 
-    if ((type === 'inv-add' || type === 'inv-edit') && _inv) {
-      const fn = type === 'inv-add' ? _inv.submitInvAdd : _inv.submitInvEdit
+    if ((type === 'inv-add' || type === 'inv-edit' || type === 'inv-adjust') && _inv) {
+      const fn = type === 'inv-add' ? _inv.submitInvAdd
+        : type === 'inv-edit' ? _inv.submitInvEdit : _inv.submitInvAdjust
       const { ok } = await fn(data)
       if (!ok) return
       state.modal = null; await load(); return
