@@ -906,3 +906,22 @@ Inventory, Auth/app identities, employees and audit records were preserved.
 See `docs/PHASE3_TRANSACTION_LEDGER_FORENSIC.md` for the full preflight,
 backfill boundary, target model and required decision before implementation.
 
+### Phase 3B ledger foundation
+
+Applied `20260904200000_phase3_ledger_foundation.sql` to DEV.
+
+- Added `sale_lines`, `payments`, `payment_allocations`, `refunds`,
+  `invoice_adjustments`, `credit_approvals`, `additional_work_proposals`,
+  `return_lines`, and `inventory_movements`.
+- Added exact-money, identity-shape, positive-quantity, decision-state and
+  commercial-family constraints.
+- Indexed all new foreign-key and primary query paths.
+- Enabled RLS on all nine tables.
+- Granted authenticated SELECT only where required and added role-specific read
+  policies; anonymous access and direct authenticated mutation privileges are
+  zero.
+- Verified all nine tables were empty immediately after the foundation apply.
+- Security advisors found no new Phase 3 issue. Performance advisors found no
+  missing new FK index; unused-index notices are expected before ledger traffic.
+- Phase 2 Auth, support, step-up and suspension helpers were not changed.
+

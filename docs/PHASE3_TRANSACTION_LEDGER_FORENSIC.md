@@ -236,9 +236,9 @@ Backfill that must not be guessed:
 - physical delivery from tickets 9 and 17's auto-populated `collected_at`
 - any commercial amount for zero-value legacy records
 
-## 7. Planned target model
+## 7. Target model and applied schema
 
-No schema has been created. The additive target remains:
+Phase 3B applied the additive target foundation:
 
 - `sale_lines`: immutable retail line snapshots with explicit item kind and
   optional Inventory/Quick Item identity
@@ -255,6 +255,22 @@ No schema has been created. The additive target remains:
 
 Legacy headers and JSON snapshots will remain for compatibility. New ledger
 records become canonical only after a staged, tested cutover.
+
+Applied migration:
+
+| Migration | Purpose | DEV status |
+|---|---|---|
+| `20260904200000_phase3_ledger_foundation.sql` | Nine canonical ledger/audit tables, constraints, indexed foreign keys, RLS and read-only role policies | applied |
+
+Post-apply verification:
+
+- 9 of 9 Phase 3 tables exist and have RLS enabled
+- 9 read policies exist; no mutation policies exist
+- anonymous privileges: 0
+- authenticated mutation privileges: 0
+- authenticated SELECT grants: 9, constrained by role policies
+- initial rows in every new table: 0
+- local/remote migration ledger includes `20260904200000`
 
 ## 8. Planned transaction and idempotency boundaries
 
@@ -283,7 +299,7 @@ frozen.
 
 ## 10. Frontend, printing and reporting cutover plan
 
-No frontend change has been made in Phase 3A.
+No frontend change has been made through Phase 3B.
 
 Planned UX keeps the existing short workflows while moving writes to atomic
 RPCs. It adds optional split tender, explicit Udhar authorization, partial
@@ -312,8 +328,8 @@ Passed:
 
 Not yet run:
 
-- Phase 3 schema/RPC/financial/security/browser tests; no Phase 3 implementation
-  existed during the preflight
+- Phase 3 RPC/financial/browser tests; transactional RPCs and application
+  cutovers are not implemented yet
 
 Security advisor baseline has no critical Phase 3 finding. Existing Phase 2
 notices remain: deliberately closed RLS/no-policy service tables, deliberately
@@ -326,12 +342,22 @@ including `returns.original_sale_id`, `sales.employee_id`, `sales.ticket_id`,
 indexed; unrelated old indexes remain separately scoped unless needed by the
 new transaction queries.
 
+The Phase 3B advisor rerun reported no new security finding and no missing-index
+finding for a new foreign key. It reports the newly created indexes as unused,
+which is expected while all nine foundation tables are empty and no RPC traffic
+has occurred.
+
 ## 12. Rollback and deployment boundary
 
 Phase 3A changed no schema, RPC, policy, Edge Function or application source.
 It did delete the six explicitly authorized DEV-only rows described above. That
 cleanup has no migration rollback and is recoverable only from an available
 Supabase backup/PITR source.
+
+Phase 3B is additive. A rollback before ledger cutover may drop the nine empty
+tables in reverse dependency order, but should not touch any legacy table or
+Phase 2 helper. After backfill or cutover, dropping ledger history is forbidden;
+rollback must switch readers/writers while retaining financial records.
 
 After the ambiguity decision, deployment remains staged: ledger foundation,
 deterministic backfill, atomic retail, atomic repair, additional work,
