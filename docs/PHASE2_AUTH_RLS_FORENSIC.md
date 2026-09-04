@@ -1,222 +1,302 @@
 # Phase 2 Auth/RLS Forensic Record
 
-Date: 2026-09-03  
-Project: `kxmovywgshyltwusghhj` (Orbito shop dev db)  
+Date completed: 2026-09-04
+
+Supabase DEV project: `kxmovywgshyltwusghhj`
+
 Branch: `phase2-auth-rls`
 
-This document intentionally contains no passwords, PINs, hashes, service keys,
+Merge status: not merged into `development`
+
+This record intentionally contains no passwords, PINs, hashes, service keys,
 access tokens, refresh tokens, or authorization headers.
 
-## Safety and repository preflight
+## Outcome
 
-- Starting branch: `development`
-- Starting HEAD: `fc6ab0bf354773069cef35cfd612ad7b263e01a6`
-- Expected HEAD matched: yes
-- Starting worktree clean: yes
+Phase 2 authentication and database-authorization stabilization is applied to
+the linked DEV project. Supabase Auth plus `public.app_users` is now the
+canonical identity/role boundary, broad anonymous access is removed, all 20
+public tables have RLS enabled, and the complete executable anonymous/role/PIN/
+suspension matrix passed.
+
+The required Owner, existing Cashier, and Orbito Support real-session gate also
+passed cleanly. The branch remains intentionally unmerged.
+
+## Repository and deployment preflight
+
+- Starting `development` HEAD: `fc6ab0bf354773069cef35cfd612ad7b263e01a6`
 - Required tag `phase1-login-stabilized-2026-09-03`: present
 - Historical baseline modified: no
-- Phase 2 branch created before implementation: yes
-- Initial `npm run build`: passed
-- Initial CLI migration ledger: local and remote matched
-- Initial `db push --dry-run`: `Remote database is up to date.`
+- Phase 2 implementation branch: `phase2-auth-rls`
+- Build before the RLS cutover: passed
+- Migration list before the RLS cutover: only the staged RLS migration was local
+- RLS dry-run: exactly `20260903181153_phase2_authenticated_rls.sql`
+- RLS push: applied successfully
+- Follow-up credential-sealing migration build/list/dry-run: passed
+- Final local/remote migration history: equal through `20260904001510`
+- Final `db push --dry-run`: `Remote database is up to date.`
 
-## Live identity preflight
+## Canonical identities and support separation
 
-| Check | Result |
-|---|---|
-| Active employees with null/blank/invalid email | none |
-| Duplicate normalized employee emails | none |
-| Owner email duplicated by employee | no |
-| Employee roles | Cashier: 1 |
-| Employee statuses | Active: 1 |
-| Employees with Business Owner role | none |
-| Nonblank legacy employee passwords | 1 row (employee ID 1) |
-| Owner legacy password populated | yes (boolean check only) |
-| Override PIN populated | yes (boolean check only) |
-| Existing `auth.users` | none |
-| Auth/owner/employee collisions | none |
+The live support preflight verified one dedicated client-project Auth identity:
 
-No identity anomaly met a mandatory stop condition.
+- email: `orbitosupport+kxmovywgshyltwusghhj@support.orbito.internal`
+- `app_users.role = 'Orbito Support'`
+- `app_users.employee_id IS NULL`
+- `app_users.status = 'Active'`
+- corresponding `auth.users` row: present
+- corresponding `support_access_log` row: present
+- log retains the real platform user identity and the separate client Auth user
 
-## Live authorization preflight
+The shop Owner remains a distinct Auth/app identity. No customer Auth user was
+deleted, merged, relabelled, or hijacked. The login Edge Function verifies the
+configured Orbito platform credentials first, then generates and verifies a
+magic-link token for this deterministic client support identity. No persistent
+support password is stored.
 
-RLS enabled before Phase 2: `active_sessions`, `employees`, `inventory`,
-`password_reset_requests`, `returns`, `sales`, `shop_config`,
-`support_access_log`, `tickets`, and `udhar`.
-
-RLS disabled before Phase 2: `attendance`, `leaves`, `quick_items`,
-`repair_components`, `salary_config`, and `salary_slips`.
-
-Legacy allow-all policies were present on `active_sessions`, `employees`,
-`inventory`, `password_reset_requests`, `returns`, `sales`, `shop_config`,
-`tickets`, and `udhar`. Both `anon` and `authenticated` held all table
-privileges on the legacy application tables, including the six tables without
-RLS. This confirmed that those six tables were reachable through the Data API.
-
-`next_invoice_seq()` and `next_ticket_seq()` were `SECURITY DEFINER`, had no
-hardened `search_path`, and were executable by `PUBLIC`, `anon`, and
-`authenticated`.
-
-`pgcrypto` is installed in the `extensions` schema. All Phase 2 calls to
-`crypt`, `gen_salt`, and `gen_random_uuid` are schema-qualified.
-
-## Migrations
+## Applied Phase 2 migrations
 
 | Migration | Purpose | DEV status |
 |---|---|---|
-| `20260903165753_phase2_auth_foundation.sql` | Canonical identities, hash-only vault, shop security, step-up table, hardened helpers, safe config RPCs | applied |
-| `20260903170222_phase2_auth_bridge_helpers.sql` | Server-only hash verification RPC | applied |
-| `20260903171448_phase2_security_helpers.sql` | Server-only PIN hashing/verification RPCs | applied |
-| `20260903175518_phase2_legacy_credential_vault.sql` | Hash credentials/PIN and null legacy plaintext locations | applied |
-| `20260903180703_phase2_neutralize_unused_employee_pin.sql` | Null confirmed-unused `employees.pin_code` data | applied |
-| `20260903181153_phase2_authenticated_rls.sql` | Remove broad policies/grants, enable RLS everywhere, apply role matrix, harden sequence RPCs | local only; safety-gated |
+| `20260903165753_phase2_auth_foundation.sql` | Canonical identities, service-only credential stores, step-up table, role helpers and safe config RPCs | applied |
+| `20260903170222_phase2_auth_bridge_helpers.sql` | Server-only legacy hash verification | applied |
+| `20260903171448_phase2_security_helpers.sql` | Server-only override-PIN hashing and verification | applied |
+| `20260903175518_phase2_legacy_credential_vault.sql` | Hash legacy credentials/PIN and null plaintext locations | applied |
+| `20260903180703_phase2_neutralize_unused_employee_pin.sql` | Null the confirmed-unused employee PIN data | applied |
+| `20260903181153_phase2_authenticated_rls.sql` | Revoke broad grants/policies, enable RLS everywhere, enforce role matrix and harden sequence RPCs | applied |
+| `20260904001510_phase2_reseal_legacy_plaintext_credentials.sql` | Remove a detected plaintext regression and enforce null-only legacy credential columns | applied |
 
-Every applied migration was preceded by `npm run build`, `migration list`, and
-`db push --dry-run`.
+Every live migration was preceded by a successful build, migration-ledger check,
+and linked dry-run.
 
-## New tables and functions
+## Database authorization state
 
-- `app_users`: canonical table-backed role/status authority linked to
-  `auth.users`; authenticated users can select only their own row.
-- `legacy_auth_credentials`: service-only one-time migration hashes.
-- `shop_security`: service-only override PIN hash.
-- `step_up_authorizations`: service-created, Auth-user-bound, exact-purpose,
-  short-lived authorization records.
-- `app_private.current_app_role()`
-- `app_private.current_employee_id()`
-- `app_private.current_app_user_active()`
-- `app_private.current_client_access_allowed()`
-- `app_private.has_step_up(text)`
-- `get_public_shop_config()`
-- `get_app_config()`
-- `verify_legacy_credential(text, text)` (service only)
-- `set_override_pin(text)` and `verify_override_pin(text)` (service only)
+Post-cutover structural checks confirmed:
 
-Privileged functions use `search_path = ''`, qualify application objects, and
-have explicit revokes/grants. The anonymous safe-config function is the one
-intentional public `SECURITY DEFINER` API and returns a fixed whitelist.
+- 20 of 20 `public` tables have RLS enabled
+- no table remains without RLS
+- no anonymous table privileges remain
+- authenticated grants match the explicit Phase 2 migration
+- 35 expected policies are present
+- `anon` cannot execute `next_invoice_seq()` or `next_ticket_seq()`
+- permitted active authenticated roles can execute the sequence helpers
+- closed service tables deliberately have RLS with no browser policies
 
-## Edge Functions
+The canonical authorization helpers require an Active `app_users` row and
+current client access. A suspended client blocks normal shop roles; only the
+canonical Orbito Support role bypasses the suspension condition.
 
-- `login`: Turnstile-protected Auth migration gateway. Existing `app_users`
-  identities use Supabase Auth only. Matching orphan Auth users fail closed.
-  Successful first login creates Auth + mapping with cleanup on partial failure.
-  Support uses a dedicated client Auth identity and magic-link token-hash
-  exchange; the platform token is never returned.
-- `account-admin`: authenticates the caller JWT and reads canonical role/status;
-  manages employee Auth/domain/mapping lifecycle, resets, owner email, safe
-  configuration, and PIN changes.
-- `verify-pin`: authenticates the caller, verifies the server-side PIN hash, and
-  creates a 75-second exact-purpose authorization.
-- `password-reset-request`: Turnstile-protected, enumeration-resistant, and
-  server-written.
-- `public-track`: exact identifier plus secondary phone verification, with a
-  fixed response whitelist and masked IMEI.
+## Edge Functions deployed
 
-## Legacy credential migration status
+| Function | Version | Gateway JWT | Security purpose |
+|---|---:|---|---|
+| `login` | 9 | required | Turnstile/Auth migration gateway and separated support bootstrap |
+| `account-admin` | 2 | required | Server-managed employee/Auth/config/reset lifecycle |
+| `verify-pin` | 1 | required | Server PIN verification and 75-second exact-purpose step-up |
+| `password-reset-request` | 1 | not required | Turnstile-protected, enumeration-resistant reset request |
+| `public-track` | 1 | not required | Exact ticket plus phone verification with fixed safe response |
 
-Post-migration verification (counts/booleans only):
+The two functions without gateway JWTs implement their required public-facing
+verification in the function body. No function exposes a service credential to
+the browser.
 
-- Hash-only vault rows: 2 (1 owner, 1 employee)
-- Remaining nonblank `employees.password`: 0
-- Remaining nonblank `shop_config.owner_password`: 0
-- Remaining nonblank `shop_config.override_pin`: 0
-- `shop_security.override_pin_hash` populated: yes
-- Remaining unmigrated legacy accounts: 2
+## Real-session gate
 
-Each successful first login creates the user's Auth identity/mapping and consumes
-that user's vault row. Once an `app_users` row exists, login never falls back to
-legacy verification.
+User-operated live verification passed without identity collision, duplicate
+login rendering, or Turnstile widget warnings:
 
-`employees.pin_code` had no application call site. Its data was neutralized in a
-separate migration; the compatibility column remains.
+| Identity | Login | Refresh/restore | Logout |
+|---|---|---|---|
+| Business Owner | pass | pass | pass |
+| Existing Cashier | pass | pass | pass |
+| Orbito Support | pass | pass | pass |
 
-## Planned RLS policy matrix
+Support restored with the canonical `Orbito Support` role. Logout returns to one
+login render and starts from a clean Turnstile widget lifecycle.
 
-| Surface | Read | Browser mutation |
-|---|---|---|
-| `app_users` | own row | none |
-| `employees` | Owner/Support/Manager roster; employee own row | none; `account-admin` only |
-| `inventory` | Cashier/Manager/Owner/Support | Manager/Owner/Support |
-| `quick_items` | all active application roles | Manager/Owner/Support |
-| `repair_components` | all active application roles | Manager/Owner/Support |
-| `tickets` | all active application roles | counter insert; staff update |
-| `sales` | Cashier/Manager/Owner/Support | counter insert; discount/Udhar variants require matching step-up |
-| `returns` | Cashier/Manager/Owner/Support | insert requires `return` step-up |
-| `udhar` | Cashier/Manager/Owner/Support | insert requires `udhar`; update requires `settle` |
-| `attendance` | own; Manager/Owner/Support all | own clocking; admin update |
-| `leaves` | own; Manager/Owner/Support all | own pending request; admin review |
-| salary tables | Manager/Owner/Support | Manager/Owner/Support |
-| password resets | Manager/Owner/Support | server only |
-| `shop_config` | safe RPCs only | server only |
-| support log | Owner/Support | service only |
-| `active_sessions` | none | none |
+## Anonymous security matrix
 
-Every protected policy also requires an Active canonical app user and current
-client access. Suspended clients deny normal roles; Orbito Support bypasses only
-the suspension check.
+Actual anonymous REST checks returned HTTP 401 for `shop_config`, `employees`,
+`tickets`, `attendance`, `leaves`, `salary_config`, `salary_slips`, and
+`password_reset_requests`.
 
-## Tests completed
+Rollback-only SQL assertions additionally confirmed:
 
-- Production Vite build: passed after Auth/frontend changes.
-- Initial live identity/schema/grant/function preflight: passed.
-- Local/remote migration ledger checks before every applied migration: passed.
-- Dry-run before every applied migration: passed.
-- Credential vault post-check: passed (no plaintext values queried/output).
-- Public tracking invalid-input runtime smoke: HTTP 400, safe response.
-- Password reset missing-Turnstile runtime smoke: HTTP 403.
-- Login/account-admin/verify-pin without JWT: HTTP 401 at gateway.
-- Browser source search: no direct `shop_config` query/update, no direct employee
-  account mutation, no `CFG.owner_password`, and no `CFG.override_pin` use.
-- Legacy forged-session defense: code path ignores and removes
-  `retailos_session`; only verified Supabase user + own `app_users` row can boot.
+- anonymous reset-request inserts are denied
+- anonymous invoice/ticket sequence calls are denied
+- no anonymous access exists to EMS/salary or other application tables
 
-## Tests still required before live RLS
+Result: pass.
 
-The authoritative sequence forbids RLS cutover until real Auth sessions pass.
-These require credential-holder interaction and must not be automated by reading
-or exposing credentials:
+## Role read matrix
 
-- Owner first-login migration, refresh/token restoration, password change,
-  logout, and old-password rejection.
-- Cashier first-login migration and POS smoke.
-- Orbito Support login/session bootstrap, audit record, and suspended-client
-  access.
-- Manager and Technician role sessions (after accounts exist).
-- Full manager-escalation, anonymous, public-track valid-match, PIN purpose/expiry,
-  and suspension matrices after RLS cutover.
+Role tests used live table data with rollback-only role impersonation; temporary
+role/status changes were rolled back and verified absent afterward.
 
-## Residual known gaps
+| Role | Result |
+|---|---|
+| Owner | Authorized business/EMS/financial reads; only own `app_users`; no raw `shop_config` access |
+| Manager | Roster, catalog, financial, EMS and reset-request reads; no support log |
+| Cashier | Own employee/attendance plus permitted catalog/ticket/financial reads; no salary/reset/support log |
+| Technician | Own employee/attendance plus repair catalogs/tickets; no inventory/financial/salary/reset/support log |
+| Orbito Support | Full intended support reads, including support log |
+| Inactive app user | No client access and zero protected data; own identity row remains visible for fail-closed boot |
 
-- Ticket updates remain row-authorized but not column/transition-specific because
-  existing repair payment/status logic spans several direct updates. Tightening
-  those invariants belongs with the repair/accounting stabilization phase. The
-  UI verifies `remove-component`, but the subsequent JSON ticket update cannot
-  yet require that purpose without also blocking unrelated ticket updates.
-- Step-up rows are reusable for their short lifetime rather than transaction-
-  consumed. They are bound to Auth user and exact purpose and expire after about
-  75 seconds.
-- POS sale/Udhar atomicity, repair payment ledger, returns accounting, inventory
-  movement ledger, and billing architecture are deliberately unchanged.
-- The local RLS migration is not applied until the required real-session gate.
+Result: pass.
 
-## Deployment order and rollback notes
+## Role mutation matrix
 
-Completed order: additive foundation -> bridge helper -> login v8 -> PIN helper
--> credential vault -> unused PIN neutralization -> remaining Edge Functions.
+All DML tests ran inside transactions and were rolled back.
 
-Remaining order: deploy application frontend -> perform real-session smoke tests
--> apply `20260903181153_phase2_authenticated_rls.sql` -> run anonymous/role/PIN/
-suspension matrix -> advisors -> final migration/schema comparison.
+- Cashier: ticket work, own attendance, pending leave and self-attributed plain
+  cash sales passed. Catalog mutation, cross-employee sales, EMS administration,
+  salary, returns and Udhar without step-up were denied. Exact step-up enabled
+  only the requested return/Udhar/settlement/discount operation.
+- Owner: catalog, tickets, plain sales, EMS administration, salary and sequence
+  operations passed. Direct browser employee mutation was denied. PIN-sensitive
+  financial paths required matching step-up.
+- Manager: the same authorized operational/admin paths passed under a temporary
+  canonical Manager role. Direct employee-table mutation remained server-only.
+- Technician: ticket updates, own attendance and pending leave passed. Admin
+  catalog, ticket creation, financial writes, salary and sequence operations
+  were denied.
+- Orbito Support: intended catalog/ticket/sale/EMS/salary/sequence operations
+  passed. Direct employee mutation and browser-written support audit rows were
+  denied; support has no employee attendance identity.
 
-Rollback must never restore plaintext credentials. Before RLS cutover, the old
-UI remains wire-compatible with the login response, while the hash vault remains
-the only legacy password authority. After an account is migrated and its vault
-row consumed, rollback requires a controlled Auth password reset, not restoration
-of the old plaintext column.
+The `account-admin` source-level escalation matrix was also inspected: a Manager
+can target only Cashier/Technician identities, cannot create or promote to
+Manager/Owner, cannot edit the Owner, and cannot reset Owner/Manager credentials.
+Owner/config/PIN changes remain Owner/Support-only.
 
-## Final gate status
+Result: pass for database enforcement; see the live-account coverage gap below.
 
-Phase 2 is not yet safe to merge. The real-session gate and live RLS cutover are
-still pending. The final migration ledger and final schema comparison must be
-recorded after that cutover.
+## PIN and step-up matrix
+
+- safe public/app configuration excludes `override_pin`, `owner_password`, and
+  `owner_email`
+- legacy employee PIN data is absent
+- legacy plaintext override PIN is absent
+- a server-generated random numeric test candidate was accepted only when exact
+- a wrong candidate was rejected
+- a different-purpose authorization was rejected
+- an expired authorization was rejected
+- rollback cleanup left no test step-up rows
+
+No reusable PIN, candidate, or hash was read into or written to this record.
+
+Result: pass.
+
+## Public tracking matrix
+
+A synthetic negative-ID ticket was inserted with `OVERRIDING SYSTEM VALUE`,
+tested over HTTP, and removed in a `finally` cleanup. Cleanup was verified.
+
+| Request | Result |
+|---|---|
+| Exact ticket identifier + exact phone | HTTP 200, fixed safe shape |
+| Partial identifier | HTTP 404 |
+| Wrong phone | HTTP 404 |
+| Ticket only | HTTP 400 |
+| Phone only | HTTP 400 |
+
+The valid response excluded technician notes, payment history and full IMEI; the
+IMEI was masked.
+
+Result: pass.
+
+## Suspension matrix
+
+Inside one rollback-only transaction the shop was marked suspended:
+
+- Owner, Manager, Cashier and Technician lost client access and saw zero
+  protected rows
+- normal-role config and sequence calls were blocked
+- Orbito Support retained canonical support access
+- Support could read suspended configuration state and use intended sequence RPCs
+
+The transaction rolled back. Cashier role/status, shop suspension state, test
+tickets and step-up fixtures were all verified restored/absent.
+
+Result: pass.
+
+## Plaintext-credential regression and containment
+
+The initial credential-vault migration correctly nulled legacy fields. A
+post-matrix boolean/count check later detected one active, unmapped employee row
+whose plaintext password column had become populated again while its hash-vault
+row still existed. The value was never selected, logged, or displayed.
+
+The repository contains no current server account path that writes this column.
+It is therefore reasonable, but not proven, to infer that a stale legacy client
+reintroduced it before the RLS cutover removed broad browser writes.
+
+`20260904001510_phase2_reseal_legacy_plaintext_credentials.sql` remediated this
+as a release blocker:
+
+- all `employees.password` values were nulled
+- `shop_config.owner_password` and `shop_config.override_pin` were re-nulled
+- validated constraints now require all three legacy fields to remain null
+- the existing employee hash-vault row was preserved for first-login migration
+
+Final non-sensitive verification:
+
+- plaintext employee-password rows: 0
+- plaintext owner-password rows: 0
+- plaintext override-PIN rows: 0
+- validated employee null constraint: present
+- validated shop-config null constraint: present
+- direct non-secret write probes: rejected by both constraints
+- remaining hash-only employee vault rows: 1
+
+## Advisor results
+
+Supabase security and performance advisors were rerun after the final DDL.
+
+No critical authorization finding was reported. Known notices are:
+
+- INFO: RLS/no-policy on `active_sessions`, `legacy_auth_credentials`,
+  `shop_config`, `shop_security`, and `step_up_authorizations`; these tables are
+  intentionally closed to browser roles
+- WARN: callable `SECURITY DEFINER` functions for the deliberately public safe
+  config and authenticated app-config/sequence APIs; their inputs/outputs,
+  internal authorization and explicit grants were reviewed
+- WARN: Supabase Auth leaked-password protection is disabled
+- INFO: several existing foreign keys lack covering indexes; this is a
+  performance backlog, not an authorization bypass
+
+## Residual gaps and deferred work
+
+- No persistent live Manager or Technician Auth accounts existed. Their RLS
+  matrices were tested by rollback-only canonical-role substitution. The
+  Manager account-admin escalation restrictions were source-inspected rather
+  than exercised with a live Manager JWT.
+- One employee remains hash-vault-only and will be migrated on a successful
+  first login. Its plaintext compatibility field is now database-enforced null.
+- Supabase Auth leaked-password protection should be enabled in the project Auth
+  settings.
+- Ticket updates are row-authorized but not yet column/transition-specific.
+- Step-up rows are exact-purpose and short-lived but reusable during their
+  approximately 75-second lifetime.
+- Atomic retail/Udhar/inventory, repair payment allocation, returns accounting,
+  repair workflow/financial state separation and billing reconciliation remain
+  explicitly deferred to later stabilization phases.
+
+## Rollback boundary
+
+Rollback must never restore plaintext credentials or broad anonymous policies.
+An Auth-migrated account can be recovered only through a controlled Auth reset,
+not by repopulating legacy password columns. The final constraint migration is a
+defense-in-depth invariant and should remain even if application code is rolled
+back.
+
+## Final gate and merge recommendation
+
+The Phase 2 database cutover and available security matrix are complete, with no
+critical authorization failure. Local and remote migration histories match and
+the linked dry-run is up to date.
+
+Recommendation: keep `phase2-auth-rls` unmerged as requested. Before approving a
+production merge, provision disposable Manager and Technician Auth identities
+and run the remaining live-JWT account-admin escalation smoke, then enable leaked
+password protection (or explicitly accept that Auth configuration risk).
