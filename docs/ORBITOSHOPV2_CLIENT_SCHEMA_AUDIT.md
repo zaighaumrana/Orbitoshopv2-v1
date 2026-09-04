@@ -871,3 +871,31 @@ Cashier, and separated Orbito Support login/refresh/logout gate passed cleanly.
 See `docs/PHASE2_AUTH_RLS_FORENSIC.md` for the complete evidence, residual gaps,
 and merge recommendation.
 
+### Phase 3A transaction-ledger preflight
+
+Started Phase 3 on `phase3-transaction-ledger` from the clean, merged and tagged
+Phase 2 baseline at `972005ddf1d1f4b212c9735630b4971e727926`.
+
+- `npm ci` and the production build passed; the existing mixed static/dynamic
+  `src/shared.js` import warning remains.
+- Local and remote migrations match through `20260904001510`; the linked
+  dry-run reports the remote database is up to date.
+- Read-only live diagnostics found 9 sales, 19 root tickets, 1 Udhar record, 2
+  returns, 2 Inventory items, 4 Quick Items and 7 repair components.
+- Identifiers, parentage, ticket/Udhar arithmetic, payment-history sums, return
+  quantities and plaintext-credential invariants otherwise reconcile.
+- Phase 3A STOP: positive Cash sales 1, 3, 5 and 6 have no tender evidence, so
+  actual received amounts cannot be backfilled without external evidence or an
+  explicit legacy-unreconciled classification.
+- Phase 3A STOP: returns 1 and 2 contain refund amounts but no durable refund
+  occurrence/method evidence.
+- All legacy sale/return line JSON lacks Inventory identity; historical stock
+  movements and restock decisions will not be guessed.
+- Ready tickets 9 and 17 have legacy payment-triggered `collected_at` values;
+  these are not accepted as physical-delivery evidence.
+- No Phase 3 schema, data, RPC, policy, Edge Function or application mutation
+  was made.
+
+See `docs/PHASE3_TRANSACTION_LEDGER_FORENSIC.md` for the full preflight,
+backfill boundary, target model and required decision before implementation.
+
