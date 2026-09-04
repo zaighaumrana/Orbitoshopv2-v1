@@ -219,16 +219,18 @@ Other measured evidence:
 
 ## 6. Deterministic and non-deterministic backfill boundary
 
-Deterministic backfill candidates:
+Completed deterministic backfill:
 
-- create repair obligations from the immutable legacy ticket quote/final total
-  for the 11 non-zero tickets
-- create 8 repair payment events from the 7 reconciling payment histories
-- create retail payments for the 3 Cash sales with valid tender/change evidence
-- reconstruct sale 7's payment and credit state from its matching, internally
-  consistent Udhar row
-- normalize all 11 current sale JSON lines into `sale_lines` snapshots while
+- normalized all 11 current sale JSON lines into `sale_lines` snapshots while
   leaving unknown `inventory_id` and cost snapshots null
+- created 12 immutable payment events: 3 reconciled retail Cash payments, 1
+  Udhar payment and 8 repair payment-history events
+- created one equal allocation for every payment; payment and allocation totals
+  both reconcile to 36,449 with zero unbalanced payments
+- reconstructed one active legacy credit approval for the outstanding 1,000
+  Udhar amount without inventing an actor or step-up authorization
+- established two Inventory opening-balance movements totaling quantity 50,
+  exactly matching current Inventory quantity
 
 Backfill that must not be guessed:
 
@@ -261,6 +263,7 @@ Applied migration:
 | Migration | Purpose | DEV status |
 |---|---|---|
 | `20260904200000_phase3_ledger_foundation.sql` | Nine canonical ledger/audit tables, constraints, indexed foreign keys, RLS and read-only role policies | applied |
+| `20260904203000_phase3_deterministic_backfill.sql` | Guarded normalization of deterministic legacy sale lines, payments, allocations, Udhar approval and Inventory opening balances | applied |
 
 Post-apply verification:
 
@@ -269,8 +272,15 @@ Post-apply verification:
 - anonymous privileges: 0
 - authenticated mutation privileges: 0
 - authenticated SELECT grants: 9, constrained by role policies
-- initial rows in every new table: 0
-- local/remote migration ledger includes `20260904200000`
+- foundation rows in every new table were initially 0
+- deterministic backfill produced 11 sale lines, 12 payments, 12 allocations,
+  1 active credit approval and 2 Inventory opening movements
+- payment and allocation totals both equal 36,449; Inventory opening quantity
+  equals current quantity 50
+- no refund, return-line, invoice-adjustment or additional-work history was
+  invented
+- local/remote migration ledger includes `20260904200000` and
+  `20260904203000`
 
 ## 8. Planned transaction and idempotency boundaries
 
@@ -299,7 +309,7 @@ frozen.
 
 ## 10. Frontend, printing and reporting cutover plan
 
-No frontend change has been made through Phase 3B.
+No frontend change has been made through Phase 3C.
 
 Planned UX keeps the existing short workflows while moving writes to atomic
 RPCs. It adds optional split tender, explicit Udhar authorization, partial
@@ -342,10 +352,9 @@ including `returns.original_sale_id`, `sales.employee_id`, `sales.ticket_id`,
 indexed; unrelated old indexes remain separately scoped unless needed by the
 new transaction queries.
 
-The Phase 3B advisor rerun reported no new security finding and no missing-index
-finding for a new foreign key. It reports the newly created indexes as unused,
-which is expected while all nine foundation tables are empty and no RPC traffic
-has occurred.
+The Phase 3B and Phase 3C advisor reruns reported no new security finding and no
+missing-index finding for a new foreign key. Unused-index notices are expected
+before application RPC traffic begins.
 
 ## 12. Rollback and deployment boundary
 
@@ -354,10 +363,10 @@ It did delete the six explicitly authorized DEV-only rows described above. That
 cleanup has no migration rollback and is recoverable only from an available
 Supabase backup/PITR source.
 
-Phase 3B is additive. A rollback before ledger cutover may drop the nine empty
-tables in reverse dependency order, but should not touch any legacy table or
-Phase 2 helper. After backfill or cutover, dropping ledger history is forbidden;
-rollback must switch readers/writers while retaining financial records.
+Phase 3B was additive and Phase 3C populated canonical ledger history. Dropping
+the nine tables is now forbidden. Any rollback must switch readers/writers while
+retaining the backfilled financial and Inventory-opening records; it must not
+touch any legacy table or Phase 2 helper.
 
 After the ambiguity decision, deployment remains staged: ledger foundation,
 deterministic backfill, atomic retail, atomic repair, additional work,

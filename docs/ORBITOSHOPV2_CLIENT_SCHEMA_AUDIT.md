@@ -925,3 +925,23 @@ Applied `20260904200000_phase3_ledger_foundation.sql` to DEV.
   missing new FK index; unused-index notices are expected before ledger traffic.
 - Phase 2 Auth, support, step-up and suspension helpers were not changed.
 
+### Phase 3C deterministic backfill
+
+Applied `20260904203000_phase3_deterministic_backfill.sql` to DEV after guarded
+precondition checks.
+
+- Normalized 11 legacy sale JSON lines into immutable `sale_lines` snapshots;
+  unknown historical Inventory identity and cost remain null.
+- Created 12 payment events and 12 allocations. Both totals reconcile to
+  36,449, with zero unbalanced payment records.
+- Reconstructed one active legacy credit approval for the remaining 1,000
+  Udhar balance without inventing an approver or step-up event.
+- Created two Inventory opening-balance movements totaling quantity 50, equal
+  to the current Inventory quantity.
+- Created no refund, return-line, invoice-adjustment or additional-work history
+  because the retained DEV records provide no deterministic evidence for it.
+- Advisor verification found no new Phase 3 security warning and no missing
+  foreign-key index on the new schema.
+- The migration is additive historical normalization only; no frontend writer
+  has been cut over yet and Phase 2 Auth/RLS remains unchanged.
+
