@@ -15,32 +15,36 @@
    file importing from a view-owned one would invert the intended
    dependency direction.
 ═══════════════════════════════════════════════════════════════════ */
-import { sb, generateInvoiceNumber } from '../../shared.js'
+import { sb } from '../../shared.js'
 import { dlog, dstack } from '../../debuglog.js'
+
+const pendingAdditionalWorkRequests = new Map()
 
 export async function createTicket(payload, employeeName, ticketNumber) {
   dstack('repairs.createTicket', `ENTRY customerName=${payload.customerName} employeeName=${employeeName} -- NOTE: this function currently has no known callers in the app, so if this fires, the stack trace above is the answer`)
-  const invoiceNo = await generateInvoiceNumber()
-  const { data, error } = await sb.from('tickets').insert({
-    ticket_number:    ticketNumber,
-    invoice_number:   invoiceNo,
-    customer_name:    payload.customerName   || '',
-    customer_phone:   payload.customerPhone  || '',
-    device_brand:     payload.deviceBrand    || '',
-    device_model:     payload.deviceModel    || '',
-    imei:             payload.imei           || '',
-    components_noted: payload.components     || [],
-    estimated_quote:  Number(payload.estimatedQuote || 0),
-    advance_payment:  Number(payload.advance        || 0),
-    advance_method:   payload.advanceMethod  || '',
-    status:           'Pending',
-    technician_note:  payload.technicianNote || '',
-    created_by:       employeeName           || 'Counter',
-    is_locked:        true,
-  }).select().single()
+  const advance = Number(payload.advance || 0)
+  const method = payload.advanceMethod || 'Cash'
+  const { data: result, error } = await sb.rpc('create_repair_ticket', {
+    p_request_id: crypto.randomUUID(),
+    p_ticket: {
+      customerName: payload.customerName || '',
+      customerPhone: payload.customerPhone || '',
+      deviceBrand: payload.deviceBrand || '',
+      deviceModel: payload.deviceModel || '',
+      imei: payload.imei || '',
+      components: payload.components || [],
+      labourCost: Number(payload.labourCost || 0),
+      quotedAmount: Number(payload.estimatedQuote || 0),
+      technicianNote: payload.technicianNote || '',
+    },
+    p_tenders: advance > 0 ? [{
+      amount: advance, method,
+      ...(method === 'Cash' ? { cashTendered:advance } : {}),
+    }] : [],
+  })
   if (error) { dlog('repairs.createTicket', `FAILED: ${error.message}`); return { ok: false, error: error.message } }
-  dlog('repairs.createTicket', `SUCCEEDED ticket_number=${data.ticket_number}`)
-  return { ok: true, data }
+  dlog('repairs.createTicket', `SUCCEEDED ticket_number=${result.ticket.ticket_number}`)
+  return { ok: true, data: result.ticket }
 }
 
 export async function updateTicket(id, updates) {
@@ -77,49 +81,24 @@ export async function getSubInvoices(parentId) {
  * Called by pos.js, admin.js, AND workshop.js -- genuinely shared.
  */
 export async function createSubInvoice(parentTicket, components, labourCost, note, employeeName) {
-  const existingSubs = await getSubInvoices(parentTicket.id)
-  const suffix = String.fromCharCode(65 + existingSubs.length) // A, B, C, ...
-
   const componentsTotal = (components||[]).reduce((s,c) => s + Number(c.price||0), 0)
   const total = componentsTotal + Number(labourCost||0)
-
-  const alreadyCredited = existingSubs.reduce((sum, s) =>
-    sum + (s.payment_history||[])
-      .filter(p => p.type === 'advance_credit')
-      .reduce((a,p) => a + Number(p.amount||0), 0)
-  , 0)
-  const remainingAdvance = Math.max(0, Number(parentTicket.advance_payment||0) - alreadyCredited)
-  const creditApplied    = Math.min(remainingAdvance, total)
-  const balanceDue       = Math.max(0, total - creditApplied)
-
-  const paymentHistory = creditApplied > 0
-    ? [{ type:'advance_credit', amount:creditApplied, date:new Date().toISOString(), note:'Credited from original advance payment' }]
-    : []
-
-  const { data, error } = await sb.from('tickets').insert({
-    parent_ticket_id:  parentTicket.id,
-    invoice_number:    `${parentTicket.invoice_number}-${suffix}`,
-    ticket_number:      `${parentTicket.ticket_number}-${suffix}`,
-    customer_name:      parentTicket.customer_name,
-    customer_phone:     parentTicket.customer_phone,
-    device_brand:       parentTicket.device_brand,
-    device_model:       parentTicket.device_model,
-    imei:               parentTicket.imei,
-    components_noted:   components || [],
-    labour_cost:        Number(labourCost||0),
-    estimated_quote:    total,
-    final_total:        total,
-    amount_paid:        creditApplied,
-    balance_due:        balanceDue,
-    payment_history:    paymentHistory,
-    technician_note:    note || '',
-    status:              'Pending',
-    is_locked:           true,
-    created_by:          employeeName || 'Technician',
-  }).select().single()
-
+  const key = JSON.stringify([parentTicket.id, components || [], Number(labourCost || 0), note || ''])
+  const requestId = pendingAdditionalWorkRequests.get(key) || crypto.randomUUID()
+  pendingAdditionalWorkRequests.set(key, requestId)
+  const description = (components || []).map(c => c.name).filter(Boolean).join(', ') || note || 'Additional work'
+  const { data: result, error } = await sb.rpc('approve_additional_work', {
+    p_request_id: requestId,
+    p_root_ticket_id: parentTicket.id,
+    p_description: description,
+    p_details: { components:components || [], labourCost:Number(labourCost || 0), note:note || '' },
+    p_quoted_amount: total,
+    p_decision_method: 'In person',
+    p_decision_note: note || '',
+  })
   if (error) return { ok: false, error: error.message }
-  return { ok: true, data, creditApplied }
+  pendingAdditionalWorkRequests.delete(key)
+  return { ok: true, data:result.ticket, creditApplied:0, proposal:result.proposal }
 }
 
 /**

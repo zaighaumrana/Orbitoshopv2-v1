@@ -987,3 +987,22 @@ Applied `20260904220000_phase3_atomic_repair_transactions.sql` to DEV.
   role check. Advisor output added only the expected reviewed RPC notices and no
   new missing-FK-index finding.
 
+### Phase 3F additional work and adjustments
+
+Applied `20260904230000_phase3_additional_work_and_adjustments.sql` to DEV.
+
+- Added a unique decision request id to `additional_work_proposals`.
+- Added pending-proposal, decision and combined approved-work RPCs. Technician
+  may propose, but only the existing financial roles may approve/decline.
+- Approved decisions atomically create a distinct immutable child invoice with
+  zero advance/payment; Declined decisions create no invoice.
+- Added the PIN-protected immutable downward-adjustment RPC. It preserves the
+  original invoice and rejects reductions that require refund reconciliation.
+- Replaced the legacy sub-invoice INSERT with the approved-work RPC and removed
+  authenticated direct `tickets` INSERT privilege/policy.
+- Rollback-only tests passed Phone/WhatsApp approval, decline, no advance reuse,
+  original-value immutability, adjustment/idempotency and denial cases. No
+  fixture remained.
+- Advisor review found only intentionally callable authenticated transaction
+  RPCs and documented baseline notices; no new missing-FK-index finding.
+
