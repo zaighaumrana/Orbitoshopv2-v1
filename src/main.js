@@ -1,91 +1,121 @@
-import { loadConfig, applyBranding, _loadSession, state, CFG } from './shared.js'
+import { sb, loadConfig, applyBranding, loadCurrentSession, _clearSession, state, CFG, can } from './shared.js'
 import { renderLogin } from './auth.js'
 import { registerRoute, registerNotFound, startRouter, navigate } from './router.js'
 import { dlog } from './debuglog.js'
 
-async function boot() {
-  await loadConfig()
-  applyBranding()
-
-  if (CFG.suspended) {
-    document.getElementById('app').innerHTML = `
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-                  height:100vh;gap:16px;text-align:center;padding:24px">
-        <div style="font-size:48px">🔒</div>
-        <h2 style="color:var(--danger)">Account Suspended</h2>
-        <p class="muted" style="max-width:360px;line-height:1.6">
-          Contact your service provider to restore access.
-        </p>
-      </div>`
-    return
-  }
-
-  const SESSION = _loadSession()
-
-  if (!SESSION.employee) {
-    registerNotFound(() => renderLogin(onLoginSuccess))
-    renderLogin(onLoginSuccess)
-    return
-  }
-
-  // EMS gate on refresh/revisit too
-  const { checkClockIn } = await import('./features/ems/index.js')
-  checkClockIn(SESSION, CFG, () => {
-    setupRoutes(SESSION)
-    startRouter()
-  })
+function canonicalRole(session) {
+  return session?.employee?.role || ''
 }
 
-function setupRoutes(SESSION) {
+async function boot() {
+  await loadConfig(true)
+  applyBranding()
+
+  const session = await loadCurrentSession()
+  if (!session) {
+    showLogin()
+    return
+  }
+
+  const role = canonicalRole(session)
+  if (CFG.suspended && role !== 'Orbito Support') {
+    await _clearSession()
+    showLogin()
+    return
+  }
+
+  await loadConfig(false)
+  applyBranding()
+  await enterApplication(session)
+}
+
+function showLogin() {
+  const render = () => renderLogin(onLoginSuccess)
+  registerRoute('/login', render)
+  registerNotFound(() => navigate('/login', { replace: true }))
+
+  if (window.location.pathname !== '/login') {
+    navigate('/login', { replace: true })
+  } else if (!document.getElementById('login-title')) {
+    navigate('/login', { replace: true })
+  }
+  startRouter()
+}
+
+function setupRoutes(session) {
+  const role = canonicalRole(session)
+  state.role = role
   registerRoute('/login', () => renderLogin(onLoginSuccess))
 
   registerRoute('/pos', async () => {
+    if (!can('pos', role)) return routeForRole(role, true)
     const { initPOS } = await import('./pos/pos.js')
-    initPOS(SESSION)
+    initPOS(session)
   })
 
   registerRoute('/workshop', async () => {
+    if (!can('workshop', role)) return routeForRole(role, true)
     const { initWorkshop } = await import('./pos/workshop.js')
-    initWorkshop(SESSION)
+    initWorkshop(session)
   })
 
   const adminModules = ['dashboard','repairs','inventory','reports','employees','receipts','ems','settings','catalog']
   adminModules.forEach(mod => {
-    registerRoute(`/admin/${mod}`, async (params, query) => {
+    registerRoute(`/admin/${mod}`, async (_params, query) => {
+      // Reject before loading the Admin bundle or issuing any module queries.
+      if (!can(mod, role)) return routeForRole(role, true)
       const { initAdmin } = await import('./admin/admin.js')
-      initAdmin(SESSION, mod, query)
+      initAdmin(session, mod, query)
     })
   })
 
   registerRoute('/admin', async () => {
+    if (!can('dashboard', role)) return routeForRole(role, true)
     navigate('/admin/dashboard', { replace: true })
   })
 
-  registerNotFound(() => {
-    const role = SESSION.isAdmin ? 'Business Owner' : (SESSION.employee?.role || '')
-    if (role === 'Business Owner' || role === 'Manager') navigate('/admin/dashboard', { replace: true })
-    else if (role === 'Technician') navigate('/workshop', { replace: true })
-    else navigate('/pos', { replace: true })
-  })
+  registerNotFound(() => routeForRole(role, true))
 }
 
-async function onLoginSuccess(SESSION) {
-  const role = SESSION.isAdmin ? 'Business Owner' : (SESSION.employee?.role || '')
-  state.role = role
-  dlog('main.onLoginSuccess', `ENTRY role=${role}`)
+function routeForRole(role, replace = false) {
+  if (role === 'Business Owner' || role === 'Manager' || role === 'Orbito Support') {
+    navigate('/admin/dashboard', { replace })
+  } else if (role === 'Technician') {
+    navigate('/workshop', { replace })
+  } else {
+    navigate('/pos', { replace })
+  }
+}
 
-  // EMS clock-in gate — fires before any view loads
+async function enterApplication(session) {
+  const role = canonicalRole(session)
   const { checkClockIn } = await import('./features/ems/index.js')
-  checkClockIn(SESSION, CFG, async () => {
-    dlog('main.onLoginSuccess', `checkClockIn proceed-callback firing`)
-    setupRoutes(SESSION)
-    if (role === 'Business Owner' || role === 'Manager') { dlog('main.onLoginSuccess', 'calling navigate(/admin/dashboard)'); navigate('/admin/dashboard') }
-    else if (role === 'Technician') { dlog('main.onLoginSuccess', 'calling navigate(/workshop)'); navigate('/workshop') }
-    else { dlog('main.onLoginSuccess', 'calling navigate(/pos)'); navigate('/pos') }
-    dlog('main.onLoginSuccess', 'calling startRouter()')
+  checkClockIn(session, CFG, () => {
+    setupRoutes(session)
+    routeForRole(role)
     startRouter()
   })
 }
+
+async function onLoginSuccess(session) {
+  const role = canonicalRole(session)
+  state.role = role
+  dlog('main.onLoginSuccess', `canonical role=${role}`)
+  await loadConfig(false)
+  applyBranding()
+  await enterApplication(session)
+}
+
+sb.auth.onAuthStateChange((event) => {
+  if (event !== 'SIGNED_OUT') return
+  state.role = null
+  try {
+    sessionStorage.removeItem('retailos_session')
+    sessionStorage.removeItem('retailos_route')
+    sessionStorage.removeItem('retailos_module')
+  } catch {}
+  showLogin()
+})
 
 window.addEventListener('online',  () => { state.online = true })
 window.addEventListener('offline', () => { state.online = false })

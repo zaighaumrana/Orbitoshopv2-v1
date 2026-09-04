@@ -3,7 +3,7 @@
 
 **Status:** Active stabilization document  
 **Baseline captured:** 2026-09-02  
-**Working branch:** `development`  
+**Working branch:** `phase2-auth-rls` (not merged into `development`)
 **Baseline schema:** `supabase/baseline/orbitoshopv2-client-schema-2026-09-02.sql`
 
 ---
@@ -81,7 +81,9 @@ Therefore:
 Create a real authenticated identity/server authorization boundary and
 make PostgreSQL RLS enforce the same permissions as the application UI.
 
-Priority: CRITICAL.
+Status: RESOLVED IN PHASE 2. Supabase Auth sessions and the canonical
+`app_users` role/status mapping now drive PostgreSQL authorization. Forged
+legacy `retailos_session` state is ignored and removed.
 
 ---
 
@@ -116,7 +118,9 @@ Replace broad policies after the real authenticated identity model exists.
 Do not tighten these policies before replacing the current anon-only
 authorization mechanism because doing so would simply break the app.
 
-Priority: CRITICAL.
+Status: RESOLVED IN PHASE 2. Migration
+`20260903181153_phase2_authenticated_rls.sql` removed the allow-all policies and
+anonymous table grants and installed the tested authenticated role matrix.
 
 ---
 
@@ -133,7 +137,8 @@ The baseline indicates insufficient protection around:
 
 These must be included in the authorization migration.
 
-Priority: CRITICAL.
+Status: RESOLVED IN PHASE 2. All 20 public tables now have RLS enabled, including
+the six tables listed above, and no anonymous table privileges remain.
 
 ---
 
@@ -161,7 +166,11 @@ Privileged PINs must also be server-verified and hashed if retained.
 Plaintext columns may only be dropped after every current login/reset/PIN
 path has migrated successfully.
 
-Priority: CRITICAL.
+Status: RESOLVED IN PHASE 2. Supabase Auth is the canonical password authority,
+the temporary legacy bridge uses service-only password hashes, the override PIN
+is server-hashed, and unused employee PIN data was nulled. Validated constraints
+now require `employees.password`, `shop_config.owner_password`, and
+`shop_config.override_pin` to remain null.
 
 ---
 
@@ -211,7 +220,9 @@ Client login page
 -> client login Edge Function
 -> Orbito platform Supabase Auth
 -> configured Orbito master-admin account
--> audited support session
+-> deterministic client-project Support Auth identity
+-> magic-link token generation and verification
+-> audited support session carrying both platform and client identity
 -> client Admin UI
 
 Platform Auth tokens are not returned to the client browser.
@@ -222,11 +233,13 @@ Successful logins are recorded in:
 
 Important:
 
-This creates legitimate platform authentication for support access.
+The platform credential and client-project Auth identity are deliberately
+separate. A platform email may also belong to a shop Owner without collision;
+the support identity never merges with or takes over the customer identity.
 
-It does NOT by itself solve the wider anon/RLS authorization problem.
-
-Status: FIXED DURING STABILIZATION PHASE 1.
+Status: FIXED IN PHASE 2. The real Owner and Support identities are separate,
+the support row has canonical `Orbito Support` role and no employee link, and
+the access log records the real platform identity plus client Auth user ID.
 
 ---
 
@@ -729,6 +742,29 @@ Characteristics:
 
 ---
 
+## Phase 2 migration set
+
+- `20260903165753_phase2_auth_foundation.sql`: canonical `app_users`, private
+  role helpers, credential/security stores, step-up authorizations and safe
+  configuration RPCs.
+- `20260903170222_phase2_auth_bridge_helpers.sql`: server-only verification for
+  the one-time legacy hash bridge.
+- `20260903171448_phase2_security_helpers.sql`: server-only PIN hash helpers.
+- `20260903175518_phase2_legacy_credential_vault.sql`: hashes legacy reusable
+  credentials and clears plaintext locations.
+- `20260903180703_phase2_neutralize_unused_employee_pin.sql`: removes confirmed
+  unused legacy employee PIN data.
+- `20260903181153_phase2_authenticated_rls.sql`: replaces broad grants and
+  policies with the canonical authenticated role matrix.
+- `20260904001510_phase2_reseal_legacy_plaintext_credentials.sql`: re-clears a
+  detected pre-cutover plaintext regression and adds validated null constraints.
+
+All seven migrations are applied to the linked DEV project. Local and remote
+history match and the final linked dry-run reports the remote database up to
+date.
+
+---
+
 # 14. Final release audit
 
 Before releasing the first client:
@@ -781,4 +817,57 @@ Added the first post-baseline migration:
 - Added server-written support access auditing.
 - Fixed duplicate route resolution after login.
 - Added Turnstile widget cleanup during successful authentication.
+
+### Phase 2 authentication/RLS stabilization
+
+Phase 2 work is tracked in `docs/PHASE2_AUTH_RLS_FORENSIC.md`.
+
+The DEV database now has the additive canonical `app_users` identity layer,
+server-only hash vault, server-only shop security, short-lived step-up records,
+safe configuration RPCs, and the Auth/administration/PIN/reset/public-tracking
+Edge Functions. Legacy passwords and PIN data were hashed and their old
+plaintext locations were nulled.
+
+## 2026-09-04
+
+Completed the Phase 2 DEV cutover after the real Business Owner, existing
+Cashier, and separated Orbito Support login/refresh/logout gate passed cleanly.
+
+- Applied the full authenticated RLS/grant migration to all public tables.
+- Passed the anonymous, role-read, role-mutation, PIN-purpose/expiry, public
+  tracking and client-suspension matrices.
+- Verified the dedicated support `app_users` identity and matching audited access
+  row without changing the shop Owner identity.
+- Caught one legacy employee plaintext-password regression in a post-matrix
+  count-only check, never selected its value, cleared it, and added validated
+  database constraints that forbid future plaintext password/override-PIN data.
+- Preserved the remaining service-only hash-vault row for first-login migration.
+- Re-ran security/performance advisors, production build, migration parity and
+  linked dry-run checks.
+- Created disposable Manager and Technician accounts through the deployed
+  `account-admin` flow and passed live Supabase JWT login/refresh/logout, route,
+  Edge Function and direct RLS enforcement tests for both roles.
+- Confirmed Manager employee administration is limited to Cashier/Technician;
+  Manager/Owner creation, promotion and credential resets are denied. Manager
+  Settings access is denied by the intended matrix.
+- Confirmed Technician access is limited to Workshop, own employee data and the
+  intended ticket read/update capabilities; Admin, Employees, POS/inventory,
+  salary data, ticket creation and role escalation are denied.
+- Deactivated all disposable employees through the supported lifecycle and
+  verified zero active test employees, zero orphan Auth/app/employee links, and
+  zero remaining test attendance/ticket fixtures. Nine fully linked inactive
+  identity chains remain because the supported lifecycle has no deletion path.
+- Attempted to enable Supabase leaked-password protection through the Management
+  API. Supabase rejected it because the project is below Pro; the setting was
+  re-read as disabled. This production risk is explicitly accepted pending a
+  plan upgrade.
+- Final production build passed. Local and remote migrations match through
+  `20260904001510`; the final linked dry-run reports the remote database is up
+  to date.
+- Phase 2 is merge-ready subject to the documented plan-level leaked-password
+  risk and later-phase financial/workflow gaps. No merge was performed.
+- Kept `phase2-auth-rls` unmerged into `development`.
+
+See `docs/PHASE2_AUTH_RLS_FORENSIC.md` for the complete evidence, residual gaps,
+and merge recommendation.
 

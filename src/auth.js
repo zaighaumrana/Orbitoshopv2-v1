@@ -1,11 +1,14 @@
 import {
   state, CFG, _saveSession, _clearSession,
-  loginViaEdgeFunction, applyBranding, currentTenant
+  loginViaEdgeFunction, establishLoginSession, applyBranding, currentTenant
 } from './shared.js'
 import { dlog, dstack } from './debuglog.js'
 
 let _onLoginSuccess = null
 let _turnstileWidgetId = null
+let _turnstileContainer = null
+let _turnstileMountTimer = null
+let _turnstileGeneration = 0
 let _loginMode = 'shop'
 
 function setLoginMode(mode) {
@@ -72,7 +75,9 @@ function setLoginMode(mode) {
 
     if (subtitle)
       subtitle.textContent =
-        'Sign in to continue'
+        CFG.suspended
+          ? 'Shop access is suspended — Orbito Support remains available'
+          : 'Sign in to continue'
 
     badge?.classList.add('hidden')
 
@@ -105,6 +110,7 @@ function setLoginMode(mode) {
 }
 
 export function renderLogin(onSuccess) {
+  cleanupTurnstile()
   _loginMode = 'shop'
 
   dstack('auth.renderLogin', '*** #app REWRITE *** (login screen)')
@@ -195,14 +201,17 @@ z-index:100
   // localhost must be added to the allowed hostnames in Cloudflare.
   const wrap = document.getElementById('cf-turnstile-wrap')
   const btn  = document.getElementById('login-btn')
+  const generation = ++_turnstileGeneration
 
   if (btn) btn.disabled = true
 
   _turnstileWidgetId = null
+  _turnstileContainer = wrap
   let attempts = 0
 
   const mountTurnstile = () => {
-    if (wrap && window.turnstile) {
+    if (generation !== _turnstileGeneration || !wrap?.isConnected) return
+    if (window.turnstile) {
       _turnstileWidgetId = window.turnstile.render(wrap, {
         sitekey:
           import.meta.env.VITE_TURNSTILE_SITE_KEY ||
@@ -214,19 +223,19 @@ z-index:100
             : 'light',
 
         callback: () => {
-          if (btn) btn.disabled = false
+          if (generation === _turnstileGeneration && btn?.isConnected) btn.disabled = false
         },
 
         'expired-callback': () => {
-          if (btn) btn.disabled = true
+          if (generation === _turnstileGeneration && btn?.isConnected) btn.disabled = true
         },
 
         'error-callback': () => {
-          if (btn) btn.disabled = true
+          if (generation === _turnstileGeneration && btn?.isConnected) btn.disabled = true
         },
       })
     } else if (attempts++ < 75) {
-      setTimeout(mountTurnstile, 200)
+      _turnstileMountTimer = setTimeout(mountTurnstile, 200)
     } else if (wrap) {
       wrap.innerHTML = `
         <p style="color:var(--danger);font-size:12px;text-align:center">
@@ -259,27 +268,31 @@ function resetTurnstile() {
 
   if (btn) btn.disabled = true
 
-  if (
-    window.turnstile &&
-    _turnstileWidgetId !== null
-  ) {
+  if (window.turnstile && _turnstileWidgetId !== null && _turnstileContainer?.isConnected) {
     try {
       window.turnstile.reset(_turnstileWidgetId)
     } catch {}
+  } else if (!_turnstileContainer?.isConnected) {
+    _turnstileWidgetId = null
+    _turnstileContainer = null
   }
 }
 
 function cleanupTurnstile() {
-  if (
-    window.turnstile &&
-    _turnstileWidgetId !== null
-  ) {
+  _turnstileGeneration += 1
+  if (_turnstileMountTimer !== null) {
+    clearTimeout(_turnstileMountTimer)
+    _turnstileMountTimer = null
+  }
+
+  if (window.turnstile && _turnstileWidgetId !== null && _turnstileContainer?.isConnected) {
     try {
       window.turnstile.remove(_turnstileWidgetId)
     } catch {}
   }
 
   _turnstileWidgetId = null
+  _turnstileContainer = null
 }
 
 async function submitLogin() {
@@ -308,25 +321,30 @@ async function submitLogin() {
    _loginMode
   )
   if (res.ok) {
-    dlog('auth.submitLogin', `LOGIN ok isAdmin=${res.isAdmin} role=${res.employee?.role} -- calling _onLoginSuccess`)
-    cleanupTurnstile()
-    const SESSION = {
-  employee: res.employee,
-  isAdmin: !!res.isAdmin,
-  isSupportAdmin: !!res.isSupportAdmin,
-}
-    const role = res.employee.role
+    const established = await establishLoginSession(res)
+    if (!established.ok) {
+      await _clearSession()
+      res.ok = false
+      res.error = established.error
+    } else {
+      dlog('auth.submitLogin', `LOGIN ok role=${established.session.employee?.role} -- calling _onLoginSuccess`)
+      cleanupTurnstile()
+      const SESSION = established.session
+      const role = SESSION.employee.role
+      const route = SESSION.isSupportAdmin
+        ? 'admin'
+        : role === 'Technician'
+          ? 'workshop'
+          : (role === 'Business Owner' || role === 'Manager')
+            ? 'admin'
+            : 'pos'
+      _saveSession(SESSION, route, 'dashboard')
+      _onLoginSuccess && _onLoginSuccess(SESSION)
+      return
+    }
+  }
 
-const route = res.isSupportAdmin
-  ? 'admin'
-  : role === 'Technician'
-    ? 'workshop'
-    : (role === 'Business Owner' || role === 'Manager')
-      ? 'admin'
-      : 'pos'
-    _saveSession(SESSION, route, 'dashboard')
-    _onLoginSuccess && _onLoginSuccess(SESSION)
-  } else {
+  if (!res.ok) {
     dlog('auth.submitLogin', `LOGIN FAILED: ${res.error}`)
     if (btn) {
   btn.disabled = false
@@ -349,15 +367,11 @@ async function forgotPassword() {
   if (_loginMode === 'support') return
   const email = document.getElementById('login-email')?.value?.trim()
   if (!email) { alert('Enter your email address first.'); return }
-  const isOwner = CFG.owner_email && email.toLowerCase() === CFG.owner_email.toLowerCase()
-  if (!isOwner) {
-    const { sb } = await import('./shared.js')
-    const { data } = await sb.from('employees')
-      .select('id').eq('email', email.toLowerCase()).maybeSingle()
-    if (!data) { alert('No account found with that email.\nContact your administrator.'); return }
-  }
+  const turnstileToken = document.querySelector('[name="cf-turnstile-response"]')?.value || ''
+  if (!turnstileToken) { alert('Complete the verification first.'); return }
   const { requestPasswordReset } = await import('./shared.js')
-  const res = await requestPasswordReset(email)
+  const res = await requestPasswordReset(email, turnstileToken)
   if (!res.ok) { alert('Something went wrong: ' + res.error); return }
-  alert(`Reset requested for ${email}.\nYour administrator will see this in Admin → Employees → Password Resets and set a new password for you.`)
+  alert('If that account is eligible, a password reset request has been recorded. Contact your administrator.')
+  resetTurnstile()
 }

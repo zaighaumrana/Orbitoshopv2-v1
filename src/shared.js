@@ -4,7 +4,15 @@ import { dlog, dstack } from './debuglog.js'
 /* ── Supabase ── */
 export const sb = createClient(
   import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON
+  import.meta.env.VITE_SUPABASE_ANON,
+  {
+    auth: {
+      storage: sessionStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+    },
+  }
 )
 
 let _platform = null
@@ -40,7 +48,7 @@ export async function logInventoryEvent() {
 
 /* ── Shared state ── */
 export const state = {
-  role:          'Business Owner',
+  role:          null,
   theme:         localStorage.getItem('retailos-theme') || 'light',
   online:        navigator.onLine,
   filter:        '',
@@ -50,28 +58,54 @@ export const state = {
 }
 
 /* ── Session ── */
-export function _loadSession() {
-  try {
-    const s = sessionStorage.getItem('retailos_session')
-    const parsed = s ? JSON.parse(s) : { employee: null, isAdmin: false }
-    dlog('shared._loadSession', `isAdmin=${parsed.isAdmin} employee=${parsed.employee?.name || 'null'}`)
-    return parsed
-  } catch { dlog('shared._loadSession', 'FAILED to parse -- returning empty session'); return { employee: null, isAdmin: false } }
+function profileToSession(profile) {
+  return {
+    authUserId: profile.auth_user_id,
+    employee: {
+      id: profile.employee_id ?? undefined,
+      name: profile.display_name,
+      role: profile.role,
+      email: profile.email,
+    },
+    isAdmin: profile.role === 'Business Owner' || profile.role === 'Orbito Support',
+    isSupportAdmin: profile.role === 'Orbito Support',
+  }
 }
-export function _saveSession(SESSION, route, module) {
-  dlog('shared._saveSession', `isAdmin=${SESSION.isAdmin} route=${route} module=${module}`)
+
+export async function loadCurrentSession() {
+  // Old retailos_session is deliberately ignored and removed. Supabase Auth
+  // plus app_users is the only identity/authorization source.
+  try { sessionStorage.removeItem('retailos_session') } catch {}
+  const { data: userData, error: userError } = await sb.auth.getUser()
+  if (userError || !userData.user) return null
+  const { data: profile, error: profileError } = await sb
+    .from('app_users')
+    .select('auth_user_id, employee_id, email, display_name, role, status')
+    .eq('auth_user_id', userData.user.id)
+    .single()
+  if (profileError || !profile || profile.status !== 'Active') {
+    await sb.auth.signOut({ scope: 'local' })
+    return null
+  }
+  state.role = profile.role
+  return profileToSession(profile)
+}
+
+export function _saveSession(_SESSION, route, module) {
   try {
-    sessionStorage.setItem('retailos_session', JSON.stringify(SESSION))
+    sessionStorage.removeItem('retailos_session')
     sessionStorage.setItem('retailos_route',   route  || '')
     sessionStorage.setItem('retailos_module',  module || 'dashboard')
   } catch {}
 }
-export function _clearSession() {
+export async function _clearSession() {
   dstack('shared._clearSession', 'clearing session storage')
   try {
     ['retailos_session','retailos_route','retailos_module']
       .forEach(k => sessionStorage.removeItem(k))
   } catch {}
+  state.role = null
+  await sb.auth.signOut({ scope: 'local' }).catch(() => {})
 }
 
 /* ── CFG ── */
@@ -80,7 +114,6 @@ export let CFG = {
   shop_logo: '', shop_description: '', primary_color: '#126c5b',
   secondary_color: '#e9b949', currency: 'Rs.', tax_rate: 0,
   terms_text: 'Warranty: 30 days on parts replaced.',
-  owner_email: '', owner_password: '', override_pin: '',
   discount_pin_required: true,
   partial_udhar_allowed: true,
   repair_module_enabled: true, inventory_module_enabled: false,
@@ -88,9 +121,10 @@ export let CFG = {
   ems_enabled: false, suspended: false,
 }
 
-export async function loadConfig() {
-  dlog('shared.loadConfig', 'ENTRY -- fetching shop_config')
-  const { data, error } = await sb.from('shop_config').select('*').single()
+export async function loadConfig(publicOnly = false) {
+  const rpc = publicOnly ? 'get_public_shop_config' : 'get_app_config'
+  dlog('shared.loadConfig', `ENTRY -- rpc=${rpc}`)
+  const { data, error } = await sb.rpc(rpc)
   if (error) { dlog('shared.loadConfig', `FAILED: ${error.message}`); console.warn('Config load failed:', error.message); return }
   Object.assign(CFG, data)
   dlog('shared.loadConfig', `DONE -- suspended=${CFG.suspended} ems_enabled=${CFG.ems_enabled}`)
@@ -151,6 +185,7 @@ export const statusBadge = s => {
 /* ── Access control ── */
 export const ACCESS = {
   'Business Owner': ['dashboard','repairs','inventory','reports','receipts','employees','ems','settings','catalog','pos','workshop'],
+  'Orbito Support': ['dashboard','repairs','inventory','reports','receipts','employees','ems','settings','catalog','pos','workshop'],
   'Manager':        ['dashboard','repairs','inventory','reports','receipts','employees','ems','catalog'],
   'Cashier':        ['pos'],
   'Technician':     ['workshop'],
@@ -200,6 +235,17 @@ export async function loginViaEdgeFunction(
   }
   dlog('shared.loginViaEdgeFunction', `OK isAdmin=${data.isAdmin} role=${data.employee?.role}`)
   return data
+}
+
+export async function establishLoginSession(edgeResult) {
+  const accessToken = edgeResult?.session?.access_token
+  const refreshToken = edgeResult?.session?.refresh_token
+  if (!accessToken || !refreshToken) return { ok: false, error: 'Login session was not returned.' }
+  const { error } = await sb.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+  if (error) return { ok: false, error: 'Login session could not be established.' }
+  const session = await loadCurrentSession()
+  if (!session) return { ok: false, error: 'Login profile could not be verified.' }
+  return { ok: true, session }
 }
 
 export function _datePart() {
@@ -255,32 +301,37 @@ export function generateTempPassword() {
 
 /** Logged-in user changes their own password (owner or employee). */
 export async function changeOwnPassword(session, oldPassword, newPassword) {
+  if (session?.isSupportAdmin) {
+    return { ok: false, error: 'Support sessions are issued through platform authentication.' }
+  }
   const err = validatePassword(newPassword)
   if (err) return { ok: false, error: err }
-
-  if (session.isAdmin || session.employee?.role === 'Business Owner') {
-    if (oldPassword !== CFG.owner_password) return { ok: false, error: 'Current password is incorrect.' }
-    const { error } = await sb.from('shop_config').update({ owner_password: newPassword }).eq('id', 1)
-    if (error) return { ok: false, error: error.message }
-    CFG.owner_password = newPassword
-    return { ok: true }
-  }
-
-  const { data, error: findErr } = await sb.from('employees')
-    .select('id, password').eq('id', session.employee.id).single()
-  if (findErr || !data) return { ok: false, error: 'Could not find your account.' }
-  if (data.password !== oldPassword) return { ok: false, error: 'Current password is incorrect.' }
-
-  const { error } = await sb.from('employees').update({ password: newPassword }).eq('id', session.employee.id)
-  if (error) return { ok: false, error: error.message }
+  const email = session.employee?.email
+  if (!email) return { ok: false, error: 'Could not identify your account.' }
+  const { error: verifyError } = await sb.auth.signInWithPassword({ email, password: oldPassword })
+  if (verifyError) return { ok: false, error: 'Current password is incorrect.' }
+  const { error } = await sb.auth.updateUser({ password: newPassword })
+  if (error) return { ok: false, error: 'Password could not be updated.' }
   return { ok: true }
 }
 
 /** No email service is configured, so "forgot password" logs a request an admin resolves manually. */
-export async function requestPasswordReset(email) {
-  const { error } = await sb.from('password_reset_requests').insert({ email: email.toLowerCase().trim() })
-  if (error) return { ok: false, error: error.message }
-  return { ok: true }
+export async function requestPasswordReset(email, turnstileToken) {
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/password-reset-request`
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: import.meta.env.VITE_SUPABASE_ANON,
+      },
+      body: JSON.stringify({ email, turnstileToken }),
+    })
+    if (!res.ok) return { ok: false, error: 'Reset request could not be submitted.' }
+    return { ok: true }
+  } catch {
+    return { ok: false, error: 'Reset request could not be submitted.' }
+  }
 }
 
 export async function listPendingResetRequests() {
@@ -291,25 +342,32 @@ export async function listPendingResetRequests() {
 }
 
 export async function resolvePasswordReset(requestId, email, newPassword, resolvedBy) {
-  const isOwner = CFG.owner_email && email.toLowerCase() === CFG.owner_email.toLowerCase()
-  if (isOwner) {
-    const { error } = await sb.from('shop_config').update({ owner_password: newPassword }).eq('id', 1)
-    if (error) return { ok: false, error: error.message }
-    CFG.owner_password = newPassword
-  } else {
-    const { error } = await sb.from('employees').update({ password: newPassword }).eq('email', email.toLowerCase().trim())
-    if (error) return { ok: false, error: error.message }
-  }
-  const { error: reqErr } = await sb.from('password_reset_requests')
-    .update({ status: 'Resolved', resolved_at: new Date().toISOString(), resolved_by: resolvedBy || '' })
-    .eq('id', requestId)
-  if (reqErr) return { ok: false, error: reqErr.message }
-  return { ok: true }
+  return invokeAccountAdmin('reset-password-request', {
+    requestId, email, newPassword, resolvedBy,
+  })
+}
+
+export async function invokeAccountAdmin(action, payload = {}) {
+  const { data, error } = await sb.functions.invoke('account-admin', {
+    body: { action, ...payload },
+  })
+  if (error || !data?.ok) return { ok: false, error: data?.error || error?.message || 'Request failed.' }
+  return data
+}
+
+export async function verifyStepUpPin(pin, purpose) {
+  const { data, error } = await sb.functions.invoke('verify-pin', { body: { pin, purpose } })
+  return { ok: !error && data?.ok === true, error: data?.error || error?.message }
+}
+
+export async function verifyCurrentStepUpPin(pin) {
+  return verifyStepUpPin(pin, ppPurpose)
 }
 
 /** Shared "My Account" modal — used by pos.js, workshop.js and admin.js. */
 export function myAccountModalHTML(session) {
   const isOwnerLike = session.isAdmin || session.employee?.role === 'Business Owner'
+  const isSupport = session.isSupportAdmin === true
   return `<div class="modal-backdrop"><div class="modal" style="max-width:420px">
     <h2>My Account</h2>
     ${state.installPrompt ? `
@@ -323,7 +381,15 @@ export function myAccountModalHTML(session) {
         <button type="button" class="secondary-button" data-action="open-leave-request" style="width:100%">📋 Request Leave</button>
       </div>
     ` : ''}
-    <form data-form="change-password">
+    ${isSupport ? `
+      <p class="muted" style="font-size:13px">
+        This support session was issued through Orbito platform authentication.
+        The client-project support identity has no reusable password.
+      </p>
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" data-close>Close</button>
+      </div>
+    ` : `<form data-form="change-password">
       <p class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Change Password</p>
       <div class="form-grid">
         <label class="field"><span>Current Password</span><input name="oldPassword" type="password" required autocomplete="current-password"></label>
@@ -335,7 +401,7 @@ export function myAccountModalHTML(session) {
         <button type="button" class="secondary-button" data-close>Close</button>
         <button class="primary-button">Update Password</button>
       </div>
-    </form>
+    </form>`}
   </div></div>`
 }
 

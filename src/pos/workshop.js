@@ -12,7 +12,7 @@ import {
 import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
   _clearSession, money, fld, modalActions,
-  openPinPrompt, pinPromptHTML, handlePpKey,
+  openPinPrompt, pinPromptHTML, handlePpKey, verifyCurrentStepUpPin,
   myAccountModalHTML, handleChangePasswordSubmit,
 } from '../shared.js'
 import {
@@ -590,13 +590,13 @@ function attachEvents() {
     }
     if (el.dataset.action === 'logout') {
       if (!confirm('Log out?')) return
-      _clearSession(); navigate('/login'); return
+      await _clearSession(); return
     }
     if (el.dataset.action === 'ems-clock-out') {
       const { handleClockOut } = await import('../features/ems/index.js')
       handleClockOut(SESSION, async () => {
         if (!confirm('Clocked out. Log out now?')) return
-        _clearSession(); navigate('/login')
+        await _clearSession()
       })
       return
     }
@@ -817,8 +817,7 @@ function _addComponentToDraft(name, tag, customText) {
 }
 
 async function verifyAdminLocal(pin) {
-  return String(pin) === String(CFG.override_pin)
-    ? { ok: true } : { ok: false }
+  return verifyCurrentStepUpPin(pin)
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -827,7 +826,7 @@ async function verifyAdminLocal(pin) {
 export async function initWorkshop(sess) {
   dlog('WORKSHOP.initWorkshop', `ENTRY isAdmin=${sess.isAdmin} caller=[${callerInfo()}]`)
   SESSION          = sess
-  state.role       = sess.isAdmin ? 'Business Owner' : (sess.employee?.role || 'Technician')
+  state.role       = sess.employee?.role || null
   wsState.filter   = ''
   wsState.statusFilter = 'all'
   await load()

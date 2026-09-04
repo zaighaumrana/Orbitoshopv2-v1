@@ -23,7 +23,6 @@ import {
   sb, state, CFG, money,
   _clearSession,
 } from '../../shared.js'
-import { navigate } from '../../router.js'
 import { dlog, dstack } from '../../debuglog.js'
 
 let SESSION         = {}
@@ -207,8 +206,7 @@ function renderBreakGate(sess, record) {
   document.getElementById('shiftend-btn').addEventListener('click', async () => {
     if (!confirm('End your shift and log out?')) return
     await _clockOut(sess, record.id)
-    _clearSession()
-    navigate('/login')
+    await _clearSession()
   })
 }
 

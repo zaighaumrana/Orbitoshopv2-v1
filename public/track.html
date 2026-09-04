@@ -345,12 +345,15 @@
     <h2>Track Your Repair</h2>
     <div class="input-row">
       <input type="text" id="search-input"
-        placeholder="Ticket # or phone number"
+        placeholder="Exact ticket or invoice #"
         autocomplete="off" autocorrect="off" spellcheck="false"
         inputmode="text">
+      <input type="tel" id="phone-input"
+        placeholder="Registered phone"
+        autocomplete="tel" inputmode="tel">
       <button class="track-btn" id="track-btn" onclick="doTrack()">Track</button>
     </div>
-    <p class="hint">Enter your ticket number (e.g. FP-2026-1234) or the phone number you registered with.</p>
+    <p class="hint">Enter the exact ticket/invoice number and the registered phone number.</p>
     <div class="error-msg" id="error-msg"></div>
   </div>
 
@@ -399,8 +402,6 @@
       <div id="res-comps"></div>
     </div>
 
-    <!-- Technician note -->
-    <div class="note-box" id="res-note" style="display:none"></div>
   </div>
 
   <!-- Contact -->
@@ -413,7 +414,7 @@
 </div>
 
 <script type="module">
-  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.2/+esm'
 
   /* ── Supabase — reads from the same client project ── */
   const SUPABASE_URL  = 'https://kxmovywgshyltwusghhj.supabase.co'
@@ -424,9 +425,7 @@
   async function loadBranding() {
     let data
     try {
-      const res = await sb.from('shop_config').select(
-        'shop_name, shop_logo, shop_phone, shop_address, terms_text, primary_color, live_tracking_enabled'
-      ).single()
+      const res = await sb.rpc('get_public_shop_config')
       if (res.error) throw res.error
       data = res.data
     } catch (e) {
@@ -480,15 +479,10 @@
       phoneEl.href = `tel:${data.shop_phone}`
     }
 
-    if (data.terms_text) {
-      document.getElementById('shop-footer').textContent = data.terms_text
-    }
-
     // Pre-fill from URL param ?t=FP-2026-1234
     const urlParam = new URLSearchParams(window.location.search).get('t')
     if (urlParam) {
       document.getElementById('search-input').value = urlParam
-      doTrack()
     }
   }
 
@@ -514,8 +508,9 @@
 
   /* ── Main search ── */
   window.doTrack = async function() {
-    const raw = document.getElementById('search-input').value.trim()
-    if (!raw) return
+    const identifier = document.getElementById('search-input').value.trim()
+    const phone = document.getElementById('phone-input').value.trim()
+    if (!identifier || !phone) return
 
     const btn    = document.getElementById('track-btn')
     const errEl  = document.getElementById('error-msg')
@@ -526,30 +521,15 @@
     errEl.style.display = 'none'
     resEl.style.display = 'none'
 
-    // Strip characters that would break PostgREST's .or() filter syntax
-    // (commas/parens are filter-clause separators, not part of any real
-    // ticket number or phone) so malformed input degrades to "no results"
-    // instead of a query error.
-    const safe = raw.replace(/[,()]/g, '')
-    if (!safe) {
-      btn.disabled = false
-      btn.textContent = 'Track'
-      errEl.textContent = 'Please enter a valid ticket number or phone number.'
-      errEl.style.display = 'block'
-      return
-    }
-
-    let data, error
+    let payload, error
     try {
-      // Only the columns this page actually renders -- narrower than
-      // select('*') so a looser-than-intended RLS policy on `tickets`
-      // exposes less than it otherwise would.
-      const res = await sb.from('tickets')
-        .select('ticket_number, invoice_number, customer_name, device_brand, device_model, imei, status, created_at, estimated_quote, final_total, components_noted, technician_note')
-        .or(`ticket_number.ilike.%${safe}%,invoice_number.ilike.%${safe}%,customer_phone.ilike.%${safe}%`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-      data = res.data; error = res.error
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/public-track`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON },
+        body: JSON.stringify({ identifier, phone }),
+      })
+      payload = await response.json().catch(() => ({}))
+      if (!response.ok || !payload.ok) error = new Error('No match')
     } catch (e) {
       error = e
     }
@@ -557,13 +537,13 @@
     btn.disabled = false
     btn.textContent = 'Track'
 
-    if (error || !data || data.length === 0) {
-      errEl.textContent = 'No repair found with that ticket number or phone. Please check and try again.'
+    if (error || !payload?.ticket) {
+      errEl.textContent = 'No repair matched that exact ticket and phone number.'
       errEl.style.display = 'block'
       return
     }
 
-    renderResult(data[0])
+    renderResult(payload.ticket)
   }
 
   function renderResult(t) {
@@ -585,8 +565,8 @@
       day: 'numeric', month: 'short', year: 'numeric'
     })
 
-    if (t.imei) {
-      document.getElementById('res-imei').textContent = t.imei
+    if (t.imei_masked) {
+      document.getElementById('res-imei').textContent = t.imei_masked
       document.getElementById('res-imei-wrap').style.display = 'block'
     }
 
@@ -642,19 +622,15 @@
       document.getElementById('res-comps-wrap').style.display = 'none'
     }
 
-    // Technician note (only show if it's not internal-only info)
-    if (t.technician_note) {
-      const noteEl = document.getElementById('res-note')
-      noteEl.style.display = 'block'
-      noteEl.innerHTML = `<strong>Note:</strong> ${t.technician_note}`
-    }
-
     document.getElementById('result-card').style.display = 'block'
     document.getElementById('result-card').scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   // Enter key triggers search
   document.getElementById('search-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doTrack()
+  })
+  document.getElementById('phone-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') doTrack()
   })
 
