@@ -18,7 +18,7 @@ import {
   matchesInvoiceSearch,
 } from '../shared.js'
 import {
-  getSubInvoices, createSubInvoice, markComponentNotNeeded,
+  getSubInvoices, createSubInvoice, markComponentNotNeeded, deliverRepair,
 } from '../features/repairs/api.js'
 import {
   insertNewTicketFromCart, collectTicketPayment,
@@ -439,6 +439,13 @@ function ticketPaymentModalHTML(ticket) {
           Add to Cart for Payment
         </button>
       ` : `<p class="muted">This ticket is fully paid.</p>`}
+      ${ticket.status === 'Ready' ? (combinedTotal > 0 ? `
+        <button class="secondary-button" style="width:100%;margin-top:8px" data-action="deliver-repair-udhar" data-ticket-id="${ticket.id}">
+          Approve Udhar & Deliver
+        </button>` : `
+        <button class="primary-button" style="width:100%;margin-top:8px" data-action="deliver-repair" data-ticket-id="${ticket.id}">
+          Deliver Device
+        </button>`) : `<p class="muted" style="font-size:12px;margin-top:8px">Mark the repair Ready before delivery.</p>`}
       <div class="modal-actions">
         <button class="secondary-button" data-close>Close</button>
       </div>
@@ -1132,6 +1139,29 @@ function attachEvents() {
       posState.cartTicketId = ticket.id
       state.modal = null
       render(); return
+    }
+
+    if (el.dataset.action === 'deliver-repair') {
+      const ticketId = Number(el.dataset.ticketId)
+      const res = await deliverRepair(ticketId, false)
+      if (!res.ok) { alert('Delivery error: ' + res.error); return }
+      state.modal = null
+      await load()
+      alert('Device marked as Delivered.')
+      return
+    }
+
+    if (el.dataset.action === 'deliver-repair-udhar') {
+      const ticketId = Number(el.dataset.ticketId)
+      openPinPrompt('udhar', async verified => {
+        if (!verified) return
+        const res = await deliverRepair(ticketId, true)
+        if (!res.ok) { alert('Delivery error: ' + res.error); return }
+        state.modal = null
+        await load()
+        alert('Device delivered with the remaining balance approved as Udhar.')
+      }, render)
+      return
     }
 
     /* ── Place Order (ticket in cart) ── */

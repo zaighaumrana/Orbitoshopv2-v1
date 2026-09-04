@@ -303,8 +303,16 @@ validates tender/change and current outstanding, then allocates parent-first and
 oldest-child-first. It updates only derived compatibility paid/balance/history
 fields and never changes operational status or `collected_at`.
 
-Later PostgreSQL transaction RPCs will own cancellation/refund, delivery,
-retail return and Inventory adjust/restock.
+`cancel_repair` now owns repair cancellation and optional refund. It requires
+the exact `repair-refund` step-up purpose, preserves all invoice/payment rows,
+adds the immutable negative cancellation adjustment needed to reconcile the
+retained amount, records an immutable refund when money leaves the shop, and
+marks the repair family Cancelled. `deliver_repair` is the only path to
+Delivered: the root must be Ready and either fully paid or covered by a fresh
+Udhar authorization. It records the authenticated handoff actor and timestamp.
+
+Later PostgreSQL transaction RPCs will own retail return and Inventory
+adjust/restock.
 
 Phase 3F now provides pending proposal, Approved/Declined decision and direct
 approved-work RPCs. An Approved decision creates a distinct child invoice in
@@ -320,9 +328,13 @@ client transaction.
 ## 9. Current and planned RLS model
 
 Phase 3D removed direct authenticated `sales` and `udhar` INSERT
-privileges/policies after cutting retail creation to the RPC. Remaining legacy
-repair, Udhar-settlement, return and Inventory-admin mutation paths stay staged
-for their dedicated cutovers.
+privileges/policies after cutting retail creation to the RPC. Phase 3F removed
+direct ticket INSERT. Phase 3G added a ticket guard that rejects direct changes
+to invoice/payment compatibility fields, immutable identity fields,
+cancellation/delivery evidence, and transitions to or from Delivered or
+Cancelled. Normal Workshop transitions such as Pending to Ready remain covered
+by the existing authenticated role policy. Remaining Udhar-settlement, return
+and Inventory-admin mutation paths stay staged for their dedicated cutovers.
 
 Every Phase 3 table will enable RLS, deny anonymous access, permit only required
 authenticated reads, and deny direct browser INSERT/UPDATE/DELETE. Secure RPCs
@@ -414,6 +426,34 @@ Phase 3F rollback-only database/RPC matrix passed:
   refund reconciliation and direct ticket INSERT were denied
 - all fixtures rolled back; retained tickets/proposals/adjustments: 0
 
+Phase 3G rollback-only database/RPC matrix passed:
+
+- full Cash refund, partial Raast refund and zero-refund cancellation each
+  reconciled to zero outstanding without rewriting the original invoice or
+  payment
+- refund method/reason, cancellation actor/time and immutable negative
+  cancellation adjustments were persisted as applicable
+- duplicate cancellation and delivery request IDs returned idempotent replays
+  without duplicate refund, adjustment or credit records
+- Pending delivery and Ready-with-balance delivery without Udhar were denied
+- Ready and fully paid delivery recorded Delivered, `delivered_at`, the acting
+  Auth user and the compatibility `collected_at`
+- payment alone left Ready unchanged; explicit delivery then succeeded
+- Ready with a valid Udhar step-up delivered with one active credit approval;
+  a later payment reduced outstanding from 100 to 60 without reversing
+  Delivered, and Cash 50 against payment 40 retained change 10
+- missing reason, missing/wrong-purpose step-up, Technician cancellation,
+  Technician delivery, direct Delivered transition and direct financial-field
+  update were denied
+- Technician Pending-to-Ready remained allowed as an operational Workshop
+  transition
+- all probes rolled back: zero `P3G` test tickets, zero refunds and zero
+  adjustments remain; canonical live counts remain 12 payments, 12 allocations,
+  2 Inventory opening movements and 1 legacy credit approval
+
+The deployed `verify-pin` Edge Function is version 2 with JWT verification
+enabled and accepts the new exact `repair-refund` purpose.
+
 Not yet run: later Phase 3 RPCs and full real-browser regression.
 
 Security advisor baseline has no critical Phase 3 finding. Existing Phase 2
@@ -427,9 +467,11 @@ including `returns.original_sale_id`, `sales.employee_id`, `sales.ticket_id`,
 indexed; unrelated old indexes remain separately scoped unless needed by the
 new transaction queries.
 
-The Phase 3B and Phase 3C advisor reruns reported no new security finding and no
-missing-index finding for a new foreign key. Unused-index notices are expected
-before application RPC traffic begins.
+The Phase 3B through Phase 3G advisor reruns reported no unexpected security
+finding and no missing-index finding for a new Phase 3 foreign key. The Phase
+3G callable transaction RPC notices are intentional and protected by their
+internal Auth/role/suspension/step-up checks. Fresh actor indexes report unused
+until application traffic exercises them.
 
 ## 12. Rollback and deployment boundary
 
@@ -440,7 +482,9 @@ Supabase backup/PITR source.
 
 Phase 3B was additive, Phase 3C populated canonical ledger history, Phase 3D
 made the new retail writer canonical, Phase 3E cut original repair creation and
-collection to transactional RPCs, and Phase 3F closed direct ticket INSERT.
+collection to transactional RPCs, Phase 3F closed direct ticket INSERT, and
+Phase 3G made cancellation/refund and physical delivery dedicated guarded
+transactions.
 Dropping the nine tables is now forbidden.
 Any rollback must switch readers/writers while
 retaining the backfilled financial and Inventory-opening records; it must not
@@ -456,11 +500,14 @@ stage requires dry-run, DEV-only apply, verification, advisors and documentation
 
 - Historical Inventory movements/restock cannot be reconstructed.
 - Two legacy Ready timestamps are not physical-delivery evidence.
-- Legacy direct financial mutation paths remain until a later staged cutover.
+- Legacy return, Inventory-adjustment and Udhar-settlement mutation paths remain
+  until their later staged cutovers.
 - Retail split-tender input is supported by the RPC but its optional UI is still
   pending Phase 3J.
 - Pending/Declined additional-work controls and repair-adjustment UI are not yet
   exposed, although their server transactions are complete.
+- Repair cancellation is server-complete but its preview/confirmation UI is
+  pending Phase 3J; delivery is exposed from the Ready repair payment modal.
 - Existing `SECURITY DEFINER`, leaked-password-plan and unindexed-FK notices
   remain documented Phase 2/baseline risks.
 

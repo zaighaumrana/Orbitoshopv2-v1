@@ -19,6 +19,7 @@ import { sb } from '../../shared.js'
 import { dlog, dstack } from '../../debuglog.js'
 
 const pendingAdditionalWorkRequests = new Map()
+const pendingDeliveryRequests = new Map()
 
 export async function createTicket(payload, employeeName, ticketNumber) {
   dstack('repairs.createTicket', `ENTRY customerName=${payload.customerName} employeeName=${employeeName} -- NOTE: this function currently has no known callers in the app, so if this fires, the stack trace above is the answer`)
@@ -99,6 +100,20 @@ export async function createSubInvoice(parentTicket, components, labourCost, not
   if (error) return { ok: false, error: error.message }
   pendingAdditionalWorkRequests.delete(key)
   return { ok: true, data:result.ticket, creditApplied:0, proposal:result.proposal }
+}
+
+export async function deliverRepair(rootTicketId, allowUdhar = false) {
+  const key = String(rootTicketId)
+  const requestId = pendingDeliveryRequests.get(key) || crypto.randomUUID()
+  pendingDeliveryRequests.set(key, requestId)
+  const { data, error } = await sb.rpc('deliver_repair', {
+    p_request_id: requestId,
+    p_root_ticket_id: rootTicketId,
+    p_allow_udhar: allowUdhar,
+  })
+  if (error) return { ok:false, error:error.message }
+  pendingDeliveryRequests.delete(key)
+  return { ok:true, data }
 }
 
 /**

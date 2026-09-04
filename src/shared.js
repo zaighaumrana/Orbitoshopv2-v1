@@ -449,6 +449,7 @@ export function pinPromptHTML(purpose) {
     return:   'Admin PIN to process return',
     discount: 'PIN required to apply discount',
     udhar:    'PIN required for credit sale',
+    'repair-refund': 'PIN required to cancel and refund repair',
     'remove-component': 'Owner/Admin PIN required',
   }[purpose] || 'Verify identity'
   return `

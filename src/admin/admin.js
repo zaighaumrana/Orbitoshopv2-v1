@@ -863,10 +863,8 @@ function attachEvents() {
 
     if (el.dataset.action === 'save-ticket-detail') {
       const newStatus   = document.getElementById('td-status')?.value
-      const actualQuote = Number(document.getElementById('td-actual-quote')?.value||0)
       const note        = document.getElementById('td-note')?.value||''
       const upd = { status:newStatus, update_note:note }
-      if (actualQuote > 0) upd.actual_quote = actualQuote
       const { error } = await sb.from('tickets').update(upd).eq('id', el.dataset.id)
       if (error) { alert('Update failed: '+error.message); return }
       state.modal = null; await load(); return

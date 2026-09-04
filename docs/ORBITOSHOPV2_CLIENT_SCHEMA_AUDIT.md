@@ -1006,3 +1006,29 @@ Applied `20260904230000_phase3_additional_work_and_adjustments.sql` to DEV.
 - Advisor review found only intentionally callable authenticated transaction
   RPCs and documented baseline notices; no new missing-FK-index finding.
 
+### Phase 3G repair cancellation and delivery
+
+Applied `20260905000000_phase3_repair_cancellation_and_delivery.sql` to DEV.
+
+- Added immutable cancellation and delivery request IDs, timestamps, reasons
+  and acting Auth-user references to repair roots.
+- Added a ticket mutation guard that blocks direct financial, immutable,
+  Delivered and Cancelled changes while preserving normal Workshop status
+  movement such as Pending to Ready.
+- Added `cancel_repair`, requiring the exact `repair-refund` PIN purpose and
+  atomically reconciling the retained obligation, optional refund and Cancelled
+  state without rewriting original invoices or payments.
+- Added `deliver_repair`, permitting physical handoff only from Ready when the
+  family is paid or its outstanding balance has a fresh Udhar approval.
+- Updated the POS Ready-ticket modal to use explicit paid or PIN-approved Udhar
+  delivery; removed direct Delivered and direct quote edits from Admin.
+- Deployed `verify-pin` version 2 with JWT verification enabled and the new
+  `repair-refund` purpose.
+- Rollback-only tests passed full/partial/zero refund, payment-before-delivery,
+  Udhar delivery, post-delivery payment, idempotency, actor/timestamp and all
+  authorization/direct-write denials. No test fixture remained.
+- Post-cutover counts remain 12 payments, 12 allocations, 2 Inventory opening
+  movements, 1 legacy credit approval, 0 refunds and 0 adjustments.
+- Advisor review found only the expected reviewed transaction-RPC and baseline
+  notices; no new missing-index finding for a Phase 3 foreign key.
+

@@ -77,11 +77,9 @@ export function ticketDetailModalHTML(id, modal) {
     <div style="border-top:1px solid var(--border);padding-top:12px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <select id="td-status" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);flex:1">
-          ${['Pending','In Progress','Ready','Delivered','Declined'].map(s =>
+          ${['Pending','In Progress','Ready','Declined'].map(s =>
             `<option ${s===tk.status?'selected':''}>${s}</option>`).join('')}
         </select>
-        <input type="number" step="any" min="0" id="td-actual-quote" placeholder="Actual price" value="${tk.actual_quote||''}"
-          style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);min-width:140px;flex:1">
       </div>
       <textarea id="td-note" placeholder="Add a note…"
         style="width:100%;margin-top:8px;min-height:60px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);box-sizing:border-box">${tk.update_note||''}</textarea>
