@@ -32,7 +32,8 @@ import {
   getDraft, resetDraft, calcDraftTotal, calcDraftPaid,
 } from '../features/pos/repairs/state.js'
 import { receiptPreview } from '../features/pos/checkout/render.js'
-import { settleUdhar, finalizeCheckout } from '../features/pos/checkout/api.js'
+import { finalizeCheckout } from '../features/pos/checkout/api.js'
+import { settleUdhar } from '../features/checkout/udhar/api.js'
 
 import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
@@ -67,10 +68,15 @@ async function load() {
   const fetchInv = CFG.inventory_module_enabled
     ? sb.from('inventory').select('*').order('name')
     : Promise.resolve({ data: [] })
-  const [tickets, sales, udhar, returns_, inv, quickItems, repairComponents] = await Promise.all([
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+  const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
+  const [tickets, sales, udharAccounts, shiftFinancial, returns_, inv, quickItems, repairComponents] = await Promise.all([
     sb.from('tickets').select('*').order('id', { ascending: false }),
     sb.from('sales').select('*').order('id', { ascending: false }),
-    sb.from('udhar').select('*').order('id', { ascending: false }),
+    sb.rpc('get_unified_udhar_accounts'),
+    sb.rpc('get_financial_report', {
+      p_from: todayStart.toISOString(), p_to: todayEnd.toISOString(), p_actor_only: true,
+    }),
     sb.from('returns').select('*').order('id', { ascending: false }),
     fetchInv,
     sb.from('quick_items').select('*').order('sort_order'),
@@ -80,7 +86,8 @@ async function load() {
     tickets:          tickets.data          || [],
     sales:            sales.data            || [],
     employees:        [],
-    udhar:            udhar.data            || [],
+    udharAccounts:    udharAccounts.data    || [],
+    shiftFinancial:   shiftFinancial.data   || {},
     returns:          returns_.data         || [],
     inventory:        inv.data              || [],
     quickItems:       quickItems.data       || [],
@@ -375,8 +382,12 @@ function buildShiftStats() {
   const empName   = SESSION.employee?.name || ''
   const shiftSales = (state.data.sales||[]).filter(s=>(s.created_at||'').slice(0,10)===todayStr&&(!empName||s.employee_name===empName))
   const itemsSold  = shiftSales.reduce((s,sale)=>s+(sale.items_sold||[]).reduce((x,i)=>x+(i.qty||1),0),0)
-  const revenue    = shiftSales.reduce((s,sale)=>s+Number(sale.total_bill||0),0)
-  const cashOnly   = shiftSales.filter(s=>s.payment_method==='Cash').reduce((s,sale)=>s+Number(sale.total_bill||0),0)
+  const financial  = state.data.shiftFinancial || {}
+  const invoiced   = Number(financial.invoiced || 0)
+  const collected  = Number(financial.paymentsCollected || 0)
+  const refunded   = Number(financial.refunds || 0)
+  const netPayments= Number(financial.netPayments || 0)
+  const cashOnly   = Number((financial.paymentMethods || []).find(x => x.method === 'Cash')?.amount || 0)
   const discounts  = shiftSales.reduce((s,sale)=>s+Number(sale.discount||0),0)
   const custCount  = new Set(shiftSales.map(s=>s.customer_name).filter(Boolean)).size
   const allTickets = state.data.tickets||[]
@@ -387,7 +398,10 @@ function buildShiftStats() {
       <center><strong>${tenant.name}</strong><br>Shift Summary — ${todayStr}<br>${empName||'All Staff'}</center>
       <hr style="border:none;border-top:1px dashed #bbb;margin:8px 0">
       <div class="stat-row"><span>Products sold</span><span>${itemsSold}</span></div>
-      <div class="stat-row"><span>Total revenue</span><span>${money(revenue)}</span></div>
+      <div class="stat-row"><span>Invoiced</span><span>${money(invoiced)}</span></div>
+      <div class="stat-row"><span>Payments collected</span><span>${money(collected)}</span></div>
+      <div class="stat-row"><span>Refunds</span><span>-${money(refunded)}</span></div>
+      <div class="stat-row"><span>Net payments</span><span>${money(netPayments)}</span></div>
       <div class="stat-row"><span>Cash collected</span><span>${money(cashOnly)}</span></div>
       <div class="stat-row"><span>Discounts given</span><span>${money(discounts)}</span></div>
       <div class="stat-row"><span>Customers served</span><span>${custCount}</span></div>
@@ -704,29 +718,29 @@ function renderModal() {
   </form></div>`
 
   if (type === 'udharList') {
-    const outstanding = (state.data.udhar||[]).filter(u => u.status !== 'Settled')
+    const outstanding = state.data.udharAccounts || []
     return `<div class="modal-backdrop"><div class="modal modal-lg">
       <h2>Outstanding Credits</h2>
       ${outstanding.length===0?`<div class="empty">No outstanding credits.</div>`:`<div style="display:grid;gap:10px">
         ${outstanding.map(u => `
           <div style="padding:12px;background:var(--surface-2);border-radius:8px;display:grid;gap:8px">
             <div style="display:flex;justify-content:space-between;align-items:flex-start">
-              <div><strong>${u.customer_name}</strong> · ${u.customer_phone}<br>
-                <small class="muted">INV-${u.sale_id} · ${new Date(u.created_at).toLocaleDateString()}</small></div>
+              <div><strong>${u.customerName}</strong> · ${u.customerPhone}<br>
+                <small class="muted">${u.kind === 'repair' ? 'Repair' : 'Retail'} · ${u.reference} · ${new Date(u.createdAt).toLocaleDateString()}</small></div>
               <span class="badge ${u.status==='Settled'?'good':'bad'}">${u.status}</span>
             </div>
             <div style="display:flex;justify-content:space-between">
-              <span>Balance: <strong>${money(u.balance_due)}</strong></span>
-              <span class="muted">Total: ${money(u.total_amount)}</span>
+              <span>Balance: <strong>${money(u.outstanding)}</strong></span>
+              <span class="muted">Current total: ${money(u.effectiveObligation)}</span>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-              <input type="number" step="any" min="0" placeholder="Amount to settle" data-settle-amount="${u.id}"
+              <input type="number" step="any" min="0" max="${u.outstanding}" placeholder="Amount to settle" data-settle-amount="${u.kind}:${u.sourceId}"
                 style="flex:1;border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text)">
-              <select data-settle-method="${u.id}"
+              <select data-settle-method="${u.kind}:${u.sourceId}"
                 style="border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text)">
                 ${['Cash','Raast','JazzCash','EasyPaisa','Bank Transfer'].map(m => `<option>${m}</option>`).join('')}
               </select>
-              <button class="primary-button" data-settle-id="${u.id}">Settle</button>
+              <button class="primary-button" data-settle-id="${u.kind}:${u.sourceId}">Settle</button>
             </div>
           </div>`).join('')}
       </div>`}
@@ -1360,13 +1374,13 @@ function attachEvents() {
 
     /* ── Settle Udhar ── */
     if (el.dataset.settleId) {
-      const udharId = Number(el.dataset.settleId)
-      const amount  = Number(document.querySelector(`[data-settle-amount="${udharId}"]`)?.value)
-      const method  = document.querySelector(`[data-settle-method="${udharId}"]`)?.value||'Cash'
+      const accountKey = el.dataset.settleId
+      const amount  = Number(document.querySelector(`[data-settle-amount="${accountKey}"]`)?.value)
+      const method  = document.querySelector(`[data-settle-method="${accountKey}"]`)?.value||'Cash'
       if (!amount||amount<=0) { alert('Enter a valid amount.'); return }
       openPinPrompt('settle', async (verified) => {
         if (!verified) return
-        const rec = state.data.udhar.find(u => u.id === udharId)
+        const rec = (state.data.udharAccounts || []).find(u => `${u.kind}:${u.sourceId}` === accountKey)
         const res = await settleUdhar(rec, amount, method)
         if (!res.ok) { alert('Settle error: ' + res.error); return }
         await load()

@@ -270,6 +270,7 @@ Applied migration:
 | `20260905000000_phase3_repair_cancellation_and_delivery.sql` | PIN-authorized cancellation/refund, explicit paid-or-Udhar delivery and protected ticket financial fields | applied |
 | `20260905010000_phase3_retail_returns_and_inventory_adjustments.sql` | Partial retail returns, actual-refund calculation, optional restock and audited Inventory create/adjust RPCs | applied |
 | `20260905011000_phase3_return_line_invariant.sql` | Deferred invariant preventing an empty return header from committing | applied |
+| `20260905020000_phase3_unified_udhar_and_reporting.sql` | Unified retail/repair Udhar settlement and canonical dashboard/report/shift read models | applied |
 
 Post-apply verification:
 
@@ -285,7 +286,7 @@ Post-apply verification:
   equals current quantity 50
 - no refund, return-line, invoice-adjustment or additional-work history was
   invented
-- local/remote migration ledger matches through `20260905011000`
+- local/remote migration ledger matches through `20260905020000`
 
 ## 8. Planned transaction and idempotency boundaries
 
@@ -492,6 +493,39 @@ the familiar PIN/print workflow. Admin Inventory separates catalog editing from
 audited Restock/Manual Correction operations; non-zero creation quantity is an
 opening movement.
 
+Phase 3I rollback-only database/RPC matrix passed:
+
+- `get_financial_report` separated retail and repair invoice value from actual
+  payment events, refunds, net payments, receivables and approved Udhar
+- the required 10,000 repair plus 3,000 advance example reported 10,000
+  invoiced, 3,000 collected and a derived 7,000 outstanding balance
+- after a 7,000 Raast payment was dated to the following test day, that day
+  reported 0 invoiced and 7,000 collected
+- retail invoice value and partial payment were reported separately; retail
+  and repair Udhar were both derived from active approvals plus canonical
+  outstanding balances
+- payment-method totals came only from `payments`; a test refund appeared as
+  money-out and reduced net payments
+- reliable tracked-Inventory cost snapshots produced the expected gross margin
+  while Quick Items and repair work were not presented as total business profit
+- `settle_udhar` accepted one approved retail or repair family, wrote an
+  ordinary payment, used parent-first repair allocation, synchronized only the
+  legacy compatibility cache and settled the approval at zero balance
+- duplicate retail and repair settlement request IDs retained one payment each
+- anonymous RPC use, Technician financial access, Cashier global reporting,
+  Cashier direct ledger/Udhar writes, no-PIN, wrong-purpose, expired-PIN and
+  suspended normal-user probes were denied; Manager and Orbito Support reads
+  remained correct, including Support access during suspension
+- all fixtures rolled back; live counts remain 5 sales, 19 tickets, 12
+  payments, 1 credit approval, 0 refunds, 0 returns and 0 step-up grants
+
+The Admin dashboard now labels invoiced value and collected money separately.
+Reports show the intended financial concepts and derive payment-method
+breakdown from payment rows. POS shift printing uses the signed-in actor's
+actual payment and refund events, so repair advances/top-ups are included and
+refunds reduce net money movement. The familiar Udhar list now combines retail
+and repair accounts without exposing allocations or ledger identifiers.
+
 Not yet run: later Phase 3 RPCs and full real-browser regression.
 
 Security advisor baseline has no critical Phase 3 finding. Existing Phase 2
@@ -504,7 +538,7 @@ Phase 3E added the repair-family parent index and Phase 3H added both return
 header indexes. The current remaining notices are seven unrelated baseline
 foreign keys across attendance, leave, salary, sales and support audit data.
 
-The Phase 3B through Phase 3H advisor reruns reported no unexpected security
+The Phase 3B through Phase 3I advisor reruns reported no unexpected security
 finding and no missing-index finding for a new Phase 3 foreign key. The Phase
 3 transaction RPC notices are intentional and protected by their
 internal Auth/role/suspension/step-up checks. Fresh actor indexes report unused
@@ -523,7 +557,9 @@ collection to transactional RPCs, Phase 3F closed direct ticket INSERT, and
 Phase 3G made cancellation/refund and physical delivery dedicated guarded
 transactions. Phase 3H removed direct return and Inventory creation paths,
 protected current quantity, and made partial return/refund/restock plus manual
-stock changes atomic and auditable.
+stock changes atomic and auditable. Phase 3I removed direct authenticated
+legacy Udhar updates and cut settlement, dashboards, reports and shift totals
+to canonical RPCs/read models.
 Dropping the nine tables is now forbidden.
 Any rollback must switch readers/writers while
 retaining the backfilled financial and Inventory-opening records; it must not
@@ -539,13 +575,14 @@ stage requires dry-run, DEV-only apply, verification, advisors and documentation
 
 - Historical Inventory movements/restock cannot be reconstructed.
 - Two legacy Ready timestamps are not physical-delivery evidence.
-- Legacy Udhar-settlement mutation remains until the Phase 3I cutover.
 - Retail split-tender input is supported by the RPC but its optional UI is still
   pending Phase 3J.
 - Pending/Declined additional-work controls and repair-adjustment UI are not yet
   exposed, although their server transactions are complete.
 - Repair cancellation is server-complete but its preview/confirmation UI is
   pending Phase 3J; delivery is exposed from the Ready repair payment modal.
+- Final repair-family summary/printing and the complete Phase 3 browser
+  regression remain for Phase 3J/3K.
 - Existing `SECURITY DEFINER`, leaked-password-plan and unindexed-FK notices
   remain documented Phase 2/baseline risks.
 

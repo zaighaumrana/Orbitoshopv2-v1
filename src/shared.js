@@ -54,7 +54,7 @@ export const state = {
   filter:        '',
   modal:         null,
   installPrompt: null,
-  data:          { tickets:[], sales:[], employees:[], udhar:[], returns:[], inventory:[], quickItems:[], repairComponents:[] },
+  data:          { tickets:[], sales:[], employees:[], udharAccounts:[], financial:{}, shiftFinancial:{}, returns:[], inventory:[], quickItems:[], repairComponents:[] },
 }
 
 /* ── Session ── */

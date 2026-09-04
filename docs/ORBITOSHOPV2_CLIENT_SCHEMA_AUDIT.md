@@ -1064,3 +1064,35 @@ to DEV.
 - Advisors show no unexpected Phase 3 security finding and no missing index on
   a new Phase 3 foreign key; the prior return FK notices are resolved.
 
+### Phase 3I unified Udhar and financial read models
+
+Applied `20260905020000_phase3_unified_udhar_and_reporting.sql` to DEV.
+
+- Added immutable actor attribution columns to `sales`, `tickets` and
+  `returns`, with conservative one-to-one legacy backfill and insert-time Auth
+  capture for all new RPC-created headers.
+- Added `get_unified_udhar_accounts`, deriving one familiar retail/repair list
+  from current invoice obligations, returns/adjustments, payments/refunds and
+  active credit approvals.
+- Added PIN-gated `settle_udhar`; settlement is an ordinary canonical payment,
+  supports Cash tender/change, reuses parent-first repair allocation and is
+  idempotent by request UUID.
+- Revoked authenticated direct UPDATE on legacy `udhar` and removed its update
+  policy. The table remains a retail compatibility cache maintained only by
+  server transactions.
+- Added `get_financial_report`, separating Invoiced/Sales, Payments Collected,
+  Refunds, Net Payments, Outstanding Receivables, Udhar Outstanding and
+  reliable Inventory Gross Profit. Cashier access is constrained to its own
+  actor-filtered shift report.
+- Admin dashboard/reports and POS shift totals now use the canonical read
+  model. Payment-method totals use payment rows, repair payments are included,
+  and refunds are visible as money-out. The Udhar UI now includes repairs.
+- Rollback-only fixtures passed REP-01 through REP-07, retail/repair
+  settlement, method/idempotency, Inventory gross-profit, anonymous,
+  Technician, PIN-purpose/expiry, direct-write and suspension tests.
+- No fixtures remain. Live counts are 5 sales, 19 tickets, 12 payments, 1
+  credit approval, 0 refunds, 0 returns and 0 step-up authorizations.
+- Advisor review found only the expected callable, internally authorized RPC
+  notices and documented Phase 2/baseline items; all three new actor foreign
+  keys have covering indexes.
+

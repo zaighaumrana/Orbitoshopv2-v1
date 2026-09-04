@@ -21,32 +21,6 @@ import { sb, CFG, logBillEvent } from '../../../shared.js'
 import { dlog } from '../../../debuglog.js'
 
 /**
- * Applies a payment against an existing udhar (credit) record.
- * Caller passes the full record (already loaded via state.data.udhar),
- * not just an id -- same pattern as createSubInvoice(parentTicket, ...)
- * in features/repairs/api.js.
- */
-export async function settleUdhar(record, amount, method) {
-  dlog('checkout.settleUdhar', `ENTRY udharId=${record?.id} amount=${amount} method=${method}`)
-  if (!record) return { ok: false, error: 'Udhar record not found.' }
-
-  const history = record.payment_history || []
-  history.push({ date: new Date().toISOString().slice(0,10), paid: amount, method })
-  const newPaid    = Number(record.amount_paid) + Number(amount)
-  const newBalance = Math.max(0, Number(record.total_amount) - newPaid)
-
-  const { error } = await sb.from('udhar').update({
-    amount_paid: newPaid, balance_due: newBalance, payment_history: history,
-    status: newBalance <= 0 ? 'Settled' : 'Partial',
-    settled_at: newBalance <= 0 ? new Date().toISOString() : null,
-  }).eq('id', record.id)
-
-  if (error) { dlog('checkout.settleUdhar', `FAILED: ${error.message}`); return { ok: false, error: error.message } }
-  dlog('checkout.settleUdhar', 'SUCCEEDED')
-  return { ok: true }
-}
-
-/**
  * Records a retail sale (and its udhar record, if paid on credit).
  * Takes everything it needs as parameters -- cart contents and the
  * checkout-flow fields (payment method, cash tendered, udhar info) --
