@@ -14,34 +14,41 @@ This record intentionally contains no customer names, phone numbers, device
 identifiers, passwords, PINs, hashes, service keys, access tokens, refresh
 tokens, or authorization headers.
 
-## Phase 3A decision: STOP
+## Phase 3A decision: GO after authorized DEV cleanup
 
-Phase 3A found ambiguous live money history. Under the Phase 3 stop rules, no
-schema, data, RPC, RLS, or application implementation may begin until the
-ambiguities below are resolved without guessing.
+Phase 3A initially stopped on ambiguous live money history. The user confirmed
+that the flagged records were disposable DEV data and explicitly authorized
+their deletion while preserving configuration, catalog, Inventory, identity and
+audit data.
 
-Blocking evidence:
+Initial blocking evidence:
 
 - Sales IDs 1, 3, 5 and 6 are positive-value Cash sales with
   `cash_tendered = 0`. The legacy checkout did not require cash tender to cover
   the invoice, so the database cannot prove how much money was received.
-- Returns IDs 1 and 2 record refund amounts but the legacy `returns` table has
+- Returns IDs 1 and 2 recorded refund amounts but the legacy `returns` table has
   no refund-method column. The method shown on the printed slip existed only in
   browser state and was not persisted.
 
-Required business evidence before backfill:
+Resolution:
 
-1. Confirm the actual collected amount for sales IDs 1, 3, 5 and 6 from an
-   external receipt/cash record, or explicitly classify each record as
-   legacy-unreconciled and exclude it from historical payment totals.
-2. Confirm whether refunds for returns IDs 1 and 2 were actually paid and, if
-   so, their payment methods, or explicitly approve a visible
-   `Legacy Unknown` method classification.
+- a dependency preflight verified exactly four target sales and two target
+  returns, with no Udhar or ticket links and no unexpected return dependency
+- returns 1 and 2 were deleted first, then sales 1, 3, 5 and 6 were deleted in
+  one guarded database transaction
+- guarded row-count checks required exactly two return deletions and four sale
+  deletions or the transaction would abort
+- post-cleanup verification found zero remaining target rows and zero blocking
+  financial anomalies
+
+Decision: GO for staged Phase 3 implementation. The deletion is a direct DEV
+data cleanup and is not represented as a reusable migration. It is recoverable
+only from a Supabase backup or point-in-time recovery if available.
 
 The following non-blocking historical gaps are also preserved rather than
 guessed:
 
-- all 18 legacy sale-line snapshots across eight non-empty sales omit Inventory
+- all 11 remaining legacy sale-line snapshots across four non-empty sales omit Inventory
   identity, so historical stock movements cannot be reconstructed reliably
 - both return records also omit Inventory identity and restock disposition
 - Ready tickets 9 and 17 have `collected_at` populated by the legacy payment
@@ -167,12 +174,12 @@ Exact row counts:
 
 | Record | Count |
 |---|---:|
-| sales | 9 |
+| sales | 5 |
 | tickets | 19 |
 | root tickets | 19 |
 | child/sub-invoices | 0 |
 | Udhar | 1 |
-| returns | 2 |
+| returns | 0 |
 | inventory | 2 |
 | Quick Items | 4 |
 | repair components | 7 |
@@ -201,18 +208,18 @@ Other measured evidence:
 - Udhar row 1 maps to sale 7 and reconciles: total 2,500; paid 1,500;
   outstanding 1,000; status Partial
 - 3 positive Cash sales have tender greater than or equal to invoice total
-- 4 positive Cash sales have zero tender evidence and are blocking
+- 3 positive Cash sales have valid tender/change evidence
+- 0 positive Cash sales lack tender evidence after authorized cleanup
 - 1 sale has zero value
 - 8 tickets have zero value
-- 3 legacy return-line entries match source sale-line fingerprints and do not
-  exceed their source quantities
+- 0 legacy return rows remain after authorized cleanup
 - 2 Ready tickets carry the legacy auto-set `collected_at` timestamp
 - no ticket uses `actual_quote` or `final_price_override`
 - Inventory and repair modules are enabled; the client is not suspended
 
 ## 6. Deterministic and non-deterministic backfill boundary
 
-Deterministic candidates after the STOP condition is resolved:
+Deterministic backfill candidates:
 
 - create repair obligations from the immutable legacy ticket quote/final total
   for the 11 non-zero tickets
@@ -220,15 +227,11 @@ Deterministic candidates after the STOP condition is resolved:
 - create retail payments for the 3 Cash sales with valid tender/change evidence
 - reconstruct sale 7's payment and credit state from its matching, internally
   consistent Udhar row
-- normalize all current sale JSON lines into `sale_lines` snapshots while
+- normalize all 11 current sale JSON lines into `sale_lines` snapshots while
   leaving unknown `inventory_id` and cost snapshots null
-- preserve the two return quantities/amounts where their source line
-  fingerprints match, subject to resolving refund occurrence/method
 
 Backfill that must not be guessed:
 
-- collected amounts for sales 1, 3, 5 and 6
-- refund occurrence/method for returns 1 and 2
 - historical Inventory identity, cost, movements or restock disposition
 - physical delivery from tickets 9 and 17's auto-populated `collected_at`
 - any commercial amount for zero-value legacy records
@@ -307,10 +310,10 @@ Passed:
 - all count-only relationship, balance, history, return and credential checks
   listed above
 
-Stopped/not run:
+Not yet run:
 
-- all Phase 3 schema/RPC/financial/security/browser tests; no implementation
-  exists and the live-data STOP condition forbids proceeding
+- Phase 3 schema/RPC/financial/security/browser tests; no Phase 3 implementation
+  existed during the preflight
 
 Security advisor baseline has no critical Phase 3 finding. Existing Phase 2
 notices remain: deliberately closed RLS/no-policy service tables, deliberately
@@ -325,8 +328,10 @@ new transaction queries.
 
 ## 12. Rollback and deployment boundary
 
-There is currently nothing to roll back: Phase 3A changed no schema, data, RPC,
-policy, Edge Function or application source.
+Phase 3A changed no schema, RPC, policy, Edge Function or application source.
+It did delete the six explicitly authorized DEV-only rows described above. That
+cleanup has no migration rollback and is recoverable only from an available
+Supabase backup/PITR source.
 
 After the ambiguity decision, deployment remains staged: ledger foundation,
 deterministic backfill, atomic retail, atomic repair, additional work,
@@ -336,15 +341,13 @@ stage requires dry-run, DEV-only apply, verification, advisors and documentation
 
 ## 13. Residual risks and merge recommendation
 
-- Historical cash collection cannot currently be proved for four sale IDs.
-- Two historical refunds lack durable occurrence/method evidence.
 - Historical Inventory movements/restock cannot be reconstructed.
 - Two legacy Ready timestamps are not physical-delivery evidence.
 - Legacy direct financial mutation paths remain until a later staged cutover.
 - Existing `SECURITY DEFINER`, leaked-password-plan and unindexed-FK notices
   remain documented Phase 2/baseline risks.
 
-Recommendation: STOP. Do not create or apply Phase 3 migrations, do not mutate
-live financial data, and do not begin the application cutover until the two
-blocking money-history decisions at the top of this record are resolved. Do not
-merge `phase3-transaction-ledger` into `development`.
+Recommendation: GO with the staged Phase 3 implementation. Preserve the
+documented legacy Inventory/delivery exceptions, do not invent historical
+values, and do not merge `phase3-transaction-ledger` into `development` without
+explicit approval.
