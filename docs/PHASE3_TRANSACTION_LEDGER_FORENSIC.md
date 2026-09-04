@@ -264,6 +264,7 @@ Applied migration:
 |---|---|---|
 | `20260904200000_phase3_ledger_foundation.sql` | Nine canonical ledger/audit tables, constraints, indexed foreign keys, RLS and read-only role policies | applied |
 | `20260904203000_phase3_deterministic_backfill.sql` | Guarded normalization of deterministic legacy sale lines, payments, allocations, Udhar approval and Inventory opening balances | applied |
+| `20260904210000_phase3_atomic_retail_checkout.sql` | Idempotent retail-sale RPC, canonical lines/tenders/allocations/Udhar and atomic Inventory decrement | applied |
 
 Post-apply verification:
 
@@ -284,11 +285,17 @@ Post-apply verification:
 
 ## 8. Planned transaction and idempotency boundaries
 
-Authenticated, suspension-aware, role-checked PostgreSQL transaction RPCs will
-own retail checkout, repair creation, repair payment, additional-work decision,
-repair adjustment, cancellation/refund, delivery, retail return and Inventory
-adjust/restock. Every critical request will use a unique `request_id` and return
-the existing committed result on retry.
+The authenticated, suspension-aware and role-checked `create_retail_sale` RPC
+now owns retail checkout. It validates current catalog price, discounts, stock,
+cash/change and optional split tenders; derives the remaining balance; requires
+purpose-specific Udhar authorization; and commits the sale header, immutable
+lines, payments, allocations, credit approval, compatibility Udhar row and
+Inventory movement together. Its caller supplies `crypto.randomUUID()` and a
+retry returns the original committed receipt.
+
+Later PostgreSQL transaction RPCs will own repair creation, repair payment,
+additional-work decision, repair adjustment, cancellation/refund, delivery,
+retail return and Inventory adjust/restock.
 
 No direct browser mutation of ledger tables will be granted. Platform BILL
 logging will remain semantically unchanged and occur only after a successful
@@ -296,10 +303,10 @@ client transaction.
 
 ## 9. Current and planned RLS model
 
-Current Phase 2 policies allow role-appropriate reads but still permit direct
-browser insert/update on legacy financial headers. In particular, all staff can
-update ticket rows, while direct sale/Udhar/return writes are guarded only by
-role and purpose-specific step-up checks.
+Phase 3D removed direct authenticated `sales` and `udhar` INSERT
+privileges/policies after cutting retail creation to the RPC. Remaining legacy
+repair, Udhar-settlement, return and Inventory-admin mutation paths stay staged
+for their dedicated cutovers.
 
 Every Phase 3 table will enable RLS, deny anonymous access, permit only required
 authenticated reads, and deny direct browser INSERT/UPDATE/DELETE. Secure RPCs
@@ -309,7 +316,11 @@ frozen.
 
 ## 10. Frontend, printing and reporting cutover plan
 
-No frontend change has been made through Phase 3C.
+Phase 3D changed retail checkout to call `create_retail_sale`; it no longer
+inserts `sales` and then `udhar` in separate browser requests. Cart lines retain
+their Inventory or Quick Item identity, and a failed request retains its UUID so
+a retry is idempotent. Successful checkout clears the UUID. Existing one-method
+UX remains unchanged; the RPC already accepts optional split tenders.
 
 Planned UX keeps the existing short workflows while moving writes to atomic
 RPCs. It adds optional split tender, explicit Udhar authorization, partial
@@ -336,10 +347,22 @@ Passed:
 - all count-only relationship, balance, history, return and credential checks
   listed above
 
-Not yet run:
+Phase 3D rollback-only database/RPC matrix passed:
 
-- Phase 3 RPC/financial/browser tests; transactional RPCs and application
-  cutovers are not implemented yet
+- exact Cash and Cash-with-change
+- split Cash + Raast + Udhar (4,000 + 3,000 + 3,000), including 1,000 change
+- partial Cash + valid Udhar approval
+- duplicate request id returned one sale only
+- tracked Inventory decremented once with one movement
+- Quick Item created no Inventory movement
+- line/payment/allocation counts and amounts reconciled
+- underpayment without Udhar, Udhar without step-up, discount without step-up,
+  insufficient stock, Technician checkout, direct sale INSERT and direct
+  payment INSERT were denied
+- all probes were rolled back; retained test sales: 0, canonical backfill counts
+  remain 12 payments, 12 allocations and 2 opening movements
+
+Not yet run: later Phase 3 RPCs and full real-browser regression.
 
 Security advisor baseline has no critical Phase 3 finding. Existing Phase 2
 notices remain: deliberately closed RLS/no-policy service tables, deliberately
@@ -363,8 +386,9 @@ It did delete the six explicitly authorized DEV-only rows described above. That
 cleanup has no migration rollback and is recoverable only from an available
 Supabase backup/PITR source.
 
-Phase 3B was additive and Phase 3C populated canonical ledger history. Dropping
-the nine tables is now forbidden. Any rollback must switch readers/writers while
+Phase 3B was additive, Phase 3C populated canonical ledger history, and Phase 3D
+made the new retail writer canonical. Dropping the nine tables is now forbidden.
+Any rollback must switch readers/writers while
 retaining the backfilled financial and Inventory-opening records; it must not
 touch any legacy table or Phase 2 helper.
 
@@ -379,6 +403,8 @@ stage requires dry-run, DEV-only apply, verification, advisors and documentation
 - Historical Inventory movements/restock cannot be reconstructed.
 - Two legacy Ready timestamps are not physical-delivery evidence.
 - Legacy direct financial mutation paths remain until a later staged cutover.
+- Retail split-tender input is supported by the RPC but its optional UI is still
+  pending Phase 3J.
 - Existing `SECURITY DEFINER`, leaked-password-plan and unindexed-FK notices
   remain documented Phase 2/baseline risks.
 

@@ -47,6 +47,7 @@ const posState = {
   udharName:       '',
   udharPhone:      '',
   udharPaidNow:    0,
+  checkoutRequestId: null,
   invSearch:       '',
   repairSearch:    '',
 }
@@ -288,7 +289,7 @@ function quickItemsPanel() {
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px">
         ${state.data.quickItems.map(item=>`
           <button class="secondary-button" style="font-size:15px;padding:11px 18px;border-radius:10px;font-weight:500"
-            data-qitem-name="${item.name}" data-qitem-prices='${JSON.stringify(item.prices)}'>
+            data-qitem-id="${item.id}" data-qitem-name="${item.name}" data-qitem-prices='${JSON.stringify(item.prices)}'>
             ${item.name}
           </button>`).join('')}
       </div>
@@ -854,6 +855,7 @@ async function doCheckout() {
 
 async function _finalizeCheckout() {
   dlog('POS._finalizeCheckout', 'ENTRY -- calling checkout.finalizeCheckout()')
+  posState.checkoutRequestId ||= crypto.randomUUID()
   const res = await finalizeCheckout({
     cart: posState.cart,
     checkoutPayment: posState.checkoutPayment,
@@ -861,12 +863,13 @@ async function _finalizeCheckout() {
     udharName: posState.udharName,
     udharPhone: posState.udharPhone,
     udharPaidNow: posState.udharPaidNow,
-    employeeId: SESSION.employee?.id,
     employeeName: SESSION.employee?.name,
+    requestId: posState.checkoutRequestId,
   })
   if (!res.ok) { dlog('POS._finalizeCheckout', `FAILED: ${res.error}`); alert('Sale error: ' + res.error); return }
 
   posState.cart=[]
+  posState.checkoutRequestId=null
   posState.cashTendered=0
   posState.udharName=''; posState.udharPhone=''; posState.udharPaidNow=0; posState.checkoutPayment='Cash'
   state.modal = { type:'receipt', sale: res.sale }
@@ -1172,18 +1175,19 @@ function attachEvents() {
     /* ── Quick items ── */
     if (el.dataset.qitemName) {
       const raw = JSON.parse(el.dataset.qitemPrices||'[]'), name = el.dataset.qitemName
+      const quickItemId = Number(el.dataset.qitemId)
       const prices = raw.map(p => (typeof p === 'object' && p !== null) ? p : { name:'', price:p })
       if (prices.length === 1) {
         const pv = prices[0]
-        posState.cart.push({ productId:`qi-${name}-${Date.now()}`, name, variantName: pv.name||'', qty:1, originalPrice:pv.price, soldPrice:pv.price, discount:0, reason:'' })
+        posState.cart.push({ productId:`qi-${quickItemId}-${Date.now()}`, name, variantName: pv.name||'', qty:1, originalPrice:pv.price, soldPrice:pv.price, discount:0, reason:'', isQuick:true, quickItemId })
         render()
-      } else { state.modal = { type:'qitem-pick', name, prices }; render() }
+      } else { state.modal = { type:'qitem-pick', name, prices, quickItemId }; render() }
       return
     }
     if (el.dataset.pickPrice !== undefined) {
-      const { name, prices } = state.modal
+      const { name, prices, quickItemId } = state.modal
       const pv = prices[Number(el.dataset.pickPrice)]
-      posState.cart.push({ productId:`qi-${name}-${Date.now()}`, name, variantName: pv.name||'', qty:1, originalPrice:pv.price, soldPrice:pv.price, discount:0, reason:'' })
+      posState.cart.push({ productId:`qi-${quickItemId}-${Date.now()}`, name, variantName: pv.name||'', qty:1, originalPrice:pv.price, soldPrice:pv.price, discount:0, reason:'', isQuick:true, quickItemId })
       state.modal = null; render(); return
     }
 

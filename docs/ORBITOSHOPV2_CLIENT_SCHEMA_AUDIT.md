@@ -945,3 +945,25 @@ precondition checks.
 - The migration is additive historical normalization only; no frontend writer
   has been cut over yet and Phase 2 Auth/RLS remains unchanged.
 
+### Phase 3D atomic retail checkout
+
+Applied `20260904210000_phase3_atomic_retail_checkout.sql` to DEV.
+
+- Added nullable unique `sales.request_id` for retry-safe legacy-header linkage,
+  plus unique non-null sale invoice and Udhar-per-sale indexes.
+- Added the authenticated `create_retail_sale` transaction RPC. It validates the
+  active canonical role, suspension, current Quick Item/Inventory price, stock,
+  discounts, tender/change and purpose-specific Udhar authorization.
+- A successful call atomically writes `sales`, `sale_lines`, `payments`,
+  `payment_allocations`, optional `credit_approvals`/compatibility `udhar`, and
+  tracked `inventory_movements` plus current quantity.
+- Removed authenticated direct `sales` INSERT and `udhar` INSERT privileges and
+  policies. Ledger mutation remains RPC-only.
+- Updated POS checkout to preserve Quick Item/Inventory identity and reuse its
+  request UUID after an uncertain retry.
+- Rollback-only RPC tests passed exact Cash, change, split tender with Udhar,
+  duplicate retry, Inventory decrement, Quick Item non-stock behavior, and all
+  relevant denial/rollback cases. No test sale was retained.
+- Advisor review found only the intentionally callable authenticated transaction
+  RPC plus documented baseline notices; no new missing-FK-index finding.
+

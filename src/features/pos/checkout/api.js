@@ -17,7 +17,7 @@
    feature can claim exclusive ownership of it. pos.js passes in
    whatever this layer needs.
 ═══════════════════════════════════════════════════════════════════ */
-import { sb, CFG, generateInvoiceNumber, logBillEvent } from '../../../shared.js'
+import { sb, CFG, logBillEvent } from '../../../shared.js'
 import { dlog } from '../../../debuglog.js'
 
 /**
@@ -54,56 +54,65 @@ export async function settleUdhar(record, amount, method) {
  */
 export async function finalizeCheckout({
   cart, checkoutPayment, cashTendered, udharName, udharPhone, udharPaidNow,
-  employeeId, employeeName,
+  employeeName, requestId,
 }) {
   dlog('checkout.finalizeCheckout', `ENTRY items=${cart.length} payment=${checkoutPayment}`)
   const isUdhar  = checkoutPayment === 'Udhar (Credit)'
-  const subtotal = cart.reduce((s,i) => s + i.soldPrice * i.qty, 0)
-  const discount = cart.reduce((s,i) => s + (i.originalPrice - i.soldPrice) * i.qty, 0)
-  const tax      = subtotal * (Number(CFG.tax_rate||0) / 100)
-  const total    = subtotal + tax
+  const roundMoney = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100
+  const subtotal = roundMoney(cart.reduce((s,i) => s + i.soldPrice * i.qty, 0))
+  const discount = roundMoney(cart.reduce((s,i) => s + (i.originalPrice - i.soldPrice) * i.qty, 0))
+  const tax      = roundMoney(subtotal * (Number(CFG.tax_rate||0) / 100))
+  const total    = roundMoney(subtotal + tax)
+  const paidNow = isUdhar ? Math.min(roundMoney(udharPaidNow || 0), total) : total
 
-  const invoiceNumber = await generateInvoiceNumber()
+  if (checkoutPayment === 'Cash' && Number(cashTendered || 0) < total) {
+    return { ok: false, error: 'Cash received is less than the sale total. Use Udhar for an unpaid balance.' }
+  }
 
-  const { data: saleData, error: saleErr } = await sb.from('sales').insert({
-    ticket_id:      null,
-    invoice_number: invoiceNumber,
-    customer_name:  udharName || '',
-    items_sold:     cart.map(i => ({ name:i.name, variant_name:i.variantName||'', qty:i.qty, original_price:i.originalPrice, sold_price:i.soldPrice, discount:i.discount, reason:i.reason||'' })),
-    discount,
-    tax,
-    total_bill:     Math.max(0, total),
-    payment_method: isUdhar ? 'Udhar' : checkoutPayment,
-    employee_id:    employeeId || null,
-    employee_name:  employeeName || '',
-    cash_tendered:  checkoutPayment === 'Cash' ? (cashTendered||0) : 0,
-    change_given:   checkoutPayment === 'Cash' ? Math.max(0, (cashTendered||0) - Math.max(0,total)) : 0,
-  }).select().single()
+  const tenders = isUdhar
+    ? (paidNow > 0 ? [{ method:'Cash', amount:paidNow, cashTendered:paidNow }] : [])
+    : [{
+        method: checkoutPayment,
+        amount: total,
+        ...(checkoutPayment === 'Cash' ? { cashTendered:roundMoney(cashTendered || 0) } : {}),
+      }]
 
-  if (saleErr) { dlog('checkout.finalizeCheckout', `SALE INSERT FAILED: ${saleErr.message}`); return { ok: false, error: saleErr.message } }
+  const lines = cart.map(i => ({
+    itemKind: i.isInventory ? 'inventory' : i.isQuick ? 'quick' : 'other',
+    inventoryId: i.isInventory ? i.inventoryId : undefined,
+    quickItemId: i.isQuick ? i.quickItemId : undefined,
+    name: i.name,
+    variantName: i.variantName || '',
+    quantity: i.qty,
+    originalPrice: roundMoney(i.originalPrice),
+    unitPrice: roundMoney(i.soldPrice),
+    discountReason: i.reason || '',
+  }))
 
-  if (isUdhar) {
-    const paidNow = Math.min(Number(udharPaidNow||0), Math.max(0,total))
-    const balance = Math.max(0, total - paidNow)
-    const { error: udharErr } = await sb.from('udhar').insert({
-      sale_id: saleData.id, customer_name: udharName, customer_phone: udharPhone,
-      total_amount: Math.max(0,total), amount_paid: paidNow, balance_due: balance,
-      payment_history: paidNow > 0 ? [{ amount:paidNow, method:'Cash', date:new Date().toISOString(), note:'Paid at time of sale' }] : [],
-      status: balance <= 0 ? 'Settled' : 'Outstanding',
-    })
-    if (udharErr) { dlog('checkout.finalizeCheckout', `UDHAR INSERT FAILED: ${udharErr.message}`); return { ok: false, error: udharErr.message } }
+  const { data: saleData, error: saleErr } = await sb.rpc('create_retail_sale', {
+    p_request_id: requestId,
+    p_lines: lines,
+    p_tenders: tenders,
+    p_allow_credit: isUdhar,
+    p_customer_name: udharName || '',
+    p_customer_phone: udharPhone || '',
+  })
+
+  if (saleErr) {
+    dlog('checkout.finalizeCheckout', `ATOMIC CHECKOUT FAILED: ${saleErr.message}`)
+    return { ok: false, error: saleErr.message }
   }
 
   const sale = {
-    receiptNo: saleData.invoice_number, date: saleData.created_at,
-    cashier: employeeName || 'Counter', customer: udharName || 'Walk-in',
+    receiptNo: saleData.invoiceNumber, date: saleData.createdAt,
+    cashier: saleData.employeeName || employeeName || 'Counter', customer: udharName || 'Walk-in',
     items: cart.map(i => ({...i})), tax, discount,
     total: Math.max(0,total), payment: isUdhar ? 'Udhar' : checkoutPayment,
-    cashTendered: checkoutPayment === 'Cash' ? (cashTendered||0) : 0,
-    changeGiven:  checkoutPayment === 'Cash' ? Math.max(0, (cashTendered||0) - Math.max(0,total)) : 0,
+    cashTendered: saleData.cashTendered || 0,
+    changeGiven:  saleData.changeGiven || 0,
   }
 
   await logBillEvent()
-  dlog('checkout.finalizeCheckout', `SUCCEEDED receiptNo=${sale.receiptNo}`)
+  dlog('checkout.finalizeCheckout', `SUCCEEDED receiptNo=${sale.receiptNo} replay=${saleData.idempotentReplay}`)
   return { ok: true, sale }
 }
