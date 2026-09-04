@@ -844,6 +844,28 @@ Cashier, and separated Orbito Support login/refresh/logout gate passed cleanly.
 - Preserved the remaining service-only hash-vault row for first-login migration.
 - Re-ran security/performance advisors, production build, migration parity and
   linked dry-run checks.
+- Created disposable Manager and Technician accounts through the deployed
+  `account-admin` flow and passed live Supabase JWT login/refresh/logout, route,
+  Edge Function and direct RLS enforcement tests for both roles.
+- Confirmed Manager employee administration is limited to Cashier/Technician;
+  Manager/Owner creation, promotion and credential resets are denied. Manager
+  Settings access is denied by the intended matrix.
+- Confirmed Technician access is limited to Workshop, own employee data and the
+  intended ticket read/update capabilities; Admin, Employees, POS/inventory,
+  salary data, ticket creation and role escalation are denied.
+- Deactivated all disposable employees through the supported lifecycle and
+  verified zero active test employees, zero orphan Auth/app/employee links, and
+  zero remaining test attendance/ticket fixtures. Nine fully linked inactive
+  identity chains remain because the supported lifecycle has no deletion path.
+- Attempted to enable Supabase leaked-password protection through the Management
+  API. Supabase rejected it because the project is below Pro; the setting was
+  re-read as disabled. This production risk is explicitly accepted pending a
+  plan upgrade.
+- Final production build passed. Local and remote migrations match through
+  `20260904001510`; the final linked dry-run reports the remote database is up
+  to date.
+- Phase 2 is merge-ready subject to the documented plan-level leaked-password
+  risk and later-phase financial/workflow gaps. No merge was performed.
 - Kept `phase2-auth-rls` unmerged into `development`.
 
 See `docs/PHASE2_AUTH_RLS_FORENSIC.md` for the complete evidence, residual gaps,
