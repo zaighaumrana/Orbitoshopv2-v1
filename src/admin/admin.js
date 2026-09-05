@@ -10,7 +10,8 @@ import {
   invokeAccountAdmin,
 } from '../shared.js'
 import {
-  getSubInvoices, createSubInvoice, markComponentNotNeeded,
+  getSubInvoices, markComponentNotNeeded, getRepairFamilySummary,
+  recordAdditionalWork, decideAdditionalWork, createRepairAdjustment, cancelRepair,
 } from '../features/repairs/api.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
 import { reportsPage } from './pages/reports.js'
@@ -20,6 +21,7 @@ import { settleUdhar } from '../features/checkout/udhar/api.js'
 import {
   ticketCreatedModalHTML, ticketDetailModalHTML, markNotNeededModalHTML,
   createSubInvoiceModalHTML, addCompTagModalHTML,
+  repairAdjustmentModalHTML, repairCancellationModalHTML,
 } from '../features/admin/repairs/render.js'
 
 
@@ -569,6 +571,8 @@ function renderModal() {
   if (type === 'mark-not-needed') return markNotNeededModalHTML(state.modal)
 
   if (type === 'create-sub-invoice') return createSubInvoiceModalHTML(state.modal)
+  if (type === 'repair-adjustment') return repairAdjustmentModalHTML(state.modal)
+  if (type === 'repair-cancellation') return repairCancellationModalHTML(state.modal)
 
   if (type === 'add-comp-tag') return addCompTagModalHTML(state.modal)
 
@@ -630,6 +634,12 @@ function attachEvents() {
         printThermal(buildTicketSlip(state.modal.ticket))
       }
       return
+    }
+    if (el.dataset.action === 'print-repair-summary') {
+      const summary = state.modal?.summary || (await getRepairFamilySummary(Number(el.dataset.ticketId))).data
+      if (!summary) { alert('Repair summary is unavailable.'); return }
+      const { buildRepairSummary, printThermal } = await import('../print/print.js')
+      printThermal(buildRepairSummary(summary)); return
     }
 
     if (el.dataset.kpiTarget) {
@@ -698,8 +708,10 @@ function attachEvents() {
         const res = await markComponentNotNeeded(ticketId, tk.components_noted||[], index, reason, SESSION.employee?.name)
         if (!res.ok) { alert('Error: ' + res.error); return }
         await load()
-        const subs = await getSubInvoices(ticketId)
-        state.modal = { type: 'ticketDetail', id: ticketId, subInvoices: subs }
+        const summaryResult = await getRepairFamilySummary(Number(ticketId))
+        const rootId = summaryResult.data?.root?.id || ticketId
+        const subs = await getSubInvoices(rootId)
+        state.modal = { type: 'ticketDetail', id: ticketId, subInvoices: subs, summary:summaryResult.data || null }
         render()
       }, render)
       return
@@ -764,7 +776,7 @@ function attachEvents() {
       return
     }
 
-    /* Create the sub-invoice — no PIN required, adding only increases what's owed */
+    /* Record pending/approved/declined additional work. */
     if (el.dataset.action === 'submit-sub-invoice') {
       const parentId = el.dataset.parentId
       const tk = state.data.tickets.find(t => String(t.id) === String(parentId))
@@ -774,14 +786,71 @@ function attachEvents() {
       const note   = document.getElementById('sub-invoice-note')?.value || ''
       if (!comps.length && !labour) { alert('Add at least one component or a labour charge.'); return }
 
-      const res = await createSubInvoice(tk, comps, labour, note, SESSION.employee?.name)
+      const decision = document.getElementById('additional-work-decision')?.value || 'Approved'
+      const method = document.getElementById('additional-work-method')?.value || 'In person'
+      const description = comps.map(c=>c.name).filter(Boolean).join(', ') || note || 'Additional work'
+      const res = await recordAdditionalWork(Number(parentId), description, comps, labour, decision, method, note)
       if (!res.ok) { alert('Error: ' + res.error); return }
 
-      const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
-      printThermal(buildSubInvoiceSlip(res.data, tk))
+      if (res.ticket) {
+        const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
+        printThermal(buildSubInvoiceSlip(res.ticket, tk))
+      }
 
       state.modal = null
       await load(); return
+    }
+
+    if (el.dataset.action === 'decide-additional-work') {
+      const decision = el.dataset.decision
+      const method = (prompt('Decision method: Phone, In person, WhatsApp, or Other', 'Phone') || '').trim()
+      if (!['Phone','In person','WhatsApp','Other'].includes(method)) { alert('Choose a valid decision method.'); return }
+      const note = prompt('Decision note (optional)', '') || ''
+      const result = await decideAdditionalWork(Number(el.dataset.proposalId), decision, method, note)
+      if (!result.ok) { alert('Decision error: ' + result.error); return }
+      if (result.ticket) {
+        const root = state.data.tickets.find(t=>!t.parent_ticket_id && String(t.id)===String(result.proposal.root_ticket_id))
+        if (root) {
+          const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
+          printThermal(buildSubInvoiceSlip(result.ticket, root))
+        }
+      }
+      state.modal = null; await load(); return
+    }
+
+    if (el.dataset.action === 'open-repair-adjustment') {
+      state.modal = { type:'repair-adjustment', rootId:Number(el.dataset.ticketId) }
+      render(); return
+    }
+    if (el.dataset.action === 'submit-repair-adjustment') {
+      const amount = Number(document.getElementById('repair-adjustment-amount')?.value || 0)
+      const type = document.getElementById('repair-adjustment-type')?.value || 'discount'
+      const reason = document.getElementById('repair-adjustment-reason')?.value?.trim() || ''
+      if (amount <= 0 || !reason) { alert('Enter a positive reduction and a reason.'); return }
+      openPinPrompt('discount', async verified => {
+        if (!verified) return
+        const result = await createRepairAdjustment(Number(el.dataset.ticketId), amount, type, reason)
+        if (!result.ok) { alert('Adjustment error: ' + result.error); return }
+        state.modal = null; await load()
+      }, render); return
+    }
+    if (el.dataset.action === 'open-repair-cancellation') {
+      const summaryResult = await getRepairFamilySummary(Number(el.dataset.ticketId))
+      if (!summaryResult.ok) { alert('Summary error: ' + summaryResult.error); return }
+      state.modal = { type:'repair-cancellation', rootId:Number(el.dataset.ticketId), summary:summaryResult.data }
+      render(); return
+    }
+    if (el.dataset.action === 'submit-repair-cancellation') {
+      const refund = Number(document.getElementById('repair-cancel-refund')?.value || 0)
+      const method = document.getElementById('repair-cancel-method')?.value || 'Cash'
+      const reason = document.getElementById('repair-cancel-reason')?.value?.trim() || ''
+      if (refund < 0 || !reason) { alert('Enter a valid refund and a reason.'); return }
+      openPinPrompt('repair-refund', async verified => {
+        if (!verified) return
+        const result = await cancelRepair(Number(el.dataset.ticketId), refund, method, reason)
+        if (!result.ok) { alert('Cancellation error: ' + result.error); return }
+        state.modal = null; await load()
+      }, render); return
     }
 
     if (el.dataset.action === 'install' && state.installPrompt) {
@@ -851,11 +920,14 @@ function attachEvents() {
 
     if (el.dataset.action === 'open-ticket-editor') {
       const ticketId = el.dataset.ticketId
-      state.modal = { type:'ticketDetail', id:ticketId, subInvoices: [] }
+      state.modal = { type:'ticketDetail', id:ticketId, subInvoices: [], summary:null }
       render()
-      const subs = await getSubInvoices(ticketId)
+      const summaryResult = await getRepairFamilySummary(Number(ticketId))
+      const rootId = summaryResult.data?.root?.id || ticketId
+      const subs = await getSubInvoices(rootId)
       if (state.modal?.type === 'ticketDetail' && String(state.modal.id) === ticketId) {
         state.modal.subInvoices = subs
+        state.modal.summary = summaryResult.data || null
         render()
       }
       return
@@ -1020,11 +1092,14 @@ function attachEvents() {
     const viewTicketEl = el.closest('[data-view-ticket]')
     if (viewTicketEl && el.tagName !== 'BUTTON' && !el.closest('button')) {
       const ticketId = String(viewTicketEl.dataset.viewTicket)
-      state.modal = { type:'ticketDetail', id:ticketId, subInvoices: [] }
+      state.modal = { type:'ticketDetail', id:ticketId, subInvoices: [], summary:null }
       render()
-      const subs = await getSubInvoices(ticketId)
+      const summaryResult = await getRepairFamilySummary(Number(ticketId))
+      const rootId = summaryResult.data?.root?.id || ticketId
+      const subs = await getSubInvoices(rootId)
       if (state.modal?.type === 'ticketDetail' && String(state.modal.id) === ticketId) {
         state.modal.subInvoices = subs
+        state.modal.summary = summaryResult.data || null
         render()
       }
       return
@@ -1043,6 +1118,16 @@ function attachEvents() {
       const labour = Number(document.querySelector('[data-subinv-labour]')?.value||0)
       const el     = document.getElementById('subinv-draft-total')
       if (el) el.textContent = money(prices+labour)
+    }
+    if (t.dataset.repairCancelRefund !== undefined) {
+      const available = Math.max(0, Number(state.modal?.summary?.netPayments || 0))
+      const refund = Math.min(available, Math.max(0, Number(t.value || 0)))
+      const customer = document.getElementById('repair-cancel-customer')
+      const retained = document.getElementById('repair-cancel-retains')
+      const obligation = document.getElementById('repair-cancel-obligation')
+      if (customer) customer.textContent = money(refund)
+      if (retained) retained.textContent = money(available-refund)
+      if (obligation) obligation.textContent = money(available-refund)
     }
   })
 

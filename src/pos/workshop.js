@@ -16,7 +16,7 @@ import {
   myAccountModalHTML, handleChangePasswordSubmit,
 } from '../shared.js'
 import {
-  getSubInvoices, createSubInvoice, markComponentNotNeeded,
+  getSubInvoices, createSubInvoice, markComponentNotNeeded, recordAdditionalWork,
 } from '../features/repairs/api.js'
 
 import { navigate } from '../router.js'
@@ -451,7 +451,7 @@ function renderModal() {
           <div class="modal-actions">
             <button type="button" class="secondary-button" data-close>Cancel</button>
             <button type="button" class="primary-button" data-action="submit-sub-invoice" data-parent-id="${parentId}">
-              Create & Print
+              ${state.role === 'Technician' ? 'Submit Proposal' : 'Create & Print'}
             </button>
           </div>
         </div>
@@ -570,8 +570,7 @@ function attachEvents() {
 
     /* Top-bar navigation */
     if (el.dataset.action === 'go-pos') {
-      const { initPOS } = await import('./pos.js')
-      initPOS(SESSION); return
+      navigate('/pos'); return
     }
     if (el.dataset.action === 'go-admin') {
       const { initAdmin } = await import('../admin/admin.js')
@@ -635,8 +634,7 @@ function attachEvents() {
     if (el.dataset.action === 'ws-collect') {
       const ticketId = el.dataset.ticketId
       sessionStorage.setItem('retailos_collect_ticket', String(ticketId))
-      const { initPOS } = await import('./pos.js')
-      initPOS(SESSION); return
+      navigate('/pos'); return
     }
 
     /* Mark a component "not needed" — requires PIN, never deletes */
@@ -734,11 +732,21 @@ function attachEvents() {
       const note   = document.getElementById('sub-invoice-note')?.value || ''
       if (!comps.length && !labour) { alert('Add at least one component or a labour charge.'); return }
 
-      const res = await createSubInvoice(tk, comps, labour, note, SESSION.employee?.name)
+      const res = state.role === 'Technician'
+        ? await recordAdditionalWork(
+            Number(parentId),
+            comps.map(c=>c.name).filter(Boolean).join(', ') || note || 'Additional work',
+            comps, labour, 'Pending', 'In person', note
+          )
+        : await createSubInvoice(tk, comps, labour, note, SESSION.employee?.name)
       if (!res.ok) { alert('Error: ' + res.error); return }
 
-      const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
-      printThermal(buildSubInvoiceSlip(res.data, tk))
+      if (state.role !== 'Technician') {
+        const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
+        printThermal(buildSubInvoiceSlip(res.data, tk))
+      } else {
+        alert('Additional work proposal saved for customer approval.')
+      }
 
       state.modal = null
       await load(); return

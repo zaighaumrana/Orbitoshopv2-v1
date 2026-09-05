@@ -28,22 +28,31 @@ import { dlog } from '../../../debuglog.js'
  */
 export async function finalizeCheckout({
   cart, checkoutPayment, cashTendered, udharName, udharPhone, udharPaidNow,
+  splitCash, splitDigital, splitMethod, splitCredit,
   employeeName, requestId,
 }) {
   dlog('checkout.finalizeCheckout', `ENTRY items=${cart.length} payment=${checkoutPayment}`)
-  const isUdhar  = checkoutPayment === 'Udhar (Credit)'
+  const isSplit = checkoutPayment === 'Split Payment'
+  const isUdhar  = checkoutPayment === 'Udhar (Credit)' || (isSplit && Number(splitCredit||0)>0)
   const roundMoney = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100
   const subtotal = roundMoney(cart.reduce((s,i) => s + i.soldPrice * i.qty, 0))
   const discount = roundMoney(cart.reduce((s,i) => s + (i.originalPrice - i.soldPrice) * i.qty, 0))
   const tax      = roundMoney(subtotal * (Number(CFG.tax_rate||0) / 100))
   const total    = roundMoney(subtotal + tax)
-  const paidNow = isUdhar ? Math.min(roundMoney(udharPaidNow || 0), total) : total
+  const paidNow = isSplit
+    ? roundMoney(Number(splitCash||0)+Number(splitDigital||0))
+    : isUdhar ? Math.min(roundMoney(udharPaidNow || 0), total) : total
 
   if (checkoutPayment === 'Cash' && Number(cashTendered || 0) < total) {
     return { ok: false, error: 'Cash received is less than the sale total. Use Udhar for an unpaid balance.' }
   }
 
-  const tenders = isUdhar
+  const tenders = isSplit
+    ? [
+        ...(Number(splitCash||0)>0 ? [{ method:'Cash', amount:roundMoney(splitCash), cashTendered:roundMoney(splitCash) }] : []),
+        ...(Number(splitDigital||0)>0 ? [{ method:splitMethod||'Raast', amount:roundMoney(splitDigital) }] : []),
+      ]
+    : isUdhar
     ? (paidNow > 0 ? [{ method:'Cash', amount:paidNow, cashTendered:paidNow }] : [])
     : [{
         method: checkoutPayment,
@@ -81,7 +90,7 @@ export async function finalizeCheckout({
     receiptNo: saleData.invoiceNumber, date: saleData.createdAt,
     cashier: saleData.employeeName || employeeName || 'Counter', customer: udharName || 'Walk-in',
     items: cart.map(i => ({...i})), tax, discount,
-    total: Math.max(0,total), payment: isUdhar ? 'Udhar' : checkoutPayment,
+    total: Math.max(0,total), payment: isUdhar ? 'Udhar' : isSplit ? 'Split' : checkoutPayment,
     cashTendered: saleData.cashTendered || 0,
     changeGiven:  saleData.changeGiven || 0,
   }

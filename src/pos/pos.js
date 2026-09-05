@@ -19,6 +19,7 @@ import {
 } from '../shared.js'
 import {
   getSubInvoices, createSubInvoice, markComponentNotNeeded, deliverRepair,
+  getRepairFamilySummary,
 } from '../features/repairs/api.js'
 import { getRetailReturnContext, createRetailReturn } from '../features/pos/returns/api.js'
 import {
@@ -49,6 +50,10 @@ const posState = {
   udharName:       '',
   udharPhone:      '',
   udharPaidNow:    0,
+  splitCash:       0,
+  splitDigital:    0,
+  splitMethod:     'Raast',
+  splitCredit:     0,
   checkoutRequestId: null,
   invSearch:       '',
   repairSearch:    '',
@@ -243,7 +248,7 @@ function posView() {
 
         ${!hasTicketInCart ? `
         <select class="tenant-switcher" data-action="payment">
-          ${['Cash','Raast','JazzCash','EasyPaisa','Bank Transfer','Udhar (Credit)'].map(m=>
+          ${['Cash','Raast','JazzCash','EasyPaisa','Bank Transfer','Split Payment','Udhar (Credit)'].map(m=>
             `<option ${posState.checkoutPayment===m?'selected':''}>${m}</option>`).join('')}
         </select>
         ${posState.checkoutPayment === 'Cash' ? `
@@ -269,6 +274,20 @@ function posView() {
               value="${posState.udharPaidNow||''}" data-udhar="paidNow"
               style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;
                      background:var(--surface);color:var(--text);font-size:16px;width:100%">
+          </div>` : ''}
+        ${posState.checkoutPayment === 'Split Payment' ? `
+          <div style="display:grid;gap:8px;margin-top:4px">
+            <label style="font-size:13px;font-weight:500;color:var(--muted)">Cash amount</label>
+            <input type="number" step="any" min="0" value="${posState.splitCash||''}" data-split="cash" class="search">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <select data-split="method" class="tenant-switcher">${['Raast','JazzCash','EasyPaisa','Bank Transfer'].map(m=>`<option ${posState.splitMethod===m?'selected':''}>${m}</option>`).join('')}</select>
+              <input type="number" step="any" min="0" value="${posState.splitDigital||''}" data-split="digital" class="search" placeholder="Digital amount">
+            </div>
+            <label style="font-size:13px;font-weight:500;color:var(--muted)">Udhar amount (optional, PIN required)</label>
+            <input type="number" step="any" min="0" value="${posState.splitCredit||''}" data-split="credit" class="search">
+            <input class="search" placeholder="Customer name (required if Udhar)" data-udhar="name" value="${posState.udharName||''}">
+            <input class="search" placeholder="Customer phone (required if Udhar)" data-udhar="phone" value="${posState.udharPhone||''}">
+            <div style="display:flex;justify-content:space-between;padding:8px 10px;background:var(--surface-2);border-radius:8px"><span>Split total</span><strong>${money(Number(posState.splitCash||0)+Number(posState.splitDigital||0)+Number(posState.splitCredit||0))} / ${money(grandTotal)}</strong></div>
           </div>` : ''}
         ` : `
           <p class="muted" style="font-size:12px;margin-top:4px">
@@ -462,6 +481,7 @@ function ticketPaymentModalHTML(ticket) {
           Deliver Device
         </button>`) : `<p class="muted" style="font-size:12px;margin-top:8px">Mark the repair Ready before delivery.</p>`}
       <div class="modal-actions">
+        <button class="secondary-button" data-action="print-repair-summary" data-ticket-id="${ticket.id}">Print Summary</button>
         <button class="secondary-button" data-close>Close</button>
       </div>
     </div>
@@ -920,7 +940,16 @@ async function placeOrder() {
 
 /* ── Standard checkout (retail items, no ticket in cart) ── */
 async function doCheckout() {
-  const isUdhar  = posState.checkoutPayment === 'Udhar (Credit)'
+  const isSplit = posState.checkoutPayment === 'Split Payment'
+  const isUdhar = posState.checkoutPayment === 'Udhar (Credit)' || (isSplit && Number(posState.splitCredit||0)>0)
+  if (isSplit) {
+    const subtotal = posState.cart.reduce((sum,item)=>sum+Number(item.soldPrice||0)*Number(item.qty||0),0)
+    const total = Math.round((subtotal + subtotal*Number(CFG.tax_rate||0)/100 + Number.EPSILON)*100)/100
+    const splitTotal = Math.round((Number(posState.splitCash||0)+Number(posState.splitDigital||0)+Number(posState.splitCredit||0)+Number.EPSILON)*100)/100
+    if (splitTotal !== total || Number(posState.splitCash||0)<0 || Number(posState.splitDigital||0)<0 || Number(posState.splitCredit||0)<0) {
+      alert(`Split amounts must add up to ${money(total)}.`); return
+    }
+  }
 
   if (isUdhar && (!posState.udharName?.trim()||!posState.udharPhone?.trim())) {
     state.modal = { type:'udharInfo' }; render(); return
@@ -947,6 +976,10 @@ async function _finalizeCheckout() {
     udharName: posState.udharName,
     udharPhone: posState.udharPhone,
     udharPaidNow: posState.udharPaidNow,
+    splitCash: posState.splitCash,
+    splitDigital: posState.splitDigital,
+    splitMethod: posState.splitMethod,
+    splitCredit: posState.splitCredit,
     employeeName: SESSION.employee?.name,
     requestId: posState.checkoutRequestId,
   })
@@ -955,6 +988,7 @@ async function _finalizeCheckout() {
   posState.cart=[]
   posState.checkoutRequestId=null
   posState.cashTendered=0
+  posState.splitCash=0; posState.splitDigital=0; posState.splitMethod='Raast'; posState.splitCredit=0
   posState.udharName=''; posState.udharPhone=''; posState.udharPaidNow=0; posState.checkoutPayment='Cash'
   state.modal = { type:'receipt', sale: res.sale }
   await load()
@@ -1227,6 +1261,12 @@ function attachEvents() {
       alert('Device marked as Delivered.')
       return
     }
+    if (el.dataset.action === 'print-repair-summary') {
+      const summaryResult = await getRepairFamilySummary(Number(el.dataset.ticketId))
+      if (!summaryResult.ok) { alert('Summary error: ' + summaryResult.error); return }
+      const { buildRepairSummary, printThermal } = await import('../print/print.js')
+      printThermal(buildRepairSummary(summaryResult.data)); return
+    }
 
     if (el.dataset.action === 'deliver-repair-udhar') {
       const ticketId = Number(el.dataset.ticketId)
@@ -1408,6 +1448,9 @@ function attachEvents() {
         t.parentNode.insertBefore(div, t.nextSibling)
       }
     }
+    if (t.dataset.split === 'cash') posState.splitCash = Number(t.value)||0
+    if (t.dataset.split === 'digital') posState.splitDigital = Number(t.value)||0
+    if (t.dataset.split === 'credit') posState.splitCredit = Number(t.value)||0
     if (t.dataset.invSearch !== undefined)    { posState.invSearch = t.value; render() }
     if (t.dataset.repairSearch !== undefined) { posState.repairSearch = t.value; render() }
     if (t.dataset.returnQty !== undefined) refreshRetailReturnPreview()
@@ -1447,6 +1490,7 @@ function attachEvents() {
     if (t.dataset.action === 'payment') {
       posState.checkoutPayment = t.value; posState.cashTendered = 0; render(); return
     }
+    if (t.dataset.split === 'method') { posState.splitMethod = t.value; return }
     if (t.dataset.udhar === 'name')  { posState.udharName  = t.value; return }
     if (t.dataset.udhar === 'phone') { posState.udharPhone = t.value; return }
     if (t.dataset.udhar === 'paidNow') { posState.udharPaidNow = Number(t.value)||0; return }

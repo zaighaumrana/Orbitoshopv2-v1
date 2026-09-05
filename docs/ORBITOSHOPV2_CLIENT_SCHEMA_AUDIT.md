@@ -1096,3 +1096,26 @@ Applied `20260905020000_phase3_unified_udhar_and_reporting.sql` to DEV.
   notices and documented Phase 2/baseline items; all three new actor foreign
   keys have covering indexes.
 
+### Phase 3J repair-family summary and final UX
+
+Applied `20260905030000_phase3_repair_family_summary.sql` to DEV.
+
+- Added `get_repair_family_summary`, an authenticated financial-staff read RPC
+  that resolves a root or child ticket to one canonical family containing
+  invoices, decisions, adjustments, payments, refunds, totals, Udhar and
+  delivery/cancellation state.
+- REP-08 passed with exact parent/child/adjustment/payment/refund/net/balance
+  reconciliation and child-to-root lookup. Anonymous and Technician reads were
+  denied; Manager access passed. Fixtures rolled back.
+- Admin now exposes pending/approved/declined additional-work decisions,
+  immutable discount/price adjustments, cancellation/refund preview and final
+  repair summary printing. Technician Workshop submissions remain Pending for
+  authorized counter approval.
+- POS exposes final repair-summary printing and optional Cash + digital + Udhar
+  split tender. Original repair print explicitly shows total, paid at creation
+  and remaining at creation.
+- Workshop to POS and collection handoff now use the canonical router, removing
+  the direct initializer/path mismatch.
+- Production build passes. Automated Windows browser smoke is pending because
+  the UI-control runtime failed to initialize twice; no browser pass is claimed.
+

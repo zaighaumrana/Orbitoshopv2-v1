@@ -271,6 +271,7 @@ Applied migration:
 | `20260905010000_phase3_retail_returns_and_inventory_adjustments.sql` | Partial retail returns, actual-refund calculation, optional restock and audited Inventory create/adjust RPCs | applied |
 | `20260905011000_phase3_return_line_invariant.sql` | Deferred invariant preventing an empty return header from committing | applied |
 | `20260905020000_phase3_unified_udhar_and_reporting.sql` | Unified retail/repair Udhar settlement and canonical dashboard/report/shift read models | applied |
+| `20260905030000_phase3_repair_family_summary.sql` | Authorized canonical repair-family read model for UI and final printing | applied |
 
 Post-apply verification:
 
@@ -286,7 +287,7 @@ Post-apply verification:
   equals current quantity 50
 - no refund, return-line, invoice-adjustment or additional-work history was
   invented
-- local/remote migration ledger matches through `20260905020000`
+- local/remote migration ledger matches through `20260905030000`
 
 ## 8. Planned transaction and idempotency boundaries
 
@@ -526,7 +527,36 @@ actual payment and refund events, so repair advances/top-ups are included and
 refunds reduce net money movement. The familiar Udhar list now combines retail
 and repair accounts without exposing allocations or ledger identifiers.
 
-Not yet run: later Phase 3 RPCs and full real-browser regression.
+Phase 3J completed the remaining UI and printing cutover:
+
+- `get_repair_family_summary` resolves either a parent or child reference to
+  the complete family and returns original/child invoices, durable decisions,
+  adjustments, payments, refunds, Udhar and exact totals
+- REP-08 rollback fixtures reconciled gross billed 6,500, adjustment -500,
+  effective obligation 6,000, payments 5,000, refund 200, net payments 4,800
+  and outstanding 1,200; opening the child returned the same parent family
+- the original repair slip now states Original Invoice Total, Paid at Creation
+  and Remaining at Creation; the final summary prints every invoice,
+  adjustment, dated payment/method, refund, balance, Udhar and delivery state
+- Admin can record additional work as Pending, Approved or Declined, and can
+  later approve/decline a pending Technician proposal with method and note
+- downward adjustment and cancellation use their existing exact-purpose PIN
+  RPCs; cancellation previews customer refund, retained amount and final
+  obligation before confirmation
+- optional retail Split Payment accepts Cash plus one digital method plus
+  optional PIN-approved Udhar without exposing allocations
+- Workshop POS and collection handoff now route through `navigate('/pos')`;
+  direct `initPOS` calls with a stale `/workshop` URL are removed
+- Technician financial-summary access remained denied while Manager access
+  passed; all database fixtures rolled back
+- production build passed after the cutover
+
+Automated Windows browser control could not initialize because its local
+runtime assets path was unavailable on two attempts. The real-browser Phase 3
+smoke remains an explicit Phase 3K/manual release-gate item and is not recorded
+as passed.
+
+Not yet run: the final Phase 3K full real-browser and authorization regression.
 
 Security advisor baseline has no critical Phase 3 finding. Existing Phase 2
 notices remain: deliberately closed RLS/no-policy service tables, deliberately
@@ -575,14 +605,8 @@ stage requires dry-run, DEV-only apply, verification, advisors and documentation
 
 - Historical Inventory movements/restock cannot be reconstructed.
 - Two legacy Ready timestamps are not physical-delivery evidence.
-- Retail split-tender input is supported by the RPC but its optional UI is still
-  pending Phase 3J.
-- Pending/Declined additional-work controls and repair-adjustment UI are not yet
-  exposed, although their server transactions are complete.
-- Repair cancellation is server-complete but its preview/confirmation UI is
-  pending Phase 3J; delivery is exposed from the Ready repair payment modal.
-- Final repair-family summary/printing and the complete Phase 3 browser
-  regression remain for Phase 3J/3K.
+- The complete real-browser regression remains for Phase 3K/manual validation;
+  the automated Windows browser-control runtime could not initialize.
 - Existing `SECURITY DEFINER`, leaked-password-plan and unindexed-FK notices
   remain documented Phase 2/baseline risks.
 

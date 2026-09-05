@@ -37,6 +37,8 @@ export function ticketCreatedModalHTML(modal) {
 export function ticketDetailModalHTML(id, modal) {
   const tk = (state.data.tickets||[]).find(t => String(t.id) === String(id))
   if (!tk) return `<div class="modal-backdrop"><div class="modal"><p class="muted">Not found.</p><div class="modal-actions"><button class="secondary-button" data-close>Close</button></div></div></div>`
+  const summary = modal.summary
+  const rootId = summary?.root?.id || tk.id
   const sc = {'Pending':'warn','In Progress':'warn','Ready':'good','Delivered':'good','Declined':'bad'}
   return `<div class="modal-backdrop"><div class="modal modal-md">
     <h2>${tk.ticket_number} <span class="badge ${sc[tk.status]||'warn'}" style="margin-left:8px">${tk.status}</span></h2>
@@ -74,6 +76,18 @@ export function ticketDetailModalHTML(id, modal) {
             </div>`).join('')}
         </div>
       </div>` : ''}
+    ${summary ? `
+      <div style="display:grid;gap:6px;margin-bottom:12px;padding:12px;background:var(--surface-2);border-radius:8px">
+        <div style="display:flex;justify-content:space-between"><span>Total billed</span><strong>${money(summary.effectiveObligation)}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Payments received</span><strong>${money(summary.paymentsReceived)}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Refunds</span><strong>${money(summary.refundsPaid)}</strong></div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:6px"><span>Outstanding</span><strong>${money(summary.outstanding)}</strong></div>
+        ${summary.udharApproved ? `<div style="display:flex;justify-content:space-between"><span>Udhar approved</span><strong>${money(summary.udharOutstanding)}</strong></div>` : ''}
+      </div>
+      ${(summary.proposals||[]).length ? `<div style="margin-bottom:12px"><strong style="font-size:13px">Additional-work decisions</strong>
+        <div style="display:grid;gap:6px;margin-top:6px">${summary.proposals.map(p => `<div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:12px"><strong>${p.description}</strong> · ${money(p.quotedAmount)} <span class="badge ${p.decision==='Approved'?'good':p.decision==='Declined'?'bad':'warn'}">${p.decision}</span>${p.decisionMethod?`<br><span class="muted">${p.decisionMethod}${p.decisionNote?' · '+p.decisionNote:''}</span>`:''}${p.decision==='Pending'?`<div style="display:flex;gap:6px;margin-top:6px"><button class="secondary-button" data-action="decide-additional-work" data-proposal-id="${p.id}" data-decision="Approved">Approve</button><button class="secondary-button" data-action="decide-additional-work" data-proposal-id="${p.id}" data-decision="Declined">Decline</button></div>`:''}</div>`).join('')}</div>
+      </div>` : ''}
+    ` : '<p class="muted" style="font-size:12px">Loading canonical family totals…</p>'}
     <div style="border-top:1px solid var(--border);padding-top:12px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <select id="td-status" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);flex:1">
@@ -86,7 +100,9 @@ export function ticketDetailModalHTML(id, modal) {
     </div>
     <div class="modal-actions">
       <button class="secondary-button" data-close>Close</button>
-      <button class="secondary-button" data-action="open-create-sub-invoice" data-ticket-id="${tk.id}">+ Create Sub-Invoice</button>
+      ${summary ? `<button class="secondary-button" data-action="print-repair-summary" data-ticket-id="${rootId}">Print Summary</button>` : ''}
+      <button class="secondary-button" data-action="open-create-sub-invoice" data-ticket-id="${rootId}">+ Additional Work</button>
+      ${summary && !['Delivered','Cancelled'].includes(summary.root.status) ? `<button class="secondary-button" data-action="open-repair-adjustment" data-ticket-id="${rootId}">Adjustment</button><button class="secondary-button" style="color:var(--danger)" data-action="open-repair-cancellation" data-ticket-id="${rootId}">Cancel Repair</button>` : ''}
       <button class="primary-button" data-action="save-ticket-detail" data-id="${tk.id}">Save Update</button>
     </div>
   </div></div>`
@@ -122,7 +138,7 @@ export function createSubInvoiceModalHTML(modal) {
   return `
     <div class="modal-backdrop" data-no-backdrop-close>
       <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
-        <h2 style="margin-bottom:4px">Create Sub-Invoice</h2>
+        <h2 style="margin-bottom:4px">Record Additional Work</h2>
         <p class="muted" style="font-size:13px;margin-bottom:16px">
           Linked to ${tk.invoice_number} — ${tk.customer_name}, ${tk.device_brand} ${tk.device_model}
         </p>
@@ -170,6 +186,11 @@ export function createSubInvoiceModalHTML(modal) {
           <textarea id="sub-invoice-note" style="min-height:56px" placeholder="What was found / done…"></textarea>
         </label>
 
+        <div class="form-grid" style="margin-bottom:12px">
+          <label class="field"><span>Customer decision</span><select id="additional-work-decision"><option>Approved</option><option>Pending</option><option>Declined</option></select></label>
+          <label class="field"><span>Decision method</span><select id="additional-work-method">${['Phone','In person','WhatsApp','Other'].map(x=>`<option>${x}</option>`).join('')}</select></label>
+        </div>
+
         <div style="display:flex;justify-content:space-between;font-weight:600;padding:10px;
                     background:var(--surface-2);border-radius:8px;margin-bottom:16px;font-size:15px">
           <span>Sub-Invoice Total</span><span id="subinv-draft-total">${money(total)}</span>
@@ -178,11 +199,44 @@ export function createSubInvoiceModalHTML(modal) {
         <div class="modal-actions">
           <button type="button" class="secondary-button" data-close>Cancel</button>
           <button type="button" class="primary-button" data-action="submit-sub-invoice" data-parent-id="${parentId}">
-            Create & Print
+            Save Decision
           </button>
         </div>
       </div>
     </div>`
+}
+
+export function repairAdjustmentModalHTML(modal) {
+  return `<div class="modal-backdrop" data-no-backdrop-close><div class="modal modal-sm">
+    <h2>Repair Price Adjustment</h2>
+    <p class="muted">Original invoices stay unchanged. This records a permanent downward adjustment.</p>
+    <label class="field"><span>Reduction amount</span><input id="repair-adjustment-amount" type="number" min="0" step="any"></label>
+    <label class="field"><span>Type</span><select id="repair-adjustment-type"><option value="discount">Discount</option><option value="price_correction">Price correction</option><option value="goodwill">Goodwill</option><option value="cancelled_work">Cancelled work</option><option value="other">Other</option></select></label>
+    <label class="field"><span>Reason</span><textarea id="repair-adjustment-reason"></textarea></label>
+    <div class="modal-actions"><button class="secondary-button" data-close>Close</button><button class="primary-button" data-action="submit-repair-adjustment" data-ticket-id="${modal.rootId}">Apply (PIN required)</button></div>
+  </div></div>`
+}
+
+export function repairCancellationModalHTML(modal) {
+  const s = modal.summary || {}
+  const paidAvailable = Math.max(0, Number(s.netPayments || 0))
+  return `<div class="modal-backdrop" data-no-backdrop-close><div class="modal modal-sm">
+    <h2>Cancel Repair</h2>
+    <div style="display:grid;gap:6px;padding:12px;background:var(--surface-2);border-radius:8px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between"><span>Current billed</span><strong>${money(s.effectiveObligation)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Net paid</span><strong>${money(s.netPayments)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Current balance</span><strong>${money(s.outstanding)}</strong></div>
+    </div>
+    <label class="field"><span>Refund amount (0 allowed)</span><input id="repair-cancel-refund" data-repair-cancel-refund type="number" min="0" max="${paidAvailable}" step="any" value="0"></label>
+    <label class="field"><span>Refund method</span><select id="repair-cancel-method">${['Cash','Raast','JazzCash','EasyPaisa','Bank Transfer'].map(x=>`<option>${x}</option>`).join('')}</select></label>
+    <label class="field"><span>Reason</span><textarea id="repair-cancel-reason"></textarea></label>
+    <div style="padding:10px;background:var(--surface-2);border-radius:8px;margin-top:10px">
+      <div style="display:flex;justify-content:space-between"><span>Customer receives</span><strong id="repair-cancel-customer">${money(0)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Shop retains</span><strong id="repair-cancel-retains">${money(paidAvailable)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Final obligation</span><strong id="repair-cancel-obligation">${money(paidAvailable)}</strong></div>
+    </div>
+    <div class="modal-actions"><button class="secondary-button" data-close>Close</button><button class="primary-button" style="background:var(--danger)" data-action="submit-repair-cancellation" data-ticket-id="${modal.rootId}">Cancel (PIN required)</button></div>
+  </div></div>`
 }
 
 export function addCompTagModalHTML(modal) {

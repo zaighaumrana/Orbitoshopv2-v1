@@ -20,6 +20,8 @@ import { dlog, dstack } from '../../debuglog.js'
 
 const pendingAdditionalWorkRequests = new Map()
 const pendingDeliveryRequests = new Map()
+const pendingRepairAdjustmentRequests = new Map()
+const pendingRepairCancellationRequests = new Map()
 
 export async function createTicket(payload, employeeName, ticketNumber) {
   dstack('repairs.createTicket', `ENTRY customerName=${payload.customerName} employeeName=${employeeName} -- NOTE: this function currently has no known callers in the app, so if this fires, the stack trace above is the answer`)
@@ -100,6 +102,81 @@ export async function createSubInvoice(parentTicket, components, labourCost, not
   if (error) return { ok: false, error: error.message }
   pendingAdditionalWorkRequests.delete(key)
   return { ok: true, data:result.ticket, creditApplied:0, proposal:result.proposal }
+}
+
+export async function getRepairFamilySummary(ticketId) {
+  const { data, error } = await sb.rpc('get_repair_family_summary', { p_ticket_id: ticketId })
+  if (error) return { ok:false, error:error.message }
+  return { ok:true, data }
+}
+
+export async function recordAdditionalWork(rootTicketId, description, components, labourCost, decision, method, note) {
+  const amount = (components || []).reduce((sum,c)=>sum+Number(c.price||0),0) + Number(labourCost || 0)
+  const proposalRequestId = crypto.randomUUID()
+  const { data: proposal, error: proposalError } = await sb.rpc('save_additional_work_proposal', {
+    p_request_id: proposalRequestId,
+    p_root_ticket_id: rootTicketId,
+    p_description: description,
+    p_details: { note: note || '', components: components || [], labourCost: Number(labourCost || 0) },
+    p_quoted_amount: Number(amount || 0),
+  })
+  if (proposalError) return { ok:false, error:proposalError.message }
+  if (decision === 'Pending') return { ok:true, proposal, ticket:null }
+
+  const { data, error } = await sb.rpc('decide_additional_work', {
+    p_request_id: crypto.randomUUID(),
+    p_proposal_id: proposal.id,
+    p_decision: decision,
+    p_decision_method: method,
+    p_decision_note: note || '',
+  })
+  if (error) return { ok:false, error:error.message }
+  return { ok:true, proposal:data.proposal, ticket:data.ticket }
+}
+
+export async function decideAdditionalWork(proposalId, decision, method, note) {
+  const { data, error } = await sb.rpc('decide_additional_work', {
+    p_request_id: crypto.randomUUID(),
+    p_proposal_id: proposalId,
+    p_decision: decision,
+    p_decision_method: method,
+    p_decision_note: note || '',
+  })
+  if (error) return { ok:false, error:error.message }
+  return { ok:true, proposal:data.proposal, ticket:data.ticket }
+}
+
+export async function createRepairAdjustment(rootTicketId, amount, type, reason) {
+  const key = JSON.stringify([rootTicketId, Number(amount), type, reason])
+  const requestId = pendingRepairAdjustmentRequests.get(key) || crypto.randomUUID()
+  pendingRepairAdjustmentRequests.set(key, requestId)
+  const { data, error } = await sb.rpc('create_repair_adjustment', {
+    p_request_id: requestId,
+    p_root_ticket_id: rootTicketId,
+    p_ticket_id: null,
+    p_amount: Number(amount),
+    p_adjustment_type: type,
+    p_reason: reason,
+  })
+  if (error) return { ok:false, error:error.message }
+  pendingRepairAdjustmentRequests.delete(key)
+  return { ok:true, data }
+}
+
+export async function cancelRepair(rootTicketId, refundAmount, refundMethod, reason) {
+  const key = JSON.stringify([rootTicketId, Number(refundAmount), refundMethod, reason])
+  const requestId = pendingRepairCancellationRequests.get(key) || crypto.randomUUID()
+  pendingRepairCancellationRequests.set(key, requestId)
+  const { data, error } = await sb.rpc('cancel_repair', {
+    p_request_id: requestId,
+    p_root_ticket_id: rootTicketId,
+    p_refund_amount: Number(refundAmount),
+    p_refund_method: Number(refundAmount) > 0 ? refundMethod : '',
+    p_reason: reason,
+  })
+  if (error) return { ok:false, error:error.message }
+  pendingRepairCancellationRequests.delete(key)
+  return { ok:true, data }
 }
 
 export async function deliverRepair(rootTicketId, allowUdhar = false) {
