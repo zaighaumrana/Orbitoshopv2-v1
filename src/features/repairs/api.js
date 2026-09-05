@@ -22,6 +22,7 @@ const pendingAdditionalWorkRequests = new Map()
 const pendingDeliveryRequests = new Map()
 const pendingRepairAdjustmentRequests = new Map()
 const pendingRepairCancellationRequests = new Map()
+const pendingComponentChangeRequests = new Map()
 
 export async function createTicket(payload, employeeName, ticketNumber) {
   dstack('repairs.createTicket', `ENTRY customerName=${payload.customerName} employeeName=${employeeName} -- NOTE: this function currently has no known callers in the app, so if this fires, the stack trace above is the answer`)
@@ -57,10 +58,7 @@ export async function updateTicket(id, updates) {
   if (updates.status         !== undefined) mapped.status           = updates.status
   if (updates.declineReason  !== undefined) mapped.decline_reason   = updates.declineReason
   if (updates.technicianNote !== undefined) mapped.technician_note  = updates.technicianNote
-  if (updates.settledAt      !== undefined) mapped.settled_at       = updates.settledAt
   if (updates.update_note    !== undefined) mapped.update_note      = updates.update_note
-  if (updates.actual_quote   !== undefined) mapped.actual_quote     = updates.actual_quote
-  if (updates.labour_cost    !== undefined) mapped.labour_cost      = updates.labour_cost
   const { error } = await sb.from('tickets').update(mapped).eq('id', id)
   if (error) { dlog('repairs.updateTicket', `FAILED: ${error.message}`); return { ok: false, error: error.message } }
   dlog('repairs.updateTicket', 'SUCCEEDED')
@@ -200,11 +198,17 @@ export async function deliverRepair(rootTicketId, allowUdhar = false) {
  * the reason attached. Caller is responsible for PIN-gating this first.
  * Called by pos.js, admin.js, AND workshop.js -- genuinely shared.
  */
-export async function markComponentNotNeeded(ticketId, componentsNoted, index, reason, employeeName) {
-  const updated = [...componentsNoted]
-  if (!updated[index]) return { ok: false, error: 'Component not found.' }
-  updated[index] = { ...updated[index], removed: true, removedReason: reason||'', removedBy: employeeName||'' }
-  const { error } = await sb.from('tickets').update({ components_noted: updated }).eq('id', ticketId)
-  if (error) return { ok: false, error: error.message }
-  return { ok: true }
+export async function markComponentNotNeeded(ticketId, index, reason) {
+  const key = JSON.stringify([ticketId, index, reason])
+  const requestId = pendingComponentChangeRequests.get(key) || crypto.randomUUID()
+  pendingComponentChangeRequests.set(key, requestId)
+  const { data, error } = await sb.rpc('mark_repair_component_not_needed', {
+    p_request_id: requestId,
+    p_ticket_id: ticketId,
+    p_component_index: index,
+    p_reason: reason,
+  })
+  if (error) return { ok:false, error:error.message }
+  pendingComponentChangeRequests.delete(key)
+  return { ok:true, data }
 }

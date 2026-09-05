@@ -272,6 +272,7 @@ Applied migration:
 | `20260905011000_phase3_return_line_invariant.sql` | Deferred invariant preventing an empty return header from committing | applied |
 | `20260905020000_phase3_unified_udhar_and_reporting.sql` | Unified retail/repair Udhar settlement and canonical dashboard/report/shift read models | applied |
 | `20260905030000_phase3_repair_family_summary.sql` | Authorized canonical repair-family read model for UI and final printing | applied |
+| `20260905031000_phase3_repair_component_change_guard.sql` | PIN-authorized component evidence change and direct rewrite guard | applied |
 
 Post-apply verification:
 
@@ -287,7 +288,7 @@ Post-apply verification:
   equals current quantity 50
 - no refund, return-line, invoice-adjustment or additional-work history was
   invented
-- local/remote migration ledger matches through `20260905030000`
+- local/remote migration ledger matches through `20260905031000`
 
 ## 8. Planned transaction and idempotency boundaries
 
@@ -556,7 +557,29 @@ runtime assets path was unavailable on two attempts. The real-browser Phase 3
 smoke remains an explicit Phase 3K/manual release-gate item and is not recorded
 as passed.
 
-Not yet run: the final Phase 3K full real-browser and authorization regression.
+Phase 3K server/build/data release gates passed:
+
+- the final code scan found and closed the remaining direct locked-component
+  JSON write; `mark_repair_component_not_needed` now requires the exact
+  `remove-component` step-up, preserves original evidence, records actor/time/
+  reason/request authorization, and is idempotent
+- direct authenticated component rewrites and Technician use without PIN were
+  denied; the valid transaction and retry both passed in a rolled-back fixture
+- all nine Phase 3 public tables have RLS, anonymous table privileges are zero,
+  and authenticated mutation privileges on the nine ledger tables are zero
+- payment/allocation mismatches, orphan allocations, cumulative over-returns,
+  negative Inventory and retained test fixtures are all zero
+- live counts remain 5 sales, 19 tickets, 12 canonical payments, 0 refunds,
+  0 returns and 0 temporary step-up grants
+- final production build passed; local and remote migration ledgers match
+  through `20260905031000`; the linked dry-run reports the remote database is
+  up to date
+- security advisors report only deliberately callable, internally authorized
+  transaction/read RPCs plus the documented Phase 2 baseline; performance
+  advisors report only unused-new-index and unrelated legacy index notices
+
+Not yet run: the final real-browser smoke; server-side authorization regression
+is complete.
 
 Security advisor baseline has no critical Phase 3 finding. Existing Phase 2
 notices remain: deliberately closed RLS/no-policy service tables, deliberately
@@ -568,7 +591,7 @@ Phase 3E added the repair-family parent index and Phase 3H added both return
 header indexes. The current remaining notices are seven unrelated baseline
 foreign keys across attendance, leave, salary, sales and support audit data.
 
-The Phase 3B through Phase 3I advisor reruns reported no unexpected security
+The Phase 3B through Phase 3K advisor reruns reported no unexpected security
 finding and no missing-index finding for a new Phase 3 foreign key. The Phase
 3 transaction RPC notices are intentional and protected by their
 internal Auth/role/suspension/step-up checks. Fresh actor indexes report unused
@@ -589,7 +612,8 @@ transactions. Phase 3H removed direct return and Inventory creation paths,
 protected current quantity, and made partial return/refund/restock plus manual
 stock changes atomic and auditable. Phase 3I removed direct authenticated
 legacy Udhar updates and cut settlement, dashboards, reports and shift totals
-to canonical RPCs/read models.
+to canonical RPCs/read models. Phase 3J added the final family read/print model,
+and Phase 3K closed direct locked-component evidence mutation.
 Dropping the nine tables is now forbidden.
 Any rollback must switch readers/writers while
 retaining the backfilled financial and Inventory-opening records; it must not
@@ -610,7 +634,8 @@ stage requires dry-run, DEV-only apply, verification, advisors and documentation
 - Existing `SECURITY DEFINER`, leaked-password-plan and unindexed-FK notices
   remain documented Phase 2/baseline risks.
 
-Recommendation: GO with the staged Phase 3 implementation. Preserve the
-documented legacy Inventory/delivery exceptions, do not invent historical
+Recommendation: HOLD merge only for the explicit real-browser smoke. Database,
+authorization, migration, build and data-integrity gates are green. Preserve
+the documented legacy Inventory/delivery exceptions, do not invent historical
 values, and do not merge `phase3-transaction-ledger` into `development` without
 explicit approval.

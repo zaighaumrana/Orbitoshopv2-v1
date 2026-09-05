@@ -1119,3 +1119,28 @@ Applied `20260905030000_phase3_repair_family_summary.sql` to DEV.
 - Production build passes. Automated Windows browser smoke is pending because
   the UI-control runtime failed to initialize twice; no browser pass is claimed.
 
+### Phase 3K final evidence and security gate
+
+Applied `20260905031000_phase3_repair_component_change_guard.sql` to DEV.
+
+- Replaced the last direct locked-component JSON update with
+  `mark_repair_component_not_needed`, requiring the exact server-side
+  `remove-component` step-up and recording request, actor, time, reason and
+  authorization evidence in the preserved component snapshot.
+- Expanded the ticket guard to reject direct authenticated rewrites of
+  `components_noted`; valid RPC, retry/idempotency, no-PIN Technician denial and
+  direct-write denial tests passed and rolled back.
+- Final audit: 9/9 Phase 3 public tables have RLS, zero anonymous table grants,
+  zero authenticated ledger mutation grants, zero payment/allocation mismatch,
+  zero orphan allocation, zero over-return, zero negative Inventory and zero
+  retained `P3` test fixture.
+- Live counts remain 5 sales, 19 tickets, 12 payments, 0 refunds, 0 returns and
+  0 step-up grants.
+- Local/remote migrations match through `20260905031000`; dry-run reports the
+  remote database is up to date; the production build passes.
+- Advisors contain no critical Phase 3 finding. New callable-function notices
+  are expected for the internally authorized RPC boundary, and unused-index
+  notices are expected before sufficient production-like traffic.
+- Merge remains on hold solely for the explicit real-browser smoke and user
+  approval. No merge into `development` was performed.
+

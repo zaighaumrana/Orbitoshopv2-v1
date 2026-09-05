@@ -651,7 +651,7 @@ function attachEvents() {
         if (!verified) return
         const tk = state.data.tickets.find(t => String(t.id) === String(ticketId))
         if (!tk) return
-        const res = await markComponentNotNeeded(ticketId, tk.components_noted||[], index, reason, SESSION.employee?.name)
+        const res = await markComponentNotNeeded(Number(ticketId), index, reason)
         if (!res.ok) { alert('Error: ' + res.error); return }
         await load()
         const subs = await getSubInvoices(ticketId)
