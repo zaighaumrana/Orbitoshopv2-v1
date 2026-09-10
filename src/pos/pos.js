@@ -13,7 +13,7 @@ import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
   _clearSession,
   money, fld, modalActions,
-  openPinPrompt, pinPromptHTML, handlePpKey, verifyCurrentStepUpPin,
+  openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   myAccountModalHTML, handleChangePasswordSubmit,
   matchesInvoiceSearch,
 } from '../shared.js'
@@ -167,6 +167,8 @@ function render() {
       </main>
     </div>
     ${renderModal()}`
+
+  normalizeModalControls(document.getElementById('app'))
 
   if (!_eventsAttached) {
     attachEvents()
@@ -1010,12 +1012,6 @@ function attachEvents() {
     // navigating elsewhere. Only act when /pos is truly the current route.
     if (!window.location.pathname.startsWith('/pos')) return
 
-    // Backdrop close — only when backdrop itself is the target
-    if (e.target.classList.contains('modal-backdrop') && !e.target.hasAttribute('data-no-backdrop-close')) {
-      dlog('POS.click', `BACKDROP-CLOSE fired -- state.modal was type=${state.modal?.type}`)
-      state.modal = null; render(); return
-    }
-
     const el = e.target.closest(
       'button,[data-close],[data-action],[data-modal],[data-qty],' +
       '[data-collect-ticket],[data-inv-pos-add],[data-qitem-name],' +
@@ -1029,12 +1025,13 @@ function attachEvents() {
 
     /* PIN numpad */
     if (el.dataset.ppKey !== undefined) {
-      handlePpKey(el.dataset.ppKey, verifyAdminLocal, render); return
+      handlePpKey(el.dataset.ppKey); return
     }
 
     /* Close modal */
     if (el.dataset.close !== undefined) {
       dlog('POS.click', `DATA-CLOSE branch firing -- state.modal was type=${state.modal?.type} -- about to call POS.render()`)
+      if (state.modal?.type === 'pinPrompt') { cancelPinPrompt(render); return }
       state.modal = null; render(); return
     }
 
@@ -1615,18 +1612,6 @@ function attachEvents() {
     }
   })
 
-  /* ── Keyboard ── */
-  document.addEventListener('keydown', e => {
-    if (document.getElementById('pp-display')) {
-      if (e.key==='Enter'||e.key==='Return') { e.preventDefault(); handlePpKey('✓',verifyAdminLocal,render); return }
-      if (e.key==='Backspace') { e.preventDefault(); handlePpKey('⌫',verifyAdminLocal,render); return }
-      if (e.key==='Escape')   { e.preventDefault(); state.modal=null; render(); return }
-      if (/^[0-9]$/.test(e.key)) { e.preventDefault(); handlePpKey(e.key,verifyAdminLocal,render); return }
-    }
-    if (e.key==='Escape' && state.modal && state.modal.type !== 'pinPrompt') {
-      state.modal = null; render()
-    }
-  })
 }
 
 /* ── Live draft total refresh (no full re-render — just update the display) ── */
@@ -1643,10 +1628,6 @@ function _refreshDraftTotals() {
     if (pEl) pEl.textContent = money(paid)
     if (bEl) bEl.textContent = money(balance)
   } catch {}
-}
-
-async function verifyAdminLocal(pin) {
-  return verifyCurrentStepUpPin(pin)
 }
 
 /* ═══════════════════════════════════════════════════════════════════

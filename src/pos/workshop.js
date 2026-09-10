@@ -12,7 +12,7 @@ import {
 import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
   _clearSession, money, fld, modalActions,
-  openPinPrompt, pinPromptHTML, handlePpKey, verifyCurrentStepUpPin,
+  openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   myAccountModalHTML, handleChangePasswordSubmit,
 } from '../shared.js'
 import {
@@ -103,6 +103,8 @@ function render() {
       </main>
     </div>
     ${renderModal()}`
+
+  normalizeModalControls(document.getElementById('app'))
 
   if (!_eventsAttached) {
     attachEvents()
@@ -534,15 +536,6 @@ function attachEvents() {
     // click" bug. Only act when /workshop is truly the current route.
     if (!window.location.pathname.startsWith('/workshop')) return
 
-    // Backdrop close
-    if (
-      e.target.classList.contains('modal-backdrop') &&
-      !e.target.hasAttribute('data-no-backdrop-close')
-    ) {
-      dlog('WORKSHOP.click', `BACKDROP-CLOSE fired -- state.modal was type=${state.modal?.type}`)
-      state.modal = null; render(); return
-    }
-
     const el = e.target.closest(
       'button,[data-close],[data-action],[data-ws-status],' +
       '[data-status-filter],[data-add-draft-comp-name],[data-tag-select],' +
@@ -553,12 +546,13 @@ function attachEvents() {
 
     /* PIN numpad */
     if (el.dataset.ppKey !== undefined) {
-      handlePpKey(el.dataset.ppKey, verifyAdminLocal, render); return
+      handlePpKey(el.dataset.ppKey); return
     }
 
     /* Close */
     if (el.dataset.close !== undefined) {
       dlog('WORKSHOP.click', `DATA-CLOSE branch firing -- state.modal was type=${state.modal?.type} -- about to call WORKSHOP.render()`)
+      if (state.modal?.type === 'pinPrompt') { cancelPinPrompt(render); return }
       state.modal = null; render(); return
     }
 
@@ -801,15 +795,6 @@ function attachEvents() {
       const action = map[e.target.id]
       if (action) { e.preventDefault(); document.querySelector(`[data-action="${action}"]`)?.click(); return }
     }
-    if (document.getElementById('pp-display')) {
-      if (e.key === 'Enter')     { e.preventDefault(); handlePpKey('✓', verifyAdminLocal, render); return }
-      if (e.key === 'Backspace') { e.preventDefault(); handlePpKey('⌫', verifyAdminLocal, render); return }
-      if (e.key === 'Escape')    { e.preventDefault(); state.modal = null; render(); return }
-      if (/^[0-9]$/.test(e.key)){ e.preventDefault(); handlePpKey(e.key, verifyAdminLocal, render); return }
-    }
-    if (e.key === 'Escape' && state.modal) {
-      state.modal = null; render()
-    }
   })
 }
 
@@ -822,10 +807,6 @@ function _addComponentToDraft(name, tag, customText) {
   ]
   state.modal = { type: 'create-sub-invoice', parentId, draftComponents, draftLabour: state.modal._draftLabour || 0 }
   render()
-}
-
-async function verifyAdminLocal(pin) {
-  return verifyCurrentStepUpPin(pin)
 }
 
 /* ═══════════════════════════════════════════════════════════════════

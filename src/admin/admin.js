@@ -3,7 +3,7 @@ import {
   _clearSession,
   can, ACCESS, validatePassword,
   money, fld, modalActions, statusBadge,
-  openPinPrompt, pinPromptHTML, handlePpKey, verifyCurrentStepUpPin,
+  openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   logBillEvent,
   myAccountModalHTML, handleChangePasswordSubmit,
   generateTempPassword, listPendingResetRequests, resolvePasswordReset,
@@ -178,6 +178,8 @@ function render() {
       </main>
     </div>
     ${renderModal()}`
+
+  normalizeModalControls(document.getElementById('app'))
 
   if (!_eventsAttached) {
     attachEvents()
@@ -605,13 +607,6 @@ function attachEvents() {
     // the other view had on screen. Only act when /admin is truly current.
     if (!window.location.pathname.startsWith('/admin')) return
 
-    // Backdrop click — close modal only if backdrop itself was clicked
-    // and it's not flagged as "no backdrop close" (e.g. receipt modal)
-    if (e.target.classList.contains('modal-backdrop') && !e.target.hasAttribute('data-no-backdrop-close')) {
-      dlog('ADMIN.click', `BACKDROP-CLOSE fired -- state.modal was type=${state.modal?.type}`)
-      state.modal = null; render(); return
-    }
-
     const el = e.target.closest(
       'button,[data-modal],[data-close],[data-action],' +
       '[data-settings-tab],[data-catalog-tab],[data-kpi-target],[data-pp-key],' +
@@ -622,9 +617,10 @@ function attachEvents() {
     if (!el) return
     dlog('ADMIN.click', `el MATCHED selector -- action=${el.dataset.action} close=${el.dataset.close} tag=${el.tagName}`)
 
-    if (el.dataset.ppKey !== undefined) { handlePpKey(el.dataset.ppKey, verifyAdminLocal, render); return }
+    if (el.dataset.ppKey !== undefined) { handlePpKey(el.dataset.ppKey); return }
     if (el.dataset.close !== undefined) {
       dlog('ADMIN.click', `DATA-CLOSE branch firing -- state.modal was type=${state.modal?.type} -- about to call ADMIN.render()`)
+      if (state.modal?.type === 'pinPrompt') { cancelPinPrompt(render); return }
       state.modal = null; render(); return
     }
     if (el.dataset.action === 'print-ticket-slip') {
@@ -1281,15 +1277,6 @@ function attachEvents() {
     dlog('ADMIN.submit', `type=${type} not recognized by this listener -- no-op`)
   })
 
-  // Keyboard
-  document.addEventListener('keydown', e => {
-    if (document.getElementById('pp-display')) {
-      if (e.key==='Enter'||e.key==='Return') { e.preventDefault(); handlePpKey('✓',verifyAdminLocal,render); return }
-      if (e.key==='Backspace')               { e.preventDefault(); handlePpKey('⌫',verifyAdminLocal,render); return }
-      if (e.key==='Escape')                  { e.preventDefault(); state.modal=null; render(); return }
-      if (/^[0-9]$/.test(e.key))            { e.preventDefault(); handlePpKey(e.key,verifyAdminLocal,render); return }
-    }
-  })
 }
 
 /* ── Sub-invoice draft helpers ── */
@@ -1313,10 +1300,6 @@ function _addComponentToDraft(name, tag, customText) {
   ]
   state.modal = { type: 'create-sub-invoice', parentId, draftComponents, draftLabour: state.modal._draftLabour || 0 }
   render()
-}
-
-async function verifyAdminLocal(pin) {
-  return verifyCurrentStepUpPin(pin)
 }
 
 /* ── Public ── */

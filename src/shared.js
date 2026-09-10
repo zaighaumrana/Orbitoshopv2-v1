@@ -356,8 +356,32 @@ export async function invokeAccountAdmin(action, payload = {}) {
 }
 
 export async function verifyStepUpPin(pin, purpose) {
-  const { data, error } = await sb.functions.invoke('verify-pin', { body: { pin, purpose } })
-  return { ok: !error && data?.ok === true, error: data?.error || error?.message }
+  const submittedPin = String(pin)
+  try {
+    const { data, error } = await sb.functions.invoke('verify-pin', {
+      body: { pin: submittedPin, purpose },
+    })
+    if (!error && data?.ok === true) return { ok: true, kind: 'success' }
+
+    // For a non-2xx Edge Function response, supabase-js exposes the response
+    // body on error.context rather than data. Only the function's deliberate
+    // verification rejection means the PIN was incorrect; transport, auth and
+    // server failures must not be presented as a bad PIN.
+    let responseData = data
+    if (!responseData && error?.context?.json) {
+      try { responseData = await error.context.json() } catch {}
+    }
+    if (responseData?.error === 'Verification failed.') {
+      return { ok: false, kind: 'incorrect', error: 'Incorrect PIN' }
+    }
+    return {
+      ok: false,
+      kind: 'server',
+      error: responseData?.error || error?.message || 'PIN verification is unavailable.',
+    }
+  } catch (error) {
+    return { ok: false, kind: 'server', error: error?.message || 'PIN verification is unavailable.' }
+  }
 }
 
 export async function verifyCurrentStepUpPin(pin) {
@@ -417,6 +441,33 @@ export async function handleChangePasswordSubmit(session, data) {
 export let ppBuffer   = ''
 export let ppPurpose  = ''
 export let ppCallback = null
+let ppRenderFn = null
+let ppVerifyFn = verifyCurrentStepUpPin
+let ppError = ''
+let ppSubmitting = false
+let ppAttempt = 0
+
+function focusPinPrompt() {
+  queueMicrotask(() => document.getElementById('pp-input')?.focus())
+}
+
+function syncPinPromptDOM() {
+  const input = document.getElementById('pp-input')
+  const display = document.getElementById('pp-display')
+  const error = document.getElementById('pp-error')
+  const confirm = document.querySelector('[data-pp-key="✓"]')
+  if (input) {
+    input.value = ppBuffer
+    input.setAttribute('aria-invalid', ppError ? 'true' : 'false')
+  }
+  if (display) display.textContent = '●'.repeat(ppBuffer.length).padEnd(4, '·')
+  if (error) {
+    error.textContent = ppError
+    error.classList.toggle('hidden', !ppError)
+  }
+  if (confirm) confirm.disabled = ppSubmitting || ppBuffer.length !== 4
+  document.querySelector('.pin-prompt')?.setAttribute('aria-busy', String(ppSubmitting))
+}
 
 /**
  * Open a PIN prompt for a sensitive/destructive action.
@@ -434,12 +485,31 @@ export let ppCallback = null
  *
  * Use this pattern for: delete, deactivate, refund, discount, settle.
  */
-export function openPinPrompt(purpose, callback, renderFn) {
+export function openPinPrompt(purpose, callback, renderFn, verifyFn = verifyCurrentStepUpPin) {
+  ppAttempt++
   ppBuffer   = ''
   ppPurpose  = purpose
   ppCallback = callback
+  ppRenderFn = renderFn
+  ppVerifyFn = verifyFn
+  ppError = ''
+  ppSubmitting = false
   state.modal = { type: 'pinPrompt', purpose }
   renderFn()
+  focusPinPrompt()
+}
+
+export function cancelPinPrompt(renderFn = ppRenderFn) {
+  ppAttempt++
+  ppBuffer = ''
+  ppPurpose = ''
+  ppCallback = null
+  ppRenderFn = null
+  ppVerifyFn = verifyCurrentStepUpPin
+  ppError = ''
+  ppSubmitting = false
+  if (state.modal?.type === 'pinPrompt') state.modal = null
+  renderFn?.()
 }
 
 export function pinPromptHTML(purpose) {
@@ -453,50 +523,115 @@ export function pinPromptHTML(purpose) {
     'remove-component': 'Owner/Admin PIN required',
   }[purpose] || 'Verify identity'
   return `
-    <div class="modal" style="max-width:340px">
-      <h2>${label}</h2>
-      <div id="pp-display" style="text-align:center;font-size:30px;letter-spacing:16px;min-height:48px;border-bottom:2px solid var(--border);padding-bottom:8px;margin:10px 0">····</div>
-      <div id="pp-error" class="hidden" style="color:var(--danger);text-align:center;font-size:13px;margin-bottom:8px">Wrong PIN.</div>
+    <div class="modal pin-prompt" role="dialog" aria-modal="true" aria-labelledby="pp-title" style="max-width:340px">
+      <h2 id="pp-title">${label}</h2>
+      <input id="pp-input" class="pin-capture-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="Four digit PIN" aria-describedby="pp-error">
+      <div id="pp-display" aria-hidden="true" style="text-align:center;font-size:30px;letter-spacing:16px;min-height:48px;border-bottom:2px solid var(--border);padding-bottom:8px;margin:10px 0">${'●'.repeat(ppBuffer.length).padEnd(4, '·')}</div>
+      <div id="pp-error" class="${ppError ? '' : 'hidden'}" role="alert" style="color:var(--danger);text-align:center;font-size:13px;margin-bottom:8px">${ppError}</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
         ${[1,2,3,4,5,6,7,8,9,'⌫',0,'✓'].map(k =>
-          `<button class="secondary-button" style="font-size:20px;min-height:50px" data-pp-key="${k}">${k}</button>`
+          `<button type="button" class="secondary-button" style="font-size:20px;min-height:50px" data-pp-key="${k}"${k === '✓' && (ppSubmitting || ppBuffer.length !== 4) ? ' disabled' : ''}>${k}</button>`
         ).join('')}
       </div>
       <div class="modal-actions" style="margin-top:10px">
-        <button class="secondary-button" data-close>Cancel</button>
+        <button type="button" class="secondary-button" data-close>Cancel</button>
       </div>
     </div>`
 }
 
-let ppSubmitting = false
-
-export async function handlePpKey(key, verifyFn, renderFn) {
-  const display = document.getElementById('pp-display')
-  const errEl   = document.getElementById('pp-error')
-  if (!display || ppSubmitting) return
-  if (key === '⌫') { ppBuffer = ppBuffer.slice(0,-1) }
-  else if (key === '✓') { await _submitPp(verifyFn, renderFn); return }
-  else { if (ppBuffer.length >= 6) return; ppBuffer += String(key) }
-  display.textContent = '●'.repeat(ppBuffer.length).padEnd(4,'·')
-  if (errEl) errEl.classList.add('hidden')
-  if (ppBuffer.length >= 4) await _submitPp(verifyFn, renderFn)
+export async function handlePpKey(key) {
+  if (state.modal?.type !== 'pinPrompt' || !document.getElementById('pp-display') || ppSubmitting) return
+  if (key === '⌫' || key === 'Delete') {
+    ppBuffer = ppBuffer.slice(0, -1)
+  } else if (key === '✓') {
+    if (ppBuffer.length === 4) await submitPinPrompt()
+    return
+  } else if (/^[0-9]$/.test(String(key)) && ppBuffer.length < 4) {
+    ppBuffer += String(key)
+  } else {
+    return
+  }
+  ppError = ''
+  syncPinPromptDOM()
 }
 
-async function _submitPp(verifyFn, renderFn) {
-  if (ppSubmitting) return
+async function submitPinPrompt() {
+  if (ppSubmitting || ppBuffer.length !== 4 || state.modal?.type !== 'pinPrompt') return
+  const attempt = ++ppAttempt
   ppSubmitting = true
-  const pin = ppBuffer; ppBuffer = ''
-  const res = await verifyFn(pin)
-  ppSubmitting = false
+  ppError = ''
+  const pin = String(ppBuffer)
+  syncPinPromptDOM()
+  const res = await ppVerifyFn(pin)
+
+  // The modal may have been explicitly closed or replaced while the request
+  // was in flight. Such a response is stale and cannot authorize an action.
+  if (attempt !== ppAttempt || state.modal?.type !== 'pinPrompt') return
   if (res.ok) {
+    const callback = ppCallback
+    const renderFn = ppRenderFn
+    ppError = ''
+    ppBuffer = ''
+    ppPurpose = ''
+    ppCallback = null
+    ppRenderFn = null
+    ppVerifyFn = verifyCurrentStepUpPin
     state.modal = null
-    // Pass verified=true explicitly — callback must check this
-    if (ppCallback) await ppCallback(true)
+    renderFn?.()
+    ppSubmitting = false
+    if (callback) await callback(true)
   } else {
-    // Never call ppCallback on failure
-    const errEl   = document.getElementById('pp-error')
-    const display = document.getElementById('pp-display')
-    if (errEl)   errEl.classList.remove('hidden')
-    if (display) display.textContent = '····'
+    ppSubmitting = false
+    ppBuffer = ''
+    ppError = res.kind === 'incorrect'
+      ? 'Incorrect PIN'
+      : 'PIN verification failed. Please check your connection and try again.'
+    syncPinPromptDOM()
+    focusPinPrompt()
   }
+}
+
+function handlePinPromptKeyboard(event) {
+  if (state.modal?.type !== 'pinPrompt' || !document.getElementById('pp-display')) return
+  const key = event.key === 'Enter' || event.key === 'Return'
+    ? '✓'
+    : event.key === 'Backspace' || event.key === 'Delete'
+      ? '⌫'
+      : event.key
+  if (key !== '✓' && key !== '⌫' && !/^[0-9]$/.test(key)) return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  handlePpKey(key)
+}
+
+// Keep exactly one listener even when Vite hot-reloads this shared module.
+const pinKeydownHandlerKey = Symbol.for('orbitoshop.pinKeydownHandler')
+const previousPinKeydownHandler = globalThis[pinKeydownHandlerKey]
+if (previousPinKeydownHandler) document.removeEventListener('keydown', previousPinKeydownHandler)
+globalThis[pinKeydownHandlerKey] = handlePinPromptKeyboard
+document.addEventListener('keydown', handlePinPromptKeyboard)
+
+/** Add the global explicit close control after each module render. */
+export function normalizeModalControls(root = document) {
+  root.querySelectorAll('.modal-backdrop > .modal').forEach(modal => {
+    modal.setAttribute('role', modal.getAttribute('role') || 'dialog')
+    modal.setAttribute('aria-modal', 'true')
+    modal.querySelectorAll('button[data-close]').forEach(button => { button.type = 'button' })
+    const existingClose = [...modal.querySelectorAll('button[data-close]')]
+      .find(button => button.dataset.modalClose !== undefined || button.textContent.trim() === '×')
+    if (existingClose) {
+      existingClose.dataset.modalClose = ''
+      existingClose.setAttribute('aria-label', existingClose.getAttribute('aria-label') || 'Close dialog')
+      return
+    }
+    const close = document.createElement('button')
+    close.type = 'button'
+    close.className = 'modal-close-button'
+    close.dataset.close = ''
+    close.dataset.modalClose = ''
+    close.setAttribute('aria-label', 'Close dialog')
+    close.title = 'Close'
+    close.textContent = '×'
+    modal.prepend(close)
+  })
 }
