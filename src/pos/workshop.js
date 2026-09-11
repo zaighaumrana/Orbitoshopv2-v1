@@ -14,10 +14,12 @@ import {
   _clearSession, money, fld, modalActions,
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   myAccountModalHTML, handleChangePasswordSubmit,
+  showToast, confirmAction, runInstallPrompt,
 } from '../shared.js'
 import {
   getSubInvoices, createSubInvoice, markComponentNotNeeded, recordAdditionalWork,
 } from '../features/repairs/api.js'
+import { findRepairFamilies, groupRepairFamilies, matchedRepairChild } from '../features/repairs/family.js'
 
 import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
@@ -38,7 +40,7 @@ async function load() {
   const [tickets, repairComponents] = await Promise.all([
     sb.from('tickets')
       .select('*')
-      .not('status', 'in', '("Delivered","Declined")')
+      .not('status', 'in', '("Delivered","Declined","Cancelled")')
       .order('created_at', { ascending: false }),
     sb.from('repair_components').select('*').order('sort_order'),
   ])
@@ -118,23 +120,16 @@ function render() {
 
 /* ── Workshop View ── */
 function workshopView() {
-  const search = wsState.filter.toLowerCase()
   const all    = state.data.tickets || []
-
-  const filtered = all.filter(t => {
-    const matchSearch = !search || (
-      `${t.customer_name} ${t.customer_phone} ${t.ticket_number}
-       ${t.invoice_number||''} ${t.device_brand} ${t.device_model} ${t.imei||''}`
-        .toLowerCase().includes(search)
-    )
-    const matchStatus = wsState.statusFilter === 'all' || t.status === wsState.statusFilter
-    return matchSearch && matchStatus
-  })
+  const roots = groupRepairFamilies(all).map(family => family.root)
+  const filtered = findRepairFamilies(all, wsState.filter)
+    .filter(family => wsState.statusFilter === 'all' || family.root.status === wsState.statusFilter)
+    .map(family => ({ ...family.root, _matchedChild:matchedRepairChild(family) }))
 
   const counts = {
-    Pending:     all.filter(t => t.status === 'Pending').length,
-    'In Progress': all.filter(t => t.status === 'In Progress').length,
-    Ready:       all.filter(t => t.status === 'Ready').length,
+    Pending:     roots.filter(t => t.status === 'Pending').length,
+    'In Progress': roots.filter(t => t.status === 'In Progress').length,
+    Ready:       roots.filter(t => t.status === 'Ready').length,
   }
 
   const statusColors = {
@@ -171,7 +166,7 @@ function workshopView() {
             ? 'primary-button' : 'secondary-button'}"
             style="font-size:12px;padding:5px 12px"
             data-status-filter="all">
-            All: ${all.length}
+            All: ${roots.length}
           </button>
         </div>
       </div>
@@ -193,6 +188,7 @@ function workshopView() {
               <span class="muted" style="font-size:12px">
                 ${t.invoice_number || t.ticket_number}
                 ${t.customer_phone ? '· ' + t.customer_phone : ''}
+                ${t._matchedChild ? `<br><span style="color:var(--primary)">Matched: ${t._matchedChild.invoice_number || t._matchedChild.ticket_number}</span>` : ''}
               </span>
             </div>
             <span class="badge ${statusColors[t.status] || 'warn'}"
@@ -571,7 +567,7 @@ function attachEvents() {
       initAdmin(SESSION, 'dashboard', {}); return
     }
     if (el.dataset.action === 'install' && state.installPrompt) {
-      state.installPrompt.prompt(); state.installPrompt = null; render(); return
+      await runInstallPrompt(); render(); return
     }
     if (el.dataset.action === 'my-account') {
       state.modal = { type: 'myAccount' }; render(); return
@@ -582,14 +578,25 @@ function attachEvents() {
       applyBranding(); render(); return
     }
     if (el.dataset.action === 'logout') {
-      if (!confirm('Log out?')) return
-      await _clearSession(); return
+      await confirmAction({
+        title: 'Log out?',
+        message: 'Are you sure you want to log out?',
+        confirmLabel: 'Log out',
+        tone: 'danger',
+        action: async () => { await _clearSession(); return true },
+      })
+      return
     }
     if (el.dataset.action === 'ems-clock-out') {
       const { handleClockOut } = await import('../features/ems/index.js')
       handleClockOut(SESSION, async () => {
-        if (!confirm('Clocked out. Log out now?')) return
-        await _clearSession()
+        await confirmAction({
+          title: 'Log out?',
+          message: 'Your shift is clocked out. Log out now?',
+          confirmLabel: 'Log out',
+          tone: 'danger',
+          action: async () => { await _clearSession(); return true },
+        })
       })
       return
     }
@@ -605,7 +612,7 @@ function attachEvents() {
       const { error } = await sb.from('tickets')
         .update({ status: newStatus })
         .eq('id', ticketId)
-      if (error) { alert('Error: ' + error.message); return }
+      if (error) { showToast('Error: ' + error.message, 'error'); return }
       const tk = state.data.tickets.find(t => String(t.id) === String(ticketId))
       if (tk) tk.status = newStatus
       render(); return
@@ -639,14 +646,14 @@ function attachEvents() {
     }
     if (el.dataset.action === 'confirm-not-needed') {
       const reason = document.getElementById('not-needed-reason')?.value?.trim()
-      if (!reason) { alert('Enter a reason.'); return }
+      if (!reason) { showToast('Enter a reason.', 'warning'); return }
       const { ticketId, index } = state.modal
       openPinPrompt('remove-component', async (verified) => {
         if (!verified) return
         const tk = state.data.tickets.find(t => String(t.id) === String(ticketId))
         if (!tk) return
         const res = await markComponentNotNeeded(Number(ticketId), index, reason)
-        if (!res.ok) { alert('Error: ' + res.error); return }
+        if (!res.ok) { showToast('Error: ' + res.error, 'error'); return }
         await load()
         const subs = await getSubInvoices(ticketId)
         state.modal = { type: 'edit-components', id: ticketId, subInvoices: subs }
@@ -685,7 +692,7 @@ function attachEvents() {
     /* Add custom component to the draft — opens tag picker */
     if (el.dataset.action === 'add-custom-draft-comp') {
       const name = document.getElementById('custom-comp-name')?.value?.trim()
-      if (!name) { alert('Enter a component name.'); return }
+      if (!name) { showToast('Enter a component name.', 'warning'); return }
       state.modal = {
         type:     'add-comp-tag',
         compName: name,
@@ -711,7 +718,7 @@ function attachEvents() {
     /* Confirm custom tag text */
     if (el.dataset.action === 'confirm-custom-tag') {
       const text = document.getElementById('custom-tag-text')?.value?.trim()
-      if (!text) { alert('Describe the issue.'); return }
+      if (!text) { showToast('Describe the issue.', 'warning'); return }
       _addComponentToDraft(state.modal.compName, 'Custom', text)
       return
     }
@@ -724,7 +731,7 @@ function attachEvents() {
       const comps  = readDraftCompsFromDOM()
       const labour = readDraftLabourFromDOM()
       const note   = document.getElementById('sub-invoice-note')?.value || ''
-      if (!comps.length && !labour) { alert('Add at least one component or a labour charge.'); return }
+      if (!comps.length && !labour) { showToast('Add at least one component or a labour charge.', 'warning'); return }
 
       const res = state.role === 'Technician'
         ? await recordAdditionalWork(
@@ -733,13 +740,13 @@ function attachEvents() {
             comps, labour, 'Pending', 'In person', note
           )
         : await createSubInvoice(tk, comps, labour, note, SESSION.employee?.name)
-      if (!res.ok) { alert('Error: ' + res.error); return }
+      if (!res.ok) { showToast('Error: ' + res.error, 'error'); return }
 
       if (state.role !== 'Technician') {
         const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
         printThermal(buildSubInvoiceSlip(res.data, tk))
       } else {
-        alert('Additional work proposal saved for customer approval.')
+        showToast('Additional work proposal saved for customer approval.', 'success')
       }
 
       state.modal = null
@@ -756,9 +763,9 @@ function attachEvents() {
     dlog('WORKSHOP.submit', `ENTRY form.dataset.form=${form.dataset.form}`)
     if (form.dataset.form === 'leave-request') {
       const result = await submitLeaveRequest(SESSION, data)
-      if (!result.ok) { alert('Error: ' + result.error); return }
+      if (!result.ok) { showToast('Error: ' + result.error, 'error'); return }
       state.modal = null
-      alert('Leave request submitted. Your manager will review it.')
+      showToast('Leave request submitted. Your manager will review it.', 'success')
       render(); return
     }
     if (form.dataset.form === 'change-password') {
@@ -769,7 +776,7 @@ function attachEvents() {
         return
       }
       state.modal = null
-      alert('Password updated.')
+      showToast('Password updated.', 'success')
       render(); return
     }
   })

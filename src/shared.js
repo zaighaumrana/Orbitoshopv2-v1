@@ -182,6 +182,261 @@ export const statusBadge = s => {
   return `<span class="badge ${bad.includes(s)?'bad':good.includes(s)?'good':'warn'}">${s}</span>`
 }
 
+/* ── Shared app-native dialogs and notifications ── */
+let activeAppDialog = null
+
+function ensureToastRegion() {
+  let region = document.getElementById('app-toast-region')
+  if (region) return region
+  region = document.createElement('div')
+  region.id = 'app-toast-region'
+  region.className = 'app-toast-region'
+  region.setAttribute('aria-label', 'Notifications')
+  document.body.append(region)
+  return region
+}
+
+/** Non-blocking feedback for success, information, validation and server errors. */
+export function showToast(message, type = 'info', options = {}) {
+  const region = ensureToastRegion()
+  const toast = document.createElement('div')
+  const safeType = ['success', 'info', 'warning', 'error'].includes(type) ? type : 'info'
+  toast.className = `app-toast app-toast-${safeType}`
+  toast.setAttribute('role', safeType === 'error' || safeType === 'warning' ? 'alert' : 'status')
+
+  const copy = document.createElement('div')
+  copy.className = 'app-toast-copy'
+  if (options.title) {
+    const title = document.createElement('strong')
+    title.textContent = options.title
+    copy.append(title)
+  }
+  const text = document.createElement('span')
+  text.textContent = String(message || '')
+  copy.append(text)
+
+  const close = document.createElement('button')
+  close.type = 'button'
+  close.className = 'app-toast-close'
+  close.setAttribute('aria-label', 'Dismiss notification')
+  close.textContent = '×'
+  const remove = () => toast.remove()
+  close.addEventListener('click', remove, { once: true })
+  toast.append(copy, close)
+  region.append(toast)
+
+  const duration = Number(options.duration ?? (safeType === 'error' ? 8000 : 5000))
+  if (duration > 0) setTimeout(remove, duration)
+  return { close: remove }
+}
+
+function closeAppDialog(dialog, value) {
+  if (!dialog || activeAppDialog !== dialog || dialog.busy) return
+  dialog.keyHandler && document.removeEventListener('keydown', dialog.keyHandler, true)
+  dialog.backdrop.remove()
+  activeAppDialog = null
+  dialog.resolve(value)
+}
+
+function openAppDialog({
+  title,
+  message = '',
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
+  tone = 'default',
+  allowEnter = false,
+  fields = [],
+  validate,
+  action,
+}) {
+  if (activeAppDialog?.busy) return Promise.resolve(null)
+  if (activeAppDialog) closeAppDialog(activeAppDialog, null)
+
+  return new Promise(resolve => {
+    const backdrop = document.createElement('div')
+    backdrop.className = 'modal-backdrop app-dialog-backdrop'
+    backdrop.dataset.noBackdropClose = ''
+
+    const form = document.createElement('form')
+    form.className = 'modal modal-sm app-dialog'
+    form.setAttribute('role', 'dialog')
+    form.setAttribute('aria-modal', 'true')
+    form.setAttribute('aria-labelledby', 'app-dialog-title')
+
+    const close = document.createElement('button')
+    close.type = 'button'
+    close.className = 'modal-close-button'
+    close.setAttribute('aria-label', 'Close dialog')
+    close.title = 'Close'
+    close.textContent = '×'
+
+    const heading = document.createElement('h2')
+    heading.id = 'app-dialog-title'
+    heading.textContent = title
+    form.append(close, heading)
+
+    if (message) {
+      const detail = document.createElement('p')
+      detail.className = 'app-dialog-message'
+      detail.textContent = message
+      form.append(detail)
+    }
+
+    const controls = []
+    if (fields.length) {
+      const fieldGrid = document.createElement('div')
+      fieldGrid.className = 'form-grid app-dialog-fields'
+      fields.forEach(field => {
+        const label = document.createElement('label')
+        label.className = 'field'
+        const caption = document.createElement('span')
+        caption.textContent = field.label
+        let control
+        if (field.type === 'select') {
+          control = document.createElement('select')
+          ;(field.options || []).forEach(optionValue => {
+            const option = document.createElement('option')
+            option.value = String(optionValue)
+            option.textContent = String(optionValue)
+            option.selected = String(optionValue) === String(field.value ?? '')
+            control.append(option)
+          })
+        } else if (field.type === 'textarea') {
+          control = document.createElement('textarea')
+          control.value = field.value ?? ''
+        } else {
+          control = document.createElement('input')
+          control.type = field.type || 'text'
+          control.value = field.value ?? ''
+        }
+        control.name = field.name
+        control.required = field.required === true
+        if (field.placeholder) control.placeholder = field.placeholder
+        label.append(caption, control)
+        fieldGrid.append(label)
+        controls.push(control)
+      })
+      form.append(fieldGrid)
+    }
+
+    const error = document.createElement('div')
+    error.className = 'app-dialog-error hidden'
+    error.setAttribute('role', 'alert')
+    form.append(error)
+
+    const actions = document.createElement('div')
+    actions.className = 'modal-actions'
+    const cancel = document.createElement('button')
+    cancel.type = 'button'
+    cancel.className = 'secondary-button'
+    cancel.textContent = cancelLabel
+    const confirm = document.createElement('button')
+    confirm.type = 'submit'
+    confirm.className = 'primary-button'
+    if (tone === 'danger') confirm.classList.add('danger-button')
+    confirm.textContent = confirmLabel
+    actions.append(cancel, confirm)
+    form.append(actions)
+    backdrop.append(form)
+    document.body.append(backdrop)
+
+    const dialog = { backdrop, resolve, busy: false, keyHandler: null }
+    activeAppDialog = dialog
+    const cancelDialog = () => closeAppDialog(dialog, null)
+    close.addEventListener('click', cancelDialog)
+    cancel.addEventListener('click', cancelDialog)
+    backdrop.addEventListener('click', event => {
+      if (event.target === backdrop) event.preventDefault()
+    })
+
+    dialog.keyHandler = event => {
+      if (activeAppDialog !== dialog) return
+      if (event.key === 'Tab') {
+        const focusable = [...form.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])')]
+        if (!focusable.length) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (event.shiftKey && (document.activeElement === first || !form.contains(document.activeElement))) {
+          event.preventDefault()
+          last.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first.focus()
+        }
+        return
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        return
+      }
+      if (event.key === 'Enter' && !allowEnter && event.target?.tagName !== 'BUTTON') {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+      }
+    }
+    document.addEventListener('keydown', dialog.keyHandler, true)
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault()
+      if (dialog.busy) return
+      const values = Object.fromEntries(new FormData(form).entries())
+      const validationError = validate?.(values)
+      if (validationError) {
+        error.textContent = validationError
+        error.classList.remove('hidden')
+        controls[0]?.focus()
+        return
+      }
+
+      dialog.busy = true
+      error.classList.add('hidden')
+      ;[close, cancel, confirm, ...controls].forEach(control => { control.disabled = true })
+      const originalLabel = confirm.textContent
+      confirm.textContent = 'Working…'
+      form.setAttribute('aria-busy', 'true')
+      try {
+        const result = action ? await action(values) : values
+        if (result === false) {
+          dialog.busy = false
+          ;[close, cancel, confirm, ...controls].forEach(control => { control.disabled = false })
+          confirm.textContent = originalLabel
+          form.setAttribute('aria-busy', 'false')
+          controls[0]?.focus()
+          return
+        }
+        dialog.busy = false
+        closeAppDialog(dialog, { confirmed: true, value: result })
+      } catch (caught) {
+        dialog.busy = false
+        ;[close, cancel, confirm, ...controls].forEach(control => { control.disabled = false })
+        confirm.textContent = originalLabel
+        form.setAttribute('aria-busy', 'false')
+        showToast(caught?.message || 'The action could not be completed.', 'error')
+      }
+    })
+
+    queueMicrotask(() => (controls[0] || cancel).focus())
+  })
+}
+
+/** Confirmation that owns the async action, preventing duplicate submissions. */
+export function confirmAction(options) {
+  return openAppDialog(options)
+}
+
+/** App-native input dialog for workflows that require user-supplied values. */
+export function requestInput(options) {
+  return openAppDialog({ ...options, allowEnter: options.allowEnter ?? true })
+}
+
+/** Invoke the install event without confusing it with a browser input dialog. */
+export async function runInstallPrompt() {
+  const installEvent = state.installPrompt
+  state.installPrompt = null
+  if (installEvent) await installEvent['prompt']()
+}
+
 /* ── Access control ── */
 export const ACCESS = {
   'Business Owner': ['dashboard','repairs','inventory','reports','receipts','employees','ems','settings','catalog','pos','workshop'],

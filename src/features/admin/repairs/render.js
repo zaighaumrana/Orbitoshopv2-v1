@@ -35,25 +35,51 @@ export function ticketCreatedModalHTML(modal) {
 }
 
 export function ticketDetailModalHTML(id, modal) {
-  const tk = (state.data.tickets||[]).find(t => String(t.id) === String(id))
-  if (!tk) return `<div class="modal-backdrop"><div class="modal"><p class="muted">Not found.</p><div class="modal-actions"><button class="secondary-button" data-close>Close</button></div></div></div>`
+  if (modal.summaryStatus === 'loading') return `<div class="modal-backdrop"><div class="modal modal-md" aria-busy="true">
+    <h2>Repair summary</h2>
+    <p class="muted">Loading current repair-family details…</p>
+    <div class="summary-skeleton" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <div class="modal-actions"><button class="secondary-button" data-close>Close</button></div>
+  </div></div>`
+  if (modal.summaryStatus === 'error' || !modal.summary) return `<div class="modal-backdrop"><div class="modal modal-sm">
+    <h2>Repair summary unavailable</h2>
+    <p class="muted">${modal.summaryError || 'Current repair details could not be loaded.'}</p>
+    <div class="modal-actions"><button class="secondary-button" data-close>Close</button><button class="primary-button" data-action="retry-ticket-detail" data-ticket-id="${id}">Retry</button></div>
+  </div></div>`
+
   const summary = modal.summary
-  const rootId = summary?.root?.id || tk.id
-  const sc = {'Pending':'warn','In Progress':'warn','Ready':'good','Delivered':'good','Declined':'bad'}
+  const root = summary.root || {}
+  const rootId = root.id || id
+  const original = (summary.invoices || []).find(invoice => !invoice.parentTicketId) || summary.invoices?.[0] || {}
+  const children = (summary.invoices || []).filter(invoice => invoice.parentTicketId)
+  const components = original.components || []
+  const cachedRoot = (state.data.tickets || []).find(ticket => String(ticket.id) === String(rootId))
+  const status = root.status || 'Pending'
+  const sc = {'Pending':'warn','In Progress':'warn','Ready':'good','Delivered':'good','Cancelled':'bad','Declined':'bad'}
+  const terminal = ['Delivered','Cancelled'].includes(status)
+  const deliveredBy = root.deliveredByDisplayName || root.deliveredBy || ''
+  const stateMessage = status === 'Delivered'
+    ? `<div class="terminal-state good"><strong>Delivery completed</strong><span>${root.deliveredAt ? new Date(root.deliveredAt).toLocaleString() : 'Delivered'}${deliveredBy ? ` · ${deliveredBy}` : ''}</span></div>`
+    : status === 'Cancelled'
+      ? `<div class="terminal-state bad"><strong>Repair cancelled</strong><span>${root.cancelledAt ? new Date(root.cancelledAt).toLocaleString() : ''}${root.cancellationReason ? `${root.cancelledAt ? ' · ' : ''}${root.cancellationReason}` : ''}</span></div>`
+      : status === 'Ready'
+        ? `<div class="terminal-state good"><strong>Ready for collection</strong><span>Payment and delivery can be completed from POS.</span></div>`
+        : `<p class="muted" style="font-size:12px">${status === 'In Progress' ? 'Repair work is in progress.' : 'Repair is waiting to be started.'}</p>`
+
   return `<div class="modal-backdrop"><div class="modal modal-md">
-    <h2>${tk.ticket_number} <span class="badge ${sc[tk.status]||'warn'}" style="margin-left:8px">${tk.status}</span></h2>
+    <h2>${root.ticketNumber || original.ticketNumber || 'Repair'} <span class="badge ${sc[status]||'warn'}" style="margin-left:8px">${status}</span></h2>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:14px;margin-bottom:14px;padding:12px;background:var(--surface-2);border-radius:8px">
-      <div><span class="muted">Customer</span><br><strong>${tk.customer_name}</strong></div>
-      <div><span class="muted">Phone</span><br><strong>${tk.customer_phone||'—'}</strong></div>
-      <div><span class="muted">Device</span><br><strong>${tk.device_brand} ${tk.device_model}</strong></div>
-      <div><span class="muted">IMEI</span><br><strong>${tk.imei||'—'}</strong></div>
-      <div><span class="muted">Quote</span><br><strong>${money(tk.estimated_quote||0)}</strong></div>
-      <div><span class="muted">Advance</span><br><strong>${money(tk.advance_payment||0)}${tk.advance_method?' ('+tk.advance_method+')':''}</strong></div>
+      <div><span class="muted">Customer</span><br><strong>${root.customerName || '—'}</strong></div>
+      <div><span class="muted">Phone</span><br><strong>${root.customerPhone||'—'}</strong></div>
+      <div><span class="muted">Device</span><br><strong>${root.deviceBrand || ''} ${root.deviceModel || ''}</strong></div>
+      <div><span class="muted">IMEI</span><br><strong>${root.imei||'—'}</strong></div>
+      <div><span class="muted">Original invoice</span><br><strong>${money(original.amount||0)}</strong></div>
+      <div><span class="muted">Net paid</span><br><strong>${money(summary.netPayments||0)}</strong></div>
     </div>
-    ${tk.technician_note ? `<div style="background:color-mix(in srgb,var(--warning) 10%,var(--surface));border-left:3px solid var(--warning);padding:10px 14px;border-radius:0 8px 8px 0;margin-bottom:12px;font-size:14px"><strong>Note:</strong> ${tk.technician_note}</div>` : ''}
-    ${(tk.components_noted||[]).length ? `
+    ${original.note ? `<div style="background:color-mix(in srgb,var(--warning) 10%,var(--surface));border-left:3px solid var(--warning);padding:10px 14px;border-radius:0 8px 8px 0;margin-bottom:12px;font-size:14px"><strong>Note:</strong> ${original.note}</div>` : ''}
+    ${components.length ? `
       <div style="display:grid;gap:6px;margin-bottom:12px">
-        ${tk.components_noted.map((c,i) => `
+        ${components.map((c,i) => `
           <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface-2);border-radius:8px;font-size:14px;${c.removed?'opacity:.55':''}">
             <span>
               <strong style="${c.removed?'text-decoration:line-through':''}">${c.name}</strong>
@@ -62,48 +88,45 @@ export function ticketDetailModalHTML(id, modal) {
             </span>
             <span style="display:flex;align-items:center;gap:8px">
               <span>${c.price>0 ? money(c.price) : '<span class="muted">Not priced</span>'}</span>
-              ${!c.removed ? `<button type="button" class="secondary-button" style="font-size:11px;padding:4px 8px" data-mark-not-needed="${i}">Not Needed</button>` : ''}
+              ${!c.removed && !terminal ? `<button type="button" class="secondary-button" style="font-size:11px;padding:4px 8px" data-mark-not-needed="${i}">Not Needed</button>` : ''}
             </span>
           </div>`).join('')}
       </div>` : ''}
-    ${(modal.subInvoices||[]).length ? `
+    ${children.length ? `
       <div style="margin-bottom:12px">
         <strong style="font-size:13px">Sub-Invoices</strong>
         <div style="display:grid;gap:6px;margin-top:6px">
-          ${modal.subInvoices.map(s => `
+          ${children.map(s => `
             <div style="display:flex;justify-content:space-between;font-size:12px;padding:8px 10px;background:var(--surface-2);border-radius:6px">
-              <span>${s.invoice_number}</span><span>${money(s.estimated_quote)} · Bal: ${money(s.balance_due)}</span>
+              <span>${s.invoiceNumber || s.ticketNumber}</span><span>${money(s.amount)}</span>
             </div>`).join('')}
         </div>
       </div>` : ''}
-    ${summary ? `
-      <div style="display:grid;gap:6px;margin-bottom:12px;padding:12px;background:var(--surface-2);border-radius:8px">
-        <div style="display:flex;justify-content:space-between"><span>Total billed</span><strong>${money(summary.effectiveObligation)}</strong></div>
-        <div style="display:flex;justify-content:space-between"><span>Payments received</span><strong>${money(summary.paymentsReceived)}</strong></div>
-        <div style="display:flex;justify-content:space-between"><span>Refunds</span><strong>${money(summary.refundsPaid)}</strong></div>
-        <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:6px"><span>Outstanding</span><strong>${money(summary.outstanding)}</strong></div>
-        ${summary.udharApproved ? `<div style="display:flex;justify-content:space-between"><span>Udhar approved</span><strong>${money(summary.udharOutstanding)}</strong></div>` : ''}
-      </div>
-      ${(summary.proposals||[]).length ? `<div style="margin-bottom:12px"><strong style="font-size:13px">Additional-work decisions</strong>
+    <div style="display:grid;gap:6px;margin-bottom:12px;padding:12px;background:var(--surface-2);border-radius:8px">
+      <div style="display:flex;justify-content:space-between"><span>Total billed</span><strong>${money(summary.effectiveObligation)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Payments received</span><strong>${money(summary.paymentsReceived)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Refunds</span><strong>${money(summary.refundsPaid)}</strong></div>
+      <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:6px"><span>Outstanding</span><strong>${money(summary.outstanding)}</strong></div>
+      ${summary.udharApproved ? `<div style="display:flex;justify-content:space-between"><span>Udhar approved</span><strong>${money(summary.udharOutstanding)}</strong></div>` : ''}
+    </div>
+    ${(summary.proposals||[]).length ? `<div style="margin-bottom:12px"><strong style="font-size:13px">Additional-work decisions</strong>
         <div style="display:grid;gap:6px;margin-top:6px">${summary.proposals.map(p => `<div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:12px"><strong>${p.description}</strong> · ${money(p.quotedAmount)} <span class="badge ${p.decision==='Approved'?'good':p.decision==='Declined'?'bad':'warn'}">${p.decision}</span>${p.decisionMethod?`<br><span class="muted">${p.decisionMethod}${p.decisionNote?' · '+p.decisionNote:''}</span>`:''}${p.decision==='Pending'?`<div style="display:flex;gap:6px;margin-top:6px"><button class="secondary-button" data-action="decide-additional-work" data-proposal-id="${p.id}" data-decision="Approved">Approve</button><button class="secondary-button" data-action="decide-additional-work" data-proposal-id="${p.id}" data-decision="Declined">Decline</button></div>`:''}</div>`).join('')}</div>
       </div>` : ''}
-    ` : '<p class="muted" style="font-size:12px">Loading canonical family totals…</p>'}
-    <div style="border-top:1px solid var(--border);padding-top:12px">
+    ${stateMessage}
+    ${!terminal ? `<div style="border-top:1px solid var(--border);padding-top:12px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <select id="td-status" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);flex:1">
           ${['Pending','In Progress','Ready','Declined'].map(s =>
-            `<option ${s===tk.status?'selected':''}>${s}</option>`).join('')}
+            `<option ${s===status?'selected':''}>${s}</option>`).join('')}
         </select>
       </div>
       <textarea id="td-note" placeholder="Add a note…"
-        style="width:100%;margin-top:8px;min-height:60px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);box-sizing:border-box">${tk.update_note||''}</textarea>
-    </div>
+        style="width:100%;margin-top:8px;min-height:60px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);box-sizing:border-box">${cachedRoot?.update_note || ''}</textarea>
+    </div>` : ''}
     <div class="modal-actions">
       <button class="secondary-button" data-close>Close</button>
-      ${summary ? `<button class="secondary-button" data-action="print-repair-summary" data-ticket-id="${rootId}">Print Summary</button>` : ''}
-      <button class="secondary-button" data-action="open-create-sub-invoice" data-ticket-id="${rootId}">+ Additional Work</button>
-      ${summary && !['Delivered','Cancelled'].includes(summary.root.status) ? `<button class="secondary-button" data-action="open-repair-adjustment" data-ticket-id="${rootId}">Adjustment</button><button class="secondary-button" style="color:var(--danger)" data-action="open-repair-cancellation" data-ticket-id="${rootId}">Cancel Repair</button>` : ''}
-      <button class="primary-button" data-action="save-ticket-detail" data-id="${tk.id}">Save Update</button>
+      <button class="secondary-button" data-action="print-repair-summary" data-ticket-id="${rootId}">Print Summary</button>
+      ${!terminal ? `<button class="secondary-button" data-action="open-create-sub-invoice" data-ticket-id="${rootId}">+ Additional Work</button><button class="secondary-button" data-action="open-repair-adjustment" data-ticket-id="${rootId}">Adjustment</button><button class="secondary-button" style="color:var(--danger)" data-action="open-repair-cancellation" data-ticket-id="${rootId}">Cancel Repair</button><button class="primary-button" data-action="save-ticket-detail" data-id="${rootId}">Save Update</button>` : ''}
     </div>
   </div></div>`
 }

@@ -87,8 +87,8 @@ Two are **inline** with existing guard clauses — restore both to their plain f
 + if (!ticketItem) return
 ```
 ```diff
-- if (error) { dlog('POS.placeOrder', `INSERT FAILED: ${error.message}`); alert('Error placing order: ' + error.message); return }
-+ if (error) { alert('Error placing order: ' + error.message); return }
+- if (error) { dlog('POS.placeOrder', `INSERT FAILED: ${error.message}`); showToast('Error placing order: ' + error.message, 'error'); return }
++ if (error) { showToast('Error placing order: ' + error.message, 'error'); return }
 ```
 
 ---
@@ -117,8 +117,8 @@ Lines: 10, 121, 131
 
 Lines: 35, 41, 47, 65, 68, 76, 88, 94, 161, 611, 626 — line 625 is standalone but line 640 is **inline**:
 ```diff
-- if (!confirm('Clock out and end your shift?')) { dlog('EMS.handleClockOut', 'user cancelled confirm()'); return }
-+ if (!confirm('Clock out and end your shift?')) return
+- const result = await confirmAction({ title:'Clock out?', action:clockOut })
++ if (!result?.confirmed) return
 ```
 Plus lines 639, 653.
 
@@ -148,8 +148,8 @@ Lines: 5, 24, 63
 
 Lines: 114, 119, 123, 128, 136, 141, 148 are standalone. Lines 120, 122, 134, 147 are **inline** with existing guard clauses — restore each, e.g.:
 ```diff
-- if (!confirm('Delete this item?')) { dlog('inventory.handleInvDelete', 'user cancelled confirm()'); return { deleted:false } }
-+ if (!confirm('Delete this item?')) return { deleted:false }
+- const result = await confirmAction({ title:'Delete item?', action:deleteItem })
++ if (!result?.confirmed) return { deleted:false }
 ```
 (same pattern for the two `if (error) { ... }` guards in `submitInvAdd`/`submitInvEdit`)
 

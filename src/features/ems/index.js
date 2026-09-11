@@ -21,7 +21,7 @@
 ═══════════════════════════════════════════════════════════════════ */
 import {
   sb, state, CFG, money,
-  _clearSession,
+  _clearSession, confirmAction, showToast,
 } from '../../shared.js'
 import { dlog, dstack } from '../../debuglog.js'
 
@@ -147,7 +147,7 @@ function renderClockInScreen(sess, isReturn) {
       clock_in:    new Date().toISOString(),
       date:        today,
     })
-    if (error) { alert('Clock-in failed: ' + error.message); btn.disabled = false; btn.textContent = '⏱ Clock In'; return }
+    if (error) { showToast('Clock-in failed: ' + error.message, 'error'); btn.disabled = false; btn.textContent = '⏱ Clock In'; return }
     clearInterval(ticker)
     _onProceed && _onProceed()
   })
@@ -204,9 +204,17 @@ function renderBreakGate(sess, record) {
   })
 
   document.getElementById('shiftend-btn').addEventListener('click', async () => {
-    if (!confirm('End your shift and log out?')) return
-    await _clockOut(sess, record.id)
-    await _clearSession()
+    await confirmAction({
+      title: 'End shift and log out?',
+      message: 'Your shift will be clocked out before this session ends.',
+      confirmLabel: 'End shift & log out',
+      tone: 'danger',
+      action: async () => {
+        await _clockOut(sess, record.id)
+        await _clearSession()
+        return true
+      },
+    })
   })
 }
 
@@ -294,19 +302,31 @@ export function clockOutButtonHTML() {
 
 export async function handleClockOut(sess, onComplete) {
   dlog('EMS.handleClockOut', `ENTRY employee=${sess.employee?.name}`)
-  if (!confirm('Clock out and end your shift?')) { dlog('EMS.handleClockOut', 'user cancelled confirm()'); return }
-  const today = new Date().toISOString().slice(0, 10)
-  const { data } = await sb.from('attendance')
-    .select('id')
-    .eq('employee_id', sess.employee.id)
-    .eq('date', today)
-    .is('clock_out', null)
-    .limit(1)
-  if (data?.[0]) {
-    await sb.from('attendance')
-      .update({ clock_out: new Date().toISOString() })
-      .eq('id', data[0].id)
-  }
+  const outcome = await confirmAction({
+    title: 'Clock out?',
+    message: 'Clock out and end your current shift?',
+    confirmLabel: 'Clock out',
+    action: async () => {
+      const today = new Date().toISOString().slice(0, 10)
+      const { data } = await sb.from('attendance')
+        .select('id')
+        .eq('employee_id', sess.employee.id)
+        .eq('date', today)
+        .is('clock_out', null)
+        .limit(1)
+      if (data?.[0]) {
+        const { error } = await sb.from('attendance')
+          .update({ clock_out: new Date().toISOString() })
+          .eq('id', data[0].id)
+        if (error) {
+          showToast('Clock-out failed: ' + error.message, 'error')
+          return false
+        }
+      }
+      return true
+    },
+  })
+  if (!outcome?.confirmed) { dlog('EMS.handleClockOut', 'user cancelled clock-out dialog'); return }
   dlog('EMS.handleClockOut', 'DONE -- calling onComplete()')
   onComplete && onComplete()
 }

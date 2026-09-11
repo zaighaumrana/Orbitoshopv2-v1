@@ -1,6 +1,7 @@
 import {
   state, CFG, _saveSession, _clearSession,
-  loginViaEdgeFunction, establishLoginSession, applyBranding, currentTenant
+  loginViaEdgeFunction, establishLoginSession, applyBranding, currentTenant,
+  showToast,
 } from './shared.js'
 import { dlog, dstack } from './debuglog.js'
 
@@ -366,12 +367,12 @@ resetTurnstile()
 async function forgotPassword() {
   if (_loginMode === 'support') return
   const email = document.getElementById('login-email')?.value?.trim()
-  if (!email) { alert('Enter your email address first.'); return }
+  if (!email) { showToast('Enter your email address first.', 'warning'); return }
   const turnstileToken = document.querySelector('[name="cf-turnstile-response"]')?.value || ''
-  if (!turnstileToken) { alert('Complete the verification first.'); return }
+  if (!turnstileToken) { showToast('Complete the verification first.', 'warning'); return }
   const { requestPasswordReset } = await import('./shared.js')
   const res = await requestPasswordReset(email, turnstileToken)
-  if (!res.ok) { alert('Something went wrong: ' + res.error); return }
-  alert('If that account is eligible, a password reset request has been recorded. Contact your administrator.')
+  if (!res.ok) { showToast('Something went wrong: ' + res.error, 'error'); return }
+  showToast('If that account is eligible, a password reset request has been recorded. Contact your administrator.', 'success')
   resetTurnstile()
 }

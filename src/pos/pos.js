@@ -16,6 +16,7 @@ import {
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   myAccountModalHTML, handleChangePasswordSubmit,
   matchesInvoiceSearch,
+  showToast, confirmAction, runInstallPrompt,
 } from '../shared.js'
 import {
   getSubInvoices, createSubInvoice, markComponentNotNeeded, deliverRepair,
@@ -439,31 +440,73 @@ function buildShiftStats() {
 /* ── Component tag picker (sub-modal) ── */
 /* ── Repair Collection modal — unified dynamic search ── */
 /* ── Ticket payment / collect modal — for adding a top-up payment to existing ticket ── */
-function ticketPaymentModalHTML(ticket) {
-  const total   = Number(ticket.final_total || ticket.estimated_quote || 0)
-  const paid    = Number(ticket.amount_paid || 0)
-  const parentBalance = Math.max(0, total - paid)
-  const { subs, subBalance, total: combinedTotal } = combinedBalance(ticket)
+function ticketPaymentModalHTML(modal) {
+  const ticket = modal.ticket
+  if (modal.summaryStatus === 'loading') return `<div class="modal-backdrop">
+    <div class="modal modal-sm" aria-busy="true">
+      <h2>Repair summary</h2>
+      <p class="muted">Loading current repair-family totals…</p>
+      <div class="summary-skeleton" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="modal-actions"><button class="secondary-button" data-close>Close</button></div>
+    </div>
+  </div>`
+  if (modal.summaryStatus === 'error' || !modal.summary) return `<div class="modal-backdrop">
+    <div class="modal modal-sm">
+      <h2>Repair summary unavailable</h2>
+      <p class="muted">${modal.summaryError || 'Current repair totals could not be loaded.'}</p>
+      <div class="modal-actions">
+        <button class="secondary-button" data-close>Close</button>
+        <button class="primary-button" data-action="retry-repair-summary" data-ticket-id="${ticket.id}">Retry</button>
+      </div>
+    </div>
+  </div>`
+
+  const summary = modal.summary
+  const root = summary.root || {}
+  const invoices = summary.invoices || []
+  const original = invoices.find(invoice => !invoice.parentTicketId) || invoices[0] || {}
+  const subs = invoices.filter(invoice => invoice.parentTicketId)
+  const originalTotal = Number(original.amount || 0)
+  const effectiveTotal = Number(summary.effectiveObligation || 0)
+  const netPaid = Number(summary.netPayments || 0)
+  const outstanding = Number(summary.outstanding || 0)
+  const status = root.status || ticket.status
+  const terminal = status === 'Delivered' || status === 'Cancelled'
+  const deliveredBy = root.deliveredByDisplayName || root.deliveredBy || ''
+  const statusGuidance = status === 'Delivered'
+    ? `<div class="terminal-state good"><strong>Delivery completed</strong><span>${root.deliveredAt ? new Date(root.deliveredAt).toLocaleString() : 'Delivered'}${deliveredBy ? ` · ${deliveredBy}` : ''}${outstanding > 0 ? ' · Remaining credit is managed from Outstanding Credits.' : ''}</span></div>`
+    : status === 'Cancelled'
+      ? `<div class="terminal-state bad"><strong>Repair cancelled</strong><span>${root.cancelledAt ? new Date(root.cancelledAt).toLocaleString() : ''}${root.cancellationReason ? `${root.cancelledAt ? ' · ' : ''}${root.cancellationReason}` : ''}</span></div>`
+      : status === 'Ready'
+        ? (outstanding > 0 ? `
+          <button class="secondary-button" style="width:100%;margin-top:8px" data-action="deliver-repair-udhar" data-ticket-id="${root.id || ticket.id}">
+            Approve Udhar & Deliver
+          </button>` : `
+          <button class="primary-button" style="width:100%;margin-top:8px" data-action="deliver-repair" data-ticket-id="${root.id || ticket.id}">
+            Deliver Device
+          </button>`)
+        : `<p class="muted" style="font-size:12px;margin-top:8px">${status === 'In Progress' ? 'Repair work is in progress. Mark it Ready when collection can begin.' : 'Repair work must be completed and marked Ready before delivery.'}</p>`
+
   return `<div class="modal-backdrop">
     <div class="modal modal-sm">
-      <h2>${ticket.invoice_number || ticket.ticket_number}</h2>
-      <p class="muted">${ticket.customer_name} · ${ticket.device_brand} ${ticket.device_model}</p>
+      <h2>${root.invoiceNumber || root.ticketNumber || ticket.invoice_number || ticket.ticket_number} <span class="badge ${status === 'Delivered' || status === 'Ready' ? 'good' : status === 'Cancelled' ? 'bad' : 'warn'}">${status}</span></h2>
+      <p class="muted">${root.customerName || ticket.customer_name} · ${root.deviceBrand || ticket.device_brand} ${root.deviceModel || ticket.device_model}</p>
       <div style="display:grid;gap:6px;padding:12px;background:var(--surface-2);border-radius:8px;margin:12px 0">
-        <div style="display:flex;justify-content:space-between"><span>Original Total</span><strong>${money(total)}</strong></div>
-        <div style="display:flex;justify-content:space-between;color:var(--success)"><span>Paid</span><strong>${money(paid)}</strong></div>
-        <div style="display:flex;justify-content:space-between"><span>Original Balance</span><span>${money(parentBalance)}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Original invoice</span><strong>${money(originalTotal)}</strong></div>
         ${subs.length ? `
           <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:6px">
             ${subs.map(s => `
               <div style="display:flex;justify-content:space-between;font-size:13px">
-                <span>${s.invoice_number}</span><span>${money(s.balance_due)}</span>
+                <span>${s.invoiceNumber || s.ticketNumber}</span><span>${money(s.amount)}</span>
               </div>`).join('')}
           </div>` : ''}
+        <div style="display:flex;justify-content:space-between"><span>Current billed</span><strong>${money(effectiveTotal)}</strong></div>
+        <div style="display:flex;justify-content:space-between;color:var(--success)"><span>Net paid</span><strong>${money(netPaid)}</strong></div>
         <div style="display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--border);padding-top:6px">
-          <span>Total Due</span><span>${money(combinedTotal)}</span>
+          <span>Total due</span><span>${money(outstanding)}</span>
         </div>
       </div>
-      ${combinedTotal > 0 ? `
+      ${outstanding > 0 && !terminal ? `
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <input type="number" step="any" min="0" placeholder="Amount to pay now" id="topup-amount"
             style="flex:1;border:1px solid var(--border);border-radius:6px;padding:8px 10px;background:var(--surface);color:var(--text)">
@@ -471,32 +514,37 @@ function ticketPaymentModalHTML(ticket) {
             ${['Cash','Raast','JazzCash','EasyPaisa','Bank Transfer'].map(m => `<option>${m}</option>`).join('')}
           </select>
         </div>
-        <button class="primary-button" style="width:100%" data-action="add-to-cart-for-payment" data-ticket-id="${ticket.id}">
+        <button class="primary-button" style="width:100%" data-action="add-to-cart-for-payment" data-ticket-id="${root.id || ticket.id}">
           Add to Cart for Payment
         </button>
-      ` : `<p class="muted">This ticket is fully paid.</p>`}
-      ${ticket.status === 'Ready' ? (combinedTotal > 0 ? `
-        <button class="secondary-button" style="width:100%;margin-top:8px" data-action="deliver-repair-udhar" data-ticket-id="${ticket.id}">
-          Approve Udhar & Deliver
-        </button>` : `
-        <button class="primary-button" style="width:100%;margin-top:8px" data-action="deliver-repair" data-ticket-id="${ticket.id}">
-          Deliver Device
-        </button>`) : `<p class="muted" style="font-size:12px;margin-top:8px">Mark the repair Ready before delivery.</p>`}
+      ` : !terminal ? `<p class="muted">This repair is fully paid.</p>` : ''}
+      ${statusGuidance}
       <div class="modal-actions">
-        <button class="secondary-button" data-action="print-repair-summary" data-ticket-id="${ticket.id}">Print Summary</button>
+        <button class="secondary-button" data-action="print-repair-summary" data-ticket-id="${root.id || ticket.id}">Print Summary</button>
         <button class="secondary-button" data-close>Close</button>
       </div>
     </div>
   </div>`
 }
 
-function openCollectTicket(ticket) {
+async function openCollectTicket(ticket) {
   if (!ticket.is_locked) {
     // Ticket was never placed (shouldn't normally happen) — open edit form
-    alert('This ticket has not been placed yet.')
+    showToast('This ticket has not been placed yet.', 'warning')
     return
   }
-  state.modal = { type: 'ticket-payment', ticket }
+  const requestId = crypto.randomUUID()
+  state.modal = { type: 'ticket-payment', ticket, summaryStatus:'loading', summary:null, requestId }
+  render()
+  const result = await getRepairFamilySummary(Number(ticket.id))
+  if (state.modal?.type !== 'ticket-payment' || state.modal.requestId !== requestId) return
+  if (!result.ok) {
+    state.modal.summaryStatus = 'error'
+    state.modal.summaryError = result.error
+  } else {
+    state.modal.summaryStatus = 'ready'
+    state.modal.summary = result.data
+  }
   render()
 }
 
@@ -720,7 +768,7 @@ function renderModal() {
   if (type === 'repair')          return repairTicketFormHTML(state.modal._info)
   if (type === 'comp-tag-picker') return compTagPickerHTML(state.modal.name)
   if (type === 'repair-collection') return repairCollectionHTML(posState.repairSearch)
-  if (type === 'ticket-payment')  return ticketPaymentModalHTML(state.modal.ticket)
+  if (type === 'ticket-payment')  return ticketPaymentModalHTML(state.modal)
 
   if (type === 'override') {
     const cartItem = posState.cart.find(i=>i.productId===state.modal.id)
@@ -906,7 +954,7 @@ async function placeOrder() {
   if (ticketItem.isNewTicket) {
     dlog('POS.placeOrder', 'isNewTicket branch -- calling repairs.insertNewTicketFromCart()')
     const res = await insertNewTicketFromCart(ticketItem)
-    if (!res.ok) { dlog('POS.placeOrder', `INSERT FAILED: ${res.error}`); alert('Error placing order: ' + res.error); return }
+    if (!res.ok) { dlog('POS.placeOrder', `INSERT FAILED: ${res.error}`); showToast('Error placing order: ' + res.error, 'error'); return }
     dlog('POS.placeOrder', `INSERT SUCCEEDED ticket_number=${res.data.ticket_number} id=${res.data.id} -- calling load() next`)
 
     posState.cart = posState.cart.filter(i => !i.isTicket)
@@ -929,14 +977,14 @@ async function placeOrder() {
   const payMethod = ticketItem.topupMethod
   dlog('POS.placeOrder', 'existing-ticket branch -- calling repairs.collectTicketPayment()')
   const res = await collectTicketPayment(ticket, payAmount, payMethod, ticketItem.requestId)
-  if (!res.ok) { alert('Error recording payment: ' + res.error); return }
+  if (!res.ok) { showToast('Error recording payment: ' + res.error, 'error'); return }
 
   posState.cart = posState.cart.filter(i => !i.isTicket)
   posState.cartTicketId = null
   posState.cartIsNewTicket = false
   await load()
   const leftoverBalance = combinedBalance(state.data.tickets.find(t=>t.id===ticketId)||ticket).total
-  alert(`Payment of ${money(payAmount)} recorded. Remaining balance: ${money(leftoverBalance)}`)
+  showToast(`Payment of ${money(payAmount)} recorded. Remaining balance: ${money(leftoverBalance)}`, 'success')
 }
 
 
@@ -949,7 +997,7 @@ async function doCheckout() {
     const total = Math.round((subtotal + subtotal*Number(CFG.tax_rate||0)/100 + Number.EPSILON)*100)/100
     const splitTotal = Math.round((Number(posState.splitCash||0)+Number(posState.splitDigital||0)+Number(posState.splitCredit||0)+Number.EPSILON)*100)/100
     if (splitTotal !== total || Number(posState.splitCash||0)<0 || Number(posState.splitDigital||0)<0 || Number(posState.splitCredit||0)<0) {
-      alert(`Split amounts must add up to ${money(total)}.`); return
+      showToast(`Split amounts must add up to ${money(total)}.`, 'warning'); return
     }
   }
 
@@ -985,7 +1033,7 @@ async function _finalizeCheckout() {
     employeeName: SESSION.employee?.name,
     requestId: posState.checkoutRequestId,
   })
-  if (!res.ok) { dlog('POS._finalizeCheckout', `FAILED: ${res.error}`); alert('Sale error: ' + res.error); return }
+  if (!res.ok) { dlog('POS._finalizeCheckout', `FAILED: ${res.error}`); showToast('Sale error: ' + res.error, 'error'); return }
 
   posState.cart=[]
   posState.checkoutRequestId=null
@@ -1068,14 +1116,14 @@ function attachEvents() {
     }
     if (el.dataset.action === 'confirm-not-needed') {
       const reason = document.getElementById('not-needed-reason')?.value?.trim()
-      if (!reason) { alert('Enter a reason.'); return }
+      if (!reason) { showToast('Enter a reason.', 'warning'); return }
       const { ticketId, index } = state.modal
       openPinPrompt('remove-component', async (verified) => {
         if (!verified) return
         const tk = state.data.tickets.find(t => String(t.id) === String(ticketId))
         if (!tk) return
         const res = await markComponentNotNeeded(Number(ticketId), index, reason)
-        if (!res.ok) { alert('Error: ' + res.error); return }
+        if (!res.ok) { showToast('Error: ' + res.error, 'error'); return }
         await load()
         const subs = await getSubInvoices(ticketId)
         state.modal = { type: 'edit-components', id: ticketId, subInvoices: subs }
@@ -1114,7 +1162,7 @@ function attachEvents() {
     /* Add custom component to the draft — opens tag picker */
     if (el.dataset.action === 'add-custom-draft-comp') {
       const name = document.getElementById('custom-comp-name')?.value?.trim()
-      if (!name) { alert('Enter a component name.'); return }
+      if (!name) { showToast('Enter a component name.', 'warning'); return }
       state.modal = {
         type:     'add-comp-tag',
         compName: name,
@@ -1138,7 +1186,7 @@ function attachEvents() {
     }
     if (el.dataset.action === 'confirm-draft-custom-tag') {
       const text = document.getElementById('custom-tag-text')?.value?.trim()
-      if (!text) { alert('Describe the issue.'); return }
+      if (!text) { showToast('Describe the issue.', 'warning'); return }
       _addComponentToDraft(state.modal.compName, 'Custom', text)
       return
     }
@@ -1151,10 +1199,10 @@ function attachEvents() {
       const comps  = readSubInvCompsFromDOM()
       const labour = readSubInvLabourFromDOM()
       const note   = document.getElementById('sub-invoice-note')?.value || ''
-      if (!comps.length && !labour) { alert('Add at least one component or a labour charge.'); return }
+      if (!comps.length && !labour) { showToast('Add at least one component or a labour charge.', 'warning'); return }
 
       const res = await createSubInvoice(tk, comps, labour, note, SESSION.employee?.name)
-      if (!res.ok) { alert('Error: ' + res.error); return }
+      if (!res.ok) { showToast('Error: ' + res.error, 'error'); return }
 
       const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
       printThermal(buildSubInvoiceSlip(res.data, tk))
@@ -1174,17 +1222,28 @@ function attachEvents() {
     if (el.dataset.action === 'ems-clock-out') {
       const { handleClockOut } = await import('../features/ems/index.js')
       handleClockOut(SESSION, async () => {
-        if (!confirm('Clocked out. Log out now?')) return
-        await _clearSession()
+        await confirmAction({
+          title: 'Log out?',
+          message: 'Your shift is clocked out. Log out now?',
+          confirmLabel: 'Log out',
+          tone: 'danger',
+          action: async () => { await _clearSession(); return true },
+        })
       })
       return
     }
     if (el.dataset.action === 'logout') {
-      if (!confirm('Log out?')) return
-      await _clearSession(); return
+      await confirmAction({
+        title: 'Log out?',
+        message: 'Are you sure you want to log out?',
+        confirmLabel: 'Log out',
+        tone: 'danger',
+        action: async () => { await _clearSession(); return true },
+      })
+      return
     }
     if (el.dataset.action === 'install' && state.installPrompt) {
-      state.installPrompt.prompt(); state.installPrompt = null; render(); return
+      await runInstallPrompt(); render(); return
     }
 
     /* ── Shift stats ── */
@@ -1211,6 +1270,11 @@ function attachEvents() {
       posState.repairSearch = ''
       state.modal = { type:'repair-collection' }; render(); return
     }
+    if (el.dataset.action === 'retry-repair-summary') {
+      const ticket = state.data.tickets.find(t => String(t.id) === String(el.dataset.ticketId)) || state.modal?.ticket
+      if (ticket) await openCollectTicket(ticket)
+      return
+    }
 
     /* ── Quick collect from main screen row or repair collection modal ── */
     if (el.dataset.collectTicket) {
@@ -1225,7 +1289,7 @@ function attachEvents() {
       const ticketId = el.dataset.ticketId
       const amount   = Number(document.getElementById('topup-amount')?.value || 0)
       const method   = document.getElementById('topup-method')?.value || 'Cash'
-      if (!amount || amount <= 0) { alert('Enter a payment amount.'); return }
+      if (!amount || amount <= 0) { showToast('Enter a payment amount.', 'warning'); return }
       const ticket = state.data.tickets.find(t => String(t.id) === String(ticketId))
       if (!ticket) return
       posState.cart = posState.cart.filter(i => !i.isTicket)
@@ -1251,16 +1315,24 @@ function attachEvents() {
 
     if (el.dataset.action === 'deliver-repair') {
       const ticketId = Number(el.dataset.ticketId)
-      const res = await deliverRepair(ticketId, false)
-      if (!res.ok) { alert('Delivery error: ' + res.error); return }
-      state.modal = null
-      await load()
-      alert('Device marked as Delivered.')
+      await confirmAction({
+        title: 'Deliver repair?',
+        message: 'Mark this fully paid repair as delivered to the customer?',
+        confirmLabel: 'Deliver device',
+        action: async () => {
+          const res = await deliverRepair(ticketId, false)
+          if (!res.ok) { showToast('Delivery error: ' + res.error, 'error'); return false }
+          state.modal = null
+          await load()
+          showToast('Device marked as Delivered.', 'success')
+          return true
+        },
+      })
       return
     }
     if (el.dataset.action === 'print-repair-summary') {
       const summaryResult = await getRepairFamilySummary(Number(el.dataset.ticketId))
-      if (!summaryResult.ok) { alert('Summary error: ' + summaryResult.error); return }
+      if (!summaryResult.ok) { showToast('Summary error: ' + summaryResult.error, 'error'); return }
       const { buildRepairSummary, printThermal } = await import('../print/print.js')
       printThermal(buildRepairSummary(summaryResult.data)); return
     }
@@ -1270,10 +1342,10 @@ function attachEvents() {
       openPinPrompt('udhar', async verified => {
         if (!verified) return
         const res = await deliverRepair(ticketId, true)
-        if (!res.ok) { alert('Delivery error: ' + res.error); return }
+        if (!res.ok) { showToast('Delivery error: ' + res.error, 'error'); return }
         state.modal = null
         await load()
-        alert('Device delivered with the remaining balance approved as Udhar.')
+        showToast('Device delivered with the remaining balance approved as Udhar.', 'success')
       }, render)
       return
     }
@@ -1303,8 +1375,8 @@ function attachEvents() {
     if (el.dataset.action === 'add-custom-item') {
       const name  = document.getElementById('custom-item-name')?.value?.trim()
       const price = parseFloat(document.getElementById('custom-item-price')?.value || '0')
-      if (!name)    { alert('Enter item name.'); return }
-      if (price<=0) { alert('Enter valid price.'); return }
+      if (!name)    { showToast('Enter item name.', 'warning'); return }
+      if (price<=0) { showToast('Enter valid price.', 'warning'); return }
       posState.cart.push({ productId:`custom-${Date.now()}`, name, qty:1, originalPrice:price, soldPrice:price, discount:0, reason:'', isCustom:true })
       document.getElementById('custom-item-name').value = ''
       document.getElementById('custom-item-price').value = ''
@@ -1365,7 +1437,7 @@ function attachEvents() {
       const compName = state.modal.name
       const parentDraft = getDraft()
       const parentInfo  = state.modal._info
-      if (!text) { alert('Describe the issue.'); return }
+      if (!text) { showToast('Describe the issue.', 'warning'); return }
       parentDraft.components.push({ name:compName, tag:'Custom', customText:text, price:0 })
       state.modal = { type:'repair', _info:parentInfo }
       render(); return
@@ -1385,7 +1457,7 @@ function attachEvents() {
     if (el.dataset.action === 'draft-add-payment') {
       const amount = Number(document.getElementById('draft-pay-amount')?.value||0)
       const method = document.getElementById('draft-pay-method')?.value||'Cash'
-      if (!amount||amount<=0) { alert('Enter a payment amount.'); return }
+      if (!amount||amount<=0) { showToast('Enter a payment amount.', 'warning'); return }
       const form = document.querySelector("[data-form='repair']")
       if (form) state.modal._info = Object.fromEntries(new FormData(form).entries())
       getDraft().payments.push({ amount, method })
@@ -1414,12 +1486,12 @@ function attachEvents() {
       const accountKey = el.dataset.settleId
       const amount  = Number(document.querySelector(`[data-settle-amount="${accountKey}"]`)?.value)
       const method  = document.querySelector(`[data-settle-method="${accountKey}"]`)?.value||'Cash'
-      if (!amount||amount<=0) { alert('Enter a valid amount.'); return }
+      if (!amount||amount<=0) { showToast('Enter a valid amount.', 'warning'); return }
       openPinPrompt('settle', async (verified) => {
         if (!verified) return
         const rec = (state.data.udharAccounts || []).find(u => `${u.kind}:${u.sourceId}` === accountKey)
         const res = await settleUdhar(rec, amount, method)
-        if (!res.ok) { alert('Settle error: ' + res.error); return }
+        if (!res.ok) { showToast('Settle error: ' + res.error, 'error'); return }
         await load()
         state.modal = { type:'udharList' }
         render()
@@ -1505,10 +1577,10 @@ function attachEvents() {
     if (type === 'repair') {
       dlog('POS.submit', 'repair branch -- adding draft ticket to cart (no DB write yet)')
       const draft = getDraft()
-      if (!data.customerName?.trim()) { alert('Customer name is required.'); return }
-      if (!data.customerPhone?.trim()) { alert('Customer phone is required.'); return }
-      if (!data.deviceBrand?.trim())  { alert('Device brand is required.'); return }
-      if (!data.deviceModel?.trim())  { alert('Device model is required.'); return }
+      if (!data.customerName?.trim()) { showToast('Customer name is required.', 'warning'); return }
+      if (!data.customerPhone?.trim()) { showToast('Customer phone is required.', 'warning'); return }
+      if (!data.deviceBrand?.trim())  { showToast('Device brand is required.', 'warning'); return }
+      if (!data.deviceModel?.trim())  { showToast('Device model is required.', 'warning'); return }
 
       const total = calcDraftTotal(draft)
       const paid  = calcDraftPaid(draft)
@@ -1554,7 +1626,7 @@ function attachEvents() {
         render(); return
       }
       const lookup = await getRetailReturnContext(found.id)
-      if (!lookup.ok) { alert('Return lookup failed: '+lookup.error); return }
+      if (!lookup.ok) { showToast('Return lookup failed: '+lookup.error, 'error'); return }
       state.modal = { type:'returnFlow', receiptNo:found.invoice_number, context:lookup.data }
       render(); return
     }
@@ -1563,14 +1635,14 @@ function attachEvents() {
       const saleId   = Number(data.saleId)
       const context  = state.modal?.context
       const preview  = retailReturnSelection(context)
-      if (preview.error) { alert(preview.error); return }
-      if (!preview.lines.length) { alert('Enter a return quantity for at least one item.'); return }
+      if (preview.error) { showToast(preview.error, 'warning'); return }
+      if (!preview.lines.length) { showToast('Enter a return quantity for at least one item.', 'warning'); return }
       const reason = String(data.notes||'').trim()
-      if (!reason) { alert('Enter a return reason.'); return }
+      if (!reason) { showToast('Enter a return reason.', 'warning'); return }
       openPinPrompt('return', async (verified) => {
         if (!verified) return
         const result = await createRetailReturn(saleId,preview.lines.map(({saleLineId,quantity,restock}) => ({saleLineId,quantity,restock})),data.refundMethod,reason)
-        if (!result.ok) { alert('Return error: '+result.error); return }
+        if (!result.ok) { showToast('Return error: '+result.error, 'error'); return }
         const refund = Number(result.data?.return?.refund_amount||0)
         const { buildReturnSlip, printThermal } = await import('../print/print.js')
         printThermal(buildReturnSlip({
@@ -1579,6 +1651,7 @@ function attachEvents() {
           refund, method:refund>0?data.refundMethod:'No cash refund',
         }))
         state.modal = null; await load()
+        showToast(`Return completed. Refund: ${money(refund)}`, 'success')
       }, render); return
     }
 
@@ -1590,15 +1663,15 @@ function attachEvents() {
         return
       }
       state.modal = null
-      alert('Password updated.')
+      showToast('Password updated.', 'success')
       render(); return
     }
 
     if (type === 'leave-request') {
       const result = await submitLeaveRequest(SESSION, data)
-      if (!result.ok) { alert('Error: ' + result.error); return }
+      if (!result.ok) { showToast('Error: ' + result.error, 'error'); return }
       state.modal = null
-      alert('Leave request submitted. Your manager will review it.')
+      showToast('Leave request submitted. Your manager will review it.', 'success')
       render(); return
     }
     if (type === 'override') {
