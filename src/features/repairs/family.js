@@ -43,5 +43,8 @@ export function findRepairFamilies(tickets = [], query = '') {
 }
 
 export function matchedRepairChild(family) {
-  return family.matchedMembers?.find(ticket => ticket.parent_ticket_id) || null
+  const matchedMembers = family.matchedMembers || []
+  const rootMatched = matchedMembers.some(ticket => String(ticket.id) === String(family.root?.id))
+  if (rootMatched) return null
+  return matchedMembers.find(ticket => ticket.parent_ticket_id) || null
 }

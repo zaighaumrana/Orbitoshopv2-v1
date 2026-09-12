@@ -48,6 +48,7 @@ const adminState = {
   receiptDateFrom:  '',
   receiptDateTo:    '',
   receiptSearch:    '',
+  receiptType:      'all',
   receiptModalIdx:  null,
 }
 
@@ -134,9 +135,6 @@ function render() {
   const tenant = currentTenant()
   if (!can(adminState.adminModule, state.role)) adminState.adminModule = 'dashboard'
   const _modalScroll = document.querySelector('.modal')?.scrollTop || 0
-  const _activeEl   = document.activeElement
-  const _focusAttr  = _activeEl?.hasAttribute('data-receipt-search') ? 'data-receipt-search' : null
-  const _cursorPos  = _focusAttr ? _activeEl.selectionStart : null
 
   document.getElementById('app').innerHTML = `
     <div class="app-shell client-shell">
@@ -190,10 +188,6 @@ function render() {
   if (_modalScroll) {
     const m = document.querySelector('.modal')
     if (m) m.scrollTop = _modalScroll
-  }
-  if (_focusAttr) {
-    const el = document.querySelector(`[${_focusAttr}]`)
-    if (el) { el.focus(); if (_cursorPos != null) el.setSelectionRange(_cursorPos, _cursorPos) }
   }
 }
 
@@ -279,12 +273,13 @@ function repairs() {
   const roots = groupRepairFamilies(state.data.tickets || []).map(family => family.root)
   const sc = {'Pending':'warn','In Progress':'warn','Ready':'good','Delivered':'good','Cancelled':'bad','Declined':'bad'}
   return `
-    ${tit('Repair Tickets','Full repair queue.',`<button class="primary-button" data-action="go-pos" title="Create tickets from the POS counter">New Ticket (via POS)</button>`)}
-    ${tlb('Search by customer, device, ticket…')}
+    ${tit('Repair Tickets','Search the complete repair family from one place.',`<button class="primary-button" data-action="go-pos" title="Create tickets from the POS counter">New Ticket (via POS)</button>`)}
+    ${tlb('Search ticket, parent/child invoice, customer, phone, device…')}
+    <p class="muted" style="font-size:12px;margin:-8px 0 12px">This search checks parent repairs and every child/sub-invoice, then opens the complete family.</p>
     <div class="grid two-col">
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>Customer</th><th>Ticket</th><th>Device</th><th>Advance</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Customer</th><th>Ticket / Invoice</th><th>Device</th><th>Advance</th><th>Status</th><th></th></tr></thead>
           <tbody>
             ${families.length ? families.map(family => {
               const r = family.root
@@ -292,7 +287,12 @@ function repairs() {
               return `
               <tr style="cursor:pointer" data-view-ticket="${r.id}">
                 <td><strong>${r.customer_name}</strong><br><small class="muted">${r.customer_phone}</small></td>
-                <td><span style="color:var(--primary);font-size:12px">${r.ticket_number}</span>${matchedChild ? `<br><small class="muted">Matched: ${matchedChild.invoice_number || matchedChild.ticket_number}</small>` : ''}</td>
+                <td>
+                  <span style="color:var(--primary);font-size:12px">${r.ticket_number}</span><br>
+                  <strong style="font-size:12px">${r.invoice_number || 'No invoice'}</strong>
+                  ${family.members.length > 1 ? `<br><small class="muted">${family.members.length - 1} child invoice${family.members.length === 2 ? '' : 's'}</small>` : ''}
+                  ${matchedChild ? `<br><small style="color:var(--primary)">Matched child: ${matchedChild.invoice_number || 'No invoice'} · ${matchedChild.ticket_number}</small>` : ''}
+                </td>
                 <td>${r.device_brand} ${r.device_model}</td>
                 <td>${Number(r.advance_payment||0)>0 ? money(r.advance_payment) : '—'}</td>
                 <td><span class="badge ${sc[r.status]||'warn'}">${r.status}</span></td>
@@ -1012,10 +1012,25 @@ function attachEvents() {
       printThermal(buildReceiptSlip(reprSale, true)); return
     }
 
+    if (el.dataset.action === 'print-repair-invoice') {
+      const ticket = state.data.tickets.find(item => String(item.id) === String(el.dataset.ticketId))
+      if (!ticket) { showToast('Repair invoice not found.', 'error'); return }
+      const { buildTicketSlip, buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
+      if (ticket.parent_ticket_id) {
+        const parent = state.data.tickets.find(item => String(item.id) === String(ticket.parent_ticket_id))
+        if (!parent) { showToast('Parent repair record not found.', 'error'); return }
+        printThermal(buildSubInvoiceSlip(ticket, parent))
+      } else {
+        printThermal(buildTicketSlip(ticket))
+      }
+      return
+    }
+
     if (el.dataset.action === 'clear-receipt-filter') {
       adminState.receiptDateFrom = ''
       adminState.receiptDateTo   = ''
       adminState.receiptSearch   = ''
+      adminState.receiptType     = 'all'
       render(); return
     }
 
@@ -1193,6 +1208,12 @@ function attachEvents() {
       adminState.filter = ''
       const { navigate } = await import('../router.js')
       navigate(`/admin/${t.value}`)
+      return
+    }
+    if (t.dataset.receiptType !== undefined) {
+      adminState.receiptType = t.value
+      adminState.receiptModalIdx = null
+      render()
       return
     }
   })

@@ -9,32 +9,39 @@
    tit/adminState from admin.js -- same pattern as
    adminInventoryPage({filter, tit}) and reportsPage({tit}).
 ═══════════════════════════════════════════════════════════════════ */
-import { state, CFG, money, matchesInvoiceSearch } from '../../../shared.js'
+import { state, money } from '../../../shared.js'
+import { buildReceiptRecords, filterReceiptRecords } from './receipts.js'
+
+function receiptArchive(adminState) {
+  return filterReceiptRecords(
+    buildReceiptRecords(state.data.sales || [], state.data.tickets || []),
+    adminState,
+  )
+}
 
 export function receiptsPage({ tit, adminState }) {
-  const allSales = state.data.sales || []
   const dateFrom = adminState.receiptDateFrom || ''
   const dateTo   = adminState.receiptDateTo   || ''
   const search   = adminState.receiptSearch   || ''
-
-  const filtered = allSales.filter(s => {
-    const matchText = (`${s.customer_name||''} ${s.payment_method||''} ${s.employee_name||''}`)
-      .toLowerCase().includes(search.toLowerCase())
-    const matchInvoice = matchesInvoiceSearch(s.invoice_number||'', search, CFG.invoice_prefix) && search.trim() !== ''
-    const sDate     = (s.created_at||'').slice(0,10)
-    const matchFrom = !dateFrom || sDate >= dateFrom
-    const matchTo   = !dateTo   || sDate <= dateTo
-    return (matchText || matchInvoice) && matchFrom && matchTo
-  })
+  const receiptType = adminState.receiptType || 'all'
+  const filtered = receiptArchive(adminState)
 
   return `
-    ${tit('Receipts Archive','Full log of all completed sales.','')}
+    ${tit('Receipts Archive','Retail receipts and repair invoices in one searchable archive.','')}
     <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;align-items:flex-end">
       <div style="flex:1;min-width:200px">
         <input class="search" data-receipt-search value="${search}"
-          placeholder="Search by customer, payment…"
+          placeholder="Search invoice, ticket, customer, phone, device…"
           style="width:100%">
       </div>
+      <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)">
+        Type
+        <select data-receipt-type style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--surface);color:var(--text);font-size:13px">
+          <option value="all" ${receiptType === 'all' ? 'selected' : ''}>All</option>
+          <option value="retail" ${receiptType === 'retail' ? 'selected' : ''}>Retail</option>
+          <option value="repair" ${receiptType === 'repair' ? 'selected' : ''}>Repair</option>
+        </select>
+      </label>
       <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)">
         From
         <input type="date" value="${dateFrom}" data-receipt-from
@@ -50,29 +57,33 @@ export function receiptsPage({ tit, adminState }) {
       <button class="secondary-button" data-action="clear-receipt-filter">Clear</button>
     </div>
     <p class="muted" style="font-size:13px;margin-bottom:8px">
-      ${filtered.length} receipt${filtered.length !== 1 ? 's' : ''} found
+      ${filtered.length} receipt${filtered.length !== 1 ? 's' : ''} / invoice${filtered.length !== 1 ? 's' : ''} found
     </p>
     <div class="card" style="display:grid;gap:0">
-      ${filtered.length ? filtered.map((s, idx) => `
+      ${filtered.length ? filtered.map((record, idx) => `
         <div style="border-bottom:1px solid var(--border);padding:12px 4px;
                     display:flex;justify-content:space-between;align-items:center;gap:12px">
           <div style="cursor:pointer;flex:1;min-width:0"
             data-action="open-receipt-modal" data-receipt-idx="${idx}">
-            <strong>${s.customer_name||'Walk-in'}</strong><br>
+            <strong>${record.customerName}</strong>
+            <span class="badge ${record.type === 'repair' ? 'warn' : 'good'}" style="margin-left:6px">${record.label}</span><br>
             <span class="muted" style="font-size:12px">
-              ${s.invoice_number||`INV-${s.id}`} · ${s.payment_method} · ${s.employee_name||''}
+              <strong>${record.invoiceNumber}</strong>${record.ticketNumber ? ` · ${record.ticketNumber}` : ''}
+              ${record.parentInvoiceNumber ? `<br>Parent: ${record.parentInvoiceNumber}${record.parentTicketNumber ? ` · ${record.parentTicketNumber}` : ''}` : ''}
+              <br>${record.paymentMethod}${record.employeeName ? ` · ${record.employeeName}` : ''}
             </span>
           </div>
           <div style="text-align:right;flex-shrink:0;display:flex;align-items:center;gap:10px">
             <div>
-              <div><strong>${money(s.total_bill)}</strong></div>
+              <div><strong>${money(record.total)}</strong></div>
               <span class="muted" style="font-size:11px">
-                ${new Date(s.created_at).toLocaleDateString()}
-                ${new Date(s.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+                ${new Date(record.createdAt).toLocaleDateString()}
+                ${new Date(record.createdAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
               </span>
             </div>
-            <button class="secondary-button" style="font-size:12px;white-space:nowrap"
-              data-action="reprint-receipt" data-sale-id="${s.id}">Reprint</button>
+            ${record.kind === 'ticket'
+              ? `<button class="secondary-button" style="font-size:12px;white-space:nowrap" data-action="print-repair-invoice" data-ticket-id="${record.id}">Print</button>`
+              : `<button class="secondary-button" style="font-size:12px;white-space:nowrap" data-action="reprint-receipt" data-sale-id="${record.id}">Reprint</button>`}
           </div>
         </div>`).join('') :
       `<div class="empty" style="padding:24px;text-align:center">No receipts found.</div>`}
@@ -111,21 +122,12 @@ export function udharListModalHTML() {
 }
 
 export function receiptDetailModalHTML(adminState) {
-  const allSales  = state.data.sales || []
-  const search    = adminState.receiptSearch  || ''
-  const dateFrom  = adminState.receiptDateFrom || ''
-  const dateTo    = adminState.receiptDateTo   || ''
-  const filtered  = allSales.filter(s => {
-    const matchText = (`${s.customer_name||''} ${s.payment_method||''} ${s.employee_name||''}`)
-      .toLowerCase().includes(search.toLowerCase())
-    const sDate     = (s.created_at||'').slice(0,10)
-    const matchFrom = !dateFrom || sDate >= dateFrom
-    const matchTo   = !dateTo   || sDate <= dateTo
-    return matchText && matchFrom && matchTo
-  })
+  const filtered = receiptArchive(adminState)
   const idx  = adminState.receiptModalIdx ?? 0
-  const s    = filtered[idx]
-  if (!s) return ''
+  const record = filtered[idx]
+  if (!record) return ''
+  if (record.kind === 'ticket') return repairReceiptDetailHTML(record, idx, filtered.length)
+  const s = record.raw
   const items = Array.isArray(s.items_sold) ? s.items_sold : []
   const hasPrev = idx > 0
   const hasNext = idx < filtered.length - 1
@@ -214,6 +216,70 @@ export function receiptDetailModalHTML(adminState) {
             <button class="secondary-button" data-close>Close</button>
             <button class="primary-button"
               data-action="reprint-receipt" data-sale-id="${s.id}">Reprint</button>
+          </div>
+        </div>
+      </div>
+    </div>`
+}
+
+function repairReceiptDetailHTML(record, index, totalRecords) {
+  const ticket = record.raw
+  const components = Array.isArray(ticket.components_noted) ? ticket.components_noted : []
+  const hasPrev = index > 0
+  const hasNext = index < totalRecords - 1
+  const invoiceTotal = Number(ticket.final_total || ticket.estimated_quote || 0)
+  const amountPaid = Number(ticket.amount_paid || 0)
+  const balanceDue = Number(ticket.balance_due || 0)
+  return `
+    <div class="modal-backdrop" data-no-backdrop-close>
+      <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div>
+            <h2 style="margin:0">${record.invoiceNumber}</h2>
+            <span class="badge warn" style="margin-top:6px">${record.label}</span>
+          </div>
+          <button class="icon-button" data-close style="font-size:20px;line-height:1">×</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;padding:12px;background:var(--surface-2);border-radius:10px;font-size:13px;margin-bottom:16px">
+          <div><span class="muted">Date</span><br><strong>${new Date(record.createdAt).toLocaleString()}</strong></div>
+          <div><span class="muted">Status</span><br><strong>${ticket.status || 'Pending'}</strong></div>
+          <div><span class="muted">Customer</span><br><strong>${record.customerName}</strong></div>
+          <div><span class="muted">Phone</span><br><strong>${record.customerPhone || '—'}</strong></div>
+          <div><span class="muted">Ticket</span><br><strong>${record.ticketNumber || '—'}</strong></div>
+          <div><span class="muted">Device</span><br><strong>${record.device || '—'}</strong></div>
+          ${record.parentInvoiceNumber ? `<div><span class="muted">Parent Invoice</span><br><strong>${record.parentInvoiceNumber}</strong></div>` : ''}
+          ${record.parentTicketNumber ? `<div><span class="muted">Parent Ticket</span><br><strong>${record.parentTicketNumber}</strong></div>` : ''}
+          <div><span class="muted">Created By</span><br><strong>${record.employeeName || '—'}</strong></div>
+          <div><span class="muted">Payment</span><br><strong>${record.paymentMethod}</strong></div>
+        </div>
+
+        <div style="margin-bottom:16px">
+          <p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Repair items</p>
+          ${components.length ? `<div style="display:grid;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+            ${components.map(component => `<div style="display:flex;justify-content:space-between;gap:8px;padding:10px 12px;border-top:1px solid var(--border);font-size:13px">
+              <span><strong>${component.name || 'Component'}</strong>${component.tag || component.condition ? `<br><span class="muted">${component.tag || component.condition}</span>` : ''}</span>
+              <strong>${money(component.price || 0)}</strong>
+            </div>`).join('')}
+          </div>` : `<p class="muted" style="font-size:13px">No component breakdown recorded.</p>`}
+          ${Number(ticket.labour_cost || 0) > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 12px;font-size:13px"><span>Labour</span><strong>${money(ticket.labour_cost)}</strong></div>` : ''}
+          ${ticket.technician_note ? `<p class="muted" style="font-size:13px;margin-top:8px">${ticket.technician_note}</p>` : ''}
+        </div>
+
+        <div style="border-top:1px solid var(--border);padding-top:12px;display:grid;gap:6px;font-size:13px">
+          <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700"><span>Invoice Total</span><span>${money(invoiceTotal)}</span></div>
+          <div style="display:flex;justify-content:space-between;color:var(--success)"><span>Paid</span><span>${money(amountPaid)}</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Balance</span><span>${money(balanceDue)}</span></div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+          <div style="display:flex;gap:8px">
+            <button class="secondary-button" ${!hasPrev ? 'disabled' : ''} data-action="receipt-prev">← Prev</button>
+            <button class="secondary-button" ${!hasNext ? 'disabled' : ''} data-action="receipt-next">Next →</button>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="secondary-button" data-close>Close</button>
+            <button class="primary-button" data-action="print-repair-invoice" data-ticket-id="${ticket.id}">Print Invoice</button>
           </div>
         </div>
       </div>

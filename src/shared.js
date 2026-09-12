@@ -57,6 +57,92 @@ export const state = {
   data:          { tickets:[], sales:[], employees:[], udharAccounts:[], financial:{}, shiftFinancial:{}, returns:[], inventory:[], quickItems:[], repairComponents:[] },
 }
 
+/* ── Global editable-control focus persistence ──
+   Most screens intentionally rerender #app from state on each filter input.
+   Capture the active control before those delegated handlers run, then restore
+   the equivalent newly-created control after the DOM replacement. */
+const editableControlSelector = 'input:not([type="hidden"]), textarea, select, [contenteditable="true"]'
+const focusPersistenceKey = Symbol.for('orbitoshop.focusPersistence')
+
+function selectorValue(value) {
+  return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+function persistentControlSelector(control) {
+  if (control.id) return `[id="${selectorValue(control.id)}"]`
+  const dataAttribute = [...control.attributes].find(attribute => attribute.name.startsWith('data-'))
+  if (dataAttribute) {
+    return dataAttribute.value
+      ? `[${dataAttribute.name}="${selectorValue(dataAttribute.value)}"]`
+      : `[${dataAttribute.name}]`
+  }
+  if (control.name) return `${control.tagName.toLowerCase()}[name="${selectorValue(control.name)}"]`
+  return null
+}
+
+function installGlobalFocusPersistence() {
+  if (globalThis[focusPersistenceKey] || typeof document === 'undefined') return
+  const persistence = { snapshot:null, restoreQueued:false, observer:null }
+  globalThis[focusPersistenceKey] = persistence
+
+  const capture = event => {
+    const control = event.target?.closest?.(editableControlSelector)
+    const app = document.getElementById('app')
+    if (!control || !app?.contains(control)) {
+      if (event.type === 'focusin') persistence.snapshot = null
+      return
+    }
+    const selector = persistentControlSelector(control)
+    if (!selector) return
+    const peers = [...app.querySelectorAll(selector)]
+    persistence.snapshot = {
+      path: window.location.pathname,
+      selector,
+      index: Math.max(0, peers.indexOf(control)),
+      start: typeof control.selectionStart === 'number' ? control.selectionStart : null,
+      end: typeof control.selectionEnd === 'number' ? control.selectionEnd : null,
+      direction: control.selectionDirection || 'none',
+    }
+  }
+
+  const restore = () => {
+    persistence.restoreQueued = false
+    const snapshot = persistence.snapshot
+    const app = document.getElementById('app')
+    if (!snapshot || !app || snapshot.path !== window.location.pathname) return
+    const active = document.activeElement
+    if (active && active !== document.body && active !== document.documentElement) return
+    const matches = [...app.querySelectorAll(snapshot.selector)]
+    const control = matches[snapshot.index] || matches[0]
+    if (!control || control.disabled) return
+    control.focus({ preventScroll:true })
+    if (snapshot.start !== null && typeof control.setSelectionRange === 'function') {
+      try { control.setSelectionRange(snapshot.start, snapshot.end, snapshot.direction) } catch {}
+    }
+  }
+
+  const observeApp = () => {
+    const app = document.getElementById('app')
+    if (!app || persistence.observer) return
+    persistence.observer = new MutationObserver(() => {
+      if (persistence.restoreQueued) return
+      persistence.restoreQueued = true
+      queueMicrotask(restore)
+    })
+    persistence.observer.observe(app, { childList:true, subtree:true })
+  }
+
+  document.addEventListener('focusin', capture, true)
+  document.addEventListener('input', capture, true)
+  document.addEventListener('pointerdown', event => {
+    if (!event.target?.closest?.(editableControlSelector)) persistence.snapshot = null
+  }, true)
+  observeApp()
+  if (!persistence.observer) document.addEventListener('DOMContentLoaded', observeApp, { once:true })
+}
+
+installGlobalFocusPersistence()
+
 /* ── Session ── */
 function profileToSession(profile) {
   return {

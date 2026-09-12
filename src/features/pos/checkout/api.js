@@ -44,7 +44,11 @@ export async function finalizeCheckout({
     : isUdhar ? Math.min(roundMoney(udharPaidNow || 0), total) : total
 
   if (checkoutPayment === 'Cash' && Number(cashTendered || 0) < total) {
-    return { ok: false, error: 'Cash received is less than the sale total. Use Udhar for an unpaid balance.' }
+    return {
+      ok: false,
+      code: 'incomplete-cash-payment',
+      error: 'Cash received is less than the sale total. Use Udhar for an unpaid balance.',
+    }
   }
 
   const tenders = isSplit
@@ -83,7 +87,13 @@ export async function finalizeCheckout({
 
   if (saleErr) {
     dlog('checkout.finalizeCheckout', `ATOMIC CHECKOUT FAILED: ${saleErr.message}`)
-    return { ok: false, error: saleErr.message }
+    return {
+      ok: false,
+      code: /cash received (?:is|cannot be) less/i.test(saleErr.message)
+        ? 'incomplete-cash-payment'
+        : 'checkout-failed',
+      error: saleErr.message,
+    }
   }
 
   const sale = {

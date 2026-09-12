@@ -128,11 +128,6 @@ function render() {
   }
   const tenant = currentTenant()
   const _modalScroll = document.querySelector('.modal')?.scrollTop || 0
-  const _activeEl   = document.activeElement
-  const _focusAttr  = _activeEl?.hasAttribute('data-repair-search') ? 'data-repair-search'
-                     : _activeEl?.hasAttribute('data-inv-search')    ? 'data-inv-search'
-                     : null
-  const _cursorPos  = _focusAttr ? _activeEl.selectionStart : null
 
   document.getElementById('app').innerHTML = `
     <div class="app-shell client-shell">
@@ -178,10 +173,6 @@ function render() {
   if (_modalScroll) {
     const m = document.querySelector('.modal')
     if (m) m.scrollTop = _modalScroll
-  }
-  if (_focusAttr) {
-    const el = document.querySelector(`[${_focusAttr}]`)
-    if (el) { el.focus(); if (_cursorPos != null) el.setSelectionRange(_cursorPos, _cursorPos) }
   }
 }
 
@@ -1033,7 +1024,20 @@ async function _finalizeCheckout() {
     employeeName: SESSION.employee?.name,
     requestId: posState.checkoutRequestId,
   })
-  if (!res.ok) { dlog('POS._finalizeCheckout', `FAILED: ${res.error}`); showToast('Sale error: ' + res.error, 'error'); return }
+  if (!res.ok) {
+    dlog('POS._finalizeCheckout', `FAILED: ${res.error}`)
+    if (res.code === 'incomplete-cash-payment') {
+      await confirmAction({
+        title: 'Incomplete Cash Payment',
+        message: 'Enter the full cash received amount, or choose Udhar for the remaining balance.',
+        confirmLabel: 'Review payment',
+        cancelLabel: 'Close',
+      })
+      return
+    }
+    showToast('Sale error: ' + res.error, 'error')
+    return
+  }
 
   posState.cart=[]
   posState.checkoutRequestId=null
