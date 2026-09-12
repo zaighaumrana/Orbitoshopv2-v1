@@ -47,8 +47,9 @@ export function buildTicketSlip(ticket) {
     }).join('') : '<div class="sm">No components noted.</div>'}
     <div class="ln"></div>
     ${Number(ticket.labour_cost)>0 ? `<div class="row"><span>Labour Fee</span><span>${money(ticket.labour_cost)}</span></div>` : ''}
-    <div class="row"><span>Estimated Quote</span><span>${money(ticket.estimated_quote)}</span></div>
-    ${Number(ticket.advance_payment)>0 ? `<div class="row"><span>Advance Paid</span><span>${money(ticket.advance_payment)}${ticket.advance_method ? ` (${ticket.advance_method})` : ''}</span></div>` : ''}
+    <div class="row b"><span>Original Invoice Total</span><span>${money(ticket.final_total ?? ticket.estimated_quote)}</span></div>
+    <div class="row"><span>Paid at Creation</span><span>${money(ticket.advance_payment||0)}${ticket.advance_method ? ` (${ticket.advance_method})` : ''}</span></div>
+    <div class="row b"><span>Remaining at Creation</span><span>${money(Math.max(0, Number(ticket.final_total ?? ticket.estimated_quote ?? 0)-Number(ticket.advance_payment||0)))}</span></div>
     <div class="ln"></div>
     ${ticket.technician_note ? `<div class="sm">Note: ${ticket.technician_note}</div><div class="ln"></div>` : ''}
     ${CFG.terms_text ? `<div class="c sm">${CFG.terms_text}</div><div class="ln"></div>` : ''}
@@ -140,4 +141,44 @@ export function buildReturnSlip(data) {
     <div class="row"><span>Method</span><span>${data.method}</span></div>
     <div class="ln"></div>
     <div class="c sm">Please retain this slip for your records.</div>`
+}
+
+export function buildRepairSummary(summary) {
+  const root = summary.root || {}
+  const invoices = summary.invoices || []
+  const adjustments = summary.adjustments || []
+  const payments = summary.payments || []
+  const refunds = summary.refunds || []
+  return `
+    ${CFG.shop_logo ? `<div class="c"><img src="${CFG.shop_logo}" style="max-width:140px;max-height:50px;object-fit:contain"></div>` : ''}
+    <div class="c b lg">${CFG.shop_name||'Repair Shop'}</div>
+    <div class="c sm">${CFG.shop_address||''}</div>
+    <div class="c sm">${CFG.shop_phone||''}</div>
+    <div class="ln"></div>
+    <div class="c b">FINAL REPAIR SUMMARY</div>
+    <div class="c lg">${root.invoiceNumber||root.ticketNumber||''}</div>
+    <div class="c sm">Ticket: ${root.ticketNumber||''}</div>
+    <div class="ln"></div>
+    <div class="row"><span>Customer</span><span>${root.customerName||''}</span></div>
+    <div class="row"><span>Device</span><span>${root.deviceBrand||''} ${root.deviceModel||''}</span></div>
+    <div class="ln"></div>
+    <div class="b">Invoices</div>
+    ${invoices.map((i,index) => `<div class="row"><span>${index===0?'Original Repair':'Sub-invoice '+index}<br><span class="sm">${i.invoiceNumber||i.ticketNumber}</span></span><span>${money(i.amount)}</span></div>`).join('')}
+    ${adjustments.length ? `<div class="b" style="margin-top:4px">Adjustments</div>${adjustments.map(a => `<div class="row"><span>${a.type}: ${a.reason}</span><span>${money(a.amount)}</span></div>`).join('')}` : ''}
+    <div class="ln"></div>
+    <div class="row b"><span>Total Billed</span><span>${money(summary.effectiveObligation)}</span></div>
+    <div class="ln"></div>
+    <div class="b">Payments</div>
+    ${payments.length ? payments.map(p => `<div class="row"><span>${new Date(p.createdAt).toLocaleDateString()} ${p.method}</span><span>${money(p.amount)}</span></div>`).join('') : '<div class="sm">None</div>'}
+    <div class="b" style="margin-top:4px">Refunds</div>
+    ${refunds.length ? refunds.map(r => `<div class="row"><span>${new Date(r.createdAt).toLocaleDateString()} ${r.method}</span><span>-${money(r.amount)}</span></div>`).join('') : '<div class="sm">None</div>'}
+    <div class="ln"></div>
+    <div class="row"><span>Net Payments</span><span>${money(summary.netPayments)}</span></div>
+    <div class="row b lg"><span>Outstanding</span><span>${money(summary.outstanding)}</span></div>
+    ${summary.udharApproved ? `<div class="row"><span>Udhar Approved</span><span>${money(summary.udharOutstanding)}</span></div>` : ''}
+    <div class="row"><span>Status</span><span>${root.status||''}</span></div>
+    ${root.deliveredAt ? `<div class="row"><span>Delivered</span><span>${new Date(root.deliveredAt).toLocaleString()}</span></div>` : ''}
+    ${root.cancelledAt ? `<div class="row"><span>Cancelled</span><span>${new Date(root.cancelledAt).toLocaleString()}</span></div>` : ''}
+    <div class="ln"></div>
+    <div class="c sm">${CFG.terms_text||'Thank you for your business.'}</div>`
 }

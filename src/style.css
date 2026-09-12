@@ -289,6 +289,7 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
   padding: 18px;
 }
 .modal {
+  position: relative;
   width: min(720px, 100%);
   max-height: 92vh;
   overflow: auto;
@@ -300,6 +301,41 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
   padding: 18px;
   display: grid;
   gap: 14px;
+}
+.modal-close-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 25px;
+  line-height: 1;
+  z-index: 1;
+}
+.modal-close-button:hover,
+.modal-close-button:focus-visible {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+.modal > h2:first-of-type { padding-right: 38px; }
+.pin-capture-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 /* ── Modal size scale — replaces one-off inline max-width:Npx values.
    Pick the closest tier rather than adding a new arbitrary number. ── */
@@ -320,6 +356,78 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
   .field input, .field select, .field textarea { min-height: 36px; padding: 7px 9px; }
 }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.app-dialog-backdrop { z-index: 30; }
+body .app-dialog-backdrop { display: grid; place-items: center; padding: 18px; }
+body .app-dialog { width: min(480px, 100%); border-radius: 8px; max-height: 92vh; }
+.app-dialog-message { color: var(--muted); line-height: 1.5; white-space: pre-line; }
+.app-dialog-fields { grid-template-columns: 1fr; }
+.app-dialog-error { color: var(--danger); font-size: 13px; }
+.summary-skeleton { display: grid; gap: 9px; padding: 12px 0; }
+.summary-skeleton i {
+  display: block;
+  height: 14px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--surface-2), var(--border), var(--surface-2));
+  background-size: 220% 100%;
+  animation: summary-pulse 1.2s ease-in-out infinite;
+}
+.summary-skeleton i:nth-child(2) { width: 82%; }
+.summary-skeleton i:nth-child(3) { width: 91%; }
+.summary-skeleton i:nth-child(4) { width: 68%; }
+@keyframes summary-pulse { to { background-position: -220% 0; } }
+.terminal-state {
+  display: grid;
+  gap: 3px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 13px;
+}
+.terminal-state span { color: var(--muted); }
+.terminal-state.good { border-left-color: var(--success); }
+.terminal-state.bad { border-left-color: var(--danger); }
+.app-toast-region {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 50;
+  width: min(380px, calc(100vw - 36px));
+  display: grid;
+  gap: 10px;
+  pointer-events: none;
+}
+.app-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+.app-toast-success { border-left-color: var(--success); }
+.app-toast-warning { border-left-color: var(--warning); }
+.app-toast-error { border-left-color: var(--danger); }
+.app-toast-info { border-left-color: var(--primary); }
+.app-toast-copy { display: grid; gap: 3px; line-height: 1.35; font-size: 13px; }
+.app-toast-close {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.app-toast-close:hover,
+.app-toast-close:focus-visible { color: var(--text); }
 .plain-form { box-shadow: none; border: 0; padding: 0; background: transparent; }
 .checkbox-field label { display: flex; gap: 8px; align-items: center; color: var(--text); }
 .checkbox-field input { width: auto; min-height: auto; }

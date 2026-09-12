@@ -3,22 +3,27 @@ import {
   _clearSession,
   can, ACCESS, validatePassword,
   money, fld, modalActions, statusBadge,
-  openPinPrompt, pinPromptHTML, handlePpKey, verifyCurrentStepUpPin,
+  openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   logBillEvent,
   myAccountModalHTML, handleChangePasswordSubmit,
   generateTempPassword, listPendingResetRequests, resolvePasswordReset,
   invokeAccountAdmin,
+  showToast, confirmAction, requestInput, runInstallPrompt,
 } from '../shared.js'
 import {
-  getSubInvoices, createSubInvoice, markComponentNotNeeded,
+  markComponentNotNeeded, getRepairFamilySummary,
+  recordAdditionalWork, decideAdditionalWork, createRepairAdjustment, cancelRepair,
 } from '../features/repairs/api.js'
+import { findRepairFamilies, groupRepairFamilies, matchedRepairChild } from '../features/repairs/family.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
 import { reportsPage } from './pages/reports.js'
 import { catalogPage, qiVariantRowHTML, addQuickItemModalHTML } from '../features/admin/catalog/render.js'
 import { receiptsPage, udharListModalHTML, receiptDetailModalHTML } from '../features/admin/checkout/render.js'
+import { settleUdhar } from '../features/checkout/udhar/api.js'
 import {
   ticketCreatedModalHTML, ticketDetailModalHTML, markNotNeededModalHTML,
   createSubInvoiceModalHTML, addCompTagModalHTML,
+  repairAdjustmentModalHTML, repairCancellationModalHTML,
 } from '../features/admin/repairs/render.js'
 
 
@@ -62,17 +67,26 @@ async function load() {
     sales: ['dashboard','reports','receipts'].includes(mod),
     employees: ['dashboard','employees'].includes(mod),
     udhar: ['dashboard','reports','receipts'].includes(mod),
+    financial: ['dashboard','reports'].includes(mod),
     returns: ['reports','receipts'].includes(mod),
     inventory: mod === 'inventory' && CFG.inventory_module_enabled,
     quickItems: mod === 'catalog',
     repairComponents: mod === 'catalog' || mod === 'repairs',
   }
   const skip = { data: [] }
-  const [tickets, sales, employees, udhar, returns_, inv, quickItems, repairComponents] = await Promise.all([
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+  const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
+  const [tickets, sales, employees, udharAccounts, financial, financialToday, returns_, inv, quickItems, repairComponents] = await Promise.all([
     needs.tickets ? sb.from('tickets').select('*').order('id', { ascending: false }) : skip,
     needs.sales ? sb.from('sales').select('*').order('id', { ascending: false }) : skip,
     needs.employees ? sb.from('employees').select('id, name, role, status, email').order('name') : skip,
-    needs.udhar ? sb.from('udhar').select('*').order('id', { ascending: false }) : skip,
+    needs.udhar ? sb.rpc('get_unified_udhar_accounts') : skip,
+    needs.financial ? sb.rpc('get_financial_report', {
+      p_from: null, p_to: null, p_actor_only: false,
+    }) : { data: {} },
+    needs.financial ? sb.rpc('get_financial_report', {
+      p_from: todayStart.toISOString(), p_to: todayEnd.toISOString(), p_actor_only: false,
+    }) : { data: {} },
     needs.returns ? sb.from('returns').select('*').order('id', { ascending: false }) : skip,
     needs.inventory ? sb.from('inventory').select('*').order('name') : skip,
     needs.quickItems ? sb.from('quick_items').select('*').order('sort_order') : skip,
@@ -82,7 +96,9 @@ async function load() {
     tickets:          tickets.data          || [],
     sales:            sales.data            || [],
     employees:        employees.data        || [],
-    udhar:            udhar.data            || [],
+    udharAccounts:    udharAccounts.data    || [],
+    financial:        financial.data        || {},
+    financialToday:   financialToday.data   || {},
     returns:          returns_.data         || [],
     inventory:        inv.data              || [],
     quickItems:       quickItems.data       || [],
@@ -165,6 +181,8 @@ function render() {
     </div>
     ${renderModal()}`
 
+  normalizeModalControls(document.getElementById('app'))
+
   if (!_eventsAttached) {
     attachEvents()
     _eventsAttached = true
@@ -206,19 +224,15 @@ const tlb = (ph) =>
 function dashboard() {
   const sales    = state.data.sales    || []
   const tickets  = state.data.tickets  || []
-  const udhar    = state.data.udhar    || []
-  const today    = new Date().toISOString().slice(0,10)
-  const todayS   = sales.filter(s => (s.created_at||'').slice(0,10) === today)
-  const total    = sales.reduce((s,x) => s + Number(x.total_bill||0), 0)
-  const todayRev = todayS.reduce((s,x) => s + Number(x.total_bill||0), 0)
-  const pending  = tickets.filter(t => !['Delivered','Declined'].includes(t.status)).length
-  const udharBal = udhar.filter(u => u.status !== 'Settled').reduce((s,u) => s + Number(u.balance_due||0), 0)
+  const financial = state.data.financial || {}
+  const todayFinancial = state.data.financialToday || {}
+  const pending  = groupRepairFamilies(tickets).filter(({ root }) => !['Delivered','Declined','Cancelled'].includes(root.status)).length
   const kpis = [
-    ["Today's Revenue", todayRev,  'receipts'],
-    ['Total Revenue',   total,     'receipts'],
-    ['Total Sales',     sales.length, 'receipts'],
+    ["Today's Invoiced", Number(todayFinancial.invoiced || 0),  'reports'],
+    ["Today's Collected", Number(todayFinancial.paymentsCollected || 0), 'reports'],
+    ['Net Payments', Number(financial.netPayments || 0), 'reports'],
     ['Open Tickets',    pending,   'repairs'],
-    ['Udhar Balance',   udharBal,  'udharList'],
+    ['Udhar Balance',   Number(financial.udharOutstanding || 0),  'udharList'],
     ['Employees',       (state.data.employees||[]).length, 'employees'],
   ]
   return `
@@ -228,7 +242,7 @@ function dashboard() {
       ${kpis.map(([l,v,target]) => `
         <div class="card kpi" style="cursor:pointer" data-kpi-target="${target}">
           <span class="label">${l}</span>
-          <span class="value">${typeof v === 'number' && !['Total Sales','Open Tickets','Employees'].includes(l)
+          <span class="value">${typeof v === 'number' && !['Open Tickets','Employees'].includes(l)
             ? money(v) : v}</span>
         </div>`).join('')}
     </div>
@@ -251,8 +265,8 @@ function dashboard() {
         <h2>Operational Alerts</h2>
         <div class="list">
           <div class="list-row"><span>Pending Repairs</span><strong>${pending}</strong></div>
-          <div class="list-row"><span>Outstanding Udhar</span><strong>${(state.data.udhar||[]).filter(u=>u.status!=='Settled').length}</strong></div>
-          <div class="list-row"><span>Today's Transactions</span><strong>${todayS.length}</strong></div>
+          <div class="list-row"><span>Outstanding Udhar</span><strong>${(state.data.udharAccounts||[]).length}</strong></div>
+          <div class="list-row"><span>Today's Payment Events</span><strong>${Number(todayFinancial.paymentCount || 0)}</strong></div>
           <div class="list-row"><span>Active Employees</span><strong>${(state.data.employees||[]).filter(e=>e.status==='Active').length}</strong></div>
         </div>
       </div>
@@ -260,10 +274,10 @@ function dashboard() {
 }
 
 function repairs() {
-  const rows = (state.data.tickets||[]).filter(t =>
-    (`${t.customer_name} ${t.ticket_number} ${t.device_model} ${t.device_brand} ${t.status} ${t.customer_phone}`)
-      .toLowerCase().includes(adminState.filter.toLowerCase()))
-  const sc = {'Pending':'warn','In Progress':'warn','Ready':'good','Delivered':'good','Declined':'bad'}
+  const families = findRepairFamilies(state.data.tickets || [], adminState.filter)
+    .sort((a,b) => new Date(b.root.created_at) - new Date(a.root.created_at))
+  const roots = groupRepairFamilies(state.data.tickets || []).map(family => family.root)
+  const sc = {'Pending':'warn','In Progress':'warn','Ready':'good','Delivered':'good','Cancelled':'bad','Declined':'bad'}
   return `
     ${tit('Repair Tickets','Full repair queue.',`<button class="primary-button" data-action="go-pos" title="Create tickets from the POS counter">New Ticket (via POS)</button>`)}
     ${tlb('Search by customer, device, ticket…')}
@@ -272,10 +286,13 @@ function repairs() {
         <div class="table-wrap"><table>
           <thead><tr><th>Customer</th><th>Ticket</th><th>Device</th><th>Advance</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            ${rows.length ? rows.map(r => `
+            ${families.length ? families.map(family => {
+              const r = family.root
+              const matchedChild = matchedRepairChild(family)
+              return `
               <tr style="cursor:pointer" data-view-ticket="${r.id}">
                 <td><strong>${r.customer_name}</strong><br><small class="muted">${r.customer_phone}</small></td>
-                <td><span style="color:var(--primary);font-size:12px">${r.ticket_number}</span></td>
+                <td><span style="color:var(--primary);font-size:12px">${r.ticket_number}</span>${matchedChild ? `<br><small class="muted">Matched: ${matchedChild.invoice_number || matchedChild.ticket_number}</small>` : ''}</td>
                 <td>${r.device_brand} ${r.device_model}</td>
                 <td>${Number(r.advance_payment||0)>0 ? money(r.advance_payment) : '—'}</td>
                 <td><span class="badge ${sc[r.status]||'warn'}">${r.status}</span></td>
@@ -287,7 +304,7 @@ function repairs() {
                     data-action="admin-collect" data-ticket-id="${r.id}">Collect</button>
                 </div>
               </td>
-              </tr>`).join('') :
+              </tr>`}).join('') :
               `<tr><td colspan="6" style="text-align:center;color:var(--muted)">No tickets found.</td></tr>`}
           </tbody>
         </table></div>
@@ -295,9 +312,9 @@ function repairs() {
       <div class="card">
         <h2>Status Summary</h2>
         <div class="list">
-          ${['Pending','In Progress','Ready','Delivered','Declined'].map(s => `
+          ${['Pending','In Progress','Ready','Delivered','Cancelled','Declined'].map(s => `
             <div class="list-row"><span>${s}</span>
-              <strong>${(state.data.tickets||[]).filter(t=>t.status===s).length}</strong>
+              <strong>${roots.filter(t=>t.status===s).length}</strong>
             </div>`).join('')}
         </div>
       </div>
@@ -561,10 +578,12 @@ function renderModal() {
   if (type === 'mark-not-needed') return markNotNeededModalHTML(state.modal)
 
   if (type === 'create-sub-invoice') return createSubInvoiceModalHTML(state.modal)
+  if (type === 'repair-adjustment') return repairAdjustmentModalHTML(state.modal)
+  if (type === 'repair-cancellation') return repairCancellationModalHTML(state.modal)
 
   if (type === 'add-comp-tag') return addCompTagModalHTML(state.modal)
 
-  if (type === 'inv-add' || type === 'inv-edit') {
+  if (type === 'inv-add' || type === 'inv-edit' || type === 'inv-adjust') {
     return _inv ? _inv.inventoryModalHTML(type, id) : ''
   }
 
@@ -574,6 +593,30 @@ function renderModal() {
   if (type === 'receipt-detail') return receiptDetailModalHTML(adminState)
 
   return ''
+}
+
+async function openTicketDetail(ticketId) {
+  const requestedId = String(ticketId)
+  const requestId = crypto.randomUUID()
+  state.modal = {
+    type:'ticketDetail',
+    id:requestedId,
+    summaryStatus:'loading',
+    summary:null,
+    requestId,
+  }
+  render()
+  const summaryResult = await getRepairFamilySummary(Number(requestedId))
+  if (state.modal?.type !== 'ticketDetail' || state.modal.requestId !== requestId) return
+  if (!summaryResult.ok) {
+    state.modal.summaryStatus = 'error'
+    state.modal.summaryError = summaryResult.error
+  } else {
+    state.modal.summaryStatus = 'ready'
+    state.modal.summary = summaryResult.data
+    state.modal.id = String(summaryResult.data?.root?.id || requestedId)
+  }
+  render()
 }
 
 /* ═══════════════ EVENTS ═══════════════ */
@@ -593,26 +636,20 @@ function attachEvents() {
     // the other view had on screen. Only act when /admin is truly current.
     if (!window.location.pathname.startsWith('/admin')) return
 
-    // Backdrop click — close modal only if backdrop itself was clicked
-    // and it's not flagged as "no backdrop close" (e.g. receipt modal)
-    if (e.target.classList.contains('modal-backdrop') && !e.target.hasAttribute('data-no-backdrop-close')) {
-      dlog('ADMIN.click', `BACKDROP-CLOSE fired -- state.modal was type=${state.modal?.type}`)
-      state.modal = null; render(); return
-    }
-
     const el = e.target.closest(
       'button,[data-modal],[data-close],[data-action],' +
       '[data-settings-tab],[data-catalog-tab],[data-kpi-target],[data-pp-key],' +
       '[data-remove-quick],[data-remove-qitem],[data-add-qprice],[data-remove-qprice],' +
-      '[data-inv-edit],[data-inv-delete],[data-settle-id],[data-view-ticket],' +
+      '[data-inv-edit],[data-inv-adjust],[data-inv-delete],[data-settle-id],[data-view-ticket],' +
       '[data-mark-not-needed],[data-subinv-comp-remove],[data-add-draft-comp-name],[data-tag-select]'
     )
     if (!el) return
     dlog('ADMIN.click', `el MATCHED selector -- action=${el.dataset.action} close=${el.dataset.close} tag=${el.tagName}`)
 
-    if (el.dataset.ppKey !== undefined) { handlePpKey(el.dataset.ppKey, verifyAdminLocal, render); return }
+    if (el.dataset.ppKey !== undefined) { handlePpKey(el.dataset.ppKey); return }
     if (el.dataset.close !== undefined) {
       dlog('ADMIN.click', `DATA-CLOSE branch firing -- state.modal was type=${state.modal?.type} -- about to call ADMIN.render()`)
+      if (state.modal?.type === 'pinPrompt') { cancelPinPrompt(render); return }
       state.modal = null; render(); return
     }
     if (el.dataset.action === 'print-ticket-slip') {
@@ -622,6 +659,12 @@ function attachEvents() {
         printThermal(buildTicketSlip(state.modal.ticket))
       }
       return
+    }
+    if (el.dataset.action === 'print-repair-summary') {
+      const summary = state.modal?.summary || (await getRepairFamilySummary(Number(el.dataset.ticketId))).data
+      if (!summary) { showToast('Repair summary is unavailable.', 'error'); return }
+      const { buildRepairSummary, printThermal } = await import('../print/print.js')
+      printThermal(buildRepairSummary(summary)); return
     }
 
     if (el.dataset.kpiTarget) {
@@ -681,18 +724,16 @@ function attachEvents() {
     }
     if (el.dataset.action === 'confirm-not-needed') {
       const reason = document.getElementById('not-needed-reason')?.value?.trim()
-      if (!reason) { alert('Enter a reason.'); return }
+      if (!reason) { showToast('Enter a reason.', 'warning'); return }
       const { ticketId, index } = state.modal
       openPinPrompt('remove-component', async (verified) => {
         if (!verified) return
         const tk = state.data.tickets.find(t => String(t.id) === String(ticketId))
         if (!tk) return
-        const res = await markComponentNotNeeded(ticketId, tk.components_noted||[], index, reason, SESSION.employee?.name)
-        if (!res.ok) { alert('Error: ' + res.error); return }
+        const res = await markComponentNotNeeded(Number(ticketId), index, reason)
+        if (!res.ok) { showToast('Error: ' + res.error, 'error'); return }
         await load()
-        const subs = await getSubInvoices(ticketId)
-        state.modal = { type: 'ticketDetail', id: ticketId, subInvoices: subs }
-        render()
+        await openTicketDetail(ticketId)
       }, render)
       return
     }
@@ -727,7 +768,7 @@ function attachEvents() {
     /* Add custom component to the draft — opens tag picker */
     if (el.dataset.action === 'add-custom-draft-comp') {
       const name = document.getElementById('custom-comp-name')?.value?.trim()
-      if (!name) { alert('Enter a component name.'); return }
+      if (!name) { showToast('Enter a component name.', 'warning'); return }
       state.modal = {
         type:     'add-comp-tag',
         compName: name,
@@ -751,12 +792,12 @@ function attachEvents() {
     }
     if (el.dataset.action === 'confirm-draft-custom-tag') {
       const text = document.getElementById('custom-tag-text')?.value?.trim()
-      if (!text) { alert('Describe the issue.'); return }
+      if (!text) { showToast('Describe the issue.', 'warning'); return }
       _addComponentToDraft(state.modal.compName, 'Custom', text)
       return
     }
 
-    /* Create the sub-invoice — no PIN required, adding only increases what's owed */
+    /* Record pending/approved/declined additional work. */
     if (el.dataset.action === 'submit-sub-invoice') {
       const parentId = el.dataset.parentId
       const tk = state.data.tickets.find(t => String(t.id) === String(parentId))
@@ -764,20 +805,89 @@ function attachEvents() {
       const comps  = readSubInvCompsFromDOM()
       const labour = readSubInvLabourFromDOM()
       const note   = document.getElementById('sub-invoice-note')?.value || ''
-      if (!comps.length && !labour) { alert('Add at least one component or a labour charge.'); return }
+      if (!comps.length && !labour) { showToast('Add at least one component or a labour charge.', 'warning'); return }
 
-      const res = await createSubInvoice(tk, comps, labour, note, SESSION.employee?.name)
-      if (!res.ok) { alert('Error: ' + res.error); return }
+      const decision = document.getElementById('additional-work-decision')?.value || 'Approved'
+      const method = document.getElementById('additional-work-method')?.value || 'In person'
+      const description = comps.map(c=>c.name).filter(Boolean).join(', ') || note || 'Additional work'
+      const res = await recordAdditionalWork(Number(parentId), description, comps, labour, decision, method, note)
+      if (!res.ok) { showToast('Error: ' + res.error, 'error'); return }
 
-      const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
-      printThermal(buildSubInvoiceSlip(res.data, tk))
+      if (res.ticket) {
+        const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
+        printThermal(buildSubInvoiceSlip(res.ticket, tk))
+      }
 
       state.modal = null
       await load(); return
     }
 
+    if (el.dataset.action === 'decide-additional-work') {
+      const decision = el.dataset.decision
+      const input = await requestInput({
+        title: `${decision} additional work?`,
+        message: 'Record how the customer decision was received.',
+        confirmLabel: `Save ${decision.toLowerCase()}`,
+        fields: [
+          { name:'method', label:'Decision method', type:'select', value:'Phone', options:['Phone','In person','WhatsApp','Other'] },
+          { name:'note', label:'Decision note (optional)', type:'textarea', value:'' },
+        ],
+      })
+      if (!input?.confirmed) return
+      const method = input.value.method
+      const note = input.value.note || ''
+      const result = await decideAdditionalWork(Number(el.dataset.proposalId), decision, method, note)
+      if (!result.ok) { showToast('Decision error: ' + result.error, 'error'); return }
+      if (result.ticket) {
+        const root = state.data.tickets.find(t=>!t.parent_ticket_id && String(t.id)===String(result.proposal.root_ticket_id))
+        if (root) {
+          const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
+          printThermal(buildSubInvoiceSlip(result.ticket, root))
+        }
+      }
+      showToast(`Additional work ${decision.toLowerCase()}.`, 'success')
+      state.modal = null; await load(); return
+    }
+
+    if (el.dataset.action === 'open-repair-adjustment') {
+      state.modal = { type:'repair-adjustment', rootId:Number(el.dataset.ticketId) }
+      render(); return
+    }
+    if (el.dataset.action === 'submit-repair-adjustment') {
+      const amount = Number(document.getElementById('repair-adjustment-amount')?.value || 0)
+      const type = document.getElementById('repair-adjustment-type')?.value || 'discount'
+      const reason = document.getElementById('repair-adjustment-reason')?.value?.trim() || ''
+      if (amount <= 0 || !reason) { showToast('Enter a positive reduction and a reason.', 'warning'); return }
+      openPinPrompt('discount', async verified => {
+        if (!verified) return
+        const result = await createRepairAdjustment(Number(el.dataset.ticketId), amount, type, reason)
+        if (!result.ok) { showToast('Adjustment error: ' + result.error, 'error'); return }
+        showToast('Repair invoice adjustment completed.', 'success')
+        state.modal = null; await load()
+      }, render); return
+    }
+    if (el.dataset.action === 'open-repair-cancellation') {
+      const summaryResult = await getRepairFamilySummary(Number(el.dataset.ticketId))
+      if (!summaryResult.ok) { showToast('Summary error: ' + summaryResult.error, 'error'); return }
+      state.modal = { type:'repair-cancellation', rootId:Number(el.dataset.ticketId), summary:summaryResult.data }
+      render(); return
+    }
+    if (el.dataset.action === 'submit-repair-cancellation') {
+      const refund = Number(document.getElementById('repair-cancel-refund')?.value || 0)
+      const method = document.getElementById('repair-cancel-method')?.value || 'Cash'
+      const reason = document.getElementById('repair-cancel-reason')?.value?.trim() || ''
+      if (refund < 0 || !reason) { showToast('Enter a valid refund and a reason.', 'warning'); return }
+      openPinPrompt('repair-refund', async verified => {
+        if (!verified) return
+        const result = await cancelRepair(Number(el.dataset.ticketId), refund, method, reason)
+        if (!result.ok) { showToast('Cancellation error: ' + result.error, 'error'); return }
+        showToast(refund > 0 ? 'Repair cancelled and refund completed.' : 'Repair cancelled.', 'success')
+        state.modal = null; await load()
+      }, render); return
+    }
+
     if (el.dataset.action === 'install' && state.installPrompt) {
-      state.installPrompt.prompt(); state.installPrompt = null; render(); return
+      await runInstallPrompt(); render(); return
     }
     if (el.dataset.action === 'my-account') {
       state.modal = { type: 'myAccount' }; render(); return
@@ -791,8 +901,13 @@ function attachEvents() {
       const email = el.dataset.resetEmail
       const newPass = generateTempPassword()
       const res = await resolvePasswordReset(el.dataset.resetId, email, newPass, SESSION.employee?.name || 'Admin')
-      if (!res.ok) { alert('Error: ' + res.error); return }
-      alert(`New password for ${email}:\n\n${newPass}\n\nShare this with them directly — it won't be shown again.`)
+      if (!res.ok) { showToast('Error: ' + res.error, 'error'); return }
+      await confirmAction({
+        title: 'Temporary password created',
+        message: `New password for ${email}:\n\n${newPass}\n\nShare this directly. It will not be shown again.`,
+        confirmLabel: 'Done',
+        cancelLabel: 'Close',
+      })
       const requests = await listPendingResetRequests()
       state.modal = { type: 'passwordResets', requests }
       render(); return
@@ -803,8 +918,13 @@ function attachEvents() {
       applyBranding(); render(); return
     }
     if (el.dataset.action === 'logout') {
-      if (!confirm('Log out?')) return
-      await _clearSession()
+      await confirmAction({
+        title: 'Log out?',
+        message: 'Are you sure you want to log out?',
+        confirmLabel: 'Log out',
+        tone: 'danger',
+        action: async () => { await _clearSession(); return true },
+      })
       return
     }
 
@@ -826,7 +946,13 @@ function attachEvents() {
     if (el.dataset.action === 'remove-employee') {
       const name      = el.dataset.empName || 'this employee'
       const empId     = el.dataset.empId
-      if (!confirm(`Make ${name} inactive? Historical records will be preserved.`)) return
+      const confirmation = await confirmAction({
+        title: 'Deactivate employee?',
+        message: `Make ${name} inactive? Historical records will be preserved.`,
+        confirmLabel: 'Continue',
+        tone: 'danger',
+      })
+      if (!confirmation?.confirmed) return
 
       openPinPrompt('admin', async (verified) => {
         if (!verified) return
@@ -836,20 +962,18 @@ function attachEvents() {
           employeeId: Number(empId), name: found.name, email: found.email,
           role: found.role, status: 'Inactive',
         })
-        if (!result.ok) { alert('Error deactivating: ' + result.error); return }
+        if (!result.ok) { showToast('Error deactivating: ' + result.error, 'error'); return }
         await load()
       }, render); return
     }
 
     if (el.dataset.action === 'open-ticket-editor') {
       const ticketId = el.dataset.ticketId
-      state.modal = { type:'ticketDetail', id:ticketId, subInvoices: [] }
-      render()
-      const subs = await getSubInvoices(ticketId)
-      if (state.modal?.type === 'ticketDetail' && String(state.modal.id) === ticketId) {
-        state.modal.subInvoices = subs
-        render()
-      }
+      await openTicketDetail(ticketId)
+      return
+    }
+    if (el.dataset.action === 'retry-ticket-detail') {
+      await openTicketDetail(el.dataset.ticketId)
       return
     }
 
@@ -863,19 +987,17 @@ function attachEvents() {
 
     if (el.dataset.action === 'save-ticket-detail') {
       const newStatus   = document.getElementById('td-status')?.value
-      const actualQuote = Number(document.getElementById('td-actual-quote')?.value||0)
       const note        = document.getElementById('td-note')?.value||''
       const upd = { status:newStatus, update_note:note }
-      if (actualQuote > 0) upd.actual_quote = actualQuote
       const { error } = await sb.from('tickets').update(upd).eq('id', el.dataset.id)
-      if (error) { alert('Update failed: '+error.message); return }
+      if (error) { showToast('Update failed: '+error.message, 'error'); return }
       state.modal = null; await load(); return
     }
 
     if (el.dataset.action === 'reprint-receipt') {
       const saleId = Number(el.dataset.saleId)
       const sale   = state.data.sales.find(s => s.id === saleId)
-      if (!sale) { alert('Sale not found.'); return }
+      if (!sale) { showToast('Sale not found.', 'error'); return }
       const { buildReceiptSlip, printThermal } = await import('../print/print.js')
       const reprSale = {
         receiptNo: sale.invoice_number||`INV-${sale.id}`, date: sale.created_at,
@@ -930,7 +1052,7 @@ function attachEvents() {
       const { error } = await sb.from('repair_components').insert({
         name: val, sort_order: (state.data.repairComponents||[]).length + 1
       })
-      if (error) { alert('Error: '+error.message); return }
+      if (error) { showToast('Error: '+error.message, 'error'); return }
       const input = document.getElementById('new-comp-input')
       if (input) input.value = ''
       await load(); return
@@ -942,7 +1064,7 @@ function attachEvents() {
     if (el.dataset.removeQuick !== undefined) {
       const compId = Number(el.dataset.removeQuick)
       const { error } = await sb.from('repair_components').delete().eq('id', compId)
-      if (error) { alert('Error: '+error.message); return }
+      if (error) { showToast('Error: '+error.message, 'error'); return }
       await load(); return
     }
 
@@ -951,7 +1073,7 @@ function attachEvents() {
       const { error } = await sb.from('quick_items').insert({
         name: val, prices: [], sort_order: (state.data.quickItems||[]).length + 1
       })
-      if (error) { alert('Error: '+error.message); return }
+      if (error) { showToast('Error: '+error.message, 'error'); return }
       await load(); return
     }
     if (el.dataset.action === 'save-qitems') {
@@ -963,7 +1085,7 @@ function attachEvents() {
       const item = (state.data.quickItems||[])[Number(el.dataset.removeQitem)]
       if (!item) return
       const { error } = await sb.from('quick_items').delete().eq('id', item.id)
-      if (error) { alert('Error: '+error.message); return }
+      if (error) { showToast('Error: '+error.message, 'error'); return }
       await load(); return
     }
     if (el.dataset.addQprice !== undefined) {
@@ -975,7 +1097,7 @@ function attachEvents() {
       if (!item) return
       const newPrices = [...(item.prices||[]), { name: variantName, price: val }]
       const { error } = await sb.from('quick_items').update({ prices: newPrices }).eq('id', item.id)
-      if (error) { alert('Error: '+error.message); return }
+      if (error) { showToast('Error: '+error.message, 'error'); return }
       await load(); return
     }
     if (el.dataset.removeQprice !== undefined) {
@@ -985,11 +1107,12 @@ function attachEvents() {
       const newPrices = [...(item.prices||[])]
       newPrices.splice(pi, 1)
       const { error } = await sb.from('quick_items').update({ prices: newPrices }).eq('id', item.id)
-      if (error) { alert('Error: '+error.message); return }
+      if (error) { showToast('Error: '+error.message, 'error'); return }
       await load(); return
     }
 
     if (el.dataset.invEdit && _inv) { _inv.handleInvEdit(el); render(); return }
+    if (el.dataset.invAdjust && _inv) { _inv.handleInvAdjust(el); render(); return }
     if (el.dataset.invDelete && _inv) {
       const { deleted } = await _inv.handleInvDelete(el)
       if (deleted) await load()
@@ -997,23 +1120,15 @@ function attachEvents() {
     }
 
     if (el.dataset.settleId) {
-      const udharId = Number(el.dataset.settleId)
-      const amount  = Number(document.querySelector(`[data-settle-amount="${udharId}"]`)?.value)
-      const method  = document.querySelector(`[data-settle-method="${udharId}"]`)?.value || 'Cash'
-      if (!amount || amount <= 0) { alert('Enter a valid amount.'); return }
+      const accountKey = el.dataset.settleId
+      const amount  = Number(document.querySelector(`[data-settle-amount="${accountKey}"]`)?.value)
+      const method  = document.querySelector(`[data-settle-method="${accountKey}"]`)?.value || 'Cash'
+      if (!amount || amount <= 0) { showToast('Enter a valid amount.', 'warning'); return }
       openPinPrompt('settle', async (verified) => {
         if (!verified) return
-        const rec = state.data.udhar.find(u => u.id === udharId); if (!rec) return
-        const history = rec.payment_history || []
-        history.push({ date:new Date().toISOString().slice(0,10), paid:amount, method })
-        const newPaid    = Number(rec.amount_paid)+Number(amount)
-        const newBalance = Math.max(0, Number(rec.total_amount)-newPaid)
-        const { error } = await sb.from('udhar').update({
-          amount_paid:newPaid, balance_due:newBalance, payment_history:history,
-          status:newBalance<=0?'Settled':'Partial',
-          settled_at:newBalance<=0?new Date().toISOString():null,
-        }).eq('id', udharId)
-        if (error) { alert('Settle error: '+error.message); return }
+        const rec = (state.data.udharAccounts || []).find(u => `${u.kind}:${u.sourceId}` === accountKey)
+        const result = await settleUdhar(rec, amount, method)
+        if (!result.ok) { showToast('Settle error: '+result.error, 'error'); return }
         await load(); state.modal = { type:'udharList' }; render()
       }, render); return
     }
@@ -1021,13 +1136,7 @@ function attachEvents() {
     const viewTicketEl = el.closest('[data-view-ticket]')
     if (viewTicketEl && el.tagName !== 'BUTTON' && !el.closest('button')) {
       const ticketId = String(viewTicketEl.dataset.viewTicket)
-      state.modal = { type:'ticketDetail', id:ticketId, subInvoices: [] }
-      render()
-      const subs = await getSubInvoices(ticketId)
-      if (state.modal?.type === 'ticketDetail' && String(state.modal.id) === ticketId) {
-        state.modal.subInvoices = subs
-        render()
-      }
+      await openTicketDetail(ticketId)
       return
     }
   })
@@ -1044,6 +1153,16 @@ function attachEvents() {
       const labour = Number(document.querySelector('[data-subinv-labour]')?.value||0)
       const el     = document.getElementById('subinv-draft-total')
       if (el) el.textContent = money(prices+labour)
+    }
+    if (t.dataset.repairCancelRefund !== undefined) {
+      const available = Math.max(0, Number(state.modal?.summary?.netPayments || 0))
+      const refund = Math.min(available, Math.max(0, Number(t.value || 0)))
+      const customer = document.getElementById('repair-cancel-customer')
+      const retained = document.getElementById('repair-cancel-retains')
+      const obligation = document.getElementById('repair-cancel-obligation')
+      if (customer) customer.textContent = money(refund)
+      if (retained) retained.textContent = money(available-refund)
+      if (obligation) obligation.textContent = money(available-refund)
     }
   })
 
@@ -1089,7 +1208,7 @@ function attachEvents() {
 
     if (type === 'add-quick-item') {
       const itemName = data.itemName?.trim()
-      if (!itemName) { alert('Item name is required.'); return }
+      if (!itemName) { showToast('Item name is required.', 'warning'); return }
       const names  = [...form.querySelectorAll('[name="variantName[]"]')].map(i => i.value.trim())
       const prices = [...form.querySelectorAll('[name="variantPrice[]"]')].map(i => Number(i.value) || 0)
       const variants = names.map((name, i) => ({ name, price: prices[i] })).filter(v => v.price > 0)
@@ -1097,7 +1216,7 @@ function attachEvents() {
         name: itemName, prices: variants,
         sort_order: (state.data.quickItems||[]).length + 1
       })
-      if (error) { alert('Error: ' + error.message); return }
+      if (error) { showToast('Error: ' + error.message, 'error'); return }
       state.modal = null
       await load(); return
     }
@@ -1110,7 +1229,7 @@ function attachEvents() {
         return
       }
       state.modal = null
-      alert('Password updated.')
+      showToast('Password updated.', 'success')
       render(); return
     }
 
@@ -1119,25 +1238,25 @@ function attachEvents() {
       const updates = { employeeId:Number(empId), name:data.name, role:data.role, status:data.status, email:(data.email||'').toLowerCase().trim() }
       if (data.password?.trim()) {
         const err = validatePassword(data.password)
-        if (err) { alert(err); return }
+        if (err) { showToast(err, 'warning'); return }
       }
       const result = await invokeAccountAdmin('update-employee', updates)
-      if (!result.ok) { alert('Error updating: '+result.error); return }
+      if (!result.ok) { showToast('Error updating: '+result.error, 'error'); return }
       if (data.password?.trim()) {
         const reset = await invokeAccountAdmin('reset-password', { email: updates.email, newPassword: data.password })
-        if (!reset.ok) { alert('Employee details were saved, but password reset failed: ' + reset.error); return }
+        if (!reset.ok) { showToast('Employee details were saved, but password reset failed: ' + reset.error, 'error'); return }
       }
       state.modal = null; await load(); return
     }
 
     if (type === 'employee') {
       const pwErr = validatePassword(data.password||'')
-      if (pwErr) { alert(pwErr); return }
+      if (pwErr) { showToast(pwErr, 'warning'); return }
       const result = await invokeAccountAdmin('create-employee', {
         name:data.name, email:(data.email||'').toLowerCase().trim(),
         password:data.password, role:data.role||'Cashier',
       })
-      if (!result.ok) { alert('Error saving employee: '+result.error); return }
+      if (!result.ok) { showToast('Error saving employee: '+result.error, 'error'); return }
       state.modal = null; await load(); return
     }
 
@@ -1162,27 +1281,28 @@ function attachEvents() {
       if (data.receiptFooter)       updates.terms_text       = data.receiptFooter
       if (data.businessDescription) updates.shop_description = data.businessDescription
       const result = await invokeAccountAdmin('update-config', { updates })
-      if (!result.ok) { alert('Settings error: '+result.error); return }
+      if (!result.ok) { showToast('Settings error: '+result.error, 'error'); return }
       state.modal = null; await load(); return
     }
 
     if (type === 'owner-login') {
       const email = data.owner_email?.toLowerCase().trim()
-      if (!email) { alert('Enter an owner email.'); return }
+      if (!email) { showToast('Enter an owner email.', 'warning'); return }
       const result = await invokeAccountAdmin('update-owner', { email })
-      if (!result.ok) { alert('Error: '+result.error); return }
-      alert('Owner email updated.'); return
+      if (!result.ok) { showToast('Error: '+result.error, 'error'); return }
+      showToast('Owner email updated.', 'success'); return
     }
 
     if (type === 'override-pin') {
-      if (!data.new_pin?.trim()) { alert('Enter a PIN.'); return }
+      if (!data.new_pin?.trim()) { showToast('Enter a PIN.', 'warning'); return }
       const result = await invokeAccountAdmin('set-pin', { pin:data.new_pin })
-      if (!result.ok) { alert('Error: '+result.error); return }
-      alert('Override PIN updated.'); return
+      if (!result.ok) { showToast('Error: '+result.error, 'error'); return }
+      showToast('Override PIN updated.', 'success'); return
     }
 
-    if ((type === 'inv-add' || type === 'inv-edit') && _inv) {
-      const fn = type === 'inv-add' ? _inv.submitInvAdd : _inv.submitInvEdit
+    if ((type === 'inv-add' || type === 'inv-edit' || type === 'inv-adjust') && _inv) {
+      const fn = type === 'inv-add' ? _inv.submitInvAdd
+        : type === 'inv-edit' ? _inv.submitInvEdit : _inv.submitInvAdjust
       const { ok } = await fn(data)
       if (!ok) return
       state.modal = null; await load(); return
@@ -1196,15 +1316,6 @@ function attachEvents() {
     dlog('ADMIN.submit', `type=${type} not recognized by this listener -- no-op`)
   })
 
-  // Keyboard
-  document.addEventListener('keydown', e => {
-    if (document.getElementById('pp-display')) {
-      if (e.key==='Enter'||e.key==='Return') { e.preventDefault(); handlePpKey('✓',verifyAdminLocal,render); return }
-      if (e.key==='Backspace')               { e.preventDefault(); handlePpKey('⌫',verifyAdminLocal,render); return }
-      if (e.key==='Escape')                  { e.preventDefault(); state.modal=null; render(); return }
-      if (/^[0-9]$/.test(e.key))            { e.preventDefault(); handlePpKey(e.key,verifyAdminLocal,render); return }
-    }
-  })
 }
 
 /* ── Sub-invoice draft helpers ── */
@@ -1228,10 +1339,6 @@ function _addComponentToDraft(name, tag, customText) {
   ]
   state.modal = { type: 'create-sub-invoice', parentId, draftComponents, draftLabour: state.modal._draftLabour || 0 }
   render()
-}
-
-async function verifyAdminLocal(pin) {
-  return verifyCurrentStepUpPin(pin)
 }
 
 /* ── Public ── */

@@ -7,63 +7,47 @@
    createSubInvoice, markComponentNotNeeded, used by pos.js, admin.js,
    AND workshop.js) stay at features/repairs/api.js.
 ═══════════════════════════════════════════════════════════════════ */
-import { sb, CFG, _datePart, generateInvoiceNumber, logBillEvent } from '../../../shared.js'
+import { sb, logBillEvent } from '../../../shared.js'
 import { dlog } from '../../../debuglog.js'
 import { calcDraftTotal, calcDraftPaid } from './state.js'
-import { combinedBalance } from './render.js'
-
-/** Separate sequence, purely for the technician-facing ticket reference —
- *  does not represent money and is never shown as the primary number. */
-export async function generateTicketNumber() {
-  const { data: seq, error } = await sb.rpc('next_ticket_seq')
-  if (error) { dlog('pos.repairs.generateTicketNumber', `RPC FAILED, falling back to Date.now(): ${error.message}`); console.warn('next_ticket_seq failed, falling back:', error.message) }
-  const n = error ? Date.now() % 10000 : seq
-  const result = `${CFG.ticket_prefix||'TK'}${_datePart()}${String(n).padStart(4,'0')}`
-  dlog('pos.repairs.generateTicketNumber', `-> ${result}`)
-  return result
-}
 
 /**
  * Inserts a brand-new ticket from a cart line's draft data. Pure data
  * operation -- returns {ok, data, error}; caller (pos.js's placeOrder())
  * handles cart cleanup, state.modal, and render().
  */
-export async function insertNewTicketFromCart(ticketItem, employeeName) {
+export async function insertNewTicketFromCart(ticketItem) {
   dlog('pos.repairs.insertNewTicketFromCart', `ENTRY customerName=${ticketItem.customerName}`)
   const draft = ticketItem.draftData
   const total = calcDraftTotal(draft)
   const paid  = calcDraftPaid(draft)
 
-  const ticketNumber  = await generateTicketNumber()
-  const invoiceNumber = await generateInvoiceNumber()
-  const { data, error } = await sb.from('tickets').insert({
-    ticket_number:     ticketNumber,
-    invoice_number:    invoiceNumber,
-    customer_name:      ticketItem.customerName,
-    customer_phone:     ticketItem.customerPhone,
-    device_brand:       ticketItem.deviceBrand,
-    device_model:       ticketItem.deviceModel,
-    imei:                ticketItem.imei,
-    components_noted:   draft.components,
-    labour_cost:         Number(draft.labour||0),
-    estimated_quote:     total,
-    final_total:         total,
-    amount_paid:         paid,
-    balance_due:         Math.max(0, total - paid),
-    payment_history:     draft.payments,
-    advance_payment:     paid,
-    advance_method:      [...new Set(draft.payments.map(p=>p.method))].join(' + '),
-    status:              'Pending',
-    technician_note:     ticketItem.technicianNote || '',
-    created_by:          employeeName || 'Counter',
-    is_locked:           true,
-    placed_at:           new Date().toISOString(),
-  }).select().single()
+  if (paid > total) return { ok: false, error: 'Initial payment cannot exceed the repair invoice.' }
+  const tenders = draft.payments.map(p => ({
+    amount: Number(p.amount),
+    method: p.method,
+    ...(p.method === 'Cash' ? { cashTendered:Number(p.amount) } : {}),
+  }))
+  const { data: result, error } = await sb.rpc('create_repair_ticket', {
+    p_request_id: ticketItem.requestId,
+    p_ticket: {
+      customerName: ticketItem.customerName,
+      customerPhone: ticketItem.customerPhone,
+      deviceBrand: ticketItem.deviceBrand,
+      deviceModel: ticketItem.deviceModel,
+      imei: ticketItem.imei,
+      components: draft.components,
+      labourCost: Number(draft.labour || 0),
+      quotedAmount: total,
+      technicianNote: ticketItem.technicianNote || '',
+    },
+    p_tenders: tenders,
+  })
 
   if (error) { dlog('pos.repairs.insertNewTicketFromCart', `FAILED: ${error.message}`); return { ok: false, error: error.message } }
   await logBillEvent()
-  dlog('pos.repairs.insertNewTicketFromCart', `SUCCEEDED ticket_number=${data.ticket_number} id=${data.id}`)
-  return { ok: true, data }
+  dlog('pos.repairs.insertNewTicketFromCart', `SUCCEEDED ticket_number=${result.ticket.ticket_number} id=${result.ticket.id} replay=${result.idempotentReplay}`)
+  return { ok: true, data: result.ticket, financial: result }
 }
 
 /**
@@ -73,35 +57,19 @@ export async function insertNewTicketFromCart(ticketItem, employeeName) {
  * returns {ok, error}; caller handles cart cleanup, load(), and the
  * confirmation alert.
  */
-export async function collectTicketPayment(ticket, payAmount, payMethod) {
+export async function collectTicketPayment(ticket, payAmount, payMethod, requestId) {
   dlog('pos.repairs.collectTicketPayment', `ENTRY ticketId=${ticket.id} amount=${payAmount}`)
-  const { subs } = combinedBalance(ticket)
-  const orderedTickets = [ticket, ...subs.sort((a,b) => new Date(a.created_at) - new Date(b.created_at))]
-
-  let remaining = payAmount
-  for (const t of orderedTickets) {
-    const tTotal   = Number(t.final_total || t.estimated_quote || 0)
-    const tBalance = Math.max(0, tTotal - Number(t.amount_paid||0))
-    if (tBalance <= 0 || remaining <= 0) continue
-
-    const applied = Math.min(remaining, tBalance)
-    remaining -= applied
-
-    const history = [...(t.payment_history||[]), { amount: applied, method: payMethod, date: new Date().toISOString() }]
-    const newPaid = Number(t.amount_paid||0) + applied
-    const newBalance = Math.max(0, tTotal - newPaid)
-
-    const { error } = await sb.from('tickets').update({
-      amount_paid: newPaid,
-      balance_due: newBalance,
-      payment_history: history,
-      status: newBalance <= 0 ? 'Ready' : t.status,
-      collected_at: newBalance <= 0 ? new Date().toISOString() : null,
-    }).eq('id', t.id)
-
-    if (error) { dlog('pos.repairs.collectTicketPayment', `FAILED on ticket ${t.id}: ${error.message}`); return { ok: false, error: error.message } }
-  }
+  const { data, error } = await sb.rpc('record_repair_payment', {
+    p_request_id: requestId,
+    p_root_ticket_id: ticket.id,
+    p_tenders: [{
+      amount: Number(payAmount),
+      method: payMethod,
+      ...(payMethod === 'Cash' ? { cashTendered:Number(payAmount) } : {}),
+    }],
+  })
+  if (error) { dlog('pos.repairs.collectTicketPayment', `FAILED: ${error.message}`); return { ok: false, error: error.message } }
   await logBillEvent()
-  dlog('pos.repairs.collectTicketPayment', 'SUCCEEDED')
-  return { ok: true }
+  dlog('pos.repairs.collectTicketPayment', `SUCCEEDED replay=${data.idempotentReplay}`)
+  return { ok: true, data }
 }

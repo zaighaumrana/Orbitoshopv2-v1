@@ -15,32 +15,40 @@
    file importing from a view-owned one would invert the intended
    dependency direction.
 ═══════════════════════════════════════════════════════════════════ */
-import { sb, generateInvoiceNumber } from '../../shared.js'
+import { sb } from '../../shared.js'
 import { dlog, dstack } from '../../debuglog.js'
+
+const pendingAdditionalWorkRequests = new Map()
+const pendingDeliveryRequests = new Map()
+const pendingRepairAdjustmentRequests = new Map()
+const pendingRepairCancellationRequests = new Map()
+const pendingComponentChangeRequests = new Map()
 
 export async function createTicket(payload, employeeName, ticketNumber) {
   dstack('repairs.createTicket', `ENTRY customerName=${payload.customerName} employeeName=${employeeName} -- NOTE: this function currently has no known callers in the app, so if this fires, the stack trace above is the answer`)
-  const invoiceNo = await generateInvoiceNumber()
-  const { data, error } = await sb.from('tickets').insert({
-    ticket_number:    ticketNumber,
-    invoice_number:   invoiceNo,
-    customer_name:    payload.customerName   || '',
-    customer_phone:   payload.customerPhone  || '',
-    device_brand:     payload.deviceBrand    || '',
-    device_model:     payload.deviceModel    || '',
-    imei:             payload.imei           || '',
-    components_noted: payload.components     || [],
-    estimated_quote:  Number(payload.estimatedQuote || 0),
-    advance_payment:  Number(payload.advance        || 0),
-    advance_method:   payload.advanceMethod  || '',
-    status:           'Pending',
-    technician_note:  payload.technicianNote || '',
-    created_by:       employeeName           || 'Counter',
-    is_locked:        true,
-  }).select().single()
+  const advance = Number(payload.advance || 0)
+  const method = payload.advanceMethod || 'Cash'
+  const { data: result, error } = await sb.rpc('create_repair_ticket', {
+    p_request_id: crypto.randomUUID(),
+    p_ticket: {
+      customerName: payload.customerName || '',
+      customerPhone: payload.customerPhone || '',
+      deviceBrand: payload.deviceBrand || '',
+      deviceModel: payload.deviceModel || '',
+      imei: payload.imei || '',
+      components: payload.components || [],
+      labourCost: Number(payload.labourCost || 0),
+      quotedAmount: Number(payload.estimatedQuote || 0),
+      technicianNote: payload.technicianNote || '',
+    },
+    p_tenders: advance > 0 ? [{
+      amount: advance, method,
+      ...(method === 'Cash' ? { cashTendered:advance } : {}),
+    }] : [],
+  })
   if (error) { dlog('repairs.createTicket', `FAILED: ${error.message}`); return { ok: false, error: error.message } }
-  dlog('repairs.createTicket', `SUCCEEDED ticket_number=${data.ticket_number}`)
-  return { ok: true, data }
+  dlog('repairs.createTicket', `SUCCEEDED ticket_number=${result.ticket.ticket_number}`)
+  return { ok: true, data: result.ticket }
 }
 
 export async function updateTicket(id, updates) {
@@ -50,10 +58,7 @@ export async function updateTicket(id, updates) {
   if (updates.status         !== undefined) mapped.status           = updates.status
   if (updates.declineReason  !== undefined) mapped.decline_reason   = updates.declineReason
   if (updates.technicianNote !== undefined) mapped.technician_note  = updates.technicianNote
-  if (updates.settledAt      !== undefined) mapped.settled_at       = updates.settledAt
   if (updates.update_note    !== undefined) mapped.update_note      = updates.update_note
-  if (updates.actual_quote   !== undefined) mapped.actual_quote     = updates.actual_quote
-  if (updates.labour_cost    !== undefined) mapped.labour_cost      = updates.labour_cost
   const { error } = await sb.from('tickets').update(mapped).eq('id', id)
   if (error) { dlog('repairs.updateTicket', `FAILED: ${error.message}`); return { ok: false, error: error.message } }
   dlog('repairs.updateTicket', 'SUCCEEDED')
@@ -77,49 +82,113 @@ export async function getSubInvoices(parentId) {
  * Called by pos.js, admin.js, AND workshop.js -- genuinely shared.
  */
 export async function createSubInvoice(parentTicket, components, labourCost, note, employeeName) {
-  const existingSubs = await getSubInvoices(parentTicket.id)
-  const suffix = String.fromCharCode(65 + existingSubs.length) // A, B, C, ...
-
   const componentsTotal = (components||[]).reduce((s,c) => s + Number(c.price||0), 0)
   const total = componentsTotal + Number(labourCost||0)
-
-  const alreadyCredited = existingSubs.reduce((sum, s) =>
-    sum + (s.payment_history||[])
-      .filter(p => p.type === 'advance_credit')
-      .reduce((a,p) => a + Number(p.amount||0), 0)
-  , 0)
-  const remainingAdvance = Math.max(0, Number(parentTicket.advance_payment||0) - alreadyCredited)
-  const creditApplied    = Math.min(remainingAdvance, total)
-  const balanceDue       = Math.max(0, total - creditApplied)
-
-  const paymentHistory = creditApplied > 0
-    ? [{ type:'advance_credit', amount:creditApplied, date:new Date().toISOString(), note:'Credited from original advance payment' }]
-    : []
-
-  const { data, error } = await sb.from('tickets').insert({
-    parent_ticket_id:  parentTicket.id,
-    invoice_number:    `${parentTicket.invoice_number}-${suffix}`,
-    ticket_number:      `${parentTicket.ticket_number}-${suffix}`,
-    customer_name:      parentTicket.customer_name,
-    customer_phone:     parentTicket.customer_phone,
-    device_brand:       parentTicket.device_brand,
-    device_model:       parentTicket.device_model,
-    imei:               parentTicket.imei,
-    components_noted:   components || [],
-    labour_cost:        Number(labourCost||0),
-    estimated_quote:    total,
-    final_total:        total,
-    amount_paid:        creditApplied,
-    balance_due:        balanceDue,
-    payment_history:    paymentHistory,
-    technician_note:    note || '',
-    status:              'Pending',
-    is_locked:           true,
-    created_by:          employeeName || 'Technician',
-  }).select().single()
-
+  const key = JSON.stringify([parentTicket.id, components || [], Number(labourCost || 0), note || ''])
+  const requestId = pendingAdditionalWorkRequests.get(key) || crypto.randomUUID()
+  pendingAdditionalWorkRequests.set(key, requestId)
+  const description = (components || []).map(c => c.name).filter(Boolean).join(', ') || note || 'Additional work'
+  const { data: result, error } = await sb.rpc('approve_additional_work', {
+    p_request_id: requestId,
+    p_root_ticket_id: parentTicket.id,
+    p_description: description,
+    p_details: { components:components || [], labourCost:Number(labourCost || 0), note:note || '' },
+    p_quoted_amount: total,
+    p_decision_method: 'In person',
+    p_decision_note: note || '',
+  })
   if (error) return { ok: false, error: error.message }
-  return { ok: true, data, creditApplied }
+  pendingAdditionalWorkRequests.delete(key)
+  return { ok: true, data:result.ticket, creditApplied:0, proposal:result.proposal }
+}
+
+export async function getRepairFamilySummary(ticketId) {
+  const { data, error } = await sb.rpc('get_repair_family_summary', { p_ticket_id: ticketId })
+  if (error) return { ok:false, error:error.message }
+  return { ok:true, data }
+}
+
+export async function recordAdditionalWork(rootTicketId, description, components, labourCost, decision, method, note) {
+  const amount = (components || []).reduce((sum,c)=>sum+Number(c.price||0),0) + Number(labourCost || 0)
+  const proposalRequestId = crypto.randomUUID()
+  const { data: proposal, error: proposalError } = await sb.rpc('save_additional_work_proposal', {
+    p_request_id: proposalRequestId,
+    p_root_ticket_id: rootTicketId,
+    p_description: description,
+    p_details: { note: note || '', components: components || [], labourCost: Number(labourCost || 0) },
+    p_quoted_amount: Number(amount || 0),
+  })
+  if (proposalError) return { ok:false, error:proposalError.message }
+  if (decision === 'Pending') return { ok:true, proposal, ticket:null }
+
+  const { data, error } = await sb.rpc('decide_additional_work', {
+    p_request_id: crypto.randomUUID(),
+    p_proposal_id: proposal.id,
+    p_decision: decision,
+    p_decision_method: method,
+    p_decision_note: note || '',
+  })
+  if (error) return { ok:false, error:error.message }
+  return { ok:true, proposal:data.proposal, ticket:data.ticket }
+}
+
+export async function decideAdditionalWork(proposalId, decision, method, note) {
+  const { data, error } = await sb.rpc('decide_additional_work', {
+    p_request_id: crypto.randomUUID(),
+    p_proposal_id: proposalId,
+    p_decision: decision,
+    p_decision_method: method,
+    p_decision_note: note || '',
+  })
+  if (error) return { ok:false, error:error.message }
+  return { ok:true, proposal:data.proposal, ticket:data.ticket }
+}
+
+export async function createRepairAdjustment(rootTicketId, amount, type, reason) {
+  const key = JSON.stringify([rootTicketId, Number(amount), type, reason])
+  const requestId = pendingRepairAdjustmentRequests.get(key) || crypto.randomUUID()
+  pendingRepairAdjustmentRequests.set(key, requestId)
+  const { data, error } = await sb.rpc('create_repair_adjustment', {
+    p_request_id: requestId,
+    p_root_ticket_id: rootTicketId,
+    p_ticket_id: null,
+    p_amount: Number(amount),
+    p_adjustment_type: type,
+    p_reason: reason,
+  })
+  if (error) return { ok:false, error:error.message }
+  pendingRepairAdjustmentRequests.delete(key)
+  return { ok:true, data }
+}
+
+export async function cancelRepair(rootTicketId, refundAmount, refundMethod, reason) {
+  const key = JSON.stringify([rootTicketId, Number(refundAmount), refundMethod, reason])
+  const requestId = pendingRepairCancellationRequests.get(key) || crypto.randomUUID()
+  pendingRepairCancellationRequests.set(key, requestId)
+  const { data, error } = await sb.rpc('cancel_repair', {
+    p_request_id: requestId,
+    p_root_ticket_id: rootTicketId,
+    p_refund_amount: Number(refundAmount),
+    p_refund_method: Number(refundAmount) > 0 ? refundMethod : '',
+    p_reason: reason,
+  })
+  if (error) return { ok:false, error:error.message }
+  pendingRepairCancellationRequests.delete(key)
+  return { ok:true, data }
+}
+
+export async function deliverRepair(rootTicketId, allowUdhar = false) {
+  const key = String(rootTicketId)
+  const requestId = pendingDeliveryRequests.get(key) || crypto.randomUUID()
+  pendingDeliveryRequests.set(key, requestId)
+  const { data, error } = await sb.rpc('deliver_repair', {
+    p_request_id: requestId,
+    p_root_ticket_id: rootTicketId,
+    p_allow_udhar: allowUdhar,
+  })
+  if (error) return { ok:false, error:error.message }
+  pendingDeliveryRequests.delete(key)
+  return { ok:true, data }
 }
 
 /**
@@ -129,11 +198,17 @@ export async function createSubInvoice(parentTicket, components, labourCost, not
  * the reason attached. Caller is responsible for PIN-gating this first.
  * Called by pos.js, admin.js, AND workshop.js -- genuinely shared.
  */
-export async function markComponentNotNeeded(ticketId, componentsNoted, index, reason, employeeName) {
-  const updated = [...componentsNoted]
-  if (!updated[index]) return { ok: false, error: 'Component not found.' }
-  updated[index] = { ...updated[index], removed: true, removedReason: reason||'', removedBy: employeeName||'' }
-  const { error } = await sb.from('tickets').update({ components_noted: updated }).eq('id', ticketId)
-  if (error) return { ok: false, error: error.message }
-  return { ok: true }
+export async function markComponentNotNeeded(ticketId, index, reason) {
+  const key = JSON.stringify([ticketId, index, reason])
+  const requestId = pendingComponentChangeRequests.get(key) || crypto.randomUUID()
+  pendingComponentChangeRequests.set(key, requestId)
+  const { data, error } = await sb.rpc('mark_repair_component_not_needed', {
+    p_request_id: requestId,
+    p_ticket_id: ticketId,
+    p_component_index: index,
+    p_reason: reason,
+  })
+  if (error) return { ok:false, error:error.message }
+  pendingComponentChangeRequests.delete(key)
+  return { ok:true, data }
 }

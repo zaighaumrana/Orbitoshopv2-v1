@@ -22,7 +22,7 @@
 ═══════════════════════════════════════════════════════════════════ */
 import {
   sb, state, CFG, money,
-  _clearSession,
+  _clearSession, showToast,
 } from '../../../shared.js'
 import { navigate } from '../../../router.js'
 import { dlog, dstack } from '../../../debuglog.js'
@@ -527,7 +527,7 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess) {
         reviewed_by: sess.employee?.id || null,
         reviewed_at: new Date().toISOString(),
       }).eq('id', leaveId)
-      if (error) { alert('Error: ' + error.message); return }
+      if (error) { showToast('Error: ' + error.message, 'error'); return }
       await reloadFn(); return
     }
 
@@ -557,14 +557,14 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess) {
 
     if (form.dataset.form === 'salary-config') {
       const empId = Number(form.dataset.empId)
-      if (!data.rate || Number(data.rate) <= 0) { alert('Enter a valid rate.'); return }
+      if (!data.rate || Number(data.rate) <= 0) { showToast('Enter a valid rate.', 'warning'); return }
       const { error } = await sb.from('salary_config').upsert({
         employee_id:    empId,
         salary_type:    data.salary_type,
         rate:           Number(data.rate),
         effective_from: new Date().toISOString().slice(0,10),
       }, { onConflict: 'employee_id' })
-      if (error) { alert('Error: ' + error.message); return }
+      if (error) { showToast('Error: ' + error.message, 'error'); return }
       await reloadFn(); return
     }
 
@@ -572,13 +572,13 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess) {
       const empId = Number(data.employee_id)
       const month = Number(data.month)
       const year  = Number(data.year)
-      if (!empId || !month || !year) { alert('Please fill all fields.'); return }
+      if (!empId || !month || !year) { showToast('Please fill all fields.', 'warning'); return }
       const btn = form.querySelector('button[type="submit"]') || form.querySelector('button')
       if (btn) { btn.disabled = true; btn.textContent = 'Generating…' }
       const result = await generateSalarySlip(empId, month, year, sess.employee?.id)
       if (btn) { btn.disabled = false; btn.textContent = 'Generate' }
-      if (!result.ok) { alert('Error: ' + result.error); return }
-      alert('Salary slip generated successfully.')
+      if (!result.ok) { showToast('Error: ' + result.error, 'error'); return }
+      showToast('Salary slip generated successfully.', 'success')
       await reloadFn(); return
     }
   })

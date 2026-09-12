@@ -35,6 +35,7 @@ export function adminInventoryPage({ filter, tit }) {
               <td class="muted">${money(i.cost)}</td>
               <td>
                 <button class="secondary-button" style="font-size:12px;padding:4px 10px" data-inv-edit="${i.id}">Edit</button>
+                <button class="secondary-button" style="font-size:12px;padding:4px 10px" data-inv-adjust="${i.id}">Adjust Stock</button>
                 <button class="secondary-button" style="font-size:12px;padding:4px 10px;color:var(--danger)" data-inv-delete="${i.id}">Delete</button>
               </td>
             </tr>`).join('')}
@@ -67,9 +68,27 @@ export function inventoryModalHTML(type, id) {
         ${fld('Name','name',item.name)}${fld('SKU','sku',item.sku)}${fld('Category','category',item.category)}
         ${fld('Selling Price','price',item.price,'number')}
         ${fld('Cost Price','cost',item.cost,'number')}
-        ${fld('Quantity','qty',item.qty,'number')}
         ${fld('Min Stock Alert','min_qty',item.min_qty,'number')}
       </div>
+      <p class="muted">Current quantity: <strong>${item.qty}</strong>. Use Adjust Stock for an audited quantity change.</p>
+      ${modalActions()}
+    </form></div>`
+  }
+  if (type === 'inv-adjust') {
+    const item = (state.data.inventory||[]).find(p => String(p.id) === String(id))
+    if (!item) return `<div class="modal-backdrop"><div class="modal"><p>Not found.</p><div class="modal-actions"><button class="secondary-button" data-close>Close</button></div></div></div>`
+    return `<div class="modal-backdrop"><form class="modal" data-form="inv-adjust" style="max-width:500px">
+      <h2>Adjust Stock — ${item.name}</h2>
+      <p class="muted">Current sellable quantity: <strong>${item.qty}</strong></p>
+      <input type="hidden" name="id" value="${item.id}">
+      <div class="form-grid">
+        <label class="field"><span>Change type</span><select name="movement_type">
+          <option value="restock">Restock (add stock)</option>
+          <option value="manual_adjustment">Manual correction (+ or −)</option>
+        </select></label>
+        ${fld('Quantity change','quantity_delta','1','number')}
+      </div>
+      <label class="field"><span>Reason</span><textarea name="reason" required></textarea></label>
       ${modalActions()}
     </form></div>`
   }

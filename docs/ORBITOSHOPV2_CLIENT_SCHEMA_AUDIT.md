@@ -871,3 +871,276 @@ Cashier, and separated Orbito Support login/refresh/logout gate passed cleanly.
 See `docs/PHASE2_AUTH_RLS_FORENSIC.md` for the complete evidence, residual gaps,
 and merge recommendation.
 
+### Phase 3A transaction-ledger preflight
+
+Started Phase 3 on `phase3-transaction-ledger` from the clean, merged and tagged
+Phase 2 baseline at `972005ddf1d1f4b212c9735630b4971e727926`.
+
+- `npm ci` and the production build passed; the existing mixed static/dynamic
+  `src/shared.js` import warning remains.
+- Local and remote migrations match through `20260904001510`; the linked
+  dry-run reports the remote database is up to date.
+- Initial read-only live diagnostics found 9 sales, 19 root tickets, 1 Udhar record, 2
+  returns, 2 Inventory items, 4 Quick Items and 7 repair components.
+- Identifiers, parentage, ticket/Udhar arithmetic, payment-history sums, return
+  quantities and plaintext-credential invariants otherwise reconcile.
+- Initial Phase 3A STOP: positive Cash sales 1, 3, 5 and 6 had no tender evidence, so
+  actual received amounts cannot be backfilled without external evidence or an
+  explicit legacy-unreconciled classification.
+- Initial Phase 3A STOP: returns 1 and 2 contained refund amounts but no durable refund
+  occurrence/method evidence.
+- All legacy sale/return line JSON lacks Inventory identity; historical stock
+  movements and restock decisions will not be guessed.
+- Ready tickets 9 and 17 have legacy payment-triggered `collected_at` values;
+  these are not accepted as physical-delivery evidence.
+- Before resolving the STOP, no Phase 3 schema, data, RPC, policy, Edge Function
+  or application mutation was made.
+
+The user subsequently confirmed the six blocking rows were disposable DEV data
+and authorized removal. A guarded transaction deleted returns 1 and 2 followed
+by sales 1, 3, 5 and 6 after verifying no Udhar, ticket or unexpected return
+dependencies. Post-cleanup counts are 5 sales and 0 returns. All blocking
+financial checks now return zero, so Phase 3A is GO. Configuration, catalog,
+Inventory, Auth/app identities, employees and audit records were preserved.
+
+See `docs/PHASE3_TRANSACTION_LEDGER_FORENSIC.md` for the full preflight,
+backfill boundary, target model and required decision before implementation.
+
+### Phase 3B ledger foundation
+
+Applied `20260904200000_phase3_ledger_foundation.sql` to DEV.
+
+- Added `sale_lines`, `payments`, `payment_allocations`, `refunds`,
+  `invoice_adjustments`, `credit_approvals`, `additional_work_proposals`,
+  `return_lines`, and `inventory_movements`.
+- Added exact-money, identity-shape, positive-quantity, decision-state and
+  commercial-family constraints.
+- Indexed all new foreign-key and primary query paths.
+- Enabled RLS on all nine tables.
+- Granted authenticated SELECT only where required and added role-specific read
+  policies; anonymous access and direct authenticated mutation privileges are
+  zero.
+- Verified all nine tables were empty immediately after the foundation apply.
+- Security advisors found no new Phase 3 issue. Performance advisors found no
+  missing new FK index; unused-index notices are expected before ledger traffic.
+- Phase 2 Auth, support, step-up and suspension helpers were not changed.
+
+### Phase 3C deterministic backfill
+
+Applied `20260904203000_phase3_deterministic_backfill.sql` to DEV after guarded
+precondition checks.
+
+- Normalized 11 legacy sale JSON lines into immutable `sale_lines` snapshots;
+  unknown historical Inventory identity and cost remain null.
+- Created 12 payment events and 12 allocations. Both totals reconcile to
+  36,449, with zero unbalanced payment records.
+- Reconstructed one active legacy credit approval for the remaining 1,000
+  Udhar balance without inventing an approver or step-up event.
+- Created two Inventory opening-balance movements totaling quantity 50, equal
+  to the current Inventory quantity.
+- Created no refund, return-line, invoice-adjustment or additional-work history
+  because the retained DEV records provide no deterministic evidence for it.
+- Advisor verification found no new Phase 3 security warning and no missing
+  foreign-key index on the new schema.
+- The migration is additive historical normalization only; no frontend writer
+  has been cut over yet and Phase 2 Auth/RLS remains unchanged.
+
+### Phase 3D atomic retail checkout
+
+Applied `20260904210000_phase3_atomic_retail_checkout.sql` to DEV.
+
+- Added nullable unique `sales.request_id` for retry-safe legacy-header linkage,
+  plus unique non-null sale invoice and Udhar-per-sale indexes.
+- Added the authenticated `create_retail_sale` transaction RPC. It validates the
+  active canonical role, suspension, current Quick Item/Inventory price, stock,
+  discounts, tender/change and purpose-specific Udhar authorization.
+- A successful call atomically writes `sales`, `sale_lines`, `payments`,
+  `payment_allocations`, optional `credit_approvals`/compatibility `udhar`, and
+  tracked `inventory_movements` plus current quantity.
+- Removed authenticated direct `sales` INSERT and `udhar` INSERT privileges and
+  policies. Ledger mutation remains RPC-only.
+- Updated POS checkout to preserve Quick Item/Inventory identity and reuse its
+  request UUID after an uncertain retry.
+- Rollback-only RPC tests passed exact Cash, change, split tender with Udhar,
+  duplicate retry, Inventory decrement, Quick Item non-stock behavior, and all
+  relevant denial/rollback cases. No test sale was retained.
+- Advisor review found only the intentionally callable authenticated transaction
+  RPC plus documented baseline notices; no new missing-FK-index finding.
+
+### Phase 3E atomic repair transactions
+
+Applied `20260904220000_phase3_atomic_repair_transactions.sql` to DEV.
+
+- Added unique non-null `tickets.request_id` and `tickets.invoice_number`
+  indexes plus the previously missing repair-family parent index.
+- Added `create_repair_ticket`, which atomically assigns the ticket/invoice
+  numbers, locks the original invoice, and records initial payment/allocation.
+- Added `record_repair_payment`, which locks one root family, validates its
+  current obligation and allocates each tender parent-first/oldest-first.
+- Compatibility `amount_paid`, `balance_due` and `payment_history` are derived
+  from canonical allocations. Payment never changes repair status or delivery
+  timestamps.
+- POS new-ticket placement and collection now use retry-safe UUID-backed RPCs.
+- Rollback-only tests passed no-advance, advance, duplicate create/payment,
+  Cash change, parent/child allocation and denial cases. No fixture remained.
+- Anonymous execution is denied; Technician payment is denied by the canonical
+  role check. Advisor output added only the expected reviewed RPC notices and no
+  new missing-FK-index finding.
+
+### Phase 3F additional work and adjustments
+
+Applied `20260904230000_phase3_additional_work_and_adjustments.sql` to DEV.
+
+- Added a unique decision request id to `additional_work_proposals`.
+- Added pending-proposal, decision and combined approved-work RPCs. Technician
+  may propose, but only the existing financial roles may approve/decline.
+- Approved decisions atomically create a distinct immutable child invoice with
+  zero advance/payment; Declined decisions create no invoice.
+- Added the PIN-protected immutable downward-adjustment RPC. It preserves the
+  original invoice and rejects reductions that require refund reconciliation.
+- Replaced the legacy sub-invoice INSERT with the approved-work RPC and removed
+  authenticated direct `tickets` INSERT privilege/policy.
+- Rollback-only tests passed Phone/WhatsApp approval, decline, no advance reuse,
+  original-value immutability, adjustment/idempotency and denial cases. No
+  fixture remained.
+- Advisor review found only intentionally callable authenticated transaction
+  RPCs and documented baseline notices; no new missing-FK-index finding.
+
+### Phase 3G repair cancellation and delivery
+
+Applied `20260905000000_phase3_repair_cancellation_and_delivery.sql` to DEV.
+
+- Added immutable cancellation and delivery request IDs, timestamps, reasons
+  and acting Auth-user references to repair roots.
+- Added a ticket mutation guard that blocks direct financial, immutable,
+  Delivered and Cancelled changes while preserving normal Workshop status
+  movement such as Pending to Ready.
+- Added `cancel_repair`, requiring the exact `repair-refund` PIN purpose and
+  atomically reconciling the retained obligation, optional refund and Cancelled
+  state without rewriting original invoices or payments.
+- Added `deliver_repair`, permitting physical handoff only from Ready when the
+  family is paid or its outstanding balance has a fresh Udhar approval.
+- Updated the POS Ready-ticket modal to use explicit paid or PIN-approved Udhar
+  delivery; removed direct Delivered and direct quote edits from Admin.
+- Deployed `verify-pin` version 2 with JWT verification enabled and the new
+  `repair-refund` purpose.
+- Rollback-only tests passed full/partial/zero refund, payment-before-delivery,
+  Udhar delivery, post-delivery payment, idempotency, actor/timestamp and all
+  authorization/direct-write denials. No test fixture remained.
+- Post-cutover counts remain 12 payments, 12 allocations, 2 Inventory opening
+  movements, 1 legacy credit approval, 0 refunds and 0 adjustments.
+- Advisor review found only the expected reviewed transaction-RPC and baseline
+  notices; no new missing-index finding for a Phase 3 foreign key.
+
+### Phase 3H retail returns and Inventory movements
+
+Applied `20260905010000_phase3_retail_returns_and_inventory_adjustments.sql`
+and the defensive `20260905011000_phase3_return_line_invariant.sql` follow-up
+to DEV.
+
+- Added idempotent request identity and persisted refund method to return
+  headers, plus the missing source-sale and processor indexes.
+- Added `get_retail_return_context` and PIN-protected `create_retail_return`.
+  The transaction validates cumulative quantities, allocates tax to line
+  reductions, reduces unpaid debt before money-out, persists an actual refund
+  only when due, updates credit compatibility state, and optionally restocks
+  tracked Inventory with an immutable movement.
+- Removed direct authenticated return INSERT and Inventory INSERT. A trigger
+  prevents direct current-quantity updates while existing authorized catalog
+  metadata edits remain available.
+- Added idempotent `create_inventory_item` and `adjust_inventory_stock`; opening
+  quantity, restock and manual correction all create movement history and
+  negative stock is rejected.
+- POS now supports per-line partial quantities, prior-return visibility,
+  Inventory restock Yes/No, reason, refund method and live actual-refund
+  preview. Admin Inventory now separates catalog editing from Adjust Stock.
+- The complete rollback-only return/Inventory matrix passed, including paid,
+  partially unpaid, repeated partial, tax-inclusive, Quick Item, restock and
+  no-restock cases. Direct and Technician mutation probes were denied.
+- The follow-up deferred constraint proved even a SQL NULL line-array cannot
+  commit an empty return header.
+- No fixture remained. Live counts remain 0 returns, 0 return lines, 0 refunds,
+  12 payments and 2 Inventory opening movements.
+- Advisors show no unexpected Phase 3 security finding and no missing index on
+  a new Phase 3 foreign key; the prior return FK notices are resolved.
+
+### Phase 3I unified Udhar and financial read models
+
+Applied `20260905020000_phase3_unified_udhar_and_reporting.sql` to DEV.
+
+- Added immutable actor attribution columns to `sales`, `tickets` and
+  `returns`, with conservative one-to-one legacy backfill and insert-time Auth
+  capture for all new RPC-created headers.
+- Added `get_unified_udhar_accounts`, deriving one familiar retail/repair list
+  from current invoice obligations, returns/adjustments, payments/refunds and
+  active credit approvals.
+- Added PIN-gated `settle_udhar`; settlement is an ordinary canonical payment,
+  supports Cash tender/change, reuses parent-first repair allocation and is
+  idempotent by request UUID.
+- Revoked authenticated direct UPDATE on legacy `udhar` and removed its update
+  policy. The table remains a retail compatibility cache maintained only by
+  server transactions.
+- Added `get_financial_report`, separating Invoiced/Sales, Payments Collected,
+  Refunds, Net Payments, Outstanding Receivables, Udhar Outstanding and
+  reliable Inventory Gross Profit. Cashier access is constrained to its own
+  actor-filtered shift report.
+- Admin dashboard/reports and POS shift totals now use the canonical read
+  model. Payment-method totals use payment rows, repair payments are included,
+  and refunds are visible as money-out. The Udhar UI now includes repairs.
+- Rollback-only fixtures passed REP-01 through REP-07, retail/repair
+  settlement, method/idempotency, Inventory gross-profit, anonymous,
+  Technician, PIN-purpose/expiry, direct-write and suspension tests.
+- No fixtures remain. Live counts are 5 sales, 19 tickets, 12 payments, 1
+  credit approval, 0 refunds, 0 returns and 0 step-up authorizations.
+- Advisor review found only the expected callable, internally authorized RPC
+  notices and documented Phase 2/baseline items; all three new actor foreign
+  keys have covering indexes.
+
+### Phase 3J repair-family summary and final UX
+
+Applied `20260905030000_phase3_repair_family_summary.sql` to DEV.
+
+- Added `get_repair_family_summary`, an authenticated financial-staff read RPC
+  that resolves a root or child ticket to one canonical family containing
+  invoices, decisions, adjustments, payments, refunds, totals, Udhar and
+  delivery/cancellation state.
+- REP-08 passed with exact parent/child/adjustment/payment/refund/net/balance
+  reconciliation and child-to-root lookup. Anonymous and Technician reads were
+  denied; Manager access passed. Fixtures rolled back.
+- Admin now exposes pending/approved/declined additional-work decisions,
+  immutable discount/price adjustments, cancellation/refund preview and final
+  repair summary printing. Technician Workshop submissions remain Pending for
+  authorized counter approval.
+- POS exposes final repair-summary printing and optional Cash + digital + Udhar
+  split tender. Original repair print explicitly shows total, paid at creation
+  and remaining at creation.
+- Workshop to POS and collection handoff now use the canonical router, removing
+  the direct initializer/path mismatch.
+- Production build passes. Automated Windows browser smoke is pending because
+  the UI-control runtime failed to initialize twice; no browser pass is claimed.
+
+### Phase 3K final evidence and security gate
+
+Applied `20260905031000_phase3_repair_component_change_guard.sql` to DEV.
+
+- Replaced the last direct locked-component JSON update with
+  `mark_repair_component_not_needed`, requiring the exact server-side
+  `remove-component` step-up and recording request, actor, time, reason and
+  authorization evidence in the preserved component snapshot.
+- Expanded the ticket guard to reject direct authenticated rewrites of
+  `components_noted`; valid RPC, retry/idempotency, no-PIN Technician denial and
+  direct-write denial tests passed and rolled back.
+- Final audit: 9/9 Phase 3 public tables have RLS, zero anonymous table grants,
+  zero authenticated ledger mutation grants, zero payment/allocation mismatch,
+  zero orphan allocation, zero over-return, zero negative Inventory and zero
+  retained `P3` test fixture.
+- Live counts remain 5 sales, 19 tickets, 12 payments, 0 refunds, 0 returns and
+  0 step-up grants.
+- Local/remote migrations match through `20260905031000`; dry-run reports the
+  remote database is up to date; the production build passes.
+- Advisors contain no critical Phase 3 finding. New callable-function notices
+  are expected for the internally authorized RPC boundary, and unused-index
+  notices are expected before sufficient production-like traffic.
+- Merge remains on hold solely for the explicit real-browser smoke and user
+  approval. No merge into `development` was performed.
+

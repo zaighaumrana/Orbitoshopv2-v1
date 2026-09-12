@@ -1,7 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════
    admin/pages/reports.js
-   Admin-only analytics page -- reads across sales (Checkout), tickets
-   (Repairs), and udhar (Checkout) data all at once for one summary.
+   Admin-only analytics page. Financial values come from the canonical
+   Phase 3 report RPC; legacy headers remain only for recent-invoice and
+   operational repair lists.
    Doesn't belong to any single feature (same reasoning as
    dashboard()/settings() staying admin-owned), so it lives here rather
    than under features/.
@@ -16,39 +17,43 @@ import { state, money } from '../../shared.js'
 
 export function reportsPage({ tit }) {
   const sales   = state.data.sales   || []
-  const tickets = state.data.tickets || []
-  const udhar   = state.data.udhar   || []
-  const total   = sales.reduce((s,x) => s+Number(x.total_bill||0), 0)
-  const disc    = sales.reduce((s,x) => s+Number(x.discount||0), 0)
-  const labour  = sales.reduce((s,x) => s+Number(x.labour_cost||0), 0)
-  const avg     = sales.length ? total/sales.length : 0
-  const udharOut= udhar.filter(u=>u.status!=='Settled').reduce((s,u)=>s+Number(u.balance_due||0),0)
+  const report  = state.data.financial || {}
+  const metric = key => Number(report[key] || 0)
+  const methods = report.paymentMethods || []
+  const costCoverage = metric('inventoryCostCoverage')
   return `
-    ${tit('Reports','Sales analytics and outstanding credits.','')}
+    ${tit('Reports','Invoices, real money movement, receivables, and Udhar.','')}
     <div class="grid kpi-grid">
-      ${[['Total Revenue',total],['Discounts Given',disc],['Labour Income',labour],
-         ['Avg Invoice',avg],['Udhar Outstanding',udharOut],['Total Invoices',sales.length]
-        ].map(([l,v]) => `
+      ${[
+        ['Invoiced / Sales', metric('invoiced')],
+        ['Payments Collected', metric('paymentsCollected')],
+        ['Refunds', metric('refunds')],
+        ['Net Payments', metric('netPayments')],
+        ['Outstanding Receivables', metric('outstandingReceivables')],
+        ['Udhar Outstanding', metric('udharOutstanding')],
+      ].map(([l,v]) => `
         <div class="card kpi"><span class="label">${l}</span>
-          <span class="value">${l==='Total Invoices'?v:money(v)}</span>
+          <span class="value">${money(v)}</span>
         </div>`).join('')}
     </div>
     <div class="grid two-col">
       <div class="card">
-        <h2>Payment Breakdown</h2>
+        <h2>Actual Payments by Method</h2>
         <div class="list">
-          ${['Cash','Raast','JazzCash','EasyPaisa','Bank Transfer','Udhar'].map(m => {
-            const c = sales.filter(s=>s.payment_method===m).length
-            const r = sales.filter(s=>s.payment_method===m).reduce((s,x)=>s+Number(x.total_bill||0),0)
-            return c ? `<div class="list-row"><span>${m} <small class="muted">(${c})</small></span><strong>${money(r)}</strong></div>` : ''
-          }).join('')}
+          ${methods.length ? methods.map(row => `
+            <div class="list-row"><span>${row.method} <small class="muted">(${row.count})</small></span><strong>${money(row.amount)}</strong></div>
+          `).join('') : '<div class="empty">No payment events.</div>'}
         </div>
       </div>
       <div class="card">
-        <h2>Repair Summary</h2>
+        <h2>Financial Detail</h2>
         <div class="list">
-          ${['Pending','In Progress','Ready','Delivered','Declined'].map(s => `
-            <div class="list-row"><span>${s}</span><strong>${tickets.filter(t=>t.status===s).length}</strong></div>`).join('')}
+          <div class="list-row"><span>Retail invoiced</span><strong>${money(metric('retailInvoiced'))}</strong></div>
+          <div class="list-row"><span>Repair invoiced</span><strong>${money(metric('repairInvoiced'))}</strong></div>
+          <div class="list-row"><span>Retail return reductions</span><strong>-${money(metric('retailReturnReductions'))}</strong></div>
+          <div class="list-row"><span>Repair adjustments</span><strong>${money(metric('repairAdjustments'))}</strong></div>
+          <div class="list-row"><span>Inventory gross profit</span><strong>${costCoverage > 0 ? money(metric('inventoryGrossProfit')) : 'Not available'}</strong></div>
+          <small class="muted">Inventory gross profit is shown only for tracked lines with a captured cost; it is not total business net profit.</small>
         </div>
       </div>
     </div>

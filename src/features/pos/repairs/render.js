@@ -15,6 +15,7 @@
 ═══════════════════════════════════════════════════════════════════ */
 import { state, CFG, money, currentTenant } from '../../../shared.js'
 import { getDraft, calcDraftTotal, calcDraftPaid } from './state.js'
+import { findRepairFamilies, matchedRepairChild } from '../../repairs/family.js'
 
 /** Combines a ticket's own balance with any sub-invoices billed under it. */
 export function combinedBalance(t) {
@@ -23,8 +24,9 @@ export function combinedBalance(t) {
   return { subs, subBalance, parentBalance: Number(t.balance_due||0), total: Number(t.balance_due||0) + subBalance }
 }
 
-export function repairRowHTML(t) {
+export function repairRowHTML(t, family = null) {
   const { subs, subBalance, parentBalance, total } = combinedBalance(t)
+  const matchedChild = family ? matchedRepairChild(family) : null
   const balanceLine = subs.length
     ? `Balance: ${money(parentBalance)} (original) + ${money(subBalance)} (${subs.length} additional) = ${money(total)} total`
     : `Balance: ${money(total)}`
@@ -34,6 +36,7 @@ export function repairRowHTML(t) {
         <strong>${t.customer_name}</strong>
         <span class="badge warn" style="margin-left:6px">${t.status}</span><br>
         <small class="muted">${t.invoice_number || t.ticket_number} · ${t.device_brand} ${t.device_model}</small>
+        ${matchedChild ? `<br><small style="color:var(--primary)">Matched additional invoice: ${matchedChild.invoice_number || matchedChild.ticket_number}</small>` : ''}
         ${total > 0 ? `<br><small class="muted">${balanceLine}</small>` : ''}
       </div>
       <div style="display:flex;gap:6px">
@@ -49,15 +52,9 @@ export function repairRowHTML(t) {
 }
 
 export function repairCollectionHTML(searchQuery = '') {
-  const search = searchQuery.toLowerCase()
-  const pending = (state.data.tickets||[])
-    .filter(t => !t.parent_ticket_id)
-    .filter(t => combinedBalance(t).total > 0 || !t.is_locked)
-    .filter(t => !search || (
-      `${t.customer_name} ${t.customer_phone} ${t.device_brand} ${t.device_model} ${t.imei} ${t.ticket_number} ${t.invoice_number||''}`
-        .toLowerCase().includes(search)
-    ))
-    .sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
+  const pending = findRepairFamilies(state.data.tickets || [], searchQuery)
+    .filter(family => combinedBalance(family.root).total > 0 || !family.root.is_locked)
+    .sort((a,b) => new Date(b.root.created_at) - new Date(a.root.created_at))
 
   return `<div class="modal-backdrop">
     <div class="modal modal-md" style="max-height:85vh;overflow-y:auto">
@@ -66,7 +63,7 @@ export function repairCollectionHTML(searchQuery = '') {
         data-repair-search value="${searchQuery}"
         style="width:100%;margin:10px 0;font-size:14px">
       <p class="muted" style="font-size:12px;margin-bottom:10px">${pending.length} pending ticket${pending.length!==1?'s':''}</p>
-      ${pending.length ? `<div style="display:grid;gap:8px">${pending.map(t => repairRowHTML(t)).join('')}</div>` :
+      ${pending.length ? `<div style="display:grid;gap:8px">${pending.map(family => repairRowHTML(family.root, family)).join('')}</div>` :
         `<div class="empty">No pending tickets match.</div>`}
       <div class="modal-actions">
         <button class="secondary-button" data-close>Close</button>

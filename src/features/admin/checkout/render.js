@@ -80,7 +80,7 @@ export function receiptsPage({ tit, adminState }) {
 }
 
 export function udharListModalHTML() {
-  const outstanding = (state.data.udhar||[]).filter(u => u.status !== 'Settled')
+  const outstanding = state.data.udharAccounts || []
   return `<div class="modal-backdrop"><div class="modal modal-lg">
     <h2>Outstanding Credits</h2>
     ${outstanding.length === 0 ? `<div class="empty">No outstanding credits.</div>` : `
@@ -88,21 +88,21 @@ export function udharListModalHTML() {
         ${outstanding.map(u => `
           <div style="padding:12px;background:var(--surface-2);border-radius:8px;display:grid;gap:8px">
             <div style="display:flex;justify-content:space-between">
-              <div><strong>${u.customer_name}</strong> · ${u.customer_phone}<br>
-                <small class="muted">INV-${u.sale_id} · ${new Date(u.created_at).toLocaleDateString()}</small></div>
+              <div><strong>${u.customerName}</strong> · ${u.customerPhone}<br>
+                <small class="muted">${u.kind === 'repair' ? 'Repair' : 'Retail'} · ${u.reference} · ${new Date(u.createdAt).toLocaleDateString()}</small></div>
               <span class="badge ${u.status==='Settled'?'good':'bad'}">${u.status}</span>
             </div>
             <div style="display:flex;justify-content:space-between">
-              <span>Balance: <strong>${money(u.balance_due)}</strong></span>
-              <span class="muted">Total: ${money(u.total_amount)}</span>
+              <span>Balance: <strong>${money(u.outstanding)}</strong></span>
+              <span class="muted">Current total: ${money(u.effectiveObligation)}</span>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-              <input type="number" step="any" min="0" placeholder="Amount to settle" data-settle-amount="${u.id}"
+              <input type="number" step="any" min="0" max="${u.outstanding}" placeholder="Amount to settle" data-settle-amount="${u.kind}:${u.sourceId}"
                 style="flex:1;border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text)">
-              <select data-settle-method="${u.id}" style="border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text)">
+              <select data-settle-method="${u.kind}:${u.sourceId}" style="border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text)">
                 ${['Cash','Raast','JazzCash','EasyPaisa','Bank Transfer'].map(m => `<option>${m}</option>`).join('')}
               </select>
-              <button class="primary-button" data-settle-id="${u.id}">Settle</button>
+              <button class="primary-button" data-settle-id="${u.kind}:${u.sourceId}">Settle</button>
             </div>
           </div>`).join('')}
       </div>`}
