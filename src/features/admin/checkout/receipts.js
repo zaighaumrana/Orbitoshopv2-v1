@@ -61,29 +61,83 @@ export function buildReceiptRecords(sales = [], tickets = []) {
     .sort((left, right) => dateValue(right.createdAt) - dateValue(left.createdAt))
 }
 
+function matchesReceiptSearch(record, search) {
+  return [
+    record.invoiceNumber,
+    record.ticketNumber,
+    record.parentInvoiceNumber,
+    record.parentTicketNumber,
+    record.customerName,
+    record.customerPhone,
+    record.device,
+    record.paymentMethod,
+    record.employeeName,
+    record.label,
+  ].filter(Boolean).join(' ').toLowerCase().includes(search)
+}
+
+function compareRepairFamilyMembers(left, right) {
+  const leftIsParent = String(left.id) === String(left.rootTicketId)
+  const rightIsParent = String(right.id) === String(right.rootTicketId)
+  if (leftIsParent !== rightIsParent) return leftIsParent ? -1 : 1
+
+  const dateDifference = dateValue(left.createdAt) - dateValue(right.createdAt)
+  if (dateDifference) return dateDifference
+
+  const invoiceDifference = String(left.invoiceNumber || '').localeCompare(
+    String(right.invoiceNumber || ''),
+    undefined,
+    { numeric:true, sensitivity:'base' },
+  )
+  if (invoiceDifference) return invoiceDifference
+  return String(left.id).localeCompare(String(right.id), undefined, { numeric:true })
+}
+
 export function filterReceiptRecords(records = [], adminState = {}) {
   const search = String(adminState.receiptSearch || '').trim().toLowerCase()
   const dateFrom = adminState.receiptDateFrom || ''
   const dateTo = adminState.receiptDateTo || ''
   const type = adminState.receiptType || 'all'
 
-  return records.filter(record => {
-    const searchable = [
-      record.invoiceNumber,
-      record.ticketNumber,
-      record.parentInvoiceNumber,
-      record.parentTicketNumber,
-      record.customerName,
-      record.customerPhone,
-      record.device,
-      record.paymentMethod,
-      record.employeeName,
-      record.label,
-    ].filter(Boolean).join(' ').toLowerCase()
+  const typeScopedRecords = records.filter(record => type === 'all' || record.type === type)
+  const scopedRecords = typeScopedRecords.filter(record => {
     const recordDate = String(record.createdAt || '').slice(0, 10)
-    return (!search || searchable.includes(search))
-      && (!dateFrom || recordDate >= dateFrom)
+    return (!dateFrom || recordDate >= dateFrom)
       && (!dateTo || recordDate <= dateTo)
-      && (type === 'all' || record.type === type)
   })
+
+  if (!search) return scopedRecords
+
+  const exactRepairInvoiceMatches = typeScopedRecords.filter(record => (
+    record.kind === 'ticket'
+    && String(record.invoiceNumber || '').trim().toLowerCase() === search
+  ))
+
+  if (!exactRepairInvoiceMatches.length) {
+    return scopedRecords.filter(record => matchesReceiptSearch(record, search))
+  }
+
+  // The date range gates the searched invoice; once eligible, keep its complete
+  // family together even when parent and child invoices were created on different days.
+  const directRepairInvoiceMatches = exactRepairInvoiceMatches.filter(record => {
+    const recordDate = String(record.createdAt || '').slice(0, 10)
+    return (!dateFrom || recordDate >= dateFrom) && (!dateTo || recordDate <= dateTo)
+  })
+  if (!directRepairInvoiceMatches.length) return []
+
+  const result = []
+  const includedKeys = new Set()
+  directRepairInvoiceMatches.forEach(match => {
+    const familyId = String(match.rootTicketId)
+    const family = typeScopedRecords
+      .filter(record => record.kind === 'ticket' && String(record.rootTicketId) === familyId)
+      .sort(compareRepairFamilyMembers)
+
+    ;[match, ...family].forEach(record => {
+      if (includedKeys.has(record.key)) return
+      includedKeys.add(record.key)
+      result.push(record)
+    })
+  })
+  return result
 }
