@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { dlog, dstack } from './debuglog.js'
+import { installNumericInputValidation } from './numeric-input.js'
 
 /* ── Supabase ── */
 export const sb = createClient(
@@ -70,7 +71,8 @@ function selectorValue(value) {
 
 function persistentControlSelector(control) {
   if (control.id) return `[id="${selectorValue(control.id)}"]`
-  const dataAttribute = [...control.attributes].find(attribute => attribute.name.startsWith('data-'))
+  const dataAttribute = [...control.attributes].find(attribute =>
+    attribute.name.startsWith('data-') && !attribute.name.startsWith('data-numeric'))
   if (dataAttribute) {
     return dataAttribute.value
       ? `[${dataAttribute.name}="${selectorValue(dataAttribute.value)}"]`
@@ -142,6 +144,7 @@ function installGlobalFocusPersistence() {
 }
 
 installGlobalFocusPersistence()
+installNumericInputValidation()
 
 /* ── Session ── */
 function profileToSession(profile) {
@@ -260,7 +263,7 @@ export function currentTenant() {
 export const money = (v, sym) =>
   `${sym || CFG.currency || 'Rs.'} ${Number(v||0).toLocaleString(undefined,{maximumFractionDigits:0})}`
 export const fld = (label, name, val = '', type = 'text') =>
-  `<label class="field"><span>${label}</span><input name="${name}" type="${type}"${type === 'number' ? ' step="any"' : ''} value="${String(val).replaceAll('"','&quot;')}"></label>`
+  `<label class="field"><span>${label}</span><input name="${name}" type="${type}"${type === 'number' ? ' step="any"' : ''}${type === 'tel' ? ' inputmode="numeric" pattern="[0-9]*" data-numeric="digits" data-numeric-message="Numbers only" autocomplete="tel"' : ''} value="${String(val).replaceAll('"','&quot;')}"></label>`
 export const modalActions = () =>
   `<div class="modal-actions"><button type="button" class="secondary-button" data-close>Cancel</button><button class="primary-button">Save</button></div>`
 export const statusBadge = s => {

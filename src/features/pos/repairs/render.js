@@ -72,10 +72,14 @@ export function repairCollectionHTML(searchQuery = '') {
   </div>`
 }
 
-export function repairTicketFormHTML(formInfo = {}) {
+export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) {
   const comps    = state.data.repairComponents || []
   const draft    = getDraft()
-  const dInfo    = formInfo || {}
+  // Draft fields round-trip through HTML on edit and component/payment changes.
+  const dInfo = Object.fromEntries(Object.entries(formInfo || {}).map(([key, value]) => [
+    key, String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;'),
+  ]))
   const total    = calcDraftTotal(draft)
   const paid     = calcDraftPaid(draft)
   const balance  = Math.max(0, total - paid)
@@ -83,18 +87,21 @@ export function repairTicketFormHTML(formInfo = {}) {
 
   return `<div class="modal-backdrop">
     <form class="modal modal-lg" data-form="repair">
-      <h2>New Repair Ticket</h2>
+      <h2>${isEditing ? 'Modify Repair Ticket' : 'New Repair Ticket'}</h2>
+      ${isEditing ? `<p class="muted" style="font-size:13px">Changes update this cart draft only. The repair is not finalized until Place Order.</p>` : ''}
 
       <div class="form-grid">
         <label class="field"><span>Customer Name *</span>
           <input name="customerName" required value="${dInfo.customerName||''}"></label>
         <label class="field"><span>Customer Phone *</span>
-          <input name="customerPhone" type="tel" required value="${dInfo.customerPhone||''}"></label>
+          <input name="customerPhone" type="tel" inputmode="numeric" pattern="[0-9]*"
+            data-numeric="digits" data-numeric-message="Numbers only" autocomplete="tel"
+            required value="${dInfo.customerPhone||''}"></label>
         <label class="field"><span>Device Brand *</span>
           <input name="deviceBrand" required value="${dInfo.deviceBrand||''}"></label>
         <label class="field"><span>Device Model *</span>
           <input name="deviceModel" required value="${dInfo.deviceModel||''}"></label>
-        <label class="field" style="grid-column:1/-1"><span>IMEI / Serial</span>
+        <label class="field" style="grid-column:1/-1"><span>IMEI / Serial <small class="muted">(letters and numbers allowed)</small></span>
           <input name="imei" value="${dInfo.imei||''}"></label>
       </div>
 
@@ -186,7 +193,7 @@ export function repairTicketFormHTML(formInfo = {}) {
 
       <div class="modal-actions" style="margin-top:12px">
         <button type="button" class="secondary-button" data-close>Cancel</button>
-        <button class="primary-button">Create & Add to Cart</button>
+        <button class="primary-button">${isEditing ? 'Save Ticket Changes' : 'Create & Add to Cart'}</button>
       </div>
     </form>
   </div>`

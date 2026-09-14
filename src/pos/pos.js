@@ -31,7 +31,8 @@ import {
   repairTicketFormHTML, repairCollectionHTML,
 } from '../features/pos/repairs/render.js'
 import {
-  getDraft, resetDraft, calcDraftTotal, calcDraftPaid,
+  getDraft, resetDraft, snapshotDraft, replaceDraft, updateCartRepairDraft,
+  calcDraftTotal, calcDraftPaid,
 } from '../features/pos/repairs/state.js'
 import { receiptPreview } from '../features/pos/checkout/render.js'
 import { finalizeCheckout } from '../features/pos/checkout/api.js'
@@ -63,6 +64,7 @@ const posState = {
 let SESSION = {}
 let _inv = null  // populated via dynamic import only when inventory_module_enabled
 let _eventsAttached = false
+let placingOrder = false
 
 /* ── Load ── */
 async function load() {
@@ -216,21 +218,24 @@ function posView() {
               <strong>${item.name}</strong><br>
               ${item.variantName ? `<small class="muted">&nbsp;&nbsp;${item.variantName}</small><br>` : ''}
               <small class="muted">
-                ${item.isTicket ? '' : money(item.soldPrice) + ' each'}
+                ${item.isTicket && item.isNewTicket
+                  ? `${item.draftData?.components?.length || 0} issue${item.draftData?.components?.length === 1 ? '' : 's'} · Quote ${money(calcDraftTotal(item.draftData))} · Paid ${money(calcDraftPaid(item.draftData))}`
+                  : item.isTicket ? `Payment ${money(item.soldPrice)}` : money(item.soldPrice) + ' each'}
                 ${item.reason?' · '+item.reason:''}
               </small>
             </div>
             ${item.isTicket ? `
-              <div></div>
+              <div class="cart-ticket-actions">
+                ${item.isNewTicket ? `<button class="secondary-button" style="font-size:12px" data-action="edit-cart-repair" data-product-id="${item.productId}">Modify Ticket</button>` : ''}
+                <button class="secondary-button" style="font-size:12px" data-remove-cart-item="${item.productId}">Remove</button>
+              </div>
             ` : `
               <div class="qty-controls">
                 <button data-qty="${item.productId}" data-delta="-1">−</button>
                 <strong>${item.qty}</strong>
                 <button data-qty="${item.productId}" data-delta="1">+</button>
-              </div>`}
-            ${item.isTicket ?
-              `<button class="secondary-button" style="font-size:12px" data-remove-cart-item="${item.productId}">Remove</button>` :
-              `<button class="secondary-button" data-modal="override" data-id="${item.productId}">Price</button>`}
+              </div>
+              <button class="secondary-button" data-modal="override" data-id="${item.productId}">Price</button>`}
           </div>`).join('') : `<div class="empty">No items in cart.</div>`}
 
         <div class="totals">
@@ -262,7 +267,9 @@ function posView() {
         ${posState.checkoutPayment === 'Udhar (Credit)' ? `
           <div style="display:grid;gap:8px;margin-top:4px">
             <input class="search" placeholder="Customer name *" data-udhar="name" value="${posState.udharName||''}">
-            <input class="search" placeholder="Customer phone *" data-udhar="phone" value="${posState.udharPhone||''}">
+            <input class="search" type="tel" inputmode="numeric" pattern="[0-9]*" data-numeric="digits"
+              data-numeric-message="Numbers only" autocomplete="tel" placeholder="Customer phone *"
+              data-udhar="phone" value="${posState.udharPhone||''}">
             <label style="font-size:13px;font-weight:500;color:var(--muted)">Cash Paid Now (optional)</label>
             <input type="number" step="any" min="0" placeholder="0 — rest goes on credit"
               value="${posState.udharPaidNow||''}" data-udhar="paidNow"
@@ -280,7 +287,9 @@ function posView() {
             <label style="font-size:13px;font-weight:500;color:var(--muted)">Udhar amount (optional, PIN required)</label>
             <input type="number" step="any" min="0" value="${posState.splitCredit||''}" data-split="credit" class="search">
             <input class="search" placeholder="Customer name (required if Udhar)" data-udhar="name" value="${posState.udharName||''}">
-            <input class="search" placeholder="Customer phone (required if Udhar)" data-udhar="phone" value="${posState.udharPhone||''}">
+            <input class="search" type="tel" inputmode="numeric" pattern="[0-9]*" data-numeric="digits"
+              data-numeric-message="Numbers only" autocomplete="tel" placeholder="Customer phone (required if Udhar)"
+              data-udhar="phone" value="${posState.udharPhone||''}">
             <div style="display:flex;justify-content:space-between;padding:8px 10px;background:var(--surface-2);border-radius:8px"><span>Split total</span><strong>${money(Number(posState.splitCash||0)+Number(posState.splitDigital||0)+Number(posState.splitCredit||0))} / ${money(grandTotal)}</strong></div>
           </div>` : ''}
         ` : `
@@ -756,7 +765,11 @@ function renderModal() {
       </div>
     </div></div>`
 
-  if (type === 'repair')          return repairTicketFormHTML(state.modal._info)
+  if (type === 'repair') {
+    return repairTicketFormHTML(state.modal._info, {
+      isEditing: Boolean(state.modal._editingCartProductId),
+    })
+  }
   if (type === 'comp-tag-picker') return compTagPickerHTML(state.modal.name)
   if (type === 'repair-collection') return repairCollectionHTML(posState.repairSearch)
   if (type === 'ticket-payment')  return ticketPaymentModalHTML(state.modal)
@@ -894,6 +907,13 @@ function removeCartItem(productId) {
   render()
 }
 
+function captureRepairFormInfo() {
+  const form = document.querySelector("[data-form='repair']")
+  const info = form ? Object.fromEntries(new FormData(form).entries()) : (state.modal?._info || {})
+  if (state.modal) state.modal._info = info
+  return info
+}
+
 function retailReturnSelection(context) {
   const selected = []
   let reduction = 0
@@ -938,6 +958,16 @@ function refreshRetailReturnPreview() {
 
 /* ── Place Order: lock the ticket, create the invoice ── */
 async function placeOrder() {
+  if (placingOrder) return
+  placingOrder = true
+  try {
+    await placeOrderOnce()
+  } finally {
+    placingOrder = false
+  }
+}
+
+async function placeOrderOnce() {
   dlog('POS.placeOrder', 'ENTRY')
   const ticketItem = posState.cart.find(i => i.isTicket)
   if (!ticketItem) { dlog('POS.placeOrder', 'no ticketItem in cart -- abort'); return }
@@ -1073,6 +1103,7 @@ function attachEvents() {
       '[data-pp-key]'
     )
     if (!el) return
+    if (placingOrder) return
     dlog('POS.click', `el MATCHED selector -- action=${el.dataset.action} close=${el.dataset.close} tag=${el.tagName}`)
 
     /* PIN numpad */
@@ -1091,6 +1122,29 @@ function attachEvents() {
     if (el.dataset.modal) {
       if (el.dataset.modal === 'repair') resetDraft() // starting a genuinely new ticket, not a mid-flow modal switch
       state.modal = { type: el.dataset.modal, id: el.dataset.id }; render(); return
+    }
+
+    if (el.dataset.action === 'edit-cart-repair') {
+      const ticketItem = posState.cart.find(item => item.productId === el.dataset.productId)
+      if (!ticketItem?.isTicket || !ticketItem.isNewTicket) {
+        showToast('Only an unplaced repair draft can be modified here.', 'warning')
+        return
+      }
+      replaceDraft(ticketItem.draftData)
+      state.modal = {
+        type: 'repair',
+        _editingCartProductId: ticketItem.productId,
+        _info: {
+          customerName: ticketItem.customerName || '',
+          customerPhone: ticketItem.customerPhone || '',
+          deviceBrand: ticketItem.deviceBrand || '',
+          deviceModel: ticketItem.deviceModel || '',
+          imei: ticketItem.imei || '',
+          technicianNote: ticketItem.technicianNote || '',
+        },
+      }
+      render()
+      return
     }
 
     /* ── Top-bar ── */
@@ -1415,11 +1469,14 @@ function attachEvents() {
     /* ── Component tag picker ── */
     if (el.dataset.pickComp) {
       // Snapshot current form field values before switching to tag picker
-      const form = document.querySelector("[data-form='repair']")
-      if (form) {
-        state.modal._info = Object.fromEntries(new FormData(form).entries())
+      const parentInfo = captureRepairFormInfo()
+      const editingCartProductId = state.modal?._editingCartProductId
+      state.modal = {
+        type:'comp-tag-picker',
+        name:el.dataset.pickComp,
+        _info:parentInfo,
+        _editingCartProductId:editingCartProductId,
       }
-      state.modal = { type:'comp-tag-picker', name:el.dataset.pickComp, _info:state.modal?._info }
       render(); return
     }
     if (el.dataset.tagPick) {
@@ -1427,13 +1484,14 @@ function attachEvents() {
       const compName = state.modal.name
       const parentDraft = getDraft()
       const parentInfo  = state.modal._info
+      const editingCartProductId = state.modal._editingCartProductId
       if (tag === 'Custom') {
         document.getElementById('tag-custom-wrap')?.classList.remove('hidden')
         return
       }
       if (!parentDraft) { state.modal = null; render(); return }
       parentDraft.components.push({ name:compName, tag, customText:'', price:0 })
-      state.modal = { type:'repair', _info:parentInfo }
+      state.modal = { type:'repair', _info:parentInfo, _editingCartProductId:editingCartProductId }
       render(); return
     }
     if (el.dataset.action === 'confirm-custom-tag') {
@@ -1441,38 +1499,38 @@ function attachEvents() {
       const compName = state.modal.name
       const parentDraft = getDraft()
       const parentInfo  = state.modal._info
+      const editingCartProductId = state.modal._editingCartProductId
       if (!text) { showToast('Describe the issue.', 'warning'); return }
       parentDraft.components.push({ name:compName, tag:'Custom', customText:text, price:0 })
-      state.modal = { type:'repair', _info:parentInfo }
+      state.modal = { type:'repair', _info:parentInfo, _editingCartProductId:editingCartProductId }
       render(); return
     }
 
     /* ── Draft form actions ── */
     if (el.dataset.draftCompRemove !== undefined) {
-      const form = document.querySelector("[data-form='repair']")
-      if (form) state.modal._info = Object.fromEntries(new FormData(form).entries())
+      captureRepairFormInfo()
       getDraft().components.splice(Number(el.dataset.draftCompRemove), 1); render(); return
     }
     if (el.dataset.draftPaymentRemove !== undefined) {
-      const form = document.querySelector("[data-form='repair']")
-      if (form) state.modal._info = Object.fromEntries(new FormData(form).entries())
+      captureRepairFormInfo()
       getDraft().payments.splice(Number(el.dataset.draftPaymentRemove), 1); render(); return
     }
     if (el.dataset.action === 'draft-add-payment') {
       const amount = Number(document.getElementById('draft-pay-amount')?.value||0)
       const method = document.getElementById('draft-pay-method')?.value||'Cash'
       if (!amount||amount<=0) { showToast('Enter a payment amount.', 'warning'); return }
-      const form = document.querySelector("[data-form='repair']")
-      if (form) state.modal._info = Object.fromEntries(new FormData(form).entries())
+      captureRepairFormInfo()
       getDraft().payments.push({ amount, method })
       document.getElementById('draft-pay-amount').value = ''
       render(); return
     }
     if (el.dataset.action === 'draft-set-override') {
+      captureRepairFormInfo()
       getDraft().overridePrice = ''
       render(); return
     }
     if (el.dataset.action === 'draft-clear-override') {
+      captureRepairFormInfo()
       getDraft().overridePrice = null
       render(); return
     }
@@ -1579,7 +1637,9 @@ function attachEvents() {
     dlog('POS.submit', `ENTRY form.dataset.form=${type}`)
 
     if (type === 'repair') {
-      dlog('POS.submit', 'repair branch -- adding draft ticket to cart (no DB write yet)')
+      if (placingOrder || state.modal?.type !== 'repair' || !form.isConnected) return
+      const editingProductId = state.modal?._editingCartProductId
+      dlog('POS.submit', `repair branch -- ${editingProductId ? 'updating' : 'adding'} cart draft (no DB write yet)`)
       const draft = getDraft()
       if (!data.customerName?.trim()) { showToast('Customer name is required.', 'warning'); return }
       if (!data.customerPhone?.trim()) { showToast('Customer phone is required.', 'warning'); return }
@@ -1588,12 +1648,8 @@ function attachEvents() {
 
       const total = calcDraftTotal(draft)
       const paid  = calcDraftPaid(draft)
-
-      // Don't actually save to DB yet — just add to cart as "new ticket"
-      // Saving happens when "Place Order" is clicked
-      posState.cart = posState.cart.filter(i => !i.isTicket)
-      posState.cart.push({
-        productId:     `new-ticket-${Date.now()}`,
+      const draftData = snapshotDraft(draft)
+      const cartValues = {
         name:          `Repair: ${data.deviceBrand} ${data.deviceModel} (${data.customerName})`,
         qty:           1,
         soldPrice:     Math.max(0, total - paid),
@@ -1602,16 +1658,30 @@ function attachEvents() {
         reason:        '',
         isTicket:      true,
         isNewTicket:   true,
-        requestId:     crypto.randomUUID(),
         customerName:  data.customerName,
         customerPhone: data.customerPhone,
         deviceBrand:   data.deviceBrand,
         deviceModel:   data.deviceModel,
         imei:          data.imei||'',
         technicianNote:data.technicianNote||'',
-        draftData:     { ...draft },
-      })
+        draftData,
+      }
+
+      // Don't actually save to DB yet — just add to cart as "new ticket"
+      // Saving happens when "Place Order" is clicked
+      if (editingProductId) {
+        const updated = updateCartRepairDraft(posState.cart, editingProductId, cartValues)
+        if (!updated) { showToast('Repair draft is no longer in the cart.', 'warning'); return }
+      } else {
+        posState.cart = posState.cart.filter(i => !i.isTicket)
+        posState.cart.push({
+          ...cartValues,
+          productId: `new-ticket-${Date.now()}`,
+          requestId: crypto.randomUUID(),
+        })
+      }
       posState.cartIsNewTicket = true
+      resetDraft()
       state.modal = null
       render(); return
     }

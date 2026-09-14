@@ -1,0 +1,35 @@
+<!doctype html><html><head><link rel="stylesheet" href="/src/style.css"><title>Numeric validation regression</title></head><body>
+<label>Phone <input id="phone" type="tel" data-numeric="digits"></label>
+<label>Price <input id="price" type="number" min="0" step="any"></label>
+<label>Serial <input id="serial"></label>
+<button id="run">Run DOM tests</button><pre id="results"></pre>
+<script type="module">
+import {installNumericInputValidation} from '/src/numeric-input.js'
+installNumericInputValidation(); installNumericInputValidation()
+const phone=document.querySelector('#phone'),price=document.querySelector('#price'),serial=document.querySelector('#serial')
+const results=document.querySelector('#results')
+const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))
+const before=(input,data)=>input.dispatchEvent(new InputEvent('beforeinput',{bubbles:true,cancelable:true,inputType:'insertText',data}))
+const paste=(input,text)=>{const clipboardData=new DataTransfer();clipboardData.setData('text',text);return input.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData}))}
+document.querySelector('#run').onclick=async()=>{
+ const lines=[];const check=(name,pass)=>{lines.push(`${pass?'PASS':'FAIL'} ${name}`);results.textContent=lines.join('\n')}
+ phone.focus();phone.value='0300';phone.setSelectionRange(4,4)
+ check('keyboard rejects phone letter',!phone.dispatchEvent(new KeyboardEvent('keydown',{key:'a',bubbles:true,cancelable:true})))
+ check('one nearby note; focus retained',document.querySelectorAll('.numeric-input-note').length===1&&document.activeElement===phone)
+ await wait(700);before(phone,'b');await wait(700)
+ check('repeated attempt resets expiry; no stacking',document.querySelectorAll('.numeric-input-note').length===1)
+ await wait(700);check('note expires',document.querySelectorAll('.numeric-input-note').length===0)
+ check('mixed paste intercepted',!paste(phone,'12ab3'))
+ check('leading zeros and sanitized pasted digits preserved',phone.value==='0300123')
+ phone.value='001x2';phone.dispatchEvent(new Event('input',{bubbles:true}))
+ check('actual mobile input sanitized',phone.value==='0012'&&document.activeElement===phone)
+ phone.value='00x7';phone.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true}))
+ check('composition completion sanitized',phone.value==='007')
+ price.focus();price.value='12.50'
+ check('invalid monetary paste rejected without amount change',!paste(price,'3x4')&&price.value==='12.50')
+ check('decimal allowed',before(price,'1.25'))
+ check('price exponent rejected with feedback',!before(price,'e')&&document.activeElement===price)
+ check('alphanumeric serial unaffected',before(serial,'SN-A012'))
+ await wait(1400);check('all notes cleaned up',document.querySelectorAll('.numeric-input-note').length===0)
+}
+</script></body></html>
