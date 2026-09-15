@@ -1,0 +1,43 @@
+<!doctype html><html><head><title>Support console role checks</title></head><body>
+<main id="app"><h1>Role checks</h1><button id="run">Run checks</button><pre id="results"></pre></main>
+<script type="module">
+import {initializeSupportConsole,dlog,revokeSupportConsole} from '/src/debuglog.js'
+let listener, profile=null, user=null, subscriptions=0
+const client={auth:{getUser:async()=>({data:{user}}),onAuthStateChange:fn=>{listener=fn;subscriptions++}},from:()=>({select:()=>({eq:()=>({single:async()=>({data:profile})})})})}
+initializeSupportConsole(client);initializeSupportConsole(client)
+const settle=()=>new Promise(resolve=>setTimeout(resolve,10))
+const login=async(role,status='Active',employee_id=null)=>{
+ user={id:role};profile={auth_user_id:user.id,role,status,employee_id}
+ listener('SIGNED_IN',{user});await settle();dlog('test',role)
+}
+document.querySelector('#run').onclick=async()=>{
+ const lines=[];const check=(name,ok)=>{lines.push(`${ok?'PASS':'FAIL'} ${name}`);document.querySelector('#results').textContent=lines.join('\n')}
+ const absent=()=>!document.querySelector('#__dbg_panel')&&!document.querySelector('button[style]')
+ check('anonymous absent',absent())
+ const oldDebug=localStorage.getItem('debug')
+ localStorage.setItem('debug','true');history.replaceState(null,'','?debug=true&role=Orbito%20Support')
+ dlog('test','spoof flag');check('query/storage flags do not enable console',absent())
+ if(oldDebug===null)localStorage.removeItem('debug');else localStorage.setItem('debug',oldDebug)
+ for(const role of ['Business Owner','Cashier','Technician','Manager','Operator','Unknown']){
+  await login(role);check(role+' absent',absent())
+  listener('TOKEN_REFRESHED',{user});await settle();check(role+' refresh absent',absent())
+  listener('SIGNED_OUT',null);check(role+' logout absent',absent())
+ }
+ await login('Orbito Support');check('support visible',!!document.querySelector('#__dbg_panel'))
+ const panel=document.querySelector('#__dbg_panel'),bar=panel._btnBar
+ bar.querySelectorAll('button')[2].click();check('minimize works',panel.style.maxHeight==='26px')
+ bar.querySelectorAll('button')[1].click();const before=panel.textContent;dlog('test','paused');check('pause works',panel.textContent===before)
+ bar.querySelectorAll('button')[1].click();bar.querySelectorAll('button')[0].click();check('clear works',!panel.textContent.includes('paused'))
+ listener('TOKEN_REFRESHED',{user});await settle();check('support refresh one panel',document.querySelectorAll('#__dbg_panel').length===1)
+ const oldButton=bar.querySelector('button');revokeSupportConsole();check('logout immediate revoke',absent()&&oldButton.onclick===null)
+ listener('SIGNED_OUT',null);await login('Business Owner');oldButton.click();check('support to owner no stale UI',absent())
+ await login('Orbito Support');check('owner to support restored',!!document.querySelector('#__dbg_panel'))
+ await login('Orbito Support','Inactive');check('inactive support denied',absent())
+ await login('Orbito Support','Active',12);check('employee-linked support denied',absent())
+ check('one auth listener',subscriptions===1)
+ user={id:'Orbito Support'};profile={auth_user_id:user.id,role:'Orbito Support',status:'Active',employee_id:null}
+ listener('SIGNED_IN',{user});listener('SIGNED_OUT',null);await settle()
+ check('queued verification cannot restore after logout',absent())
+ listener('SIGNED_OUT',null)
+}
+</script></body></html>

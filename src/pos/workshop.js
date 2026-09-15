@@ -14,7 +14,7 @@ import {
   _clearSession, money, fld, modalActions,
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   myAccountModalHTML, handleChangePasswordSubmit,
-  showToast, confirmAction, runInstallPrompt,
+  showBlockingError, showToast, confirmAction, runInstallPrompt,
 } from '../shared.js'
 import {
   getSubInvoices, createSubInvoice, markComponentNotNeeded, recordAdditionalWork,
@@ -612,7 +612,7 @@ function attachEvents() {
       const { error } = await sb.from('tickets')
         .update({ status: newStatus })
         .eq('id', ticketId)
-      if (error) { showToast('Error: ' + error.message, 'error'); return }
+      if (error) { showBlockingError('Error: ' + error.message); return }
       const tk = state.data.tickets.find(t => String(t.id) === String(ticketId))
       if (tk) tk.status = newStatus
       render(); return
@@ -646,14 +646,14 @@ function attachEvents() {
     }
     if (el.dataset.action === 'confirm-not-needed') {
       const reason = document.getElementById('not-needed-reason')?.value?.trim()
-      if (!reason) { showToast('Enter a reason.', 'warning'); return }
+      if (!reason) { showBlockingError('Enter a reason.'); return }
       const { ticketId, index } = state.modal
       openPinPrompt('remove-component', async (verified) => {
         if (!verified) return
         const tk = state.data.tickets.find(t => String(t.id) === String(ticketId))
         if (!tk) return
         const res = await markComponentNotNeeded(Number(ticketId), index, reason)
-        if (!res.ok) { showToast('Error: ' + res.error, 'error'); return }
+        if (!res.ok) { showBlockingError('Error: ' + res.error); return }
         await load()
         const subs = await getSubInvoices(ticketId)
         state.modal = { type: 'edit-components', id: ticketId, subInvoices: subs }
@@ -692,7 +692,7 @@ function attachEvents() {
     /* Add custom component to the draft — opens tag picker */
     if (el.dataset.action === 'add-custom-draft-comp') {
       const name = document.getElementById('custom-comp-name')?.value?.trim()
-      if (!name) { showToast('Enter a component name.', 'warning'); return }
+      if (!name) { showBlockingError('Enter a component name.'); return }
       state.modal = {
         type:     'add-comp-tag',
         compName: name,
@@ -718,7 +718,7 @@ function attachEvents() {
     /* Confirm custom tag text */
     if (el.dataset.action === 'confirm-custom-tag') {
       const text = document.getElementById('custom-tag-text')?.value?.trim()
-      if (!text) { showToast('Describe the issue.', 'warning'); return }
+      if (!text) { showBlockingError('Describe the issue.'); return }
       _addComponentToDraft(state.modal.compName, 'Custom', text)
       return
     }
@@ -731,7 +731,7 @@ function attachEvents() {
       const comps  = readDraftCompsFromDOM()
       const labour = readDraftLabourFromDOM()
       const note   = document.getElementById('sub-invoice-note')?.value || ''
-      if (!comps.length && !labour) { showToast('Add at least one component or a labour charge.', 'warning'); return }
+      if (!comps.length && !labour) { showBlockingError('Add at least one component or a labour charge.'); return }
 
       const res = state.role === 'Technician'
         ? await recordAdditionalWork(
@@ -740,7 +740,7 @@ function attachEvents() {
             comps, labour, 'Pending', 'In person', note
           )
         : await createSubInvoice(tk, comps, labour, note, SESSION.employee?.name)
-      if (!res.ok) { showToast('Error: ' + res.error, 'error'); return }
+      if (!res.ok) { showBlockingError('Error: ' + res.error); return }
 
       if (state.role !== 'Technician') {
         const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
@@ -763,7 +763,7 @@ function attachEvents() {
     dlog('WORKSHOP.submit', `ENTRY form.dataset.form=${form.dataset.form}`)
     if (form.dataset.form === 'leave-request') {
       const result = await submitLeaveRequest(SESSION, data)
-      if (!result.ok) { showToast('Error: ' + result.error, 'error'); return }
+      if (!result.ok) { showBlockingError('Error: ' + result.error); return }
       state.modal = null
       showToast('Leave request submitted. Your manager will review it.', 'success')
       render(); return

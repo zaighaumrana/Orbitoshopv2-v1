@@ -1,0 +1,29 @@
+<!doctype html><html><head><link rel="stylesheet" href="/src/style.css"><title>Blocking dialog checks</title></head><body>
+<div id="app"><button id="run">Run dialog checks</button></div><pre id="results"></pre>
+<script type="module">
+import {sb,showBlockingError,confirmAction,showToast} from '/src/shared.js'
+import {insertNewTicketFromCart} from '/src/features/pos/repairs/api.js'
+window.fetch=async()=>new Response('{}',{headers:{'Content-Type':'application/json'}})
+let rpcCalls=0
+sb.rpc=async()=>{rpcCalls++;return {error:{message:'Unexpected call'}}}
+const tick=()=>new Promise(resolve=>setTimeout(resolve,0))
+document.querySelector('#run').onclick=async()=>{
+ const lines=[];const check=(name,ok)=>{lines.push(`${ok?'PASS':'FAIL'} ${name}`);document.querySelector('#results').textContent=lines.join('\n')}
+ const over=await insertNewTicketFromCart({customerName:'Fixture',draftData:{components:[],labour:100,overridePrice:null,payments:[{amount:101,method:'Cash'}]}})
+ check('over-advance remains blocked before database write',!over.ok&&rpcCalls===0)
+ const first=showBlockingError(over.error),second=showBlockingError(over.error)
+ check('duplicate calls share one notice',first===second&&document.querySelectorAll('.app-dialog').length===1)
+ check('exact title and one OK button',document.querySelector('#app-dialog-title').textContent==='Payment Too High'&&document.querySelector('.modal-actions').children.length===1&&document.querySelector('.modal-actions button').textContent==='OK')
+ document.querySelector('.app-dialog').requestSubmit();await first
+ check('acknowledgement closes notice',!document.querySelector('.app-dialog'))
+ let attempts=0
+ const nested=confirmAction({title:'Deliver repair',action:async()=>{attempts++;await tick();showBlockingError('Delivery error: Payment is required.');return false}})
+ const form=document.querySelector('.app-dialog');form.requestSubmit();form.requestSubmit();await tick();await tick()
+ check('double-submit runs action once',attempts===1)
+ check('failure stays in existing dialog and permits retry',document.querySelectorAll('.app-dialog').length===1&&!form.querySelector('.app-dialog-error').classList.contains('hidden')&&!form.querySelector('button[type=submit]').disabled)
+ form.querySelector('.modal-close-button').click();await nested
+ showToast('Saved successfully.','success')
+ check('success still uses toast',!!document.querySelector('.app-toast-success')&&!document.querySelector('.app-dialog'))
+ showBlockingError(over.error)
+}
+</script></body></html>

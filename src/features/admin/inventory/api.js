@@ -3,7 +3,7 @@
    Admin-exclusive inventory management operations -- verified by
    actual caller (only admin.js calls any of these).
 ═══════════════════════════════════════════════════════════════════ */
-import { sb, state, logInventoryEvent, confirmAction, showToast } from '../../../shared.js'
+import { sb, state, logInventoryEvent, confirmAction, showBlockingError, showToast } from '../../../shared.js'
 import { dlog } from '../../../debuglog.js'
 
 const pendingInventoryRequests = new Map()
@@ -28,7 +28,7 @@ export async function handleInvDelete(el) {
       const { error } = await sb.from('inventory').delete().eq('id', Number(el.dataset.invDelete))
       if (error) {
         dlog('admin.inventory.handleInvDelete', `FAILED: ${error.message}`)
-        showToast('Error: ' + error.message, 'error')
+        showBlockingError('Error: ' + error.message)
         return false
       }
       dlog('admin.inventory.handleInvDelete', 'SUCCEEDED')
@@ -51,7 +51,7 @@ export async function submitInvAdd(data) {
     p_cost:Number(data.cost||0), p_initial_quantity:Number(data.qty||0),
     p_min_quantity:Number(data.min_qty||0),
   })
-  if (error) { dlog('admin.inventory.submitInvAdd', `FAILED: ${error.message}`); showToast('Error: '+error.message, 'error'); return { ok:false } }
+  if (error) { dlog('admin.inventory.submitInvAdd', `FAILED: ${error.message}`); showBlockingError('Error: '+error.message); return { ok:false } }
   pendingInventoryRequests.delete(key)
   await logInventoryEvent()
   dlog('admin.inventory.submitInvAdd', 'SUCCEEDED')
@@ -65,7 +65,7 @@ export async function submitInvEdit(data) {
     price:Number(data.price), cost:Number(data.cost),
     min_qty:Number(data.min_qty),
   }).eq('id', Number(data.id))
-  if (error) { dlog('admin.inventory.submitInvEdit', `FAILED: ${error.message}`); showToast('Error: '+error.message, 'error'); return { ok:false } }
+  if (error) { dlog('admin.inventory.submitInvEdit', `FAILED: ${error.message}`); showBlockingError('Error: '+error.message); return { ok:false } }
   dlog('admin.inventory.submitInvEdit', 'SUCCEEDED')
   return { ok:true }
 }
@@ -82,7 +82,7 @@ export async function submitInvAdjust(data) {
     p_movement_type:data.movement_type,
     p_reason:data.reason,
   })
-  if (error) { showToast('Stock adjustment failed: '+error.message, 'error'); return { ok:false } }
+  if (error) { showBlockingError('Stock adjustment failed: '+error.message); return { ok:false } }
   pendingInventoryRequests.delete(key)
   return { ok:true }
 }

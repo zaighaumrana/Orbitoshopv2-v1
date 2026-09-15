@@ -16,7 +16,7 @@ import {
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   myAccountModalHTML, handleChangePasswordSubmit,
   matchesInvoiceSearch,
-  showToast, confirmAction, runInstallPrompt,
+  showBlockingError, showToast, confirmAction, runInstallPrompt,
 } from '../shared.js'
 import {
   getSubInvoices, createSubInvoice, markComponentNotNeeded, deliverRepair,
@@ -530,7 +530,7 @@ function ticketPaymentModalHTML(modal) {
 async function openCollectTicket(ticket) {
   if (!ticket.is_locked) {
     // Ticket was never placed (shouldn't normally happen) — open edit form
-    showToast('This ticket has not been placed yet.', 'warning')
+    showBlockingError('This ticket has not been placed yet.')
     return
   }
   const requestId = crypto.randomUUID()
@@ -975,7 +975,7 @@ async function placeOrderOnce() {
   if (ticketItem.isNewTicket) {
     dlog('POS.placeOrder', 'isNewTicket branch -- calling repairs.insertNewTicketFromCart()')
     const res = await insertNewTicketFromCart(ticketItem)
-    if (!res.ok) { dlog('POS.placeOrder', `INSERT FAILED: ${res.error}`); showToast('Error placing order: ' + res.error, 'error'); return }
+    if (!res.ok) { dlog('POS.placeOrder', `INSERT FAILED: ${res.error}`); showBlockingError('Error placing order: ' + res.error); return }
     dlog('POS.placeOrder', `INSERT SUCCEEDED ticket_number=${res.data.ticket_number} id=${res.data.id} -- calling load() next`)
 
     posState.cart = posState.cart.filter(i => !i.isTicket)
@@ -998,7 +998,7 @@ async function placeOrderOnce() {
   const payMethod = ticketItem.topupMethod
   dlog('POS.placeOrder', 'existing-ticket branch -- calling repairs.collectTicketPayment()')
   const res = await collectTicketPayment(ticket, payAmount, payMethod, ticketItem.requestId)
-  if (!res.ok) { showToast('Error recording payment: ' + res.error, 'error'); return }
+  if (!res.ok) { showBlockingError('Error recording payment: ' + res.error); return }
 
   posState.cart = posState.cart.filter(i => !i.isTicket)
   posState.cartTicketId = null
@@ -1018,7 +1018,7 @@ async function doCheckout() {
     const total = Math.round((subtotal + subtotal*Number(CFG.tax_rate||0)/100 + Number.EPSILON)*100)/100
     const splitTotal = Math.round((Number(posState.splitCash||0)+Number(posState.splitDigital||0)+Number(posState.splitCredit||0)+Number.EPSILON)*100)/100
     if (splitTotal !== total || Number(posState.splitCash||0)<0 || Number(posState.splitDigital||0)<0 || Number(posState.splitCredit||0)<0) {
-      showToast(`Split amounts must add up to ${money(total)}.`, 'warning'); return
+      showBlockingError(`Split amounts must add up to ${money(total)}.`); return
     }
   }
 
@@ -1065,7 +1065,7 @@ async function _finalizeCheckout() {
       })
       return
     }
-    showToast('Sale error: ' + res.error, 'error')
+    showBlockingError('Sale error: ' + res.error)
     return
   }
 
@@ -1127,7 +1127,7 @@ function attachEvents() {
     if (el.dataset.action === 'edit-cart-repair') {
       const ticketItem = posState.cart.find(item => item.productId === el.dataset.productId)
       if (!ticketItem?.isTicket || !ticketItem.isNewTicket) {
-        showToast('Only an unplaced repair draft can be modified here.', 'warning')
+        showBlockingError('Only an unplaced repair draft can be modified here.')
         return
       }
       replaceDraft(ticketItem.draftData)
@@ -1174,14 +1174,14 @@ function attachEvents() {
     }
     if (el.dataset.action === 'confirm-not-needed') {
       const reason = document.getElementById('not-needed-reason')?.value?.trim()
-      if (!reason) { showToast('Enter a reason.', 'warning'); return }
+      if (!reason) { showBlockingError('Enter a reason.'); return }
       const { ticketId, index } = state.modal
       openPinPrompt('remove-component', async (verified) => {
         if (!verified) return
         const tk = state.data.tickets.find(t => String(t.id) === String(ticketId))
         if (!tk) return
         const res = await markComponentNotNeeded(Number(ticketId), index, reason)
-        if (!res.ok) { showToast('Error: ' + res.error, 'error'); return }
+        if (!res.ok) { showBlockingError('Error: ' + res.error); return }
         await load()
         const subs = await getSubInvoices(ticketId)
         state.modal = { type: 'edit-components', id: ticketId, subInvoices: subs }
@@ -1220,7 +1220,7 @@ function attachEvents() {
     /* Add custom component to the draft — opens tag picker */
     if (el.dataset.action === 'add-custom-draft-comp') {
       const name = document.getElementById('custom-comp-name')?.value?.trim()
-      if (!name) { showToast('Enter a component name.', 'warning'); return }
+      if (!name) { showBlockingError('Enter a component name.'); return }
       state.modal = {
         type:     'add-comp-tag',
         compName: name,
@@ -1244,7 +1244,7 @@ function attachEvents() {
     }
     if (el.dataset.action === 'confirm-draft-custom-tag') {
       const text = document.getElementById('custom-tag-text')?.value?.trim()
-      if (!text) { showToast('Describe the issue.', 'warning'); return }
+      if (!text) { showBlockingError('Describe the issue.'); return }
       _addComponentToDraft(state.modal.compName, 'Custom', text)
       return
     }
@@ -1257,10 +1257,10 @@ function attachEvents() {
       const comps  = readSubInvCompsFromDOM()
       const labour = readSubInvLabourFromDOM()
       const note   = document.getElementById('sub-invoice-note')?.value || ''
-      if (!comps.length && !labour) { showToast('Add at least one component or a labour charge.', 'warning'); return }
+      if (!comps.length && !labour) { showBlockingError('Add at least one component or a labour charge.'); return }
 
       const res = await createSubInvoice(tk, comps, labour, note, SESSION.employee?.name)
-      if (!res.ok) { showToast('Error: ' + res.error, 'error'); return }
+      if (!res.ok) { showBlockingError('Error: ' + res.error); return }
 
       const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
       printThermal(buildSubInvoiceSlip(res.data, tk))
@@ -1347,7 +1347,7 @@ function attachEvents() {
       const ticketId = el.dataset.ticketId
       const amount   = Number(document.getElementById('topup-amount')?.value || 0)
       const method   = document.getElementById('topup-method')?.value || 'Cash'
-      if (!amount || amount <= 0) { showToast('Enter a payment amount.', 'warning'); return }
+      if (!amount || amount <= 0) { showBlockingError('Enter a payment amount.'); return }
       const ticket = state.data.tickets.find(t => String(t.id) === String(ticketId))
       if (!ticket) return
       posState.cart = posState.cart.filter(i => !i.isTicket)
@@ -1379,7 +1379,7 @@ function attachEvents() {
         confirmLabel: 'Deliver device',
         action: async () => {
           const res = await deliverRepair(ticketId, false)
-          if (!res.ok) { showToast('Delivery error: ' + res.error, 'error'); return false }
+          if (!res.ok) { showBlockingError('Delivery error: ' + res.error); return false }
           state.modal = null
           await load()
           showToast('Device marked as Delivered.', 'success')
@@ -1390,7 +1390,7 @@ function attachEvents() {
     }
     if (el.dataset.action === 'print-repair-summary') {
       const summaryResult = await getRepairFamilySummary(Number(el.dataset.ticketId))
-      if (!summaryResult.ok) { showToast('Summary error: ' + summaryResult.error, 'error'); return }
+      if (!summaryResult.ok) { showBlockingError('Summary error: ' + summaryResult.error); return }
       const { buildRepairSummary, printThermal } = await import('../print/print.js')
       printThermal(buildRepairSummary(summaryResult.data)); return
     }
@@ -1400,7 +1400,7 @@ function attachEvents() {
       openPinPrompt('udhar', async verified => {
         if (!verified) return
         const res = await deliverRepair(ticketId, true)
-        if (!res.ok) { showToast('Delivery error: ' + res.error, 'error'); return }
+        if (!res.ok) { showBlockingError('Delivery error: ' + res.error); return }
         state.modal = null
         await load()
         showToast('Device delivered with the remaining balance approved as Udhar.', 'success')
@@ -1433,8 +1433,8 @@ function attachEvents() {
     if (el.dataset.action === 'add-custom-item') {
       const name  = document.getElementById('custom-item-name')?.value?.trim()
       const price = parseFloat(document.getElementById('custom-item-price')?.value || '0')
-      if (!name)    { showToast('Enter item name.', 'warning'); return }
-      if (price<=0) { showToast('Enter valid price.', 'warning'); return }
+      if (!name)    { showBlockingError('Enter item name.'); return }
+      if (price<=0) { showBlockingError('Enter valid price.'); return }
       posState.cart.push({ productId:`custom-${Date.now()}`, name, qty:1, originalPrice:price, soldPrice:price, discount:0, reason:'', isCustom:true })
       document.getElementById('custom-item-name').value = ''
       document.getElementById('custom-item-price').value = ''
@@ -1500,7 +1500,7 @@ function attachEvents() {
       const parentDraft = getDraft()
       const parentInfo  = state.modal._info
       const editingCartProductId = state.modal._editingCartProductId
-      if (!text) { showToast('Describe the issue.', 'warning'); return }
+      if (!text) { showBlockingError('Describe the issue.'); return }
       parentDraft.components.push({ name:compName, tag:'Custom', customText:text, price:0 })
       state.modal = { type:'repair', _info:parentInfo, _editingCartProductId:editingCartProductId }
       render(); return
@@ -1518,7 +1518,7 @@ function attachEvents() {
     if (el.dataset.action === 'draft-add-payment') {
       const amount = Number(document.getElementById('draft-pay-amount')?.value||0)
       const method = document.getElementById('draft-pay-method')?.value||'Cash'
-      if (!amount||amount<=0) { showToast('Enter a payment amount.', 'warning'); return }
+      if (!amount||amount<=0) { showBlockingError('Enter a payment amount.'); return }
       captureRepairFormInfo()
       getDraft().payments.push({ amount, method })
       document.getElementById('draft-pay-amount').value = ''
@@ -1548,12 +1548,12 @@ function attachEvents() {
       const accountKey = el.dataset.settleId
       const amount  = Number(document.querySelector(`[data-settle-amount="${accountKey}"]`)?.value)
       const method  = document.querySelector(`[data-settle-method="${accountKey}"]`)?.value||'Cash'
-      if (!amount||amount<=0) { showToast('Enter a valid amount.', 'warning'); return }
+      if (!amount||amount<=0) { showBlockingError('Enter a valid amount.'); return }
       openPinPrompt('settle', async (verified) => {
         if (!verified) return
         const rec = (state.data.udharAccounts || []).find(u => `${u.kind}:${u.sourceId}` === accountKey)
         const res = await settleUdhar(rec, amount, method)
-        if (!res.ok) { showToast('Settle error: ' + res.error, 'error'); return }
+        if (!res.ok) { showBlockingError('Settle error: ' + res.error); return }
         await load()
         state.modal = { type:'udharList' }
         render()
@@ -1641,10 +1641,10 @@ function attachEvents() {
       const editingProductId = state.modal?._editingCartProductId
       dlog('POS.submit', `repair branch -- ${editingProductId ? 'updating' : 'adding'} cart draft (no DB write yet)`)
       const draft = getDraft()
-      if (!data.customerName?.trim()) { showToast('Customer name is required.', 'warning'); return }
-      if (!data.customerPhone?.trim()) { showToast('Customer phone is required.', 'warning'); return }
-      if (!data.deviceBrand?.trim())  { showToast('Device brand is required.', 'warning'); return }
-      if (!data.deviceModel?.trim())  { showToast('Device model is required.', 'warning'); return }
+      if (!data.customerName?.trim()) { showBlockingError('Customer name is required.'); return }
+      if (!data.customerPhone?.trim()) { showBlockingError('Customer phone is required.'); return }
+      if (!data.deviceBrand?.trim())  { showBlockingError('Device brand is required.'); return }
+      if (!data.deviceModel?.trim())  { showBlockingError('Device model is required.'); return }
 
       const total = calcDraftTotal(draft)
       const paid  = calcDraftPaid(draft)
@@ -1671,7 +1671,7 @@ function attachEvents() {
       // Saving happens when "Place Order" is clicked
       if (editingProductId) {
         const updated = updateCartRepairDraft(posState.cart, editingProductId, cartValues)
-        if (!updated) { showToast('Repair draft is no longer in the cart.', 'warning'); return }
+        if (!updated) { showBlockingError('Repair draft is no longer in the cart.'); return }
       } else {
         posState.cart = posState.cart.filter(i => !i.isTicket)
         posState.cart.push({
@@ -1700,7 +1700,7 @@ function attachEvents() {
         render(); return
       }
       const lookup = await getRetailReturnContext(found.id)
-      if (!lookup.ok) { showToast('Return lookup failed: '+lookup.error, 'error'); return }
+      if (!lookup.ok) { showBlockingError('Return lookup failed: '+lookup.error); return }
       state.modal = { type:'returnFlow', receiptNo:found.invoice_number, context:lookup.data }
       render(); return
     }
@@ -1709,14 +1709,14 @@ function attachEvents() {
       const saleId   = Number(data.saleId)
       const context  = state.modal?.context
       const preview  = retailReturnSelection(context)
-      if (preview.error) { showToast(preview.error, 'warning'); return }
-      if (!preview.lines.length) { showToast('Enter a return quantity for at least one item.', 'warning'); return }
+      if (preview.error) { showBlockingError(preview.error); return }
+      if (!preview.lines.length) { showBlockingError('Enter a return quantity for at least one item.'); return }
       const reason = String(data.notes||'').trim()
-      if (!reason) { showToast('Enter a return reason.', 'warning'); return }
+      if (!reason) { showBlockingError('Enter a return reason.'); return }
       openPinPrompt('return', async (verified) => {
         if (!verified) return
         const result = await createRetailReturn(saleId,preview.lines.map(({saleLineId,quantity,restock}) => ({saleLineId,quantity,restock})),data.refundMethod,reason)
-        if (!result.ok) { showToast('Return error: '+result.error, 'error'); return }
+        if (!result.ok) { showBlockingError('Return error: '+result.error); return }
         const refund = Number(result.data?.return?.refund_amount||0)
         const { buildReturnSlip, printThermal } = await import('../print/print.js')
         printThermal(buildReturnSlip({
@@ -1743,7 +1743,7 @@ function attachEvents() {
 
     if (type === 'leave-request') {
       const result = await submitLeaveRequest(SESSION, data)
-      if (!result.ok) { showToast('Error: ' + result.error, 'error'); return }
+      if (!result.ok) { showBlockingError('Error: ' + result.error); return }
       state.modal = null
       showToast('Leave request submitted. Your manager will review it.', 'success')
       render(); return

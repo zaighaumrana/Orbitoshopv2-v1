@@ -8,7 +8,7 @@ import {
   myAccountModalHTML, handleChangePasswordSubmit,
   generateTempPassword, listPendingResetRequests, resolvePasswordReset,
   invokeAccountAdmin,
-  showToast, confirmAction, requestInput, runInstallPrompt,
+  showBlockingError, showToast, confirmAction, requestInput, runInstallPrompt,
 } from '../shared.js'
 import {
   markComponentNotNeeded, getRepairFamilySummary,
@@ -662,7 +662,7 @@ function attachEvents() {
     }
     if (el.dataset.action === 'print-repair-summary') {
       const summary = state.modal?.summary || (await getRepairFamilySummary(Number(el.dataset.ticketId))).data
-      if (!summary) { showToast('Repair summary is unavailable.', 'error'); return }
+      if (!summary) { showBlockingError('Repair summary is unavailable.'); return }
       const { buildRepairSummary, printThermal } = await import('../print/print.js')
       printThermal(buildRepairSummary(summary)); return
     }
@@ -724,14 +724,14 @@ function attachEvents() {
     }
     if (el.dataset.action === 'confirm-not-needed') {
       const reason = document.getElementById('not-needed-reason')?.value?.trim()
-      if (!reason) { showToast('Enter a reason.', 'warning'); return }
+      if (!reason) { showBlockingError('Enter a reason.'); return }
       const { ticketId, index } = state.modal
       openPinPrompt('remove-component', async (verified) => {
         if (!verified) return
         const tk = state.data.tickets.find(t => String(t.id) === String(ticketId))
         if (!tk) return
         const res = await markComponentNotNeeded(Number(ticketId), index, reason)
-        if (!res.ok) { showToast('Error: ' + res.error, 'error'); return }
+        if (!res.ok) { showBlockingError('Error: ' + res.error); return }
         await load()
         await openTicketDetail(ticketId)
       }, render)
@@ -768,7 +768,7 @@ function attachEvents() {
     /* Add custom component to the draft — opens tag picker */
     if (el.dataset.action === 'add-custom-draft-comp') {
       const name = document.getElementById('custom-comp-name')?.value?.trim()
-      if (!name) { showToast('Enter a component name.', 'warning'); return }
+      if (!name) { showBlockingError('Enter a component name.'); return }
       state.modal = {
         type:     'add-comp-tag',
         compName: name,
@@ -792,7 +792,7 @@ function attachEvents() {
     }
     if (el.dataset.action === 'confirm-draft-custom-tag') {
       const text = document.getElementById('custom-tag-text')?.value?.trim()
-      if (!text) { showToast('Describe the issue.', 'warning'); return }
+      if (!text) { showBlockingError('Describe the issue.'); return }
       _addComponentToDraft(state.modal.compName, 'Custom', text)
       return
     }
@@ -805,13 +805,13 @@ function attachEvents() {
       const comps  = readSubInvCompsFromDOM()
       const labour = readSubInvLabourFromDOM()
       const note   = document.getElementById('sub-invoice-note')?.value || ''
-      if (!comps.length && !labour) { showToast('Add at least one component or a labour charge.', 'warning'); return }
+      if (!comps.length && !labour) { showBlockingError('Add at least one component or a labour charge.'); return }
 
       const decision = document.getElementById('additional-work-decision')?.value || 'Approved'
       const method = document.getElementById('additional-work-method')?.value || 'In person'
       const description = comps.map(c=>c.name).filter(Boolean).join(', ') || note || 'Additional work'
       const res = await recordAdditionalWork(Number(parentId), description, comps, labour, decision, method, note)
-      if (!res.ok) { showToast('Error: ' + res.error, 'error'); return }
+      if (!res.ok) { showBlockingError('Error: ' + res.error); return }
 
       if (res.ticket) {
         const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
@@ -837,7 +837,7 @@ function attachEvents() {
       const method = input.value.method
       const note = input.value.note || ''
       const result = await decideAdditionalWork(Number(el.dataset.proposalId), decision, method, note)
-      if (!result.ok) { showToast('Decision error: ' + result.error, 'error'); return }
+      if (!result.ok) { showBlockingError('Decision error: ' + result.error); return }
       if (result.ticket) {
         const root = state.data.tickets.find(t=>!t.parent_ticket_id && String(t.id)===String(result.proposal.root_ticket_id))
         if (root) {
@@ -857,18 +857,18 @@ function attachEvents() {
       const amount = Number(document.getElementById('repair-adjustment-amount')?.value || 0)
       const type = document.getElementById('repair-adjustment-type')?.value || 'discount'
       const reason = document.getElementById('repair-adjustment-reason')?.value?.trim() || ''
-      if (amount <= 0 || !reason) { showToast('Enter a positive reduction and a reason.', 'warning'); return }
+      if (amount <= 0 || !reason) { showBlockingError('Enter a positive reduction and a reason.'); return }
       openPinPrompt('discount', async verified => {
         if (!verified) return
         const result = await createRepairAdjustment(Number(el.dataset.ticketId), amount, type, reason)
-        if (!result.ok) { showToast('Adjustment error: ' + result.error, 'error'); return }
+        if (!result.ok) { showBlockingError('Adjustment error: ' + result.error); return }
         showToast('Repair invoice adjustment completed.', 'success')
         state.modal = null; await load()
       }, render); return
     }
     if (el.dataset.action === 'open-repair-cancellation') {
       const summaryResult = await getRepairFamilySummary(Number(el.dataset.ticketId))
-      if (!summaryResult.ok) { showToast('Summary error: ' + summaryResult.error, 'error'); return }
+      if (!summaryResult.ok) { showBlockingError('Summary error: ' + summaryResult.error); return }
       state.modal = { type:'repair-cancellation', rootId:Number(el.dataset.ticketId), summary:summaryResult.data }
       render(); return
     }
@@ -876,11 +876,11 @@ function attachEvents() {
       const refund = Number(document.getElementById('repair-cancel-refund')?.value || 0)
       const method = document.getElementById('repair-cancel-method')?.value || 'Cash'
       const reason = document.getElementById('repair-cancel-reason')?.value?.trim() || ''
-      if (refund < 0 || !reason) { showToast('Enter a valid refund and a reason.', 'warning'); return }
+      if (refund < 0 || !reason) { showBlockingError('Enter a valid refund and a reason.'); return }
       openPinPrompt('repair-refund', async verified => {
         if (!verified) return
         const result = await cancelRepair(Number(el.dataset.ticketId), refund, method, reason)
-        if (!result.ok) { showToast('Cancellation error: ' + result.error, 'error'); return }
+        if (!result.ok) { showBlockingError('Cancellation error: ' + result.error); return }
         showToast(refund > 0 ? 'Repair cancelled and refund completed.' : 'Repair cancelled.', 'success')
         state.modal = null; await load()
       }, render); return
@@ -901,7 +901,7 @@ function attachEvents() {
       const email = el.dataset.resetEmail
       const newPass = generateTempPassword()
       const res = await resolvePasswordReset(el.dataset.resetId, email, newPass, SESSION.employee?.name || 'Admin')
-      if (!res.ok) { showToast('Error: ' + res.error, 'error'); return }
+      if (!res.ok) { showBlockingError('Error: ' + res.error); return }
       await confirmAction({
         title: 'Temporary password created',
         message: `New password for ${email}:\n\n${newPass}\n\nShare this directly. It will not be shown again.`,
@@ -962,7 +962,7 @@ function attachEvents() {
           employeeId: Number(empId), name: found.name, email: found.email,
           role: found.role, status: 'Inactive',
         })
-        if (!result.ok) { showToast('Error deactivating: ' + result.error, 'error'); return }
+        if (!result.ok) { showBlockingError('Error deactivating: ' + result.error); return }
         await load()
       }, render); return
     }
@@ -990,14 +990,14 @@ function attachEvents() {
       const note        = document.getElementById('td-note')?.value||''
       const upd = { status:newStatus, update_note:note }
       const { error } = await sb.from('tickets').update(upd).eq('id', el.dataset.id)
-      if (error) { showToast('Update failed: '+error.message, 'error'); return }
+      if (error) { showBlockingError('Update failed: '+error.message); return }
       state.modal = null; await load(); return
     }
 
     if (el.dataset.action === 'reprint-receipt') {
       const saleId = Number(el.dataset.saleId)
       const sale   = state.data.sales.find(s => s.id === saleId)
-      if (!sale) { showToast('Sale not found.', 'error'); return }
+      if (!sale) { showBlockingError('Sale not found.'); return }
       const { buildReceiptSlip, printThermal } = await import('../print/print.js')
       const reprSale = {
         receiptNo: sale.invoice_number||`INV-${sale.id}`, date: sale.created_at,
@@ -1014,11 +1014,11 @@ function attachEvents() {
 
     if (el.dataset.action === 'print-repair-invoice') {
       const ticket = state.data.tickets.find(item => String(item.id) === String(el.dataset.ticketId))
-      if (!ticket) { showToast('Repair invoice not found.', 'error'); return }
+      if (!ticket) { showBlockingError('Repair invoice not found.'); return }
       const { buildTicketSlip, buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
       if (ticket.parent_ticket_id) {
         const parent = state.data.tickets.find(item => String(item.id) === String(ticket.parent_ticket_id))
-        if (!parent) { showToast('Parent repair record not found.', 'error'); return }
+        if (!parent) { showBlockingError('Parent repair record not found.'); return }
         printThermal(buildSubInvoiceSlip(ticket, parent))
       } else {
         printThermal(buildTicketSlip(ticket))
@@ -1067,7 +1067,7 @@ function attachEvents() {
       const { error } = await sb.from('repair_components').insert({
         name: val, sort_order: (state.data.repairComponents||[]).length + 1
       })
-      if (error) { showToast('Error: '+error.message, 'error'); return }
+      if (error) { showBlockingError('Error: '+error.message); return }
       const input = document.getElementById('new-comp-input')
       if (input) input.value = ''
       await load(); return
@@ -1079,7 +1079,7 @@ function attachEvents() {
     if (el.dataset.removeQuick !== undefined) {
       const compId = Number(el.dataset.removeQuick)
       const { error } = await sb.from('repair_components').delete().eq('id', compId)
-      if (error) { showToast('Error: '+error.message, 'error'); return }
+      if (error) { showBlockingError('Error: '+error.message); return }
       await load(); return
     }
 
@@ -1088,7 +1088,7 @@ function attachEvents() {
       const { error } = await sb.from('quick_items').insert({
         name: val, prices: [], sort_order: (state.data.quickItems||[]).length + 1
       })
-      if (error) { showToast('Error: '+error.message, 'error'); return }
+      if (error) { showBlockingError('Error: '+error.message); return }
       await load(); return
     }
     if (el.dataset.action === 'save-qitems') {
@@ -1100,7 +1100,7 @@ function attachEvents() {
       const item = (state.data.quickItems||[])[Number(el.dataset.removeQitem)]
       if (!item) return
       const { error } = await sb.from('quick_items').delete().eq('id', item.id)
-      if (error) { showToast('Error: '+error.message, 'error'); return }
+      if (error) { showBlockingError('Error: '+error.message); return }
       await load(); return
     }
     if (el.dataset.addQprice !== undefined) {
@@ -1112,7 +1112,7 @@ function attachEvents() {
       if (!item) return
       const newPrices = [...(item.prices||[]), { name: variantName, price: val }]
       const { error } = await sb.from('quick_items').update({ prices: newPrices }).eq('id', item.id)
-      if (error) { showToast('Error: '+error.message, 'error'); return }
+      if (error) { showBlockingError('Error: '+error.message); return }
       await load(); return
     }
     if (el.dataset.removeQprice !== undefined) {
@@ -1122,7 +1122,7 @@ function attachEvents() {
       const newPrices = [...(item.prices||[])]
       newPrices.splice(pi, 1)
       const { error } = await sb.from('quick_items').update({ prices: newPrices }).eq('id', item.id)
-      if (error) { showToast('Error: '+error.message, 'error'); return }
+      if (error) { showBlockingError('Error: '+error.message); return }
       await load(); return
     }
 
@@ -1138,12 +1138,12 @@ function attachEvents() {
       const accountKey = el.dataset.settleId
       const amount  = Number(document.querySelector(`[data-settle-amount="${accountKey}"]`)?.value)
       const method  = document.querySelector(`[data-settle-method="${accountKey}"]`)?.value || 'Cash'
-      if (!amount || amount <= 0) { showToast('Enter a valid amount.', 'warning'); return }
+      if (!amount || amount <= 0) { showBlockingError('Enter a valid amount.'); return }
       openPinPrompt('settle', async (verified) => {
         if (!verified) return
         const rec = (state.data.udharAccounts || []).find(u => `${u.kind}:${u.sourceId}` === accountKey)
         const result = await settleUdhar(rec, amount, method)
-        if (!result.ok) { showToast('Settle error: '+result.error, 'error'); return }
+        if (!result.ok) { showBlockingError('Settle error: '+result.error); return }
         await load(); state.modal = { type:'udharList' }; render()
       }, render); return
     }
@@ -1229,7 +1229,7 @@ function attachEvents() {
 
     if (type === 'add-quick-item') {
       const itemName = data.itemName?.trim()
-      if (!itemName) { showToast('Item name is required.', 'warning'); return }
+      if (!itemName) { showBlockingError('Item name is required.'); return }
       const names  = [...form.querySelectorAll('[name="variantName[]"]')].map(i => i.value.trim())
       const prices = [...form.querySelectorAll('[name="variantPrice[]"]')].map(i => Number(i.value) || 0)
       const variants = names.map((name, i) => ({ name, price: prices[i] })).filter(v => v.price > 0)
@@ -1237,7 +1237,7 @@ function attachEvents() {
         name: itemName, prices: variants,
         sort_order: (state.data.quickItems||[]).length + 1
       })
-      if (error) { showToast('Error: ' + error.message, 'error'); return }
+      if (error) { showBlockingError('Error: ' + error.message); return }
       state.modal = null
       await load(); return
     }
@@ -1259,25 +1259,25 @@ function attachEvents() {
       const updates = { employeeId:Number(empId), name:data.name, role:data.role, status:data.status, email:(data.email||'').toLowerCase().trim() }
       if (data.password?.trim()) {
         const err = validatePassword(data.password)
-        if (err) { showToast(err, 'warning'); return }
+        if (err) { showBlockingError(err); return }
       }
       const result = await invokeAccountAdmin('update-employee', updates)
-      if (!result.ok) { showToast('Error updating: '+result.error, 'error'); return }
+      if (!result.ok) { showBlockingError('Error updating: '+result.error); return }
       if (data.password?.trim()) {
         const reset = await invokeAccountAdmin('reset-password', { email: updates.email, newPassword: data.password })
-        if (!reset.ok) { showToast('Employee details were saved, but password reset failed: ' + reset.error, 'error'); return }
+        if (!reset.ok) { showBlockingError('Employee details were saved, but password reset failed: ' + reset.error); return }
       }
       state.modal = null; await load(); return
     }
 
     if (type === 'employee') {
       const pwErr = validatePassword(data.password||'')
-      if (pwErr) { showToast(pwErr, 'warning'); return }
+      if (pwErr) { showBlockingError(pwErr); return }
       const result = await invokeAccountAdmin('create-employee', {
         name:data.name, email:(data.email||'').toLowerCase().trim(),
         password:data.password, role:data.role||'Cashier',
       })
-      if (!result.ok) { showToast('Error saving employee: '+result.error, 'error'); return }
+      if (!result.ok) { showBlockingError('Error saving employee: '+result.error); return }
       state.modal = null; await load(); return
     }
 
@@ -1302,22 +1302,22 @@ function attachEvents() {
       if (data.receiptFooter)       updates.terms_text       = data.receiptFooter
       if (data.businessDescription) updates.shop_description = data.businessDescription
       const result = await invokeAccountAdmin('update-config', { updates })
-      if (!result.ok) { showToast('Settings error: '+result.error, 'error'); return }
+      if (!result.ok) { showBlockingError('Settings error: '+result.error); return }
       state.modal = null; await load(); return
     }
 
     if (type === 'owner-login') {
       const email = data.owner_email?.toLowerCase().trim()
-      if (!email) { showToast('Enter an owner email.', 'warning'); return }
+      if (!email) { showBlockingError('Enter an owner email.'); return }
       const result = await invokeAccountAdmin('update-owner', { email })
-      if (!result.ok) { showToast('Error: '+result.error, 'error'); return }
+      if (!result.ok) { showBlockingError('Error: '+result.error); return }
       showToast('Owner email updated.', 'success'); return
     }
 
     if (type === 'override-pin') {
-      if (!data.new_pin?.trim()) { showToast('Enter a PIN.', 'warning'); return }
+      if (!data.new_pin?.trim()) { showBlockingError('Enter a PIN.'); return }
       const result = await invokeAccountAdmin('set-pin', { pin:data.new_pin })
-      if (!result.ok) { showToast('Error: '+result.error, 'error'); return }
+      if (!result.ok) { showBlockingError('Error: '+result.error); return }
       showToast('Override PIN updated.', 'success'); return
     }
 

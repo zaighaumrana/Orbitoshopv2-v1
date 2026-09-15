@@ -21,7 +21,7 @@
 ═══════════════════════════════════════════════════════════════════ */
 import {
   sb, state, CFG, money,
-  _clearSession, confirmAction, showToast,
+  _clearSession, confirmAction, showBlockingError, showToast,
 } from '../../shared.js'
 import { dlog, dstack } from '../../debuglog.js'
 
@@ -147,7 +147,7 @@ function renderClockInScreen(sess, isReturn) {
       clock_in:    new Date().toISOString(),
       date:        today,
     })
-    if (error) { showToast('Clock-in failed: ' + error.message, 'error'); btn.disabled = false; btn.textContent = '⏱ Clock In'; return }
+    if (error) { showBlockingError('Clock-in failed: ' + error.message); btn.disabled = false; btn.textContent = '⏱ Clock In'; return }
     clearInterval(ticker)
     _onProceed && _onProceed()
   })
@@ -319,7 +319,7 @@ export async function handleClockOut(sess, onComplete) {
           .update({ clock_out: new Date().toISOString() })
           .eq('id', data[0].id)
         if (error) {
-          showToast('Clock-out failed: ' + error.message, 'error')
+          showBlockingError('Clock-out failed: ' + error.message)
           return false
         }
       }

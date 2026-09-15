@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
-import { dlog, dstack } from './debuglog.js'
+import { dlog, dstack, initializeSupportConsole, revokeSupportConsole } from './debuglog.js'
 import { installNumericInputValidation } from './numeric-input.js'
+import { blockingErrorCopy } from './blocking-error.js'
 
 /* ── Supabase ── */
 export const sb = createClient(
@@ -15,6 +16,8 @@ export const sb = createClient(
     },
   }
 )
+
+initializeSupportConsole(sb)
 
 let _platform = null
 function getPlatform() {
@@ -188,6 +191,7 @@ export function _saveSession(_SESSION, route, module) {
   } catch {}
 }
 export async function _clearSession() {
+  revokeSupportConsole()
   dstack('shared._clearSession', 'clearing session storage')
   try {
     ['retailos_session','retailos_route','retailos_module']
@@ -337,6 +341,7 @@ function openAppDialog({
   fields = [],
   validate,
   action,
+  notice = false,
 }) {
   if (activeAppDialog?.busy) return Promise.resolve(null)
   if (activeAppDialog) closeAppDialog(activeAppDialog, null)
@@ -424,12 +429,20 @@ function openAppDialog({
     confirm.className = 'primary-button'
     if (tone === 'danger') confirm.classList.add('danger-button')
     confirm.textContent = confirmLabel
-    actions.append(cancel, confirm)
+    if (!notice) actions.append(cancel)
+    actions.append(confirm)
     form.append(actions)
     backdrop.append(form)
     document.body.append(backdrop)
 
-    const dialog = { backdrop, resolve, busy: false, keyHandler: null }
+    const dialog = { backdrop, resolve, busy: false, keyHandler: null,
+      actionFailed:false,
+      showFailure(copy) {
+        error.textContent = `${copy.title}: ${copy.message}`
+        error.classList.remove('hidden')
+        this.actionFailed = true
+      },
+    }
     activeAppDialog = dialog
     const cancelDialog = () => closeAppDialog(dialog, null)
     close.addEventListener('click', cancelDialog)
@@ -479,6 +492,7 @@ function openAppDialog({
       }
 
       dialog.busy = true
+      dialog.actionFailed = false
       error.classList.add('hidden')
       ;[close, cancel, confirm, ...controls].forEach(control => { control.disabled = true })
       const originalLabel = confirm.textContent
@@ -486,7 +500,7 @@ function openAppDialog({
       form.setAttribute('aria-busy', 'true')
       try {
         const result = action ? await action(values) : values
-        if (result === false) {
+        if (result === false || dialog.actionFailed) {
           dialog.busy = false
           ;[close, cancel, confirm, ...controls].forEach(control => { control.disabled = false })
           confirm.textContent = originalLabel
@@ -501,12 +515,28 @@ function openAppDialog({
         ;[close, cancel, confirm, ...controls].forEach(control => { control.disabled = false })
         confirm.textContent = originalLabel
         form.setAttribute('aria-busy', 'false')
-        showToast(caught?.message || 'The action could not be completed.', 'error')
+        dialog.showFailure(blockingErrorCopy(caught?.message))
       }
     })
 
-    queueMicrotask(() => (controls[0] || cancel).focus())
+    queueMicrotask(() => (controls[0] || (notice ? confirm : cancel)).focus())
   })
+}
+
+let blockingNotice = null
+/** Acknowledgement-only shared dialog; repeated failures do not stack notices.
+ * Failures inside a running confirmation stay in that dialog (no nested await).
+ */
+export function showBlockingError(message) {
+  const copy = blockingErrorCopy(message)
+  if (activeAppDialog?.busy) {
+    activeAppDialog.showFailure(copy)
+    return Promise.resolve(null)
+  }
+  if (blockingNotice) return blockingNotice
+  blockingNotice = openAppDialog({ ...copy, confirmLabel:'OK', notice:true })
+    .finally(() => { blockingNotice = null })
+  return blockingNotice
 }
 
 /** Confirmation that owns the async action, preventing duplicate submissions. */
