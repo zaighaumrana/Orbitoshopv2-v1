@@ -48,3 +48,23 @@ export function matchedRepairChild(family) {
   if (rootMatched) return null
   return matchedMembers.find(ticket => ticket.parent_ticket_id) || null
 }
+
+/** Operational scope comes from persisted invoices, never proposal details.
+ * An approved child starts in operational status Pending; that is not a
+ * pending customer decision. Deduplicate invoices, not intentionally repeated
+ * component names within or across invoices. */
+export function repairFamilyWork(family) {
+  const seen = new Set()
+  return [family.root, ...family.members].filter(ticket => {
+    if (!ticket || seen.has(String(ticket.id))) return false
+    seen.add(String(ticket.id))
+    return !['Cancelled', 'Declined'].includes(ticket.status)
+  }).map(ticket => ({
+    ticketId: ticket.id,
+    additional: !!ticket.parent_ticket_id,
+    invoice: ticket.invoice_number || ticket.ticket_number,
+    components: ticket.components_noted || [],
+    hasLabour: Number(ticket.labour_cost || 0) > 0,
+    note: ticket.technician_note || '',
+  }))
+}

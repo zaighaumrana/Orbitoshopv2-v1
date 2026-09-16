@@ -1,3 +1,4 @@
+import { escapeHTML } from '../../../html.js'
 /* ═══════════════════════════════════════════════════════════════════
    features/admin/repairs/render.js
    Admin-exclusive repair ticket modals -- verified by actual caller
@@ -82,7 +83,7 @@ export function ticketDetailModalHTML(id, modal) {
         ${components.map((c,i) => `
           <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface-2);border-radius:8px;font-size:14px;${c.removed?'opacity:.55':''}">
             <span>
-              <strong style="${c.removed?'text-decoration:line-through':''}">${c.name}</strong>
+              <strong style="${c.removed?'text-decoration:line-through':''}">${escapeHTML(c.name)}</strong>
               <span class="badge warn" style="font-size:11px">${c.tag||c.condition||''}</span>
               ${c.removed ? `<br><span class="muted" style="font-size:11px">Not needed: ${c.removedReason||''}</span>` : ''}
             </span>
@@ -137,7 +138,7 @@ export function markNotNeededModalHTML(modal) {
   if (!tk || !c) return ''
   return `<div class="modal-backdrop" data-no-backdrop-close>
     <div class="modal modal-xs">
-      <h2>Mark "${c.name}" Not Needed</h2>
+      <h2>Mark "${escapeHTML(c.name)}" Not Needed</h2>
       <p class="muted" style="font-size:13px">E.g. "Only needed cleaning, no repair required." This stays visible on the ticket, it's not deleted.</p>
       <label class="field"><span>Reason</span><textarea id="not-needed-reason" style="min-height:56px"></textarea></label>
       <div class="modal-actions">
@@ -188,7 +189,7 @@ export function addCompTagModalHTML(modal) {
   return `
     <div class="modal-backdrop" data-no-backdrop-close>
       <div class="modal modal-xs">
-        <h2>${compName}</h2>
+        <h2>${escapeHTML(compName)}</h2>
         <p class="muted" style="font-size:13px">What's the issue?</p>
         <div style="display:grid;gap:8px;margin-top:10px">
           <button type="button" class="secondary-button" style="font-size:15px;min-height:48px" data-tag-select="Broken">Broken</button>

@@ -1,3 +1,4 @@
+import { escapeHTML } from '../html.js'
 import { CFG, money } from '../shared.js'
 import { dlog, dstack } from '../debuglog.js'
 
@@ -43,7 +44,7 @@ export function buildTicketSlip(ticket) {
     <div class="b">Issues Noted:</div>
     ${comps.length ? comps.map(c => {
       const label = c.tag === 'Custom' ? (c.customText || '') : (c.tag || '')
-      return `<div class="row"><span>· ${c.name}${label ? ` (${label})` : ''}</span><span class="sm">${Number(c.price)>0 ? money(c.price) : ''}</span></div>`
+      return `<div class="row"><span>· ${escapeHTML(c.name)}${label ? ` (${label})` : ''}</span><span class="sm">${Number(c.price)>0 ? money(c.price) : ''}</span></div>`
     }).join('') : '<div class="sm">No components noted.</div>'}
     <div class="ln"></div>
     ${Number(ticket.labour_cost)>0 ? `<div class="row"><span>Labour Fee</span><span>${money(ticket.labour_cost)}</span></div>` : ''}
@@ -114,7 +115,7 @@ export function buildSubInvoiceSlip(sub, parentTicket) {
     <div class="row"><span>Date</span><span>${new Date(sub.created_at||Date.now()).toLocaleDateString()}</span></div>
     <div class="ln"></div>
     <div class="b">Additional Work:</div>
-    ${comps.length ? comps.map(c => `<div class="row"><span>· ${c.name}</span><span class="sm">${Number(c.price)>0?money(c.price):''}</span></div>`).join('') : '<div class="sm">No additional components.</div>'}
+    ${comps.length ? comps.map(c => `<div class="row"><span>· ${escapeHTML(c.name)}</span><span class="sm">${Number(c.price)>0?money(c.price):''}</span></div>`).join('') : '<div class="sm">No additional components.</div>'}
     <div class="ln"></div>
     ${Number(sub.labour_cost)>0 ? `<div class="row"><span>Labour Fee</span><span>${money(sub.labour_cost)}</span></div>` : ''}
     <div class="row b"><span>Sub-Invoice Total</span><span>${money(sub.estimated_quote)}</span></div>

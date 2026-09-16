@@ -1,3 +1,4 @@
+import { escapeHTML } from '../../../html.js'
 /* ═══════════════════════════════════════════════════════════════════
    features/pos/repairs/render.js
    Pure, presentational rendering for repair tickets -- POS-exclusive,
@@ -109,7 +110,14 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
         ${comps.map(c => `
           <button type="button" class="secondary-button" style="font-size:13px;padding:6px 14px"
-            data-pick-comp="${c.name}">${c.name}</button>`).join('')}
+            data-pick-comp="${escapeHTML(c.name)}">${escapeHTML(c.name)}</button>`).join('')}
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:end">
+        <label class="field" style="flex:1"><span>Custom component name</span>
+          <input id="intake-custom-comp-name" class="search" placeholder="Custom component name">
+        </label>
+        <button type="button" class="secondary-button" data-action="add-intake-custom-comp">+ Add</button>
       </div>
 
       ${draft.components.length ? `
@@ -118,7 +126,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
             <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;
                         padding:8px;background:var(--surface-2);border-radius:8px">
               <div>
-                <strong style="font-size:13px">${c.name}</strong><br>
+                <strong style="font-size:13px">${escapeHTML(c.name)}</strong><br>
                 <span class="muted" style="font-size:12px">
                   ${c.tag === 'Custom' ? (c.customText || '—') : c.tag}
                 </span>
@@ -202,7 +210,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
 export function compTagPickerHTML(name) {
   return `<div class="modal-backdrop" data-no-backdrop-close>
     <div class="modal modal-xs">
-      <h2>${name}</h2>
+      <h2>${escapeHTML(name)}</h2>
       <p class="muted" style="font-size:13px">What's the issue?</p>
       <div style="display:grid;gap:8px;margin-top:10px">
         <button type="button" class="secondary-button" style="font-size:15px;min-height:48px" data-tag-pick="Broken">Broken</button>
@@ -239,7 +247,7 @@ export function ticketSlipPreview(ticket) {
     <strong>Issues Noted:</strong><br>
     ${comps.length ? comps.map(c => {
       const label = c.tag === 'Custom' ? (c.customText || '') : (c.tag || '')
-      return `· ${c.name}${label?` (${label})`:''}${Number(c.price)>0?` — ${money(c.price)}`:''}`
+      return `· ${escapeHTML(c.name)}${label?` (${label})`:''}${Number(c.price)>0?` — ${money(c.price)}`:''}`
     }).join('<br>') : 'No components noted.'}
     <hr>
     ${ticket.technician_note ? `<strong>Technician Note:</strong><br>${ticket.technician_note}<hr>` : ''}

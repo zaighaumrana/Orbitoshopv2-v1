@@ -1,5 +1,46 @@
 # Phase 3 final consistency stabilization
 
+## Final Workshop and intake patch — 2026-09-17
+
+Two additional consistency fixes are implemented, uncommitted and unmerged.
+
+### Approved operational family scope
+
+Root cause: Workshop grouped family identities and financials, but rendered only the parent's `components_noted`. The original status-filtered query could also omit children with a different lifecycle status.
+
+Workshop now reads active parent tickets plus their child tickets through existing RLS-protected reads. A pure `repairFamilyWork` helper assembles each invoice once, preserving intentional repeated component names. Cards distinguish Original Repair / Additional Work and show component tags, Not Needed markers, related labour presence, and child work notes. No child data is copied into the parent. Cancelled/Declined child tickets are excluded from active scope.
+
+Only persisted invoices contribute operational work. The existing `decide_additional_work` RPC creates a child only for Approved decisions. Its child's operational status starts as Pending: this must not be confused with a Pending customer proposal. Pending/Declined proposal details are never consumed as active work and history is untouched.
+
+Technicians use the same already-authorized ticket reads for operational scope, without a financial-summary request or any new permission. Canonical financial totals remain unchanged for authorized roles. Read failures show a blocking error rather than silently claiming a complete work list.
+
+### Custom component on original intake
+
+Root cause: intake already supported the normal `{name, tag, customText, price}` draft model and tag picker, but offered only predefined-name buttons.
+
+New Repair Ticket and its draft-edit view now include Custom component name / + Add next to the predefined buttons. Add trims and rejects blank names using the shared blocking dialog, then opens the existing tag picker. Enter uses the same action. Modal-type guards reject stale double-clicks on both entry and tag confirmation. Intentional repeated names remain allowed, matching Additional Work. Existing snapshot/edit, ticket serialization, Admin detail, Workshop, and print paths consume the same component objects. Component names are escaped as text in the affected display/print paths.
+
+Schema check: `create_repair_ticket` in `20260904220000_phase3_atomic_repair_transactions.sql` validates the components array and stores it directly in `tickets.components_noted`; it does not require a catalog component ID. Approved additional work stores the same shape from proposal details. No schema migration, backend function, RLS, auth, ledger, payment, or Technician financial change was needed. No live DB writes were made.
+
+Files in this follow-up:
+
+- `src/features/repairs/family.js`
+- `src/pos/workshop.js`
+- `src/features/pos/repairs/render.js`
+- `src/pos/pos.js`
+- `src/html.js`
+- `src/features/admin/repairs/render.js`
+- `src/print/print.js`
+- `tests/repair-work-scope.test.mjs`
+- `tests/phase3-consistency.html`
+- this document
+
+Verification: 11/11 Node tests pass, covering approved child work exactly once, Pending/Declined proposal exclusion, cancelled-child exclusion, no-parent mutation, no-child behavior, intentional repeated names, custom-component draft editing, and previous regressions. The isolated browser fixture passes 21 checks including actual intake event handlers, blank-name dialog, trim/tag/double-click behavior, custom names in Admin and ticket print, child operational rendering for Technician, unchanged family financials, receipt archive, summary, decisions, and dialog/focus regressions. No browser errors/warnings were captured. Production build and whitespace checks pass (existing ineffective dynamic-import and LF/CRLF advisories only).
+
+Final console recheck: no error-level entries, but one Cloudflare Turnstile warning (`300030`) was captured in the development browser session. The first fixture run had no warnings; the later session included a rebuild/reload. Its origin was not established, so this is not a blanket clean-console certification of live authentication.
+
+Limitations: browser RPCs are stubbed; these results do not claim a live saved-ticket transaction, live JWT/RLS retest, or physical print. Persistence support was verified against the existing SQL/client payload, not by creating a live test ticket. Existing API row limits still bound large queue reads. Ready for focused online acceptance; no wider smoke test, cleanup, commit, or merge performed.
+
 Date: 2026-09-16. Implementation complete for review; not committed or merged.
 
 ## Scope and safety

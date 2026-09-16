@@ -1,3 +1,4 @@
+import { escapeHTML } from '../html.js'
 import { createSubInvoiceModalHTML, rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 /* ═══════════════════════════════════════════════════════════════════
    RetailOS — workshop.js
@@ -20,7 +21,7 @@ import {
 import {
   getSubInvoices, markComponentNotNeeded, getRepairFamilySummary,
 } from '../features/repairs/api.js'
-import { findRepairFamilies, groupRepairFamilies, matchedRepairChild } from '../features/repairs/family.js'
+import { findRepairFamilies, groupRepairFamilies, matchedRepairChild, repairFamilyWork } from '../features/repairs/family.js'
 
 import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
@@ -42,11 +43,19 @@ async function load() {
   const [tickets, repairComponents] = await Promise.all([
     sb.from('tickets')
       .select('*')
+      .is('parent_ticket_id', null)
       .not('status', 'in', '("Delivered","Declined","Cancelled")')
       .order('created_at', { ascending: false }),
     sb.from('repair_components').select('*').order('sort_order'),
   ])
-  state.data.tickets          = tickets.data          || []
+  // Child lifecycle may differ from its active root. Fetch those children
+  // without loading unrelated closed families or consulting financial RPCs.
+  const roots = tickets.data || []
+  const children = roots.length ? await sb.from('tickets').select('*')
+    .in('parent_ticket_id', roots.map(ticket => ticket.id))
+    .order('created_at', {ascending:true}) : {data:[]}
+  if (tickets.error || children.error) showBlockingError('Repair work could not be loaded completely. Reload to retry.')
+  state.data.tickets = [...roots, ...(children.data || [])]
   state.data.repairComponents = repairComponents.data || []
   wsState.familySummaries = new Map()
   if (['Business Owner','Manager','Cashier','Orbito Support'].includes(SESSION.employee?.role)) {
@@ -134,7 +143,7 @@ function workshopView() {
   const roots = groupRepairFamilies(all).map(family => family.root)
   const filtered = findRepairFamilies(all, wsState.filter)
     .filter(family => wsState.statusFilter === 'all' || family.root.status === wsState.statusFilter)
-    .map(family => ({ ...family.root, _matchedChild:matchedRepairChild(family) }))
+    .map(family => ({ ...family.root, _matchedChild:matchedRepairChild(family), _work:repairFamilyWork(family) }))
 
   const counts = {
     Pending:     roots.filter(t => t.status === 'Pending').length,
@@ -212,16 +221,17 @@ function workshopView() {
           </div>
 
           <!-- Components -->
-          ${(t.components_noted||[]).length ? `
+          ${t._work.some(work => work.components.length || work.hasLabour || work.note) ? t._work.map(work => `
             <div style="display:grid;gap:6px">
-              ${t.components_noted.map(c => `
+              ${t._work.length > 1 ? `<small class="muted">${work.additional ? 'Additional Work' : 'Original Repair'} · ${work.invoice || ''}</small>` : ''}
+              ${work.components.map(c => `
                 <div style="display:flex;justify-content:space-between;
                             align-items:center;padding:7px 10px;
                             background:var(--surface-2);border-radius:8px;font-size:13px">
                   <span>
-                    <strong>${c.name}</strong>
+                    <strong>${escapeHTML(c.name)}</strong>
                     <span class="badge warn" style="font-size:11px;margin-left:6px">
-                      ${c.tag || c.condition || ''}
+                      ${c.tag || c.condition || ''}${c.removed ? ' · Not needed' : ''}
                     </span>
                     ${c.customText ? `<span class="muted" style="font-size:12px"> — ${c.customText}</span>` : ''}
                   </span>
@@ -229,7 +239,9 @@ function workshopView() {
                     ${Number(c.price||0) > 0 ? money(c.price) : 'Not priced'}
                   </span>
                 </div>`).join('')}
-            </div>` : `
+              ${work.hasLabour ? '<small class="muted">Labour included</small>' : ''}
+              ${work.additional && work.note ? `<small class="muted">${escapeHTML(work.note)}</small>` : ''}
+            </div>`).join('') : `
             <p class="muted" style="font-size:13px">No components logged yet.</p>`}
 
           <!-- Labour + Quote -->
@@ -320,7 +332,7 @@ function renderModal() {
               <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;
                           ${c.removed?'opacity:.55':''}">
                 <div>
-                  <span style="font-size:13px;${c.removed?'text-decoration:line-through':''}"><strong>${c.name}</strong></span>
+                  <span style="font-size:13px;${c.removed?'text-decoration:line-through':''}"><strong>${escapeHTML(c.name)}</strong></span>
                   <span class="badge warn" style="font-size:11px;margin-left:6px">${c.tag || ''}</span>
                   ${c.customText ? `<span class="muted" style="font-size:12px"> — ${c.customText}</span>` : ''}
                   ${c.removed ? `<br><span class="muted" style="font-size:11px">Not needed: ${c.removedReason||''}</span>` : ''}
@@ -373,7 +385,7 @@ function renderModal() {
     if (!tk || !c) return ''
     return `<div class="modal-backdrop" data-no-backdrop-close>
       <div class="modal modal-xs">
-        <h2>Mark "${c.name}" Not Needed</h2>
+        <h2>Mark "${escapeHTML(c.name)}" Not Needed</h2>
         <p class="muted" style="font-size:13px">E.g. "Only needed cleaning, no repair required." This stays visible on the ticket, it's not deleted.</p>
         <label class="field"><span>Reason</span><textarea id="not-needed-reason" style="min-height:56px"></textarea></label>
         <div class="modal-actions">

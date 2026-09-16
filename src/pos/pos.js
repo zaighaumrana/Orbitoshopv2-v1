@@ -1398,19 +1398,23 @@ function attachEvents() {
     }
 
     /* ── Component tag picker ── */
-    if (el.dataset.pickComp) {
+    if (el.dataset.pickComp || el.dataset.action === 'add-intake-custom-comp') {
+      if (state.modal?.type !== 'repair') return
+      const name = (el.dataset.pickComp || document.getElementById('intake-custom-comp-name')?.value || '').trim()
+      if (!name) { showBlockingError('Enter a component name.'); return }
       // Snapshot current form field values before switching to tag picker
       const parentInfo = captureRepairFormInfo()
       const editingCartProductId = state.modal?._editingCartProductId
       state.modal = {
         type:'comp-tag-picker',
-        name:el.dataset.pickComp,
+        name,
         _info:parentInfo,
         _editingCartProductId:editingCartProductId,
       }
       render(); return
     }
     if (el.dataset.tagPick) {
+      if (state.modal?.type !== 'comp-tag-picker') return
       const tag      = el.dataset.tagPick
       const compName = state.modal.name
       const parentDraft = getDraft()
@@ -1426,6 +1430,7 @@ function attachEvents() {
       render(); return
     }
     if (el.dataset.action === 'confirm-custom-tag') {
+      if (state.modal?.type !== 'comp-tag-picker') return
       const text     = document.getElementById('tag-custom-text')?.value?.trim()
       const compName = state.modal.name
       const parentDraft = getDraft()
@@ -1541,6 +1546,7 @@ function attachEvents() {
       'tag-custom-text':  'confirm-custom-tag',
       'custom-tag-text':  'confirm-draft-custom-tag',
       'custom-comp-name': 'add-custom-draft-comp',
+      'intake-custom-comp-name': 'add-intake-custom-comp',
     }
     const action = map[e.target.id]
     if (!action) return

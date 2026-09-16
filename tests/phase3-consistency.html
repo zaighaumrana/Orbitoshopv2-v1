@@ -4,6 +4,10 @@
 <script type="module">
 import {sb,state,CFG,showTransactionSuccess,confirmAction} from '/src/shared.js'
 import {initWorkshop} from '/src/pos/workshop.js'
+import {initPOS} from '/src/pos/pos.js'
+import {getDraft,resetDraft} from '/src/features/pos/repairs/state.js'
+import {ticketDetailModalHTML} from '/src/features/admin/repairs/render.js'
+import {buildTicketSlip} from '/src/print/print.js'
 import {createSubInvoiceModalHTML,submitAdditionalWorkDraft,rememberAdditionalWorkInput} from '/src/features/repairs/additional-work.js'
 import {buildRepairSummary} from '/src/print/print.js'
 import {receiptsPage} from '/src/features/admin/checkout/render.js'
@@ -11,10 +15,12 @@ const root={id:1,invoice_number:'PARENT',ticket_number:'TK-1',customer_name:'Fix
 const child={...root,id:2,parent_ticket_id:1,invoice_number:'CHILD',estimated_quote:300,components_noted:[{name:'Battery',price:250}],labour_cost:50}
 const summary={root:{id:1,invoiceNumber:'PARENT',status:'Ready'},invoices:[{id:1,invoiceNumber:'PARENT',amount:1000,components:root.components_noted,labourCost:100},{id:2,invoiceNumber:'CHILD',parentTicketId:1,amount:300,components:child.components_noted,labourCost:50}],effectiveObligation:1300,netPayments:300,outstanding:1000,payments:[{createdAt:root.created_at,amount:300,method:'Cash'}],refunds:[],adjustments:[]}
 const calls=[];let failDecision=false
-sb.from=table=>{const q={select:()=>q,not:()=>q,eq:()=>q,order:async()=>({data:table==='tickets'?[root,child]:[]})};return q}
+sb.from=table=>{let rows=table==='tickets'?[root,child]:[];const q={select:()=>q,not:()=>q,eq:()=>q,is:()=>{rows=rows.filter(t=>!t.parent_ticket_id);return q},in:(_,ids)=>{rows=rows.filter(t=>ids.includes(t.parent_ticket_id));return q},order:async()=>({data:rows})};return q}
 sb.rpc=async(name,args)=>{
  calls.push({name,args});await new Promise(r=>setTimeout(r,5))
  if(name==='get_app_config')return {data:{...CFG,ems_enabled:false}}
+ if(name==='get_unified_udhar_accounts')return {data:[]}
+ if(name==='get_financial_report')return {data:{}}
  if(name==='get_repair_family_summary')return {data:summary}
  if(name==='save_additional_work_proposal')return {data:{id:10,decision:'Pending'}}
  if(name==='decide_additional_work')return failDecision?{error:{message:'Fixture retry'}}:{data:{proposal:{id:10,decision:args.p_decision},ticket:args.p_decision==='Approved'?child:null}}
@@ -33,6 +39,7 @@ document.querySelector('#run').onclick=async()=>{
  const count=calls.length
  await initWorkshop({employee:{role:'Technician',name:'Fixture'}})
  check('Technician no financial RPC; operational view retained',!calls.slice(count).some(c=>c.name==='get_repair_family_summary')&&document.querySelector('#app').textContent.includes('Financial summary unavailable for this role.')&&document.querySelector('#app').textContent.includes('Screen'))
+ check('Workshop includes approved child work once for Technician',document.querySelector('#app').textContent.split('Battery').length===2&&document.querySelector('#app').textContent.includes('Additional Work'))
  const search=document.querySelector('[data-ws-filter]');search.focus();search.value='Fixture';search.dispatchEvent(new Event('input',{bubbles:true}));await tick()
  check('Workshop filter retains focus',document.activeElement?.hasAttribute('data-ws-filter'))
  const modal={type:'create-sub-invoice',parentId:1,draftComponents:[{name:'Battery',price:250}],draftLabour:50,additionalFields:{note:'Work note',decision:'Declined',method:'WhatsApp',decisionNote:'Customer note'}}
@@ -69,5 +76,25 @@ document.querySelector('#run').onclick=async()=>{
  check('success waits for owning confirmation, action once',executions===1&&document.querySelectorAll('.app-dialog').length===1&&document.querySelector('.app-dialog').textContent.includes('Confirmed transaction.'))
  document.querySelector('.app-dialog').requestSubmit()
  preview.innerHTML=buildRepairSummary(summary)
+ history.replaceState(null,'','/pos/fixture')
+ resetDraft();state.modal={type:'repair'}
+ await initPOS({isAdmin:true,employee:{role:'Business Owner',name:'Fixture'}})
+ const custom=document.querySelector('#intake-custom-comp-name')
+ custom.value='   '
+ document.querySelector('[data-action="add-intake-custom-comp"]').click()
+ check('blank custom intake uses blocking app dialog',document.querySelector('.app-dialog')?.textContent.includes('Enter a component name.')&&getDraft().components.length===0)
+ document.querySelector('.app-dialog').requestSubmit();await tick()
+ custom.value='  charging IC  '
+ const add=document.querySelector('[data-action="add-intake-custom-comp"]');add.click();add.click()
+ check('custom intake opens existing tag picker once',state.modal.type==='comp-tag-picker'&&state.modal.name==='charging IC'&&getDraft().components.length===0)
+ const tag=document.querySelector('[data-tag-pick="Broken"]');tag.click();tag.click()
+ check('tag confirmation adds trimmed component once',getDraft().components.length===1&&getDraft().components[0].name==='charging IC'&&getDraft().components[0].tag==='Broken')
+ const customTicket={...root,components_noted:[{name:'speaker'},...getDraft().components]}
+ preview.innerHTML=buildTicketSlip(customTicket)
+ check('custom component included in ticket print',preview.textContent.includes('speaker')&&preview.textContent.includes('charging IC'))
+ const customSummary={...summary,invoices:[{...summary.invoices[0],components:customTicket.components_noted}]}
+ preview.innerHTML=ticketDetailModalHTML(1,{summary:customSummary})
+ check('custom component included in Admin detail',preview.textContent.includes('speaker')&&preview.textContent.includes('charging IC'))
+ state.modal=null
 }
 </script></body></html>
