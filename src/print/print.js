@@ -163,7 +163,15 @@ export function buildRepairSummary(summary) {
     <div class="row"><span>Device</span><span>${root.deviceBrand||''} ${root.deviceModel||''}</span></div>
     <div class="ln"></div>
     <div class="b">Invoices</div>
-    ${invoices.map((i,index) => `<div class="row"><span>${index===0?'Original Repair':'Sub-invoice '+index}<br><span class="sm">${i.invoiceNumber||i.ticketNumber}</span></span><span>${money(i.amount)}</span></div>`).join('')}
+    ${invoices.map(i => {
+      const esc = value => String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
+      return `<div class="b" style="margin-top:6px">${i.parentTicketId ? 'Additional Work' : 'Original Repair'}: ${esc(i.invoiceNumber||i.ticketNumber)}</div>
+        ${i.parentTicketId ? `<div class="sm">Parent: ${esc(root.invoiceNumber||root.ticketNumber)}</div>` : ''}
+        ${(i.components||[]).map(c=>`<div class="row sm"><span>${esc(c.name)}${c.tag ? ' — '+esc(c.tag==='Custom'?c.customText:c.tag) : ''}${c.removed ? ' (not needed)' : ''}</span><span>${c.price != null ? money(c.price) : ''}</span></div>`).join('')}
+        ${i.labourCost != null ? `<div class="row sm"><span>Labour</span><span>${money(i.labourCost)}</span></div>` : ''}
+        ${i.note ? `<div class="sm">${esc(i.note)}</div>` : ''}
+        <div class="row b"><span>Invoice subtotal</span><span>${money(i.amount)}</span></div>`
+    }).join('')}
     ${adjustments.length ? `<div class="b" style="margin-top:4px">Adjustments</div>${adjustments.map(a => `<div class="row"><span>${a.type}: ${a.reason}</span><span>${money(a.amount)}</span></div>`).join('')}` : ''}
     <div class="ln"></div>
     <div class="row b"><span>Total Billed</span><span>${money(summary.effectiveObligation)}</span></div>

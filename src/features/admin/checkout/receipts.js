@@ -1,5 +1,7 @@
+import { databaseDate, localDateKey } from '../../../datetime.js'
+
 function dateValue(value) {
-  const time = new Date(value || 0).getTime()
+  const time = databaseDate(value).getTime()
   return Number.isFinite(time) ? time : 0
 }
 
@@ -101,7 +103,7 @@ export function filterReceiptRecords(records = [], adminState = {}) {
 
   const typeScopedRecords = records.filter(record => type === 'all' || record.type === type)
   const scopedRecords = typeScopedRecords.filter(record => {
-    const recordDate = String(record.createdAt || '').slice(0, 10)
+    const recordDate = localDateKey(record.createdAt)
     return (!dateFrom || recordDate >= dateFrom)
       && (!dateTo || recordDate <= dateTo)
   })
@@ -120,7 +122,7 @@ export function filterReceiptRecords(records = [], adminState = {}) {
   // The date range gates the searched invoice; once eligible, keep its complete
   // family together even when parent and child invoices were created on different days.
   const directRepairInvoiceMatches = exactRepairInvoiceMatches.filter(record => {
-    const recordDate = String(record.createdAt || '').slice(0, 10)
+    const recordDate = localDateKey(record.createdAt)
     return (!dateFrom || recordDate >= dateFrom) && (!dateTo || recordDate <= dateTo)
   })
   if (!directRepairInvoiceMatches.length) return []

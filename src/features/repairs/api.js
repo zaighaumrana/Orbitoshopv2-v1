@@ -108,27 +108,35 @@ export async function getRepairFamilySummary(ticketId) {
   return { ok:true, data }
 }
 
-export async function recordAdditionalWork(rootTicketId, description, components, labourCost, decision, method, note) {
+const additionalWorkAttempts = new Map()
+export async function recordAdditionalWork(rootTicketId, description, components, labourCost, decision, method, note, workNote = note) {
   const amount = (components || []).reduce((sum,c)=>sum+Number(c.price||0),0) + Number(labourCost || 0)
-  const proposalRequestId = crypto.randomUUID()
+  const key = JSON.stringify([rootTicketId, description, components, labourCost, decision, method, note, workNote])
+  const attempt = additionalWorkAttempts.get(key) || {proposalRequestId:crypto.randomUUID(), decisionRequestId:crypto.randomUUID()}
+  additionalWorkAttempts.set(key, attempt)
+  const proposalRequestId = attempt.proposalRequestId
   const { data: proposal, error: proposalError } = await sb.rpc('save_additional_work_proposal', {
     p_request_id: proposalRequestId,
     p_root_ticket_id: rootTicketId,
     p_description: description,
-    p_details: { note: note || '', components: components || [], labourCost: Number(labourCost || 0) },
+    p_details: { note: workNote || '', components: components || [], labourCost: Number(labourCost || 0), decisionMethod:method, decisionNote:note || '' },
     p_quoted_amount: Number(amount || 0),
   })
   if (proposalError) return { ok:false, error:proposalError.message }
-  if (decision === 'Pending') return { ok:true, proposal, ticket:null }
+  if (decision === 'Pending') {
+    additionalWorkAttempts.delete(key)
+    return { ok:true, proposal, ticket:null }
+  }
 
   const { data, error } = await sb.rpc('decide_additional_work', {
-    p_request_id: crypto.randomUUID(),
+    p_request_id: attempt.decisionRequestId,
     p_proposal_id: proposal.id,
     p_decision: decision,
     p_decision_method: method,
     p_decision_note: note || '',
   })
   if (error) return { ok:false, error:error.message }
+  additionalWorkAttempts.delete(key)
   return { ok:true, proposal:data.proposal, ticket:data.ticket }
 }
 

@@ -329,6 +329,9 @@ function closeAppDialog(dialog, value) {
   dialog.backdrop.remove()
   activeAppDialog = null
   dialog.resolve(value)
+  if (value?.confirmed && dialog.successNotice) {
+    queueMicrotask(() => showTransactionSuccess(...dialog.successNotice))
+  }
 }
 
 function openAppDialog({
@@ -537,6 +540,20 @@ export function showBlockingError(message) {
   blockingNotice = openAppDialog({ ...copy, confirmLabel:'OK', notice:true })
     .finally(() => { blockingNotice = null })
   return blockingNotice
+}
+
+let transactionNotice = null
+/** Call only after a confirmed transaction. This acknowledgement never executes
+ * the transaction and waits for an owning confirmation to finish before opening. */
+export function showTransactionSuccess(message, title = 'Completed') {
+  if (activeAppDialog?.busy) {
+    activeAppDialog.successNotice = [message, title]
+    return Promise.resolve(null)
+  }
+  if (transactionNotice) return transactionNotice
+  transactionNotice = openAppDialog({title, message, confirmLabel:'OK', notice:true})
+    .finally(() => { transactionNotice = null })
+  return transactionNotice
 }
 
 /** Confirmation that owns the async action, preventing duplicate submissions. */

@@ -1,3 +1,4 @@
+import { rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
   _clearSession,
@@ -8,11 +9,11 @@ import {
   myAccountModalHTML, handleChangePasswordSubmit,
   generateTempPassword, listPendingResetRequests, resolvePasswordReset,
   invokeAccountAdmin,
-  showBlockingError, showToast, confirmAction, requestInput, runInstallPrompt,
+  showTransactionSuccess, showBlockingError, showToast, confirmAction, requestInput, runInstallPrompt,
 } from '../shared.js'
 import {
   markComponentNotNeeded, getRepairFamilySummary,
-  recordAdditionalWork, decideAdditionalWork, createRepairAdjustment, cancelRepair,
+  decideAdditionalWork, createRepairAdjustment, cancelRepair,
 } from '../features/repairs/api.js'
 import { findRepairFamilies, groupRepairFamilies, matchedRepairChild } from '../features/repairs/family.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
@@ -661,7 +662,7 @@ function attachEvents() {
       return
     }
     if (el.dataset.action === 'print-repair-summary') {
-      const summary = state.modal?.summary || (await getRepairFamilySummary(Number(el.dataset.ticketId))).data
+      const summary = (await getRepairFamilySummary(Number(el.dataset.ticketId))).data
       if (!summary) { showBlockingError('Repair summary is unavailable.'); return }
       const { buildRepairSummary, printThermal } = await import('../print/print.js')
       printThermal(buildRepairSummary(summary)); return
@@ -749,7 +750,7 @@ function attachEvents() {
       const parentId = state.modal?.parentId
       const comps = readSubInvCompsFromDOM()
       comps.splice(Number(el.dataset.subinvCompRemove), 1)
-      state.modal = { type: 'create-sub-invoice', parentId, draftComponents: comps, draftLabour: readSubInvLabourFromDOM() }
+      state.modal = { type: 'create-sub-invoice', additionalFields:state.modal?.additionalFields, parentId, draftComponents: comps, draftLabour: readSubInvLabourFromDOM() }
       render(); return
     }
 
@@ -757,6 +758,7 @@ function attachEvents() {
     if (el.dataset.addDraftCompName) {
       state.modal = {
         type:     'add-comp-tag',
+        additionalFields:state.modal?.additionalFields,
         compName: el.dataset.addDraftCompName,
         _parentId: state.modal?.parentId,
         _draftComponents: readSubInvCompsFromDOM(),
@@ -771,6 +773,7 @@ function attachEvents() {
       if (!name) { showBlockingError('Enter a component name.'); return }
       state.modal = {
         type:     'add-comp-tag',
+        additionalFields:state.modal?.additionalFields,
         compName: name,
         _parentId: state.modal?.parentId,
         _draftComponents: readSubInvCompsFromDOM(),
@@ -801,25 +804,22 @@ function attachEvents() {
     if (el.dataset.action === 'submit-sub-invoice') {
       const parentId = el.dataset.parentId
       const tk = state.data.tickets.find(t => String(t.id) === String(parentId))
-      if (!tk) return
-      const comps  = readSubInvCompsFromDOM()
+      if (!tk || state.modal?.type !== 'create-sub-invoice') return
+      const modal = state.modal
+      const comps = readSubInvCompsFromDOM()
       const labour = readSubInvLabourFromDOM()
-      const note   = document.getElementById('sub-invoice-note')?.value || ''
       if (!comps.length && !labour) { showBlockingError('Add at least one component or a labour charge.'); return }
-
-      const decision = document.getElementById('additional-work-decision')?.value || 'Approved'
-      const method = document.getElementById('additional-work-method')?.value || 'In person'
-      const description = comps.map(c=>c.name).filter(Boolean).join(', ') || note || 'Additional work'
-      const res = await recordAdditionalWork(Number(parentId), description, comps, labour, decision, method, note)
-      if (!res.ok) { showBlockingError('Error: ' + res.error); return }
-
+      const res = await submitAdditionalWorkDraft(parentId, comps, labour, modal, false)
+      if (res.busy) return
+      if (!res.ok) { showBlockingError(res.error); return }
       if (res.ticket) {
-        const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
-        printThermal(buildSubInvoiceSlip(res.ticket, tk))
+        const {buildSubInvoiceSlip,printThermal} = await import('../print/print.js')
+        printThermal(buildSubInvoiceSlip(res.ticket,tk))
       }
-
-      state.modal = null
-      await load(); return
+      if (state.modal === modal) state.modal = null
+      await load()
+      if (!res.ticket) showTransactionSuccess(`Additional work saved as ${(res.proposal?.decision || 'Pending').toLowerCase()}.`)
+      return
     }
 
     if (el.dataset.action === 'decide-additional-work') {
@@ -845,7 +845,7 @@ function attachEvents() {
           printThermal(buildSubInvoiceSlip(result.ticket, root))
         }
       }
-      showToast(`Additional work ${decision.toLowerCase()}.`, 'success')
+      showTransactionSuccess(`Additional work ${decision.toLowerCase()}.`)
       state.modal = null; await load(); return
     }
 
@@ -862,7 +862,7 @@ function attachEvents() {
         if (!verified) return
         const result = await createRepairAdjustment(Number(el.dataset.ticketId), amount, type, reason)
         if (!result.ok) { showBlockingError('Adjustment error: ' + result.error); return }
-        showToast('Repair invoice adjustment completed.', 'success')
+        showTransactionSuccess('Repair invoice adjustment completed.')
         state.modal = null; await load()
       }, render); return
     }
@@ -881,7 +881,7 @@ function attachEvents() {
         if (!verified) return
         const result = await cancelRepair(Number(el.dataset.ticketId), refund, method, reason)
         if (!result.ok) { showBlockingError('Cancellation error: ' + result.error); return }
-        showToast(refund > 0 ? 'Repair cancelled and refund completed.' : 'Repair cancelled.', 'success')
+        showTransactionSuccess(refund > 0 ? 'Repair cancelled and refund completed.' : 'Repair cancelled.')
         state.modal = null; await load()
       }, render); return
     }
@@ -1145,6 +1145,7 @@ function attachEvents() {
         const result = await settleUdhar(rec, amount, method)
         if (!result.ok) { showBlockingError('Settle error: '+result.error); return }
         await load(); state.modal = { type:'udharList' }; render()
+        showTransactionSuccess('Udhar payment recorded.')
       }, render); return
     }
 
@@ -1159,6 +1160,7 @@ function attachEvents() {
   // Input
   app.addEventListener('input', e => {
     const t = e.target
+    rememberAdditionalWorkInput(t, state.modal)
     if (t.dataset.filter !== undefined) { adminState.filter = t.value; render() }
     if (t.dataset.receiptSearch !== undefined) { adminState.receiptSearch = t.value; render() }
     if (t.dataset.receiptFrom !== undefined) { adminState.receiptDateFrom = t.value; render() }
@@ -1358,7 +1360,7 @@ function _addComponentToDraft(name, tag, customText) {
     ...(state.modal._draftComponents || []),
     { name, tag, customText, price: 0 },
   ]
-  state.modal = { type: 'create-sub-invoice', parentId, draftComponents, draftLabour: state.modal._draftLabour || 0 }
+  state.modal = { type: 'create-sub-invoice', additionalFields:state.modal?.additionalFields, parentId, draftComponents, draftLabour: state.modal._draftLabour || 0 }
   render()
 }
 

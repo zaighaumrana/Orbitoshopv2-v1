@@ -3,7 +3,7 @@
    Admin-exclusive inventory management operations -- verified by
    actual caller (only admin.js calls any of these).
 ═══════════════════════════════════════════════════════════════════ */
-import { sb, state, logInventoryEvent, confirmAction, showBlockingError, showToast } from '../../../shared.js'
+import { sb, state, logInventoryEvent, confirmAction, showTransactionSuccess, showBlockingError, showToast } from '../../../shared.js'
 import { dlog } from '../../../debuglog.js'
 
 const pendingInventoryRequests = new Map()
@@ -84,5 +84,6 @@ export async function submitInvAdjust(data) {
   })
   if (error) { showBlockingError('Stock adjustment failed: '+error.message); return { ok:false } }
   pendingInventoryRequests.delete(key)
+  showTransactionSuccess('Stock adjustment completed.')
   return { ok:true }
 }

@@ -1,3 +1,4 @@
+import { createSubInvoiceModalHTML, rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 /* ═══════════════════════════════════════════════════════════════════
    RetailOS — workshop.js
    Roles served: Technician, Business Owner (when switching to workshop)
@@ -14,10 +15,10 @@ import {
   _clearSession, money, fld, modalActions,
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   myAccountModalHTML, handleChangePasswordSubmit,
-  showBlockingError, showToast, confirmAction, runInstallPrompt,
+  showTransactionSuccess, showBlockingError, showToast, confirmAction, runInstallPrompt,
 } from '../shared.js'
 import {
-  getSubInvoices, createSubInvoice, markComponentNotNeeded, recordAdditionalWork,
+  getSubInvoices, markComponentNotNeeded, getRepairFamilySummary,
 } from '../features/repairs/api.js'
 import { findRepairFamilies, groupRepairFamilies, matchedRepairChild } from '../features/repairs/family.js'
 
@@ -26,6 +27,7 @@ import { dlog, dstack, callerInfo } from '../debuglog.js'
 
 /* ── Workshop state ── */
 const wsState = {
+  familySummaries: new Map(),
   filter:      '',
   statusFilter: 'all',  // 'all' | 'Pending' | 'In Progress' | 'Ready'
 }
@@ -46,6 +48,14 @@ async function load() {
   ])
   state.data.tickets          = tickets.data          || []
   state.data.repairComponents = repairComponents.data || []
+  wsState.familySummaries = new Map()
+  if (['Business Owner','Manager','Cashier','Orbito Support'].includes(SESSION.employee?.role)) {
+    const roots = groupRepairFamilies(state.data.tickets)
+    await Promise.all(roots.map(async ({root}) => {
+      const result = await getRepairFamilySummary(root.id)
+      if (result.ok) wsState.familySummaries.set(String(root.id), result.data)
+    }))
+  }
   applyBranding()
   dlog('WORKSHOP.load', 'DATA READY -- calling render()')
   render()
@@ -224,18 +234,12 @@ function workshopView() {
 
           <!-- Labour + Quote -->
           <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:13px">
-            ${Number(t.labour_cost||0) > 0 ? `
-              <span>Labour: <strong>${money(t.labour_cost)}</strong></span>` : ''}
-            ${Number(t.final_total||t.estimated_quote||0) > 0 ? `
-              <span>Quote: <strong>${money(t.final_total || t.estimated_quote)}</strong></span>` : ''}
-            ${Number(t.amount_paid||0) > 0 ? `
-              <span style="color:var(--success)">
-                Paid: <strong>${money(t.amount_paid)}</strong>
-              </span>` : ''}
-            ${Number(t.balance_due||0) > 0 ? `
-              <span style="color:var(--danger)">
-                Balance: <strong>${money(t.balance_due)}</strong>
-              </span>` : ''}
+            ${SESSION.employee?.role === 'Technician' ? '<span class="muted">Financial summary unavailable for this role.</span>' :
+              wsState.familySummaries.has(String(t.id)) ? `
+                <span>${wsState.familySummaries.get(String(t.id)).invoices?.length > 1 ? 'Family total billed' : 'Total billed'}: <strong>${money(wsState.familySummaries.get(String(t.id)).effectiveObligation)}</strong></span>
+                <span>Paid: <strong>${money(wsState.familySummaries.get(String(t.id)).netPayments)}</strong></span>
+                <span>Outstanding: <strong>${money(wsState.familySummaries.get(String(t.id)).outstanding)}</strong></span>` :
+                '<span class="muted">Financial summary unavailable. Reload to retry.</span>'}
           </div>
 
           <!-- Technician note -->
@@ -356,7 +360,7 @@ function renderModal() {
           <div class="modal-actions">
             <button class="secondary-button" data-close>Close</button>
             <button class="primary-button" data-action="open-create-sub-invoice" data-ticket-id="${tk.id}">
-              + Create Sub-Invoice
+              + Additional Work
             </button>
           </div>
         </div>
@@ -380,81 +384,7 @@ function renderModal() {
     </div>`
   }
 
-  if (type === 'create-sub-invoice') {
-    const parentId = state.modal.parentId
-    const tk = (state.data.tickets||[]).find(t => String(t.id) === String(parentId))
-    if (!tk) return ''
-    const draft      = state.modal.draftComponents || []
-    const labour     = state.modal.draftLabour ?? 0
-    const compDefs   = state.data.repairComponents || []
-    const partsTotal = draft.reduce((s,c) => s + Number(c.price||0), 0)
-    const total      = partsTotal + labour
-
-    return `
-      <div class="modal-backdrop" data-no-backdrop-close>
-        <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
-          <h2 style="margin-bottom:4px">Create Sub-Invoice</h2>
-          <p class="muted" style="font-size:13px;margin-bottom:16px">
-            Linked to ${tk.invoice_number} — ${tk.customer_name}, ${tk.device_brand} ${tk.device_model}
-          </p>
-
-          <div style="display:grid;gap:8px;margin-bottom:14px">
-            <strong style="font-size:13px">Additional Components</strong>
-            ${draft.length ? draft.map((c,i) => `
-              <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
-                <div>
-                  <span style="font-size:13px"><strong>${c.name}</strong></span>
-                  <span class="badge warn" style="font-size:11px;margin-left:6px">${c.tag || ''}</span>
-                  ${c.customText ? `<span class="muted" style="font-size:12px"> — ${c.customText}</span>` : ''}
-                </div>
-                <input type="number" step="any" min="0" value="${c.price || ''}" placeholder="Price"
-                  data-draft-comp-price="${i}"
-                  style="width:110px;border:1px solid var(--border);border-radius:6px;
-                         padding:6px 8px;background:var(--surface);color:var(--text);font-size:13px">
-                <button type="button" data-draft-comp-remove="${i}"
-                  style="color:var(--danger);background:none;border:none;font-size:18px;cursor:pointer;padding:0 4px">×</button>
-              </div>`).join('') : `<p class="muted" style="font-size:13px">No components added yet.</p>`}
-          </div>
-
-          <div style="margin-bottom:12px">
-            <p class="muted" style="font-size:12px;margin-bottom:6px">Add component:</p>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-              ${compDefs.map(c => `<button type="button" class="secondary-button" style="font-size:12px;padding:5px 12px"
-                data-add-draft-comp-name="${c.name}">${c.name}</button>`).join('')}
-            </div>
-            <div style="display:flex;gap:8px">
-              <input id="custom-comp-name" class="search" placeholder="Custom component name" style="flex:1">
-              <button type="button" class="secondary-button" data-action="add-custom-draft-comp">+ Add</button>
-            </div>
-          </div>
-
-          <label style="display:flex;justify-content:space-between;align-items:center;padding:10px;
-                        background:var(--surface-2);border-radius:8px;margin-bottom:8px;gap:12px">
-            <span style="font-size:13px;font-weight:500">Labour Charge</span>
-            <input type="number" step="any" min="0" value="${labour || ''}" placeholder="0" data-draft-labour
-              style="width:120px;border:1px solid var(--border);border-radius:6px;
-                     padding:6px 8px;background:var(--surface);color:var(--text);font-size:13px">
-          </label>
-
-          <label class="field" style="margin-bottom:12px">
-            <span>Note</span>
-            <textarea id="sub-invoice-note" style="min-height:56px" placeholder="What was found / done…"></textarea>
-          </label>
-
-          <div style="display:flex;justify-content:space-between;font-weight:600;padding:10px;
-                      background:var(--surface-2);border-radius:8px;margin-bottom:16px;font-size:15px">
-            <span>Sub-Invoice Total</span><span id="draft-total">${money(total)}</span>
-          </div>
-
-          <div class="modal-actions">
-            <button type="button" class="secondary-button" data-close>Cancel</button>
-            <button type="button" class="primary-button" data-action="submit-sub-invoice" data-parent-id="${parentId}">
-              ${state.role === 'Technician' ? 'Submit Proposal' : 'Create & Print'}
-            </button>
-          </div>
-        </div>
-      </div>`
-  }
+  if (type === 'create-sub-invoice') return createSubInvoiceModalHTML(state.modal, {technician:SESSION.employee?.role === 'Technician', workshop:true})
 
   if (type === 'add-comp-tag') {
     const { compName } = state.modal
@@ -673,7 +603,7 @@ function attachEvents() {
       const parentId = state.modal?.parentId
       const comps = readDraftCompsFromDOM()
       comps.splice(Number(el.dataset.draftCompRemove), 1)
-      state.modal = { type: 'create-sub-invoice', parentId, draftComponents: comps, draftLabour: readDraftLabourFromDOM() }
+      state.modal = { type: 'create-sub-invoice', additionalFields:state.modal?.additionalFields, parentId, draftComponents: comps, draftLabour: readDraftLabourFromDOM() }
       render(); return
     }
 
@@ -681,6 +611,7 @@ function attachEvents() {
     if (el.dataset.addDraftCompName) {
       state.modal = {
         type:     'add-comp-tag',
+        additionalFields:state.modal?.additionalFields,
         compName: el.dataset.addDraftCompName,
         _parentId: state.modal?.parentId,
         _draftComponents: readDraftCompsFromDOM(),
@@ -695,6 +626,7 @@ function attachEvents() {
       if (!name) { showBlockingError('Enter a component name.'); return }
       state.modal = {
         type:     'add-comp-tag',
+        additionalFields:state.modal?.additionalFields,
         compName: name,
         _parentId: state.modal?.parentId,
         _draftComponents: readDraftCompsFromDOM(),
@@ -723,34 +655,26 @@ function attachEvents() {
       return
     }
 
-    /* Create the sub-invoice — no PIN required, adding only increases what's owed */
+    /* Record the customer decision; only approved work creates an invoice. */
     if (el.dataset.action === 'submit-sub-invoice') {
       const parentId = el.dataset.parentId
       const tk = state.data.tickets.find(t => String(t.id) === String(parentId))
-      if (!tk) return
-      const comps  = readDraftCompsFromDOM()
+      if (!tk || state.modal?.type !== 'create-sub-invoice') return
+      const modal = state.modal
+      const comps = readDraftCompsFromDOM()
       const labour = readDraftLabourFromDOM()
-      const note   = document.getElementById('sub-invoice-note')?.value || ''
       if (!comps.length && !labour) { showBlockingError('Add at least one component or a labour charge.'); return }
-
-      const res = state.role === 'Technician'
-        ? await recordAdditionalWork(
-            Number(parentId),
-            comps.map(c=>c.name).filter(Boolean).join(', ') || note || 'Additional work',
-            comps, labour, 'Pending', 'In person', note
-          )
-        : await createSubInvoice(tk, comps, labour, note, SESSION.employee?.name)
-      if (!res.ok) { showBlockingError('Error: ' + res.error); return }
-
-      if (state.role !== 'Technician') {
-        const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
-        printThermal(buildSubInvoiceSlip(res.data, tk))
-      } else {
-        showToast('Additional work proposal saved for customer approval.', 'success')
+      const res = await submitAdditionalWorkDraft(parentId, comps, labour, modal, SESSION.employee?.role === 'Technician')
+      if (res.busy) return
+      if (!res.ok) { showBlockingError(res.error); return }
+      if (res.ticket) {
+        const {buildSubInvoiceSlip,printThermal} = await import('../print/print.js')
+        printThermal(buildSubInvoiceSlip(res.ticket,tk))
       }
-
-      state.modal = null
-      await load(); return
+      if (state.modal === modal) state.modal = null
+      await load()
+      if (!res.ticket) showTransactionSuccess(`Additional work saved as ${(res.proposal?.decision || 'Pending').toLowerCase()}.`)
+      return
     }
   })
 
@@ -784,6 +708,7 @@ function attachEvents() {
   /* ── Input — live total update ── */
   app.addEventListener('input', e => {
     const t = e.target
+    rememberAdditionalWorkInput(t, state.modal)
     if (t.dataset.wsFilter !== undefined) {
       wsState.filter = t.value; render(); return
     }
@@ -812,7 +737,7 @@ function _addComponentToDraft(name, tag, customText) {
     ...(state.modal._draftComponents || []),
     { name, tag, customText, price: 0 },
   ]
-  state.modal = { type: 'create-sub-invoice', parentId, draftComponents, draftLabour: state.modal._draftLabour || 0 }
+  state.modal = { type: 'create-sub-invoice', additionalFields:state.modal?.additionalFields, parentId, draftComponents, draftLabour: state.modal._draftLabour || 0 }
   render()
 }
 

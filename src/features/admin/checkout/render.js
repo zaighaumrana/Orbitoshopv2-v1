@@ -10,6 +10,7 @@
    adminInventoryPage({filter, tit}) and reportsPage({tit}).
 ═══════════════════════════════════════════════════════════════════ */
 import { state, money } from '../../../shared.js'
+import { localDateTime } from '../../../datetime.js'
 import { buildReceiptRecords, filterReceiptRecords } from './receipts.js'
 
 function receiptArchive(adminState) {
@@ -77,13 +78,13 @@ export function receiptsPage({ tit, adminState }) {
             <div>
               <div><strong>${money(record.total)}</strong></div>
               <span class="muted" style="font-size:11px">
-                ${new Date(record.createdAt).toLocaleDateString()}
-                ${new Date(record.createdAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
+                ${localDateTime(record.createdAt)}
               </span>
             </div>
             ${record.kind === 'ticket'
               ? `<button class="secondary-button" style="font-size:12px;white-space:nowrap" data-action="print-repair-invoice" data-ticket-id="${record.id}">Print</button>`
               : `<button class="secondary-button" style="font-size:12px;white-space:nowrap" data-action="reprint-receipt" data-sale-id="${record.id}">Reprint</button>`}
+            ${record.kind === 'ticket' ? `<button class="secondary-button" style="font-size:12px" data-action="print-repair-summary" data-ticket-id="${record.rootTicketId}">Print Summary</button>` : ''}
           </div>
         </div>`).join('') :
       `<div class="empty" style="padding:24px;text-align:center">No receipts found.</div>`}

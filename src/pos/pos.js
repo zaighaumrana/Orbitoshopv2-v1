@@ -1,3 +1,4 @@
+import { createSubInvoiceModalHTML, rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 /* ═══════════════════════════════════════════════════════════════════
    RetailOS — pos.js
    Roles served: Cashier
@@ -16,10 +17,10 @@ import {
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   myAccountModalHTML, handleChangePasswordSubmit,
   matchesInvoiceSearch,
-  showBlockingError, showToast, confirmAction, runInstallPrompt,
+  showTransactionSuccess, showBlockingError, showToast, confirmAction, runInstallPrompt,
 } from '../shared.js'
 import {
-  getSubInvoices, createSubInvoice, markComponentNotNeeded, deliverRepair,
+  getSubInvoices, markComponentNotNeeded, deliverRepair,
   getRepairFamilySummary,
 } from '../features/repairs/api.js'
 import { getRetailReturnContext, createRetailReturn } from '../features/pos/returns/api.js'
@@ -393,7 +394,7 @@ function _addComponentToDraft(name, tag, customText) {
     ...(state.modal._draftComponents || []),
     { name, tag, customText, price: 0 },
   ]
-  state.modal = { type: 'create-sub-invoice', parentId, draftComponents, draftLabour: state.modal._draftLabour || 0 }
+  state.modal = { type: 'create-sub-invoice', additionalFields:state.modal?.additionalFields, parentId, draftComponents, draftLabour: state.modal._draftLabour || 0 }
   render()
 }
 
@@ -624,7 +625,7 @@ function renderModal() {
           <div class="modal-actions">
             <button class="secondary-button" data-close>Close</button>
             <button class="primary-button" data-action="open-create-sub-invoice" data-ticket-id="${tk.id}">
-              + Create Sub-Invoice
+              + Additional Work
             </button>
           </div>
         </div>
@@ -648,81 +649,7 @@ function renderModal() {
     </div>`
   }
 
-  if (type === 'create-sub-invoice') {
-    const parentId = state.modal.parentId
-    const tk = (state.data.tickets||[]).find(t => String(t.id) === String(parentId))
-    if (!tk) return ''
-    const draft      = state.modal.draftComponents || []
-    const labour     = state.modal.draftLabour ?? 0
-    const compDefs   = state.data.repairComponents || []
-    const partsTotal = draft.reduce((s,c) => s + Number(c.price||0), 0)
-    const total      = partsTotal + labour
-
-    return `
-      <div class="modal-backdrop" data-no-backdrop-close>
-        <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
-          <h2 style="margin-bottom:4px">Create Sub-Invoice</h2>
-          <p class="muted" style="font-size:13px;margin-bottom:16px">
-            Linked to ${tk.invoice_number} — ${tk.customer_name}, ${tk.device_brand} ${tk.device_model}
-          </p>
-
-          <div style="display:grid;gap:8px;margin-bottom:14px">
-            <strong style="font-size:13px">Additional Components</strong>
-            ${draft.length ? draft.map((c,i) => `
-              <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
-                <div>
-                  <span style="font-size:13px"><strong>${c.name}</strong></span>
-                  <span class="badge warn" style="font-size:11px;margin-left:6px">${c.tag || ''}</span>
-                  ${c.customText ? `<span class="muted" style="font-size:12px"> — ${c.customText}</span>` : ''}
-                </div>
-                <input type="number" step="any" min="0" value="${c.price || ''}" placeholder="Price"
-                  data-subinv-comp-price="${i}"
-                  style="width:110px;border:1px solid var(--border);border-radius:6px;
-                         padding:6px 8px;background:var(--surface);color:var(--text);font-size:13px">
-                <button type="button" data-subinv-comp-remove="${i}"
-                  style="color:var(--danger);background:none;border:none;font-size:18px;cursor:pointer;padding:0 4px">×</button>
-              </div>`).join('') : `<p class="muted" style="font-size:13px">No components added yet.</p>`}
-          </div>
-
-          <div style="margin-bottom:12px">
-            <p class="muted" style="font-size:12px;margin-bottom:6px">Add component:</p>
-            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-              ${compDefs.map(c => `<button type="button" class="secondary-button" style="font-size:12px;padding:5px 12px"
-                data-add-draft-comp-name="${c.name}">${c.name}</button>`).join('')}
-            </div>
-            <div style="display:flex;gap:8px">
-              <input id="custom-comp-name" class="search" placeholder="Custom component name" style="flex:1">
-              <button type="button" class="secondary-button" data-action="add-custom-draft-comp">+ Add</button>
-            </div>
-          </div>
-
-          <label style="display:flex;justify-content:space-between;align-items:center;padding:10px;
-                        background:var(--surface-2);border-radius:8px;margin-bottom:8px;gap:12px">
-            <span style="font-size:13px;font-weight:500">Labour Charge</span>
-            <input type="number" step="any" min="0" value="${labour || ''}" placeholder="0" data-subinv-labour
-              style="width:120px;border:1px solid var(--border);border-radius:6px;
-                     padding:6px 8px;background:var(--surface);color:var(--text);font-size:13px">
-          </label>
-
-          <label class="field" style="margin-bottom:12px">
-            <span>Note</span>
-            <textarea id="sub-invoice-note" style="min-height:56px" placeholder="What was found / done…"></textarea>
-          </label>
-
-          <div style="display:flex;justify-content:space-between;font-weight:600;padding:10px;
-                      background:var(--surface-2);border-radius:8px;margin-bottom:16px;font-size:15px">
-            <span>Sub-Invoice Total</span><span id="subinv-draft-total">${money(total)}</span>
-          </div>
-
-          <div class="modal-actions">
-            <button type="button" class="secondary-button" data-close>Cancel</button>
-            <button type="button" class="primary-button" data-action="submit-sub-invoice" data-parent-id="${parentId}">
-              Create & Print
-            </button>
-          </div>
-        </div>
-      </div>`
-  }
+  if (type === 'create-sub-invoice') return createSubInvoiceModalHTML(state.modal)
 
   if (type === 'add-comp-tag') {
     const { compName } = state.modal
@@ -1005,7 +932,7 @@ async function placeOrderOnce() {
   posState.cartIsNewTicket = false
   await load()
   const leftoverBalance = combinedBalance(state.data.tickets.find(t=>t.id===ticketId)||ticket).total
-  showToast(`Payment of ${money(payAmount)} recorded. Remaining balance: ${money(leftoverBalance)}`, 'success')
+  showTransactionSuccess(`Payment of ${money(payAmount)} recorded. Remaining balance: ${money(leftoverBalance)}`)
 }
 
 
@@ -1201,7 +1128,7 @@ function attachEvents() {
       const parentId = state.modal?.parentId
       const comps = readSubInvCompsFromDOM()
       comps.splice(Number(el.dataset.subinvCompRemove), 1)
-      state.modal = { type: 'create-sub-invoice', parentId, draftComponents: comps, draftLabour: readSubInvLabourFromDOM() }
+      state.modal = { type: 'create-sub-invoice', additionalFields:state.modal?.additionalFields, parentId, draftComponents: comps, draftLabour: readSubInvLabourFromDOM() }
       render(); return
     }
 
@@ -1209,6 +1136,7 @@ function attachEvents() {
     if (el.dataset.addDraftCompName) {
       state.modal = {
         type:     'add-comp-tag',
+        additionalFields:state.modal?.additionalFields,
         compName: el.dataset.addDraftCompName,
         _parentId: state.modal?.parentId,
         _draftComponents: readSubInvCompsFromDOM(),
@@ -1223,6 +1151,7 @@ function attachEvents() {
       if (!name) { showBlockingError('Enter a component name.'); return }
       state.modal = {
         type:     'add-comp-tag',
+        additionalFields:state.modal?.additionalFields,
         compName: name,
         _parentId: state.modal?.parentId,
         _draftComponents: readSubInvCompsFromDOM(),
@@ -1249,24 +1178,26 @@ function attachEvents() {
       return
     }
 
-    /* Create the sub-invoice — no PIN required, adding only increases what's owed */
+    /* Record the customer decision; only approved work creates an invoice. */
     if (el.dataset.action === 'submit-sub-invoice') {
       const parentId = el.dataset.parentId
       const tk = state.data.tickets.find(t => String(t.id) === String(parentId))
-      if (!tk) return
-      const comps  = readSubInvCompsFromDOM()
+      if (!tk || state.modal?.type !== 'create-sub-invoice') return
+      const modal = state.modal
+      const comps = readSubInvCompsFromDOM()
       const labour = readSubInvLabourFromDOM()
-      const note   = document.getElementById('sub-invoice-note')?.value || ''
       if (!comps.length && !labour) { showBlockingError('Add at least one component or a labour charge.'); return }
-
-      const res = await createSubInvoice(tk, comps, labour, note, SESSION.employee?.name)
-      if (!res.ok) { showBlockingError('Error: ' + res.error); return }
-
-      const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
-      printThermal(buildSubInvoiceSlip(res.data, tk))
-
-      state.modal = null
-      await load(); return
+      const res = await submitAdditionalWorkDraft(parentId, comps, labour, modal, false)
+      if (res.busy) return
+      if (!res.ok) { showBlockingError(res.error); return }
+      if (res.ticket) {
+        const {buildSubInvoiceSlip,printThermal} = await import('../print/print.js')
+        printThermal(buildSubInvoiceSlip(res.ticket,tk))
+      }
+      if (state.modal === modal) state.modal = null
+      await load()
+      if (!res.ticket) showTransactionSuccess(`Additional work saved as ${(res.proposal?.decision || 'Pending').toLowerCase()}.`)
+      return
     }
 
     if (el.dataset.action === 'my-account') {
@@ -1382,7 +1313,7 @@ function attachEvents() {
           if (!res.ok) { showBlockingError('Delivery error: ' + res.error); return false }
           state.modal = null
           await load()
-          showToast('Device marked as Delivered.', 'success')
+          showTransactionSuccess('Device marked as Delivered.')
           return true
         },
       })
@@ -1403,7 +1334,7 @@ function attachEvents() {
         if (!res.ok) { showBlockingError('Delivery error: ' + res.error); return }
         state.modal = null
         await load()
-        showToast('Device delivered with the remaining balance approved as Udhar.', 'success')
+        showTransactionSuccess('Device delivered with the remaining balance approved as Udhar.')
       }, render)
       return
     }
@@ -1557,6 +1488,7 @@ function attachEvents() {
         await load()
         state.modal = { type:'udharList' }
         render()
+        showTransactionSuccess('Udhar payment recorded.')
       }, render); return
     }
   })
@@ -1564,6 +1496,7 @@ function attachEvents() {
   /* ── Input ── */
   app.addEventListener('input', e => {
     const t = e.target
+    rememberAdditionalWorkInput(t, state.modal)
     if (t.dataset.cashTendered !== undefined) {
       posState.cashTendered = Number(t.value)||0
       const subtotal = posState.cart.reduce((s,i)=>s+i.soldPrice*i.qty,0)
@@ -1725,7 +1658,7 @@ function attachEvents() {
           refund, method:refund>0?data.refundMethod:'No cash refund',
         }))
         state.modal = null; await load()
-        showToast(`Return completed. Refund: ${money(refund)}`, 'success')
+        showTransactionSuccess(`Return completed. Refund: ${money(refund)}`)
       }, render); return
     }
 

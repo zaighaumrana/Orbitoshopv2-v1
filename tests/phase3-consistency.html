@@ -1,0 +1,73 @@
+<!doctype html><html><head><title>Phase 3 consistency checks</title><link rel="stylesheet" href="/src/style.css"></head><body>
+<script>window.fetch=async()=>new Response('{}',{headers:{'Content-Type':'application/json'}})</script>
+<button id="run">Run consistency checks</button><pre id="results"></pre><div id="app"></div><div id="preview"></div>
+<script type="module">
+import {sb,state,CFG,showTransactionSuccess,confirmAction} from '/src/shared.js'
+import {initWorkshop} from '/src/pos/workshop.js'
+import {createSubInvoiceModalHTML,submitAdditionalWorkDraft,rememberAdditionalWorkInput} from '/src/features/repairs/additional-work.js'
+import {buildRepairSummary} from '/src/print/print.js'
+import {receiptsPage} from '/src/features/admin/checkout/render.js'
+const root={id:1,invoice_number:'PARENT',ticket_number:'TK-1',customer_name:'Fixture',device_brand:'Test',device_model:'Phone',status:'Ready',is_locked:true,estimated_quote:1000,components_noted:[{name:'Screen',price:900}],labour_cost:100,created_at:'2026-09-15T20:38:00Z'}
+const child={...root,id:2,parent_ticket_id:1,invoice_number:'CHILD',estimated_quote:300,components_noted:[{name:'Battery',price:250}],labour_cost:50}
+const summary={root:{id:1,invoiceNumber:'PARENT',status:'Ready'},invoices:[{id:1,invoiceNumber:'PARENT',amount:1000,components:root.components_noted,labourCost:100},{id:2,invoiceNumber:'CHILD',parentTicketId:1,amount:300,components:child.components_noted,labourCost:50}],effectiveObligation:1300,netPayments:300,outstanding:1000,payments:[{createdAt:root.created_at,amount:300,method:'Cash'}],refunds:[],adjustments:[]}
+const calls=[];let failDecision=false
+sb.from=table=>{const q={select:()=>q,not:()=>q,eq:()=>q,order:async()=>({data:table==='tickets'?[root,child]:[]})};return q}
+sb.rpc=async(name,args)=>{
+ calls.push({name,args});await new Promise(r=>setTimeout(r,5))
+ if(name==='get_app_config')return {data:{...CFG,ems_enabled:false}}
+ if(name==='get_repair_family_summary')return {data:summary}
+ if(name==='save_additional_work_proposal')return {data:{id:10,decision:'Pending'}}
+ if(name==='decide_additional_work')return failDecision?{error:{message:'Fixture retry'}}:{data:{proposal:{id:10,decision:args.p_decision},ticket:args.p_decision==='Approved'?child:null}}
+ return {error:{message:'Unexpected RPC '+name}}
+}
+const tick=()=>new Promise(r=>setTimeout(r,10))
+document.querySelector('#run').onclick=async()=>{
+ document.querySelector('#run').disabled=true
+ const lines=[];const check=(name,ok)=>{lines.push(`${ok?'PASS':'FAIL'} ${name}`);document.querySelector('#results').textContent=lines.join('\n')}
+ history.replaceState(null,'','/workshop/fixture')
+ await initWorkshop({isAdmin:true,employee:{role:'Business Owner',name:'Fixture'}})
+ check('Workshop uses canonical family total 1300 / paid 300 / outstanding 1000',document.querySelector('#app').textContent.includes('1,300')&&document.querySelector('#app').textContent.includes('1,000')&&calls.filter(c=>c.name==='get_repair_family_summary').length===1)
+ summary.netPayments=1100;summary.outstanding=200
+ await initWorkshop({isAdmin:true,employee:{role:'Business Owner',name:'Fixture'}})
+ check('Workshop reload reflects paid 1100 / outstanding 200',document.querySelector('#app').textContent.includes('1,100')&&document.querySelector('#app').textContent.includes('200'))
+ const count=calls.length
+ await initWorkshop({employee:{role:'Technician',name:'Fixture'}})
+ check('Technician no financial RPC; operational view retained',!calls.slice(count).some(c=>c.name==='get_repair_family_summary')&&document.querySelector('#app').textContent.includes('Financial summary unavailable for this role.')&&document.querySelector('#app').textContent.includes('Screen'))
+ const search=document.querySelector('[data-ws-filter]');search.focus();search.value='Fixture';search.dispatchEvent(new Event('input',{bubbles:true}));await tick()
+ check('Workshop filter retains focus',document.activeElement?.hasAttribute('data-ws-filter'))
+ const modal={type:'create-sub-invoice',parentId:1,draftComponents:[{name:'Battery',price:250}],draftLabour:50,additionalFields:{note:'Work note',decision:'Declined',method:'WhatsApp',decisionNote:'Customer note'}}
+ const preview=document.querySelector('#preview');preview.innerHTML=createSubInvoiceModalHTML(modal)
+ check('shared decision fields preserve notes and method',preview.querySelector('#additional-work-decision').value==='Declined'&&preview.querySelector('#additional-work-method').value==='WhatsApp'&&preview.querySelector('#additional-work-note').value==='Customer note')
+ preview.innerHTML=createSubInvoiceModalHTML(modal,{technician:true,workshop:true})
+ check('Technician form pending-only',preview.querySelector('#additional-work-decision').disabled&&preview.querySelector('#additional-work-decision').value==='Pending')
+ preview.innerHTML=''
+ for(const decision of ['Pending','Declined','Approved']){
+  calls.length=0;modal.additionalFields.decision=decision
+  const work=submitAdditionalWorkDraft(1,modal.draftComponents,50,modal)
+  const duplicate=await submitAdditionalWorkDraft(1,modal.draftComponents,50,modal)
+  const result=await work
+  check(decision+' canonical RPCs and no duplicate submission',result.ok&&duplicate.busy&&calls.filter(c=>c.name==='save_additional_work_proposal').length===1&&calls.filter(c=>c.name==='decide_additional_work').length===(decision==='Pending'?0:1)&&!!result.ticket===(decision==='Approved'))
+ }
+ calls.length=0;await submitAdditionalWorkDraft(1,modal.draftComponents,50,modal,true)
+ check('Technician forced Pending even with Approved field',calls.length===1&&calls[0].name==='save_additional_work_proposal')
+ calls.length=0;failDecision=true;await submitAdditionalWorkDraft(1,modal.draftComponents,50,modal);const ids=calls.map(c=>c.args.p_request_id)
+ failDecision=false;await submitAdditionalWorkDraft(1,modal.draftComponents,50,modal)
+ check('partial failure retry reuses idempotency keys',ids[0]===calls[2].args.p_request_id&&ids[1]===calls[3].args.p_request_id)
+ preview.innerHTML=buildRepairSummary(summary)
+ check('summary itemizes parent/child components labour and totals',preview.textContent.includes('Screen')&&preview.textContent.includes('Battery')&&preview.textContent.includes('Parent: PARENT')&&preview.textContent.includes('Invoice subtotal')&&preview.textContent.includes('1,300'))
+ state.data.sales=[{id:3,invoice_number:'RETAIL',created_at:root.created_at}]
+ preview.innerHTML=receiptsPage({tit:()=>'',adminState:{}})
+ const summaries=[...preview.querySelectorAll('[data-action="print-repair-summary"]')]
+ check('archive parent/child same summary; retail none; invoice prints retained',summaries.length===2&&summaries.every(b=>b.dataset.ticketId==='1')&&preview.querySelectorAll('[data-action="print-repair-invoice"]').length===2)
+ preview.innerHTML=''
+ const first=showTransactionSuccess('Payment recorded.'),second=showTransactionSuccess('Payment recorded.')
+ check('success dialog deduplicated',first===second&&document.querySelectorAll('.app-dialog').length===1)
+ document.querySelector('.app-dialog').requestSubmit();await first
+ let executions=0
+ const confirm=confirmAction({title:'Fixture confirmation',action:async()=>{executions++;showTransactionSuccess('Confirmed transaction.');return true}})
+ const form=document.querySelector('.app-dialog');form.requestSubmit();form.requestSubmit();await confirm;await tick()
+ check('success waits for owning confirmation, action once',executions===1&&document.querySelectorAll('.app-dialog').length===1&&document.querySelector('.app-dialog').textContent.includes('Confirmed transaction.'))
+ document.querySelector('.app-dialog').requestSubmit()
+ preview.innerHTML=buildRepairSummary(summary)
+}
+</script></body></html>
