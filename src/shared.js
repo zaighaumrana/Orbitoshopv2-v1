@@ -1,7 +1,10 @@
+import { escapeHTML } from "./html.js"
 import { createClient } from '@supabase/supabase-js'
 import { dlog, dstack, initializeSupportConsole, revokeSupportConsole } from './debuglog.js'
 import { installNumericInputValidation } from './numeric-input.js'
 import { blockingErrorCopy } from './blocking-error.js'
+import { logLegacyUsage } from './platform/legacy.js'
+import { installThermalMeter } from './platform/thermal.js'
 
 /* ── Supabase ── */
 export const sb = createClient(
@@ -18,37 +21,11 @@ export const sb = createClient(
 )
 
 initializeSupportConsole(sb)
+installThermalMeter(sb)
 
-let _platform = null
-function getPlatform() {
-  if (!_platform) _platform = createClient(
-    import.meta.env.VITE_PLATFORM_URL,
-    import.meta.env.VITE_PLATFORM_ANON
-  )
-  return _platform
-}
-
-export const CLIENT_ID         = Number(import.meta.env.VITE_CLIENT_ID || 1)
-export const CLIENT_EVENT_RATE = 5
-export const CLIENT_INV_RATE   = 1
-
-export async function logBillEvent() {
-  try {
-    await getPlatform().from('usage_logs').insert({
-      client_id: CLIENT_ID, module_type: 'BILL',
-      token_count: 1, rate_at_log: CLIENT_EVENT_RATE,
-    })
-  } catch (e) { console.warn('Billing log failed:', e.message) }
-}
-
-export async function logInventoryEvent() {
-  try {
-    await getPlatform().from('usage_logs').insert({
-      client_id: CLIENT_ID, module_type: 'INVENTORY',
-      token_count: 1, rate_at_log: CLIENT_INV_RATE,
-    })
-  } catch (e) { console.warn('Billing log failed:', e.message) }
-}
+// Do not hold a completed Shop operation open while legacy Platform is offline.
+export function logBillEvent(result) { void logLegacyUsage('BILL', result) }
+export function logInventoryEvent(result) { void logLegacyUsage('INVENTORY', result) }
 
 /* ── Shared state ── */
 export const state = {
@@ -266,13 +243,15 @@ export function currentTenant() {
 /* ── Helpers ── */
 export const money = (v, sym) =>
   `${sym || CFG.currency || 'Rs.'} ${Number(v||0).toLocaleString(undefined,{maximumFractionDigits:0})}`
+// Configurable currency is text too; preserve raw money() for textContent/dialogs.
+export const moneyHTML = (v, sym) => escapeHTML(money(v, sym))
 export const fld = (label, name, val = '', type = 'text') =>
-  `<label class="field"><span>${label}</span><input name="${name}" type="${type}"${type === 'number' ? ' step="any"' : ''}${type === 'tel' ? ' inputmode="numeric" pattern="[0-9]*" data-numeric="digits" data-numeric-message="Numbers only" autocomplete="tel"' : ''} value="${String(val).replaceAll('"','&quot;')}"></label>`
+  `<label class="field"><span>${escapeHTML(label)}</span><input name="${escapeHTML(name)}" type="${escapeHTML(type)}"${type === 'number' ? ' step="any"' : ''}${type === 'tel' ? ' inputmode="numeric" pattern="[0-9]*" data-numeric="digits" data-numeric-message="Numbers only" autocomplete="tel"' : ''} value="${escapeHTML(val)}"></label>`
 export const modalActions = () =>
   `<div class="modal-actions"><button type="button" class="secondary-button" data-close>Cancel</button><button class="primary-button">Save</button></div>`
 export const statusBadge = s => {
   const bad=['Suspended','Cancelled','Declined'], good=['Active','Delivered','Ready','Settled']
-  return `<span class="badge ${bad.includes(s)?'bad':good.includes(s)?'good':'warn'}">${s}</span>`
+  return `<span class="badge ${bad.includes(s)?'bad':good.includes(s)?'good':'warn'}">${escapeHTML(s)}</span>`
 }
 
 /* ── Shared app-native dialogs and notifications ── */
@@ -575,7 +554,7 @@ export async function runInstallPrompt() {
 
 /* ── Access control ── */
 export const ACCESS = {
-  'Business Owner': ['dashboard','repairs','inventory','reports','receipts','employees','ems','settings','catalog','pos','workshop'],
+  'Business Owner': ['dashboard','repairs','inventory','reports','receipts','employees','ems','settings','catalog','pos','workshop','billing-usage'],
   'Orbito Support': ['dashboard','repairs','inventory','reports','receipts','employees','ems','settings','catalog','pos','workshop'],
   'Manager':        ['dashboard','repairs','inventory','reports','receipts','employees','ems','catalog'],
   'Cashier':        ['pos'],
@@ -683,12 +662,7 @@ export function validatePassword(p) {
   return null
 }
 
-export function generateTempPassword() {
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%'
-  let pass = ''
-  for (let i = 0; i < 10; i++) pass += chars[Math.floor(Math.random() * chars.length)]
-  return pass
-}
+export { generateTempPassword } from './security/password.js'
 
 /** Logged-in user changes their own password (owner or employee). */
 export async function changeOwnPassword(session, oldPassword, newPassword) {
@@ -915,10 +889,10 @@ export function pinPromptHTML(purpose) {
   }[purpose] || 'Verify identity'
   return `
     <div class="modal pin-prompt" role="dialog" aria-modal="true" aria-labelledby="pp-title" style="max-width:340px">
-      <h2 id="pp-title">${label}</h2>
+      <h2 id="pp-title">${escapeHTML(label)}</h2>
       <input id="pp-input" class="pin-capture-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="Four digit PIN" aria-describedby="pp-error">
       <div id="pp-display" aria-hidden="true" style="text-align:center;font-size:30px;letter-spacing:16px;min-height:48px;border-bottom:2px solid var(--border);padding-bottom:8px;margin:10px 0">${'●'.repeat(ppBuffer.length).padEnd(4, '·')}</div>
-      <div id="pp-error" class="${ppError ? '' : 'hidden'}" role="alert" style="color:var(--danger);text-align:center;font-size:13px;margin-bottom:8px">${ppError}</div>
+      <div id="pp-error" class="${ppError ? '' : 'hidden'}" role="alert" style="color:var(--danger);text-align:center;font-size:13px;margin-bottom:8px">${escapeHTML(ppError)}</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
         ${[1,2,3,4,5,6,7,8,9,'⌫',0,'✓'].map(k =>
           `<button type="button" class="secondary-button" style="font-size:20px;min-height:50px" data-pp-key="${k}"${k === '✓' && (ppSubmitting || ppBuffer.length !== 4) ? ' disabled' : ''}>${k}</button>`

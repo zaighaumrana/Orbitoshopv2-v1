@@ -27,7 +27,7 @@ Deno.serve(async (req: Request) => {
     const body = await req.json().catch(() => ({}))
     const purpose = String(body.purpose ?? '')
     const pin = String(body.pin ?? '')
-    if (!PURPOSES.has(purpose) || !/^[0-9]{4,6}$/.test(pin)) {
+    if (!PURPOSES.has(purpose)) {
       return json({ ok: false, error: 'Verification failed.' }, 403)
     }
 
@@ -47,17 +47,14 @@ Deno.serve(async (req: Request) => {
       return json({ ok: false, error: 'Authorization failed.' }, 403)
     }
 
-    const { data: valid, error: verifyError } = await admin.rpc('verify_override_pin', { candidate_pin: pin })
-    if (verifyError || valid !== true) return json({ ok: false, error: 'Verification failed.' }, 403)
-
-    const expiresAt = new Date(Date.now() + 75_000).toISOString()
-    const { error: insertError } = await admin.from('step_up_authorizations').insert({
-      auth_user_id: userData.user.id,
-      purpose,
-      expires_at: expiresAt,
+    const { data: verified, error: verifyError } = await admin.rpc('verify_override_pin_guarded', {
+      p_actor: userData.user.id,
+      p_pin: pin,
+      p_purpose: purpose,
     })
-    if (insertError) return json({ ok: false, error: 'Authorization could not be recorded.' }, 503)
-    return json({ ok: true, purpose, expiresAt })
+    if (verifyError) return json({ ok: false, error: 'Verification is unavailable.' }, 503)
+    if (verified?.ok !== true) return json({ ok: false, error: 'Verification failed.' }, 403)
+    return json(verified)
   } catch (error) {
     console.error('PIN verification failed.', error instanceof Error ? error.message : 'unknown error')
     return json({ ok: false, error: 'Verification is unavailable.' }, 503)

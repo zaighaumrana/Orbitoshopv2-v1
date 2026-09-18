@@ -1,3 +1,4 @@
+import { escapeHTML, safeImageURL } from "../html.js"
 import { createSubInvoiceModalHTML, rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 /* ═══════════════════════════════════════════════════════════════════
    RetailOS — pos.js
@@ -13,7 +14,7 @@ import {
 import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
   _clearSession,
-  money, fld, modalActions,
+  money, moneyHTML, fld, modalActions,
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   myAccountModalHTML, handleChangePasswordSubmit,
   matchesInvoiceSearch,
@@ -137,14 +138,14 @@ function render() {
       <main class="main">
         <header class="topbar">
           <div class="brand top-brand">
-            <div class="logo">${tenant.logo?`<img alt="" src="${tenant.logo}">`:tenant.name.slice(0,2).toUpperCase()}</div>
+            <div class="logo">${tenant.logo?`<img alt="" src="${escapeHTML(safeImageURL(tenant.logo))}">`: escapeHTML(tenant.name.slice(0,2).toUpperCase())}</div>
             <div>
-              <strong>${tenant.name}</strong>
+              <strong>${escapeHTML(tenant.name)}</strong>
               <span class="muted" style="font-size:12px">Cashier · POS Counter</span>
             </div>
           </div>
           <div class="top-actions">
-            <span class="chip"><strong style="font-size:12px">${SESSION.employee.name}</strong></span>
+            <span class="chip"><strong style="font-size:12px">${escapeHTML(SESSION.employee.name)}</strong></span>
             <span class="chip"><i class="dot ${state.online?'':'offline'}"></i>${state.online?'Online':'Offline'}</span>
             ${(SESSION.isAdmin || SESSION.employee?.role === 'Business Owner') ? `
               <button class="secondary-button" data-action="go-admin">Admin</button>
@@ -194,7 +195,7 @@ function posView() {
     <div class="page-title">
       <div>
         <h1>Point of Sale</h1>
-        <p class="muted">Counter · ${tenant.name} · <strong>${SESSION.employee.name}</strong></p>
+        <p class="muted">Counter · ${escapeHTML(tenant.name)} · <strong>${escapeHTML(SESSION.employee.name)}</strong></p>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <button class="secondary-button" data-action="shift-stats">📋 Shift Stats</button>
@@ -216,13 +217,13 @@ function posView() {
         ${posState.cart.length ? posState.cart.map(item => `
           <div class="cart-line">
             <div>
-              <strong>${item.name}</strong><br>
-              ${item.variantName ? `<small class="muted">&nbsp;&nbsp;${item.variantName}</small><br>` : ''}
+              <strong>${escapeHTML(item.name)}</strong><br>
+              ${item.variantName ? `<small class="muted">&nbsp;&nbsp;${escapeHTML(item.variantName)}</small><br>` : ''}
               <small class="muted">
                 ${item.isTicket && item.isNewTicket
-                  ? `${item.draftData?.components?.length || 0} issue${item.draftData?.components?.length === 1 ? '' : 's'} · Quote ${money(calcDraftTotal(item.draftData))} · Paid ${money(calcDraftPaid(item.draftData))}`
-                  : item.isTicket ? `Payment ${money(item.soldPrice)}` : money(item.soldPrice) + ' each'}
-                ${item.reason?' · '+item.reason:''}
+                  ? `${item.draftData?.components?.length || 0} issue${item.draftData?.components?.length === 1 ? '' : 's'} · Quote ${moneyHTML(calcDraftTotal(item.draftData))} · Paid ${moneyHTML(calcDraftPaid(item.draftData))}`
+                  : item.isTicket ? `Payment ${moneyHTML(item.soldPrice)}` : moneyHTML(item.soldPrice) + ' each'}
+                ${item.reason?' · '+escapeHTML(item.reason):''}
               </small>
             </div>
             ${item.isTicket ? `
@@ -240,10 +241,10 @@ function posView() {
           </div>`).join('') : `<div class="empty">No items in cart.</div>`}
 
         <div class="totals">
-          <div class="total-row"><span>Subtotal</span><strong>${money(subtotal)}</strong></div>
-          ${disc>0?`<div class="total-row"><span>Discounts</span><strong style="color:var(--success)">− ${money(disc)}</strong></div>`:''}
-          ${tax>0?`<div class="total-row"><span>Tax ${tenant.taxRate}%</span><strong>${money(tax)}</strong></div>`:''}
-          <div class="total-row grand"><span>Total</span><strong>${money(grandTotal)}</strong></div>
+          <div class="total-row"><span>Subtotal</span><strong>${moneyHTML(subtotal)}</strong></div>
+          ${disc>0?`<div class="total-row"><span>Discounts</span><strong style="color:var(--success)">− ${moneyHTML(disc)}</strong></div>`:''}
+          ${tax>0?`<div class="total-row"><span>Tax ${tenant.taxRate}%</span><strong>${moneyHTML(tax)}</strong></div>`:''}
+          <div class="total-row grand"><span>Total</span><strong>${moneyHTML(grandTotal)}</strong></div>
         </div>
 
         ${!hasTicketInCart ? `
@@ -262,15 +263,15 @@ function posView() {
             <div style="display:flex;justify-content:space-between;padding:9px 12px;border-radius:8px;font-weight:600;font-size:15px;
                 background:${change>=0?'color-mix(in srgb,#22c55e 12%,var(--surface))':'color-mix(in srgb,#ef4444 12%,var(--surface))'}">
               <span>${change>=0?'Change Due':'Short by'}</span>
-              <span style="color:${change>=0?'#22c55e':'#ef4444'}">${money(Math.abs(change))}</span>
+              <span style="color:${change>=0?'#22c55e':'#ef4444'}">${moneyHTML(Math.abs(change))}</span>
             </div>` : ''}
           </div>` : ''}
         ${posState.checkoutPayment === 'Udhar (Credit)' ? `
           <div style="display:grid;gap:8px;margin-top:4px">
-            <input class="search" placeholder="Customer name *" data-udhar="name" value="${posState.udharName||''}">
+            <input class="search" placeholder="Customer name *" data-udhar="name" value="${escapeHTML(posState.udharName||'')}">
             <input class="search" type="tel" inputmode="numeric" pattern="[0-9]*" data-numeric="digits"
               data-numeric-message="Numbers only" autocomplete="tel" placeholder="Customer phone *"
-              data-udhar="phone" value="${posState.udharPhone||''}">
+              data-udhar="phone" value="${escapeHTML(posState.udharPhone||'')}">
             <label style="font-size:13px;font-weight:500;color:var(--muted)">Cash Paid Now (optional)</label>
             <input type="number" step="any" min="0" placeholder="0 — rest goes on credit"
               value="${posState.udharPaidNow||''}" data-udhar="paidNow"
@@ -287,11 +288,11 @@ function posView() {
             </div>
             <label style="font-size:13px;font-weight:500;color:var(--muted)">Udhar amount (optional, PIN required)</label>
             <input type="number" step="any" min="0" value="${posState.splitCredit||''}" data-split="credit" class="search">
-            <input class="search" placeholder="Customer name (required if Udhar)" data-udhar="name" value="${posState.udharName||''}">
+            <input class="search" placeholder="Customer name (required if Udhar)" data-udhar="name" value="${escapeHTML(posState.udharName||'')}">
             <input class="search" type="tel" inputmode="numeric" pattern="[0-9]*" data-numeric="digits"
               data-numeric-message="Numbers only" autocomplete="tel" placeholder="Customer phone (required if Udhar)"
-              data-udhar="phone" value="${posState.udharPhone||''}">
-            <div style="display:flex;justify-content:space-between;padding:8px 10px;background:var(--surface-2);border-radius:8px"><span>Split total</span><strong>${money(Number(posState.splitCash||0)+Number(posState.splitDigital||0)+Number(posState.splitCredit||0))} / ${money(grandTotal)}</strong></div>
+              data-udhar="phone" value="${escapeHTML(posState.udharPhone||'')}">
+            <div style="display:flex;justify-content:space-between;padding:8px 10px;background:var(--surface-2);border-radius:8px"><span>Split total</span><strong>${moneyHTML(Number(posState.splitCash||0)+Number(posState.splitDigital||0)+Number(posState.splitCredit||0))} / ${moneyHTML(grandTotal)}</strong></div>
           </div>` : ''}
         ` : `
           <p class="muted" style="font-size:12px;margin-top:4px">
@@ -320,8 +321,8 @@ function quickItemsPanel() {
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px">
         ${state.data.quickItems.map(item=>`
           <button class="secondary-button" style="font-size:15px;padding:11px 18px;border-radius:10px;font-weight:500"
-            data-qitem-id="${item.id}" data-qitem-name="${item.name}" data-qitem-prices='${JSON.stringify(item.prices)}'>
-            ${item.name}
+            data-qitem-id="${item.id}" data-qitem-name="${escapeHTML(item.name)}" data-qitem-prices='${escapeHTML(JSON.stringify(item.prices))}'>
+            ${escapeHTML(item.name)}
           </button>`).join('')}
       </div>
       <div style="border-top:1px solid var(--border);padding-top:12px">
@@ -418,15 +419,15 @@ function buildShiftStats() {
   const pendingAll = allTickets.filter(t=>!t.parent_ticket_id && (Number(t.balance_due||0)>0 || !t.is_locked))
   return `
     <div class="shift-print">
-      <center><strong>${tenant.name}</strong><br>Shift Summary — ${todayStr}<br>${empName||'All Staff'}</center>
+      <center><strong>${escapeHTML(tenant.name)}</strong><br>Shift Summary — ${todayStr}<br>${escapeHTML(empName||'All Staff')}</center>
       <hr style="border:none;border-top:1px dashed #bbb;margin:8px 0">
       <div class="stat-row"><span>Products sold</span><span>${itemsSold}</span></div>
-      <div class="stat-row"><span>Invoiced</span><span>${money(invoiced)}</span></div>
-      <div class="stat-row"><span>Payments collected</span><span>${money(collected)}</span></div>
-      <div class="stat-row"><span>Refunds</span><span>-${money(refunded)}</span></div>
-      <div class="stat-row"><span>Net payments</span><span>${money(netPayments)}</span></div>
-      <div class="stat-row"><span>Cash collected</span><span>${money(cashOnly)}</span></div>
-      <div class="stat-row"><span>Discounts given</span><span>${money(discounts)}</span></div>
+      <div class="stat-row"><span>Invoiced</span><span>${moneyHTML(invoiced)}</span></div>
+      <div class="stat-row"><span>Payments collected</span><span>${moneyHTML(collected)}</span></div>
+      <div class="stat-row"><span>Refunds</span><span>-${moneyHTML(refunded)}</span></div>
+      <div class="stat-row"><span>Net payments</span><span>${moneyHTML(netPayments)}</span></div>
+      <div class="stat-row"><span>Cash collected</span><span>${moneyHTML(cashOnly)}</span></div>
+      <div class="stat-row"><span>Discounts given</span><span>${moneyHTML(discounts)}</span></div>
       <div class="stat-row"><span>Customers served</span><span>${custCount}</span></div>
       ${CFG.repair_module_enabled?`
       <hr style="border:none;border-top:1px dashed #bbb;margin:8px 0">
@@ -454,7 +455,7 @@ function ticketPaymentModalHTML(modal) {
   if (modal.summaryStatus === 'error' || !modal.summary) return `<div class="modal-backdrop">
     <div class="modal modal-sm">
       <h2>Repair summary unavailable</h2>
-      <p class="muted">${modal.summaryError || 'Current repair totals could not be loaded.'}</p>
+      <p class="muted">${escapeHTML(modal.summaryError || 'Current repair totals could not be loaded.')}</p>
       <div class="modal-actions">
         <button class="secondary-button" data-close>Close</button>
         <button class="primary-button" data-action="retry-repair-summary" data-ticket-id="${ticket.id}">Retry</button>
@@ -475,9 +476,9 @@ function ticketPaymentModalHTML(modal) {
   const terminal = status === 'Delivered' || status === 'Cancelled'
   const deliveredBy = root.deliveredByDisplayName || root.deliveredBy || ''
   const statusGuidance = status === 'Delivered'
-    ? `<div class="terminal-state good"><strong>Delivery completed</strong><span>${root.deliveredAt ? new Date(root.deliveredAt).toLocaleString() : 'Delivered'}${deliveredBy ? ` · ${deliveredBy}` : ''}${outstanding > 0 ? ' · Remaining credit is managed from Outstanding Credits.' : ''}</span></div>`
+    ? `<div class="terminal-state good"><strong>Delivery completed</strong><span>${root.deliveredAt ? new Date(root.deliveredAt).toLocaleString() : 'Delivered'}${deliveredBy ? ` · ${escapeHTML(deliveredBy)}` : ''}${outstanding > 0 ? ' · Remaining credit is managed from Outstanding Credits.' : ''}</span></div>`
     : status === 'Cancelled'
-      ? `<div class="terminal-state bad"><strong>Repair cancelled</strong><span>${root.cancelledAt ? new Date(root.cancelledAt).toLocaleString() : ''}${root.cancellationReason ? `${root.cancelledAt ? ' · ' : ''}${root.cancellationReason}` : ''}</span></div>`
+      ? `<div class="terminal-state bad"><strong>Repair cancelled</strong><span>${root.cancelledAt ? new Date(root.cancelledAt).toLocaleString() : ''}${root.cancellationReason ? `${root.cancelledAt ? ' · ' : ''}${escapeHTML(root.cancellationReason)}` : ''}</span></div>`
       : status === 'Ready'
         ? (outstanding > 0 ? `
           <button class="secondary-button" style="width:100%;margin-top:8px" data-action="deliver-repair-udhar" data-ticket-id="${root.id || ticket.id}">
@@ -490,21 +491,21 @@ function ticketPaymentModalHTML(modal) {
 
   return `<div class="modal-backdrop">
     <div class="modal modal-sm">
-      <h2>${root.invoiceNumber || root.ticketNumber || ticket.invoice_number || ticket.ticket_number} <span class="badge ${status === 'Delivered' || status === 'Ready' ? 'good' : status === 'Cancelled' ? 'bad' : 'warn'}">${status}</span></h2>
-      <p class="muted">${root.customerName || ticket.customer_name} · ${root.deviceBrand || ticket.device_brand} ${root.deviceModel || ticket.device_model}</p>
+      <h2>${escapeHTML(root.invoiceNumber || root.ticketNumber || ticket.invoice_number || ticket.ticket_number)} <span class="badge ${status === 'Delivered' || status === 'Ready' ? 'good' : status === 'Cancelled' ? 'bad' : 'warn'}">${escapeHTML(status)}</span></h2>
+      <p class="muted">${escapeHTML(root.customerName || ticket.customer_name)} · ${escapeHTML(root.deviceBrand || ticket.device_brand)} ${escapeHTML(root.deviceModel || ticket.device_model)}</p>
       <div style="display:grid;gap:6px;padding:12px;background:var(--surface-2);border-radius:8px;margin:12px 0">
-        <div style="display:flex;justify-content:space-between"><span>Original invoice</span><strong>${money(originalTotal)}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Original invoice</span><strong>${moneyHTML(originalTotal)}</strong></div>
         ${subs.length ? `
           <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:6px">
             ${subs.map(s => `
               <div style="display:flex;justify-content:space-between;font-size:13px">
-                <span>${s.invoiceNumber || s.ticketNumber}</span><span>${money(s.amount)}</span>
+                <span>${escapeHTML(s.invoiceNumber || s.ticketNumber)}</span><span>${moneyHTML(s.amount)}</span>
               </div>`).join('')}
           </div>` : ''}
-        <div style="display:flex;justify-content:space-between"><span>Current billed</span><strong>${money(effectiveTotal)}</strong></div>
-        <div style="display:flex;justify-content:space-between;color:var(--success)"><span>Net paid</span><strong>${money(netPaid)}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Current billed</span><strong>${moneyHTML(effectiveTotal)}</strong></div>
+        <div style="display:flex;justify-content:space-between;color:var(--success)"><span>Net paid</span><strong>${moneyHTML(netPaid)}</strong></div>
         <div style="display:flex;justify-content:space-between;font-weight:700;border-top:1px solid var(--border);padding-top:6px">
-          <span>Total due</span><span>${money(outstanding)}</span>
+          <span>Total due</span><span>${moneyHTML(outstanding)}</span>
         </div>
       </div>
       ${outstanding > 0 && !terminal ? `
@@ -572,11 +573,11 @@ function renderModal() {
     return `
       <div class="modal-backdrop" data-no-backdrop-close>
         <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
-          <h2 style="margin-bottom:4px">${tk.customer_name}</h2>
+          <h2 style="margin-bottom:4px">${escapeHTML(tk.customer_name)}</h2>
           <p class="muted" style="font-size:13px;margin-bottom:16px">
-            ${tk.invoice_number || tk.ticket_number}
-            ${tk.invoice_number ? `<br><span style="font-size:11px">Ticket: ${tk.ticket_number}</span>` : ''}
-            · ${tk.device_brand} ${tk.device_model}
+            ${escapeHTML(tk.invoice_number || tk.ticket_number)}
+            ${tk.invoice_number ? `<br><span style="font-size:11px">Ticket: ${escapeHTML(tk.ticket_number)}</span>` : ''}
+            · ${escapeHTML(tk.device_brand)} ${escapeHTML(tk.device_model)}
           </p>
 
           <div style="display:grid;gap:8px;margin-bottom:14px">
@@ -585,12 +586,12 @@ function renderModal() {
               <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;
                           ${c.removed?'opacity:.55':''}">
                 <div>
-                  <span style="font-size:13px;${c.removed?'text-decoration:line-through':''}"><strong>${c.name}</strong></span>
-                  <span class="badge warn" style="font-size:11px;margin-left:6px">${c.tag || ''}</span>
-                  ${c.customText ? `<span class="muted" style="font-size:12px"> — ${c.customText}</span>` : ''}
-                  ${c.removed ? `<br><span class="muted" style="font-size:11px">Not needed: ${c.removedReason||''}</span>` : ''}
+                  <span style="font-size:13px;${c.removed?'text-decoration:line-through':''}"><strong>${escapeHTML(c.name)}</strong></span>
+                  <span class="badge warn" style="font-size:11px;margin-left:6px">${escapeHTML(c.tag || '')}</span>
+                  ${c.customText ? `<span class="muted" style="font-size:12px"> — ${escapeHTML(c.customText)}</span>` : ''}
+                  ${c.removed ? `<br><span class="muted" style="font-size:11px">Not needed: ${escapeHTML(c.removedReason||'')}</span>` : ''}
                 </div>
-                <span style="font-size:13px;min-width:70px;text-align:right">${Number(c.price)>0?money(c.price):'—'}</span>
+                <span style="font-size:13px;min-width:70px;text-align:right">${Number(c.price)>0?moneyHTML(c.price):'—'}</span>
                 ${!c.removed ? `<button type="button" class="secondary-button" style="font-size:11px;padding:4px 8px"
                   data-mark-not-needed="${i}">Not Needed</button>` : `<span></span>`}
               </div>`).join('') :
@@ -599,13 +600,13 @@ function renderModal() {
 
           <div style="display:flex;justify-content:space-between;padding:10px;background:var(--surface-2);
                       border-radius:8px;margin-bottom:8px;font-size:13px">
-            <span>Labour Fee (locked)</span><span>${money(tk.labour_cost||0)}</span>
+            <span>Labour Fee (locked)</span><span>${moneyHTML(tk.labour_cost||0)}</span>
           </div>
-          ${tk.technician_note ? `<p class="muted" style="font-size:12px;margin-bottom:12px">Note: ${tk.technician_note}</p>` : ''}
+          ${tk.technician_note ? `<p class="muted" style="font-size:12px;margin-bottom:12px">Note: ${escapeHTML(tk.technician_note)}</p>` : ''}
 
           <div style="display:flex;justify-content:space-between;font-weight:600;padding:10px;
                       background:var(--surface-2);border-radius:8px;margin-bottom:16px;font-size:15px">
-            <span>Original Total</span><span>${money(grandTotal)}</span>
+            <span>Original Total</span><span>${moneyHTML(grandTotal)}</span>
           </div>
 
           ${subs.length ? `
@@ -615,11 +616,11 @@ function renderModal() {
                 ${subs.map(s => `
                   <div style="display:flex;justify-content:space-between;font-size:12px;
                               padding:8px 10px;background:var(--surface-2);border-radius:6px">
-                    <span>${s.invoice_number}</span>
-                    <span>${money(s.estimated_quote)} · Bal: ${money(s.balance_due)}</span>
+                    <span>${escapeHTML(s.invoice_number)}</span>
+                    <span>${moneyHTML(s.estimated_quote)} · Bal: ${moneyHTML(s.balance_due)}</span>
                   </div>`).join('')}
               </div>
-              <p class="muted" style="font-size:12px;margin-top:6px">Combined outstanding balance: ${money(subsTotal)}</p>
+              <p class="muted" style="font-size:12px;margin-top:6px">Combined outstanding balance: ${moneyHTML(subsTotal)}</p>
             </div>` : ''}
 
           <div class="modal-actions">
@@ -638,7 +639,7 @@ function renderModal() {
     if (!tk || !c) return ''
     return `<div class="modal-backdrop" data-no-backdrop-close>
       <div class="modal modal-xs">
-        <h2>Mark "${c.name}" Not Needed</h2>
+        <h2>Mark "${escapeHTML(c.name)}" Not Needed</h2>
         <p class="muted" style="font-size:13px">E.g. "Only needed cleaning, no repair required." This stays visible on the ticket, it's not deleted.</p>
         <label class="field"><span>Reason</span><textarea id="not-needed-reason" style="min-height:56px"></textarea></label>
         <div class="modal-actions">
@@ -656,7 +657,7 @@ function renderModal() {
     return `
       <div class="modal-backdrop" data-no-backdrop-close>
         <div class="modal modal-xs">
-          <h2>${compName}</h2>
+          <h2>${escapeHTML(compName)}</h2>
           <p class="muted" style="font-size:13px">What's the issue?</p>
           <div style="display:grid;gap:8px;margin-top:10px">
             <button type="button" class="secondary-button" style="font-size:15px;min-height:48px" data-tag-select="Broken">Broken</button>
@@ -705,9 +706,9 @@ function renderModal() {
     const cartItem = posState.cart.find(i=>i.productId===state.modal.id)
     return `<div class="modal-backdrop"><form class="modal" data-form="override">
       <h2>Price Override</h2>
-      <p class="muted">Original: ${money(cartItem?.originalPrice||0)}</p>
+      <p class="muted">Original: ${moneyHTML(cartItem?.originalPrice||0)}</p>
       ${fld('Sold Price','soldPrice',cartItem?.soldPrice||0,'number')}
-      <label class="field"><span>Reason for Discount</span><textarea name="reason">${cartItem?.reason||''}</textarea></label>
+      <label class="field"><span>Reason for Discount</span><textarea name="reason">${escapeHTML(cartItem?.reason||'')}</textarea></label>
       ${modalActions()}
     </form></div>`
   }
@@ -726,13 +727,13 @@ function renderModal() {
         ${outstanding.map(u => `
           <div style="padding:12px;background:var(--surface-2);border-radius:8px;display:grid;gap:8px">
             <div style="display:flex;justify-content:space-between;align-items:flex-start">
-              <div><strong>${u.customerName}</strong> · ${u.customerPhone}<br>
-                <small class="muted">${u.kind === 'repair' ? 'Repair' : 'Retail'} · ${u.reference} · ${new Date(u.createdAt).toLocaleDateString()}</small></div>
-              <span class="badge ${u.status==='Settled'?'good':'bad'}">${u.status}</span>
+              <div><strong>${escapeHTML(u.customerName)}</strong> · ${escapeHTML(u.customerPhone)}<br>
+                <small class="muted">${u.kind === 'repair' ? 'Repair' : 'Retail'} · ${escapeHTML(u.reference)} · ${new Date(u.createdAt).toLocaleDateString()}</small></div>
+              <span class="badge ${u.status==='Settled'?'good':'bad'}">${escapeHTML(u.status)}</span>
             </div>
             <div style="display:flex;justify-content:space-between">
-              <span>Balance: <strong>${money(u.outstanding)}</strong></span>
-              <span class="muted">Current total: ${money(u.effectiveObligation)}</span>
+              <span>Balance: <strong>${moneyHTML(u.outstanding)}</strong></span>
+              <span class="muted">Current total: ${moneyHTML(u.effectiveObligation)}</span>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
               <input type="number" step="any" min="0" max="${u.outstanding}" placeholder="Amount to settle" data-settle-amount="${u.kind}:${u.sourceId}"
@@ -754,7 +755,7 @@ function renderModal() {
     const context = state.modal.context
     if (!context) return `<div class="modal-backdrop"><form class="modal modal-sm" data-form="return-lookup">
       <h2>Process Return</h2>
-      <p class="muted">Enter the invoice number from the original receipt (just the numbers — the "${CFG.invoice_prefix||'INV'}" prefix is added automatically).</p>
+      <p class="muted">Enter the invoice number from the original receipt (just the numbers — the "${escapeHTML(CFG.invoice_prefix||'INV')}" prefix is added automatically).</p>
       ${fld('Invoice No.','receiptNo',receiptInput)}
       ${state.modal.notFound?`<p style="color:var(--danger);font-size:13px">Invoice not found.</p>`:''}
       <div class="modal-actions"><button class="secondary-button" data-close>Cancel</button><button class="primary-button">Look Up</button></div>
@@ -766,15 +767,15 @@ function renderModal() {
     const netPaid = Number(financial.paymentsReceived||0)-Number(financial.refundsPaid||0)
     const currentOutstanding = Math.max(0,currentObligation-netPaid)
     return `<div class="modal-backdrop"><form class="modal modal-md" data-form="return-confirm">
-      <h2>Return — ${sale.invoiceNumber}</h2>
-      <p class="muted">${sale.customerName||'Walk-in'} · ${new Date(sale.createdAt).toLocaleDateString()}</p>
+      <h2>Return — ${escapeHTML(sale.invoiceNumber)}</h2>
+      <p class="muted">${escapeHTML(sale.customerName||'Walk-in')} · ${new Date(sale.createdAt).toLocaleDateString()}</p>
       <div style="display:grid;gap:8px;margin:10px 0">
         ${items.length ? items.map(item=>`
           <div style="padding:10px;background:var(--surface-2);border-radius:8px;display:grid;gap:8px">
             <div style="display:flex;justify-content:space-between;gap:8px">
-              <span><strong>${item.name}</strong>${item.variantName?` · ${item.variantName}`:''}<br>
+              <span><strong>${escapeHTML(item.name)}</strong>${item.variantName?` · ${escapeHTML(item.variantName)}`:''}<br>
                 <small class="muted">Sold ${item.soldQuantity} · already returned ${item.alreadyReturned}</small></span>
-              <strong>${money(item.remainingValue)} remaining</strong>
+              <strong>${moneyHTML(item.remainingValue)} remaining</strong>
             </div>
             <div class="form-grid">
               <label class="field"><span>Return quantity (max ${item.remainingQuantity})</span>
@@ -791,11 +792,11 @@ function renderModal() {
       </label>
       <label class="field"><span>Reason</span><textarea name="notes" required></textarea></label>
       <div style="padding:10px;background:var(--surface-2);border-radius:8px;display:grid;gap:4px">
-        <div style="display:flex;justify-content:space-between"><span>Current obligation</span><strong>${money(currentObligation)}</strong></div>
-        <div style="display:flex;justify-content:space-between"><span>Net paid</span><strong>${money(netPaid)}</strong></div>
-        <div style="display:flex;justify-content:space-between"><span>Current outstanding</span><strong>${money(currentOutstanding)}</strong></div>
-        <div style="display:flex;justify-content:space-between"><span>Return value</span><strong id="return-value-preview">${money(0)}</strong></div>
-        <div style="display:flex;justify-content:space-between"><span>Actual refund due</span><strong id="refund-due-preview">${money(0)}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Current obligation</span><strong>${moneyHTML(currentObligation)}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Net paid</span><strong>${moneyHTML(netPaid)}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Current outstanding</span><strong>${moneyHTML(currentOutstanding)}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Return value</span><strong id="return-value-preview">${moneyHTML(0)}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Actual refund due</span><strong id="refund-due-preview">${moneyHTML(0)}</strong></div>
       </div>
       <input type="hidden" name="saleId" value="${sale.id}">
       <div class="modal-actions"><button class="secondary-button" data-close>Cancel</button><button class="primary-button" ${items.length?'':'disabled'}>Process Return</button></div>
@@ -805,9 +806,9 @@ function renderModal() {
   if (type === 'qitem-pick') {
     const { name, prices } = state.modal
     return `<div class="modal-backdrop"><div class="modal modal-xs">
-      <h2>${name}</h2><p class="muted">Select price:</p>
+      <h2>${escapeHTML(name)}</h2><p class="muted">Select price:</p>
       <div style="display:grid;gap:8px;margin-top:8px">
-        ${(prices||[]).map((p,i)=>`<button class="secondary-button" style="font-size:16px;min-height:48px" data-pick-price="${i}">${p.name ? `${p.name} — ${money(p.price)}` : money(p.price)}</button>`).join('')}
+        ${(prices||[]).map((p,i)=>`<button class="secondary-button" style="font-size:16px;min-height:48px" data-pick-price="${i}">${p.name ? `${escapeHTML(p.name)} — ${moneyHTML(p.price)}` : moneyHTML(p.price)}</button>`).join('')}
       </div>
       <div class="modal-actions"><button class="secondary-button" data-close>Cancel</button></div>
     </div></div>`
@@ -1513,7 +1514,7 @@ function attachEvents() {
         const div = document.createElement('div')
         div.id = 'change-display'
         div.style.cssText = `display:flex;justify-content:space-between;padding:9px 12px;border-radius:8px;font-weight:600;font-size:15px;margin-top:4px;background:${change>=0?'color-mix(in srgb,#22c55e 12%,var(--surface))':'color-mix(in srgb,#ef4444 12%,var(--surface))'}`
-        div.innerHTML = `<span>${change>=0?'Change Due':'Short by'}</span><span style="color:${change>=0?'#22c55e':'#ef4444'}">${money(Math.abs(change))}</span>`
+        div.innerHTML = `<span>${change>=0?'Change Due':'Short by'}</span><span style="color:${change>=0?'#22c55e':'#ef4444'}">${moneyHTML(Math.abs(change))}</span>`
         t.parentNode.insertBefore(div, t.nextSibling)
       }
     }

@@ -1,3 +1,4 @@
+import { escapeHTML } from "../../html.js"
 /* ═══════════════════════════════════════════════════════════════════
    features/ems/index.js
    The genuinely shared slice of EMS -- verified by actual caller, not
@@ -102,14 +103,14 @@ function renderClockInScreen(sess, isReturn) {
             ${isReturn ? '👋' : '🕐'}
           </div>
           <h2 style="margin:0 0 6px">
-            ${isReturn ? 'Welcome Back' : `Good ${_greeting()}, ${sess.employee.name.split(' ')[0]}!`}
+            ${isReturn ? 'Welcome Back' : `Good ${_greeting()}, ${escapeHTML(sess.employee.name.split(' ')[0])}!`}
           </h2>
-          <p class="muted" style="font-size:13px">${date}</p>
+          <p class="muted" style="font-size:13px">${escapeHTML(date)}</p>
         </div>
 
         <div style="background:var(--surface-2);border-radius:12px;padding:20px">
           <div style="font-size:36px;font-weight:700;font-variant-numeric:tabular-nums"
-            id="live-clock">${time}</div>
+            id="live-clock">${escapeHTML(time)}</div>
           <p class="muted" style="font-size:13px;margin-top:4px">Current Time</p>
         </div>
 
@@ -126,7 +127,7 @@ function renderClockInScreen(sess, isReturn) {
         </button>
 
         <p class="muted" style="font-size:12px">
-          ${sess.employee.role} · ${CFG.shop_name || 'RetailOS'}
+          ${escapeHTML(sess.employee.role)} · ${escapeHTML(CFG.shop_name || 'RetailOS')}
         </p>
       </div>
     </div>`
@@ -171,7 +172,7 @@ function renderBreakGate(sess, record) {
           <h2 style="margin:0 0 6px">You're Clocked In</h2>
           <p class="muted" style="font-size:13px">
             Since ${clockedInAt.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}
-            · ${elapsedStr} on shift
+            · ${escapeHTML(elapsedStr)} on shift
           </p>
         </div>
 

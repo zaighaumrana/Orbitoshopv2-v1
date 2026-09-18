@@ -45,7 +45,7 @@ export async function insertNewTicketFromCart(ticketItem) {
   })
 
   if (error) { dlog('pos.repairs.insertNewTicketFromCart', `FAILED: ${error.message}`); return { ok: false, error: error.message } }
-  await logBillEvent()
+  logBillEvent(result)
   dlog('pos.repairs.insertNewTicketFromCart', `SUCCEEDED ticket_number=${result.ticket.ticket_number} id=${result.ticket.id} replay=${result.idempotentReplay}`)
   return { ok: true, data: result.ticket, financial: result }
 }
@@ -69,7 +69,7 @@ export async function collectTicketPayment(ticket, payAmount, payMethod, request
     }],
   })
   if (error) { dlog('pos.repairs.collectTicketPayment', `FAILED: ${error.message}`); return { ok: false, error: error.message } }
-  await logBillEvent()
+  logBillEvent(data)
   dlog('pos.repairs.collectTicketPayment', `SUCCEEDED replay=${data.idempotentReplay}`)
   return { ok: true, data }
 }

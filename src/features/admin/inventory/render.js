@@ -1,9 +1,10 @@
+import { escapeHTML } from "../../../html.js"
 /* ═══════════════════════════════════════════════════════════════════
    features/admin/inventory/render.js
    Admin-exclusive inventory management rendering -- verified by
    actual caller (only admin.js calls either of these).
 ═══════════════════════════════════════════════════════════════════ */
-import { state, money, fld, modalActions } from '../../../shared.js'
+import { state, money, moneyHTML, fld, modalActions } from '../../../shared.js'
 
 export function adminInventoryPage({ filter, tit }) {
   const items    = state.data.inventory || []
@@ -17,22 +18,22 @@ export function adminInventoryPage({ filter, tit }) {
     ${tit('Inventory','Stock levels, pricing, and alerts.',
       `<button class="primary-button" data-modal="inv-add">+ Add Item</button>`)}
     ${lowStock.length ? `<div style="background:color-mix(in srgb,var(--warning) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--warning) 30%,var(--border));border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px">
-      ⚠ ${lowStock.length} item${lowStock.length>1?'s':''} low: ${lowStock.map(i=>`<strong>${i.name}</strong> (${i.qty} left)`).join(', ')}
+      ⚠ ${lowStock.length} item${lowStock.length>1?'s':''} low: ${lowStock.map(i=>`<strong>${escapeHTML(i.name)}</strong> (${i.qty} left)`).join(', ')}
     </div>` : ''}
     <div class="card">
       <input class="search" placeholder="Search inventory…" data-filter
-        value="${filter||''}" style="width:100%;margin-bottom:10px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text)">
+        value="${escapeHTML(filter||'')}" style="width:100%;margin-bottom:10px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text)">
       ${filtered.length ? `
         <div class="table-wrap"><table>
           <thead><tr><th>Name</th><th>SKU</th><th>Category</th><th>Qty</th><th>Sell</th><th>Cost</th><th></th></tr></thead>
           <tbody>
             ${filtered.map(i => `<tr>
-              <td><strong>${i.name}</strong></td>
-              <td class="muted">${i.sku||'—'}</td>
-              <td>${i.category||'—'}</td>
+              <td><strong>${escapeHTML(i.name)}</strong></td>
+              <td class="muted">${escapeHTML(i.sku||'—')}</td>
+              <td>${escapeHTML(i.category||'—')}</td>
               <td><span class="badge ${Number(i.qty||0)<=Number(i.min_qty||0)&&Number(i.min_qty||0)>0?'bad':'good'}">${i.qty}</span></td>
-              <td>${money(i.price)}</td>
-              <td class="muted">${money(i.cost)}</td>
+              <td>${moneyHTML(i.price)}</td>
+              <td class="muted">${moneyHTML(i.cost)}</td>
               <td>
                 <button class="secondary-button" style="font-size:12px;padding:4px 10px" data-inv-edit="${i.id}">Edit</button>
                 <button class="secondary-button" style="font-size:12px;padding:4px 10px" data-inv-adjust="${i.id}">Adjust Stock</button>
@@ -78,7 +79,7 @@ export function inventoryModalHTML(type, id) {
     const item = (state.data.inventory||[]).find(p => String(p.id) === String(id))
     if (!item) return `<div class="modal-backdrop"><div class="modal"><p>Not found.</p><div class="modal-actions"><button class="secondary-button" data-close>Close</button></div></div></div>`
     return `<div class="modal-backdrop"><form class="modal" data-form="inv-adjust" style="max-width:500px">
-      <h2>Adjust Stock — ${item.name}</h2>
+      <h2>Adjust Stock — ${escapeHTML(item.name)}</h2>
       <p class="muted">Current sellable quantity: <strong>${item.qty}</strong></p>
       <input type="hidden" name="id" value="${item.id}">
       <div class="form-grid">

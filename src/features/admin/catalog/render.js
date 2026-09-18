@@ -1,3 +1,4 @@
+import { escapeHTML } from "../../../html.js"
 /* ═══════════════════════════════════════════════════════════════════
    features/admin/catalog/render.js
    Admin-exclusive catalog management -- verified by actual caller
@@ -18,7 +19,7 @@
    from admin.js -- same pattern as adminInventoryPage({filter, tit})
    and reportsPage({tit}).
 ═══════════════════════════════════════════════════════════════════ */
-import { state, money, fld, modalActions } from '../../../shared.js'
+import { state, money, moneyHTML, fld, modalActions } from '../../../shared.js'
 
 export function catalogPage({ tit, adminState, isAllowed }) {
   if (!isAllowed)
@@ -44,7 +45,7 @@ export function catalogTabContent(adminState) {
           ${comps.map((c) => `
             <div style="display:flex;align-items:center;gap:6px;background:var(--surface-2);
                         border:1px solid var(--border);border-radius:8px;padding:6px 10px">
-              <span style="font-size:13px">${c.name}</span>
+              <span style="font-size:13px">${escapeHTML(c.name)}</span>
               <button type="button" data-remove-quick="${c.id}"
                 style="color:var(--danger);background:none;border:none;
                        font-size:16px;line-height:1;padding:0 2px;cursor:pointer">×</button>
@@ -65,7 +66,7 @@ export function catalogTabContent(adminState) {
         ${items.map((item,i) => `
           <div style="padding:12px;background:var(--surface-2);border-radius:8px;display:grid;gap:8px">
             <div style="display:flex;justify-content:space-between;align-items:center">
-              <strong>${item.name}</strong>
+              <strong>${escapeHTML(item.name)}</strong>
               <button type="button" data-remove-qitem="${i}"
                 style="color:var(--danger);background:none;border:none;font-size:18px;cursor:pointer">×</button>
             </div>
@@ -74,7 +75,7 @@ export function catalogTabContent(adminState) {
                 const pv = (typeof p === 'object' && p !== null) ? p : { name:'', price:p }
                 return `
                 <span style="display:inline-flex;align-items:center;gap:4px;margin-right:6px">
-                  ${pv.name ? `<strong>${pv.name}</strong>:` : ''} ${money(pv.price)}
+                  ${pv.name ? `<strong>${escapeHTML(pv.name)}</strong>:` : ''} ${moneyHTML(pv.price)}
                   <button type="button" data-remove-qprice="${i}-${pi}"
                     style="color:var(--danger);background:none;border:none;font-size:14px;cursor:pointer;padding:0">×</button>
                 </span>`

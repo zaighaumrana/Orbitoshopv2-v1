@@ -1,3 +1,4 @@
+import { escapeHTML } from "../../html.js"
 /* ═══════════════════════════════════════════════════════════════════
    admin/pages/reports.js
    Admin-only analytics page. Financial values come from the canonical
@@ -13,7 +14,7 @@
    view-level helper being imported by a page module would invert the
    intended dependency direction.
 ═══════════════════════════════════════════════════════════════════ */
-import { state, money } from '../../shared.js'
+import { state, money, moneyHTML } from '../../shared.js'
 
 export function reportsPage({ tit }) {
   const sales   = state.data.sales   || []
@@ -33,7 +34,7 @@ export function reportsPage({ tit }) {
         ['Udhar Outstanding', metric('udharOutstanding')],
       ].map(([l,v]) => `
         <div class="card kpi"><span class="label">${l}</span>
-          <span class="value">${money(v)}</span>
+          <span class="value">${moneyHTML(v)}</span>
         </div>`).join('')}
     </div>
     <div class="grid two-col">
@@ -41,18 +42,18 @@ export function reportsPage({ tit }) {
         <h2>Actual Payments by Method</h2>
         <div class="list">
           ${methods.length ? methods.map(row => `
-            <div class="list-row"><span>${row.method} <small class="muted">(${row.count})</small></span><strong>${money(row.amount)}</strong></div>
+            <div class="list-row"><span>${escapeHTML(row.method)} <small class="muted">(${row.count})</small></span><strong>${moneyHTML(row.amount)}</strong></div>
           `).join('') : '<div class="empty">No payment events.</div>'}
         </div>
       </div>
       <div class="card">
         <h2>Financial Detail</h2>
         <div class="list">
-          <div class="list-row"><span>Retail invoiced</span><strong>${money(metric('retailInvoiced'))}</strong></div>
-          <div class="list-row"><span>Repair invoiced</span><strong>${money(metric('repairInvoiced'))}</strong></div>
-          <div class="list-row"><span>Retail return reductions</span><strong>-${money(metric('retailReturnReductions'))}</strong></div>
-          <div class="list-row"><span>Repair adjustments</span><strong>${money(metric('repairAdjustments'))}</strong></div>
-          <div class="list-row"><span>Inventory gross profit</span><strong>${costCoverage > 0 ? money(metric('inventoryGrossProfit')) : 'Not available'}</strong></div>
+          <div class="list-row"><span>Retail invoiced</span><strong>${moneyHTML(metric('retailInvoiced'))}</strong></div>
+          <div class="list-row"><span>Repair invoiced</span><strong>${moneyHTML(metric('repairInvoiced'))}</strong></div>
+          <div class="list-row"><span>Retail return reductions</span><strong>-${moneyHTML(metric('retailReturnReductions'))}</strong></div>
+          <div class="list-row"><span>Repair adjustments</span><strong>${moneyHTML(metric('repairAdjustments'))}</strong></div>
+          <div class="list-row"><span>Inventory gross profit</span><strong>${costCoverage > 0 ? moneyHTML(metric('inventoryGrossProfit')) : 'Not available'}</strong></div>
           <small class="muted">Inventory gross profit is shown only for tracked lines with a captured cost; it is not total business net profit.</small>
         </div>
       </div>
@@ -64,10 +65,10 @@ export function reportsPage({ tit }) {
         <tbody>
           ${sales.slice(0,15).map(s => `<tr>
             <td>${s.invoice_number||`INV-${s.id}`}</td>
-            <td>${s.customer_name||'Walk-in'}</td>
+            <td>${escapeHTML(s.customer_name||'Walk-in')}</td>
             <td>${(s.items_sold||[]).length} item(s)</td>
-            <td>${s.payment_method}</td>
-            <td>${money(s.total_bill)}</td>
+            <td>${escapeHTML(s.payment_method)}</td>
+            <td>${moneyHTML(s.total_bill)}</td>
             <td>${new Date(s.created_at).toLocaleDateString()}</td>
             <td><button class="secondary-button" style="font-size:12px"
               data-action="reprint-receipt" data-sale-id="${s.id}">Reprint</button></td>

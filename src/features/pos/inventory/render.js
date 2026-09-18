@@ -1,3 +1,4 @@
+import { escapeHTML } from "../../../html.js"
 /* ═══════════════════════════════════════════════════════════════════
    features/pos/inventory/render.js
    POS-exclusive inventory browsing -- verified by actual caller (only
@@ -10,7 +11,7 @@
    parameterized (posState passed in, not reached into globally) from
    before this split.
 ═══════════════════════════════════════════════════════════════════ */
-import { state, money } from '../../../shared.js'
+import { state, money, moneyHTML } from '../../../shared.js'
 
 export function inventoryPanel(posState) {
   const invItems = (state.data.inventory||[]).filter(i=>Number(i.qty||0)>0)
@@ -20,14 +21,14 @@ export function inventoryPanel(posState) {
   return `
     <div class="card">
       <h2 style="margin-bottom:10px">Stock Items</h2>
-      <input placeholder="Search stock…" value="${posState.invSearch||''}" data-inv-search
+      <input placeholder="Search stock…" value="${escapeHTML(posState.invSearch||'')}" data-inv-search
         style="width:100%;margin-bottom:10px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);font-size:14px">
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         ${filtered.slice(0,24).map(i=>`
           <button class="secondary-button" style="font-size:13px;padding:8px 14px;border-radius:8px;text-align:left"
-            data-inv-pos-add="${i.id}" data-inv-pos-name="${i.name}" data-inv-pos-price="${i.price}">
-            <div style="font-weight:600">${i.name}</div>
-            <div style="font-size:11px;color:var(--muted)">${money(i.price)} · ${i.qty} left</div>
+            data-inv-pos-add="${i.id}" data-inv-pos-name="${escapeHTML(i.name)}" data-inv-pos-price="${i.price}">
+            <div style="font-weight:600">${escapeHTML(i.name)}</div>
+            <div style="font-size:11px;color:var(--muted)">${moneyHTML(i.price)} · ${i.qty} left</div>
           </button>`).join('')}
       </div>
     </div>`

@@ -1,0 +1,27 @@
+<!doctype html><meta charset="utf-8"><title>Phase 4 public tracker checks</title>
+<h1>Phase 4 public tracker checks</h1><p>Actual tracker page with fixture transport. No live Supabase calls.</p>
+<button id="run">Run tracker payload checks</button><pre id="results"></pre>
+<script type="module">
+document.querySelector('#run').onclick=async()=>{
+ document.querySelector('#run').disabled=true
+ const attack='\"><img src=x onerror="window.fixtureXss=true">'
+ const ticket={status:'In Progress',customer_name:attack,device_brand:attack,device_model:attack,invoice_number:attack,created_at:'2026-09-18',components_noted:[{name:attack,tag:attack,customText:attack}]}
+ let source=await (await fetch('/track.html')).text()
+ // Keep the real tracker render code; replace only its external transport and startup.
+ source=source.replace("from './ui-text.js'","from '/ui-text.js'")
+ source=source.replace(/import \{ createClient \} from '[^']+'/,'const createClient=()=>({rpc:async()=>({data:{shop_name:"Fixture shop",live_tracking_enabled:true}})}); window.fetch=async()=>{throw Error("Live transport forbidden in fixture")}')
+ source=source.replace(/  loadBranding\(\)\r?\n/,`  await loadBranding(); renderResult(${JSON.stringify(ticket)}); parent.postMessage('phase4-tracker-ready',parent.location.origin)\n`)
+ const frame=document.createElement('iframe')
+ window.addEventListener('message',function done(event){
+  if(event.source!==frame.contentWindow||event.data!=='phase4-tracker-ready')return
+  window.removeEventListener('message',done)
+  const doc=frame.contentDocument, lines=[]
+  const check=(name,pass)=>lines.push((pass?'PASS':'FAIL')+' '+name)
+  check('Customer/device/invoice payloads remain literal text', ['res-customer','res-device','res-ticket-num'].every(id=>doc.getElementById(id).textContent.includes(attack)))
+  check('Component name/tag/custom text cannot create injected elements',!doc.querySelector('#res-comps img')&&doc.getElementById('res-comps').textContent.includes(attack))
+  check('No injected payload executed',!frame.contentWindow.fixtureXss)
+  document.querySelector('#results').textContent=lines.join('\n')+'\nDONE'
+ })
+ frame.srcdoc=source;document.body.append(frame)
+}
+</script>

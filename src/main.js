@@ -59,7 +59,7 @@ function setupRoutes(session) {
     initWorkshop(session)
   })
 
-  const adminModules = ['dashboard','repairs','inventory','reports','employees','receipts','ems','settings','catalog']
+  const adminModules = ['dashboard','repairs','inventory','reports','employees','receipts','ems','settings','catalog','billing-usage']
   adminModules.forEach(mod => {
     registerRoute(`/admin/${mod}`, async (_params, query) => {
       // Reject before loading the Admin bundle or issuing any module queries.

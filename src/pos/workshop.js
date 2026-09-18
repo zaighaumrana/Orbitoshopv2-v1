@@ -1,4 +1,4 @@
-import { escapeHTML } from '../html.js'
+import { escapeHTML, safeImageURL } from '../html.js'
 import { createSubInvoiceModalHTML, rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 /* ═══════════════════════════════════════════════════════════════════
    RetailOS — workshop.js
@@ -13,7 +13,7 @@ import {
 
 import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
-  _clearSession, money, fld, modalActions,
+  _clearSession, money, moneyHTML, fld, modalActions,
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   myAccountModalHTML, handleChangePasswordSubmit,
   showTransactionSuccess, showBlockingError, showToast, confirmAction, runInstallPrompt,
@@ -86,19 +86,19 @@ function render() {
           <div class="brand top-brand">
             <div class="logo">
               ${tenant.logo
-                ? `<img alt="" src="${tenant.logo}">`
-                : tenant.name.slice(0,2).toUpperCase()}
+                ? `<img alt="" src="${escapeHTML(safeImageURL(tenant.logo))}">`
+                : escapeHTML(tenant.name.slice(0,2).toUpperCase())}
             </div>
             <div>
-              <strong>${tenant.name}</strong>
+              <strong>${escapeHTML(tenant.name)}</strong>
               <span class="muted" style="font-size:12px">
-                ${state.role} · Workshop
+                ${escapeHTML(state.role)} · Workshop
               </span>
             </div>
           </div>
           <div class="top-actions">
             <span class="chip">
-              <strong style="font-size:12px">${SESSION.employee.name}</strong>
+              <strong style="font-size:12px">${escapeHTML(SESSION.employee.name)}</strong>
             </span>
             <span class="chip">
               <i class="dot ${state.online ? '' : 'offline'}"></i>
@@ -192,7 +192,7 @@ function workshopView() {
 
       <!-- Search -->
       <input class="search" placeholder="Search name, phone, device, IMEI, ticket #…"
-        data-ws-filter value="${wsState.filter}"
+        data-ws-filter value="${escapeHTML(wsState.filter)}"
         style="font-size:14px;padding:10px 14px">
 
       <!-- Ticket Cards -->
@@ -203,21 +203,21 @@ function workshopView() {
           <div style="display:flex;justify-content:space-between;
                       align-items:start;gap:12px">
             <div style="display:grid;gap:3px">
-              <strong style="font-size:16px">${t.customer_name}</strong>
+              <strong style="font-size:16px">${escapeHTML(t.customer_name)}</strong>
               <span class="muted" style="font-size:12px">
-                ${t.invoice_number || t.ticket_number}
-                ${t.customer_phone ? '· ' + t.customer_phone : ''}
+                ${escapeHTML(t.invoice_number || t.ticket_number)}
+                ${t.customer_phone ? '· ' + escapeHTML(t.customer_phone) : ''}
                 ${t._matchedChild ? `<br><span style="color:var(--primary)">Matched: ${t._matchedChild.invoice_number || t._matchedChild.ticket_number}</span>` : ''}
               </span>
             </div>
             <span class="badge ${statusColors[t.status] || 'warn'}"
-              style="flex-shrink:0;font-size:12px">${t.status}</span>
+              style="flex-shrink:0;font-size:12px">${escapeHTML(t.status)}</span>
           </div>
 
           <!-- Device info -->
           <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px">
-            <span>📱 <strong>${t.device_brand} ${t.device_model}</strong></span>
-            ${t.imei ? `<span class="muted">IMEI: ${t.imei}</span>` : ''}
+            <span>📱 <strong>${escapeHTML(t.device_brand)} ${escapeHTML(t.device_model)}</strong></span>
+            ${t.imei ? `<span class="muted">IMEI: ${escapeHTML(t.imei)}</span>` : ''}
           </div>
 
           <!-- Components -->
@@ -231,12 +231,12 @@ function workshopView() {
                   <span>
                     <strong>${escapeHTML(c.name)}</strong>
                     <span class="badge warn" style="font-size:11px;margin-left:6px">
-                      ${c.tag || c.condition || ''}${c.removed ? ' · Not needed' : ''}
+                      ${escapeHTML(c.tag || c.condition || '')}${c.removed ? ' · Not needed' : ''}
                     </span>
-                    ${c.customText ? `<span class="muted" style="font-size:12px"> — ${c.customText}</span>` : ''}
+                    ${c.customText ? `<span class="muted" style="font-size:12px"> — ${escapeHTML(c.customText)}</span>` : ''}
                   </span>
                   <span style="color:var(--muted)">
-                    ${Number(c.price||0) > 0 ? money(c.price) : 'Not priced'}
+                    ${Number(c.price||0) > 0 ? moneyHTML(c.price) : 'Not priced'}
                   </span>
                 </div>`).join('')}
               ${work.hasLabour ? '<small class="muted">Labour included</small>' : ''}
@@ -248,9 +248,9 @@ function workshopView() {
           <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:13px">
             ${SESSION.employee?.role === 'Technician' ? '<span class="muted">Financial summary unavailable for this role.</span>' :
               wsState.familySummaries.has(String(t.id)) ? `
-                <span>${wsState.familySummaries.get(String(t.id)).invoices?.length > 1 ? 'Family total billed' : 'Total billed'}: <strong>${money(wsState.familySummaries.get(String(t.id)).effectiveObligation)}</strong></span>
-                <span>Paid: <strong>${money(wsState.familySummaries.get(String(t.id)).netPayments)}</strong></span>
-                <span>Outstanding: <strong>${money(wsState.familySummaries.get(String(t.id)).outstanding)}</strong></span>` :
+                <span>${wsState.familySummaries.get(String(t.id)).invoices?.length > 1 ? 'Family total billed' : 'Total billed'}: <strong>${moneyHTML(wsState.familySummaries.get(String(t.id)).effectiveObligation)}</strong></span>
+                <span>Paid: <strong>${moneyHTML(wsState.familySummaries.get(String(t.id)).netPayments)}</strong></span>
+                <span>Outstanding: <strong>${moneyHTML(wsState.familySummaries.get(String(t.id)).outstanding)}</strong></span>` :
                 '<span class="muted">Financial summary unavailable. Reload to retry.</span>'}
           </div>
 
@@ -259,7 +259,7 @@ function workshopView() {
             <div style="background:color-mix(in srgb,var(--warning) 10%,var(--surface));
                         border-left:3px solid var(--warning);
                         padding:8px 12px;border-radius:0 8px 8px 0;font-size:13px">
-              <strong>Note:</strong> ${t.technician_note}
+              <strong>Note:</strong> ${escapeHTML(t.technician_note)}
             </div>` : ''}
 
           <!-- Action buttons -->
@@ -319,11 +319,11 @@ function renderModal() {
     return `
       <div class="modal-backdrop" data-no-backdrop-close>
         <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
-          <h2 style="margin-bottom:4px">${tk.customer_name}</h2>
+          <h2 style="margin-bottom:4px">${escapeHTML(tk.customer_name)}</h2>
           <p class="muted" style="font-size:13px;margin-bottom:16px">
-            ${tk.invoice_number || tk.ticket_number}
-            ${tk.invoice_number ? `<br><span style="font-size:11px">Ticket: ${tk.ticket_number}</span>` : ''}
-            · ${tk.device_brand} ${tk.device_model}
+            ${escapeHTML(tk.invoice_number || tk.ticket_number)}
+            ${tk.invoice_number ? `<br><span style="font-size:11px">Ticket: ${escapeHTML(tk.ticket_number)}</span>` : ''}
+            · ${escapeHTML(tk.device_brand)} ${escapeHTML(tk.device_model)}
           </p>
 
           <div style="display:grid;gap:8px;margin-bottom:14px">
@@ -333,11 +333,11 @@ function renderModal() {
                           ${c.removed?'opacity:.55':''}">
                 <div>
                   <span style="font-size:13px;${c.removed?'text-decoration:line-through':''}"><strong>${escapeHTML(c.name)}</strong></span>
-                  <span class="badge warn" style="font-size:11px;margin-left:6px">${c.tag || ''}</span>
-                  ${c.customText ? `<span class="muted" style="font-size:12px"> — ${c.customText}</span>` : ''}
-                  ${c.removed ? `<br><span class="muted" style="font-size:11px">Not needed: ${c.removedReason||''}</span>` : ''}
+                  <span class="badge warn" style="font-size:11px;margin-left:6px">${escapeHTML(c.tag || '')}</span>
+                  ${c.customText ? `<span class="muted" style="font-size:12px"> — ${escapeHTML(c.customText)}</span>` : ''}
+                  ${c.removed ? `<br><span class="muted" style="font-size:11px">Not needed: ${escapeHTML(c.removedReason||'')}</span>` : ''}
                 </div>
-                <span style="font-size:13px;min-width:70px;text-align:right">${Number(c.price)>0?money(c.price):'—'}</span>
+                <span style="font-size:13px;min-width:70px;text-align:right">${Number(c.price)>0?moneyHTML(c.price):'—'}</span>
                 ${!c.removed ? `<button type="button" class="secondary-button" style="font-size:11px;padding:4px 8px"
                   data-mark-not-needed="${i}">Not Needed</button>` : `<span></span>`}
               </div>`).join('') :
@@ -346,13 +346,13 @@ function renderModal() {
 
           <div style="display:flex;justify-content:space-between;padding:10px;background:var(--surface-2);
                       border-radius:8px;margin-bottom:8px;font-size:13px">
-            <span>Labour Fee (locked)</span><span>${money(tk.labour_cost||0)}</span>
+            <span>Labour Fee (locked)</span><span>${moneyHTML(tk.labour_cost||0)}</span>
           </div>
-          ${tk.technician_note ? `<p class="muted" style="font-size:12px;margin-bottom:12px">Note: ${tk.technician_note}</p>` : ''}
+          ${tk.technician_note ? `<p class="muted" style="font-size:12px;margin-bottom:12px">Note: ${escapeHTML(tk.technician_note)}</p>` : ''}
 
           <div style="display:flex;justify-content:space-between;font-weight:600;padding:10px;
                       background:var(--surface-2);border-radius:8px;margin-bottom:16px;font-size:15px">
-            <span>Original Total</span><span>${money(grandTotal)}</span>
+            <span>Original Total</span><span>${moneyHTML(grandTotal)}</span>
           </div>
 
           ${subs.length ? `
@@ -362,11 +362,11 @@ function renderModal() {
                 ${subs.map(s => `
                   <div style="display:flex;justify-content:space-between;font-size:12px;
                               padding:8px 10px;background:var(--surface-2);border-radius:6px">
-                    <span>${s.invoice_number}</span>
-                    <span>${money(s.estimated_quote)} · Bal: ${money(s.balance_due)}</span>
+                    <span>${escapeHTML(s.invoice_number)}</span>
+                    <span>${moneyHTML(s.estimated_quote)} · Bal: ${moneyHTML(s.balance_due)}</span>
                   </div>`).join('')}
               </div>
-              <p class="muted" style="font-size:12px;margin-top:6px">Combined outstanding balance: ${money(subsTotal)}</p>
+              <p class="muted" style="font-size:12px;margin-top:6px">Combined outstanding balance: ${moneyHTML(subsTotal)}</p>
             </div>` : ''}
 
           <div class="modal-actions">
@@ -403,7 +403,7 @@ function renderModal() {
     return `
       <div class="modal-backdrop" data-no-backdrop-close>
         <div class="modal modal-xs">
-          <h2>${compName}</h2>
+          <h2>${escapeHTML(compName)}</h2>
           <p class="muted" style="font-size:13px">What's the issue?</p>
           <div style="display:grid;gap:8px;margin-top:10px">
             <button type="button" class="secondary-button"

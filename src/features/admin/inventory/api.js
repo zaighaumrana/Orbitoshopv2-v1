@@ -45,7 +45,7 @@ export async function submitInvAdd(data) {
   const key = `create:${data.name}:${data.sku||''}`
   const requestId = pendingInventoryRequests.get(key) || crypto.randomUUID()
   pendingInventoryRequests.set(key,requestId)
-  const { error } = await sb.rpc('create_inventory_item', {
+  const { data: result, error } = await sb.rpc('create_inventory_item', {
     p_request_id:requestId, p_name:data.name, p_sku:data.sku||'',
     p_category:data.category||'General', p_price:Number(data.price||0),
     p_cost:Number(data.cost||0), p_initial_quantity:Number(data.qty||0),
@@ -53,7 +53,7 @@ export async function submitInvAdd(data) {
   })
   if (error) { dlog('admin.inventory.submitInvAdd', `FAILED: ${error.message}`); showBlockingError('Error: '+error.message); return { ok:false } }
   pendingInventoryRequests.delete(key)
-  await logInventoryEvent()
+  logInventoryEvent(result)
   dlog('admin.inventory.submitInvAdd', 'SUCCEEDED')
   return { ok:true }
 }

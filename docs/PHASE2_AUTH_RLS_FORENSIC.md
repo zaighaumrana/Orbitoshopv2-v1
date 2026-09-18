@@ -1,5 +1,12 @@
 # Phase 2 Auth/RLS Forensic Record
 
+> Phase 4 development note (2026-09-18): this document records the historical
+> deployed Phase 2 state. The uncommitted, **not remotely applied** Phase 4
+> security migration adds actor-backed PIN cooldowns and one-request approval
+> consumption, replacing reusable time-window checks. See
+> [Phase 4 work log](PHASE4_PLATFORM_BRIDGE_BILLING_PAPER.md) for staged code and
+> local-only test evidence; these changes do not alter this record's live claims.
+
 Date completed: 2026-09-04
 
 Supabase DEV project: `kxmovywgshyltwusghhj`

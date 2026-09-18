@@ -414,6 +414,7 @@
 </div>
 
 <script type="module">
+  import { escapeHTML, safeImageURL } from './ui-text.js'
   import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.2/+esm'
 
   /* ── Supabase — reads from the same client project ── */
@@ -452,7 +453,7 @@
             Online repair tracking is not enabled for this shop.
             Please contact us directly for updates.
           </p>
-          ${data.shop_phone ? `<a href="tel:${data.shop_phone}" style="color:#126c5b;font-weight:600">${data.shop_phone}</a>` : ''}
+          ${data.shop_phone ? `<a href="tel:${escapeHTML(data.shop_phone)}" style="color:#126c5b;font-weight:600">${escapeHTML(data.shop_phone)}</a>` : ''}
         </div>`
       return
     }
@@ -466,7 +467,7 @@
 
     if (data.shop_logo) {
       const img = document.createElement('img')
-      img.src = data.shop_logo
+      img.src = safeImageURL(data.shop_logo)
       img.className = 'shop-logo'
       img.alt = data.shop_name
       document.getElementById('shop-brand').prepend(img)
@@ -613,9 +614,9 @@
       document.getElementById('res-comps').innerHTML = comps.map(c => `
         <div class="component-row">
           <span>
-            <span class="comp-name">${c.name}</span>
-            <span class="comp-tag">${c.tag || c.condition || ''}</span>
-            ${c.customText ? `<span style="font-size:12px;color:var(--muted)"> — ${c.customText}</span>` : ''}
+            <span class="comp-name">${escapeHTML(c.name)}</span>
+            <span class="comp-tag">${escapeHTML(c.tag || c.condition || '')}</span>
+            ${c.customText ? `<span style="font-size:12px;color:var(--muted)"> — ${escapeHTML(c.customText)}</span>` : ''}
           </span>
         </div>`).join('')
     } else {

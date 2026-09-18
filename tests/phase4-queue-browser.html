@@ -1,0 +1,69 @@
+<!doctype html><meta charset="utf-8"><title>Phase 4 durable queue checks</title>
+<h1>Phase 4 durable queue checks</h1>
+<p>Isolated fixture identity. No network or printer calls. Reload is part of this test.</p>
+<button id="prepare">Prepare pending print and reload</button><pre id="results"></pre>
+<script type="module">
+import {installThermalMeter,queueThermalIntent,flushThermalQueue} from '/src/platform/thermal.js'
+const actor='phase4-queue-fixture', key='phase4-queue-reload', calls=[]
+const output=document.querySelector('#results')
+let offline=!sessionStorage.getItem(key), auth, reject=false
+const check=(name,ok)=>{output.textContent+=`${ok?'PASS':'FAIL'} ${name}\n`}
+const db=await new Promise((resolve,reject)=>{
+ const r=indexedDB.open('orbito-thermal-intents-v1',1)
+ r.onupgradeneeded=()=>r.result.createObjectStore('intents',{keyPath:'id'})
+ r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)
+})
+const operation=(mode,fn)=>new Promise((resolve,reject)=>{
+ const tx=db.transaction('intents',mode),r=fn(tx.objectStore('intents'))
+ tx.oncomplete=()=>resolve(r.result);tx.onerror=()=>reject(tx.error)
+})
+const rows=async()=>(await operation('readonly',s=>s.getAll())).filter(r=>r.actorId===actor)
+const until=async(fn)=>{for(let i=0;i<100;i++){if(await fn())return;await new Promise(r=>setTimeout(r,20))}throw Error('Fixture condition timed out')}
+installThermalMeter({auth:{onAuthStateChange(cb){auth=cb;cb('INITIAL_SESSION',{user:{id:actor}})}},async rpc(_name,args){
+ calls.push(args)
+ if(offline)return {error:{message:'Fixture outage'}}
+ if(reject&&args.p_intent.document_reference==='REJECT')return {error:{code:'22023'}}
+ return {data:{accepted:true}}
+}})
+document.querySelector('#prepare').onclick=async()=>{
+ try {
+  await queueThermalIntent({document_reference:'RELOAD'})
+  await until(async()=>calls.length>0&&(await rows()).length===1)
+  sessionStorage.setItem(key,(await rows())[0].id)
+  location.reload()
+ }catch(e){check(e.message,false)}
+}
+if(sessionStorage.getItem(key)){
+ document.querySelector('#prepare').disabled=true
+ try{
+  const id=sessionStorage.getItem(key)
+  await until(async()=>calls.some(c=>c.p_request_id===id)&&(await rows()).length===0)
+  check('Reload retries the exact durable request ID and removes only after acceptance',true)
+  reject=true
+  await queueThermalIntent({document_reference:'REJECT'})
+  await until(async()=>(await rows()).some(r=>r.deliveryState==='rejected'))
+  const rejected=(await rows())[0]
+  check('Invalid intent retained as rejected evidence',rejected.rejectionCode==='22023')
+  const before=calls.filter(c=>c.p_request_id===rejected.id).length
+  await queueThermalIntent({document_reference:'VALID'})
+  await until(()=>calls.some(c=>c.p_intent.document_reference==='VALID'))
+  await flushThermalQueue()
+  check('Rejected entry does not block a valid later intent',calls.some(c=>c.p_intent.document_reference==='VALID'))
+  check('Rejected entry is not retried indefinitely',calls.filter(c=>c.p_request_id===rejected.id).length===before)
+  offline=true
+  await queueThermalIntent({document_reference:'ACTOR'})
+  await until(async()=>(await rows()).length===2)
+  auth('SIGNED_IN',{user:{id:'phase4-other-fixture'}})
+  await new Promise(r=>setTimeout(r,100));const count=calls.length
+  offline=false;await flushThermalQueue()
+  check('A different actor cannot deliver the queued identity',calls.length===count&&(await rows()).length===2)
+  auth('SIGNED_IN',{user:{id:actor}})
+  await until(async()=>(await rows()).length===1)
+  check('Original actor resumes its pending intent',true)
+  // Only this test-owned rejected record is removed; no queue-wide clear/delete.
+  await operation('readwrite',s=>s.delete(rejected.id))
+  sessionStorage.removeItem(key)
+  output.textContent+='DONE\n'
+ }catch(e){check(e.stack,false)}
+}
+</script>
