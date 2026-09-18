@@ -107,7 +107,8 @@ export function installNumericInputValidation() {
   document.addEventListener('keydown', event => {
     const input = event.target
     if (!(input instanceof HTMLInputElement) || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return
-    if (event.key.length !== 1) return
+    // Synthetic keydown events may omit key; only character strings belong here.
+    if (typeof event.key !== 'string' || event.key.length !== 1) return
     const mode = validationMode(input)
     if (!mode || sanitizeNumericValue(event.key, mode) === event.key) return
     event.preventDefault()
