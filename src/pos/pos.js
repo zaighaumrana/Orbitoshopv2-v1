@@ -67,6 +67,7 @@ let SESSION = {}
 let _inv = null  // populated via dynamic import only when inventory_module_enabled
 let _eventsAttached = false
 let placingOrder = false
+let checkoutInFlight = false
 
 /* ── Load ── */
 async function load() {
@@ -302,7 +303,7 @@ function posView() {
         `}
 
         <button class="primary-button" data-action="${hasTicketInCart ? 'place-order' : 'checkout'}"
-          ${posState.cart.length?'':'disabled'}>
+          ${posState.cart.length && !checkoutInFlight?'':'disabled'}>
           ${hasTicketInCart ? 'Place Order' : 'Checkout & Receipt'}
         </button>
       </aside>
@@ -939,6 +940,7 @@ async function placeOrderOnce() {
 
 /* ── Standard checkout (retail items, no ticket in cart) ── */
 async function doCheckout() {
+  if (checkoutInFlight || !posState.cart.length) return
   const isSplit = posState.checkoutPayment === 'Split Payment'
   const isUdhar = posState.checkoutPayment === 'Udhar (Credit)' || (isSplit && Number(posState.splitCredit||0)>0)
   if (isSplit) {
@@ -966,6 +968,20 @@ async function doCheckout() {
 }
 
 async function _finalizeCheckout() {
+  // Hold through cart clearing and reload: the old checkout UI can still receive
+  // a second activation while the successful sale is being refreshed.
+  if (checkoutInFlight || !posState.cart.length) return
+  checkoutInFlight = true
+  try {
+    render()
+    await _finalizeCheckoutOnce()
+  } finally {
+    checkoutInFlight = false
+    if (window.location.pathname.startsWith('/pos')) render()
+  }
+}
+
+async function _finalizeCheckoutOnce() {
   dlog('POS._finalizeCheckout', 'ENTRY -- calling checkout.finalizeCheckout()')
   posState.checkoutRequestId ||= crypto.randomUUID()
   const res = await finalizeCheckout({
@@ -1347,6 +1363,7 @@ function attachEvents() {
 
     /* ── Standard Checkout ── */
     if (el.dataset.action === 'checkout') {
+      if (checkoutInFlight || !posState.cart.length || el.disabled || !el.isConnected) return
       const hasDiscount = posState.cart.some(i => i.discount > 0)
       if (hasDiscount && CFG.discount_pin_required) {
         openPinPrompt('discount', async (verified) => {
