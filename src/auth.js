@@ -1,3 +1,4 @@
+import { escapeHTML, safeImageURL } from "./html.js"
 import {
   state, CFG, _saveSession, _clearSession,
   loginViaEdgeFunction, establishLoginSession, applyBranding, currentTenant,
@@ -123,7 +124,7 @@ export function renderLogin(onSuccess) {
         <div style="text-align:center;display:grid;gap:8px">
           <div class="logo" style="margin:0 auto 8px;width:72px;height:72px;font-size:20px;overflow:hidden">
             ${CFG.shop_logo
-              ? `<img src="${CFG.shop_logo}" style="width:100%;height:100%;object-fit:contain;border-radius:inherit">`
+              ? `<img src="${escapeHTML(safeImageURL(CFG.shop_logo))}" style="width:100%;height:100%;object-fit:contain;border-radius:inherit">`
               : CFG.shop_name?.slice(0,2).toUpperCase() || 'FP'}
           </div>
           <div
@@ -135,7 +136,7 @@ export function renderLogin(onSuccess) {
           </div>
 
           <h2 id="login-title" style="margin:0">
-           ${CFG.shop_name || 'RetailOS'}
+           ${escapeHTML(CFG.shop_name || 'RetailOS')}
           </h2>
 
           <p
@@ -173,7 +174,7 @@ export function renderLogin(onSuccess) {
           </button>
         </div>
                 <p class="muted" style="text-align:center;font-size:12px;margin:0">
-          ${CFG.shop_address || ''}
+          ${escapeHTML(CFG.shop_address || '')}
         </p>
       </div>
 

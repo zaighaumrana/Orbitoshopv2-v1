@@ -13,7 +13,7 @@ import { escapeHTML } from '../../../html.js'
    repairComponents) stay as direct imports since that's shared,
    read-only app data, not UI state tied to one modal invocation.
 ═══════════════════════════════════════════════════════════════════ */
-import { state, money } from '../../../shared.js'
+import { state, money, moneyHTML } from '../../../shared.js'
 
 /** Admin's own "ticket created" confirmation -- shown after creating a
  *  repair ticket from... [context: currently unreachable in the admin
@@ -26,7 +26,7 @@ export function ticketCreatedModalHTML(modal) {
       <h2>Repair Ticket Created</h2>
       <div style="text-align:center;padding:12px 0">
         <div style="font-size:15px;font-weight:700">${modal.ticket.invoice_number || modal.ticket.ticket_number}</div>
-        <div class="muted" style="font-size:12px">Ticket: ${modal.ticket.ticket_number}</div>
+        <div class="muted" style="font-size:12px">Ticket: ${escapeHTML(modal.ticket.ticket_number)}</div>
       </div>
       <div class="modal-actions">
         <button class="secondary-button" data-close>Close</button>
@@ -44,7 +44,7 @@ export function ticketDetailModalHTML(id, modal) {
   </div></div>`
   if (modal.summaryStatus === 'error' || !modal.summary) return `<div class="modal-backdrop"><div class="modal modal-sm">
     <h2>Repair summary unavailable</h2>
-    <p class="muted">${modal.summaryError || 'Current repair details could not be loaded.'}</p>
+    <p class="muted">${escapeHTML(modal.summaryError || 'Current repair details could not be loaded.')}</p>
     <div class="modal-actions"><button class="secondary-button" data-close>Close</button><button class="primary-button" data-action="retry-ticket-detail" data-ticket-id="${id}">Retry</button></div>
   </div></div>`
 
@@ -60,35 +60,35 @@ export function ticketDetailModalHTML(id, modal) {
   const terminal = ['Delivered','Cancelled'].includes(status)
   const deliveredBy = root.deliveredByDisplayName || root.deliveredBy || ''
   const stateMessage = status === 'Delivered'
-    ? `<div class="terminal-state good"><strong>Delivery completed</strong><span>${root.deliveredAt ? new Date(root.deliveredAt).toLocaleString() : 'Delivered'}${deliveredBy ? ` · ${deliveredBy}` : ''}</span></div>`
+    ? `<div class="terminal-state good"><strong>Delivery completed</strong><span>${root.deliveredAt ? new Date(root.deliveredAt).toLocaleString() : 'Delivered'}${deliveredBy ? ` · ${escapeHTML(deliveredBy)}` : ''}</span></div>`
     : status === 'Cancelled'
-      ? `<div class="terminal-state bad"><strong>Repair cancelled</strong><span>${root.cancelledAt ? new Date(root.cancelledAt).toLocaleString() : ''}${root.cancellationReason ? `${root.cancelledAt ? ' · ' : ''}${root.cancellationReason}` : ''}</span></div>`
+      ? `<div class="terminal-state bad"><strong>Repair cancelled</strong><span>${root.cancelledAt ? new Date(root.cancelledAt).toLocaleString() : ''}${root.cancellationReason ? `${root.cancelledAt ? ' · ' : ''}${escapeHTML(root.cancellationReason)}` : ''}</span></div>`
       : status === 'Ready'
         ? `<div class="terminal-state good"><strong>Ready for collection</strong><span>Payment and delivery can be completed from POS.</span></div>`
         : `<p class="muted" style="font-size:12px">${status === 'In Progress' ? 'Repair work is in progress.' : 'Repair is waiting to be started.'}</p>`
 
   return `<div class="modal-backdrop"><div class="modal modal-md">
-    <h2>${root.ticketNumber || original.ticketNumber || 'Repair'} <span class="badge ${sc[status]||'warn'}" style="margin-left:8px">${status}</span></h2>
+    <h2>${escapeHTML(root.ticketNumber || original.ticketNumber || 'Repair')} <span class="badge ${sc[status]||'warn'}" style="margin-left:8px">${escapeHTML(status)}</span></h2>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:14px;margin-bottom:14px;padding:12px;background:var(--surface-2);border-radius:8px">
-      <div><span class="muted">Customer</span><br><strong>${root.customerName || '—'}</strong></div>
-      <div><span class="muted">Phone</span><br><strong>${root.customerPhone||'—'}</strong></div>
-      <div><span class="muted">Device</span><br><strong>${root.deviceBrand || ''} ${root.deviceModel || ''}</strong></div>
-      <div><span class="muted">IMEI</span><br><strong>${root.imei||'—'}</strong></div>
-      <div><span class="muted">Original invoice</span><br><strong>${money(original.amount||0)}</strong></div>
-      <div><span class="muted">Net paid</span><br><strong>${money(summary.netPayments||0)}</strong></div>
+      <div><span class="muted">Customer</span><br><strong>${escapeHTML(root.customerName || '—')}</strong></div>
+      <div><span class="muted">Phone</span><br><strong>${escapeHTML(root.customerPhone||'—')}</strong></div>
+      <div><span class="muted">Device</span><br><strong>${escapeHTML(root.deviceBrand || '')} ${escapeHTML(root.deviceModel || '')}</strong></div>
+      <div><span class="muted">IMEI</span><br><strong>${escapeHTML(root.imei||'—')}</strong></div>
+      <div><span class="muted">Original invoice</span><br><strong>${moneyHTML(original.amount||0)}</strong></div>
+      <div><span class="muted">Net paid</span><br><strong>${moneyHTML(summary.netPayments||0)}</strong></div>
     </div>
-    ${original.note ? `<div style="background:color-mix(in srgb,var(--warning) 10%,var(--surface));border-left:3px solid var(--warning);padding:10px 14px;border-radius:0 8px 8px 0;margin-bottom:12px;font-size:14px"><strong>Note:</strong> ${original.note}</div>` : ''}
+    ${original.note ? `<div style="background:color-mix(in srgb,var(--warning) 10%,var(--surface));border-left:3px solid var(--warning);padding:10px 14px;border-radius:0 8px 8px 0;margin-bottom:12px;font-size:14px"><strong>Note:</strong> ${escapeHTML(original.note)}</div>` : ''}
     ${components.length ? `
       <div style="display:grid;gap:6px;margin-bottom:12px">
         ${components.map((c,i) => `
           <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface-2);border-radius:8px;font-size:14px;${c.removed?'opacity:.55':''}">
             <span>
               <strong style="${c.removed?'text-decoration:line-through':''}">${escapeHTML(c.name)}</strong>
-              <span class="badge warn" style="font-size:11px">${c.tag||c.condition||''}</span>
-              ${c.removed ? `<br><span class="muted" style="font-size:11px">Not needed: ${c.removedReason||''}</span>` : ''}
+              <span class="badge warn" style="font-size:11px">${escapeHTML(c.tag||c.condition||'')}</span>
+              ${c.removed ? `<br><span class="muted" style="font-size:11px">Not needed: ${escapeHTML(c.removedReason||'')}</span>` : ''}
             </span>
             <span style="display:flex;align-items:center;gap:8px">
-              <span>${c.price>0 ? money(c.price) : '<span class="muted">Not priced</span>'}</span>
+              <span>${c.price>0 ? moneyHTML(c.price) : '<span class="muted">Not priced</span>'}</span>
               ${!c.removed && !terminal ? `<button type="button" class="secondary-button" style="font-size:11px;padding:4px 8px" data-mark-not-needed="${i}">Not Needed</button>` : ''}
             </span>
           </div>`).join('')}
@@ -99,19 +99,19 @@ export function ticketDetailModalHTML(id, modal) {
         <div style="display:grid;gap:6px;margin-top:6px">
           ${children.map(s => `
             <div style="display:flex;justify-content:space-between;font-size:12px;padding:8px 10px;background:var(--surface-2);border-radius:6px">
-              <span>${s.invoiceNumber || s.ticketNumber}</span><span>${money(s.amount)}</span>
+              <span>${escapeHTML(s.invoiceNumber || s.ticketNumber)}</span><span>${moneyHTML(s.amount)}</span>
             </div>`).join('')}
         </div>
       </div>` : ''}
     <div style="display:grid;gap:6px;margin-bottom:12px;padding:12px;background:var(--surface-2);border-radius:8px">
-      <div style="display:flex;justify-content:space-between"><span>Total billed</span><strong>${money(summary.effectiveObligation)}</strong></div>
-      <div style="display:flex;justify-content:space-between"><span>Payments received</span><strong>${money(summary.paymentsReceived)}</strong></div>
-      <div style="display:flex;justify-content:space-between"><span>Refunds</span><strong>${money(summary.refundsPaid)}</strong></div>
-      <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:6px"><span>Outstanding</span><strong>${money(summary.outstanding)}</strong></div>
-      ${summary.udharApproved ? `<div style="display:flex;justify-content:space-between"><span>Udhar approved</span><strong>${money(summary.udharOutstanding)}</strong></div>` : ''}
+      <div style="display:flex;justify-content:space-between"><span>Total billed</span><strong>${moneyHTML(summary.effectiveObligation)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Payments received</span><strong>${moneyHTML(summary.paymentsReceived)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Refunds</span><strong>${moneyHTML(summary.refundsPaid)}</strong></div>
+      <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:6px"><span>Outstanding</span><strong>${moneyHTML(summary.outstanding)}</strong></div>
+      ${summary.udharApproved ? `<div style="display:flex;justify-content:space-between"><span>Udhar approved</span><strong>${moneyHTML(summary.udharOutstanding)}</strong></div>` : ''}
     </div>
     ${(summary.proposals||[]).length ? `<div style="margin-bottom:12px"><strong style="font-size:13px">Additional-work decisions</strong>
-        <div style="display:grid;gap:6px;margin-top:6px">${summary.proposals.map(p => `<div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:12px"><strong>${p.description}</strong> · ${money(p.quotedAmount)} <span class="badge ${p.decision==='Approved'?'good':p.decision==='Declined'?'bad':'warn'}">${p.decision}</span>${p.decisionMethod?`<br><span class="muted">${p.decisionMethod}${p.decisionNote?' · '+p.decisionNote:''}</span>`:''}${p.decision==='Pending'?`<div style="display:flex;gap:6px;margin-top:6px"><button class="secondary-button" data-action="decide-additional-work" data-proposal-id="${p.id}" data-decision="Approved">Approve</button><button class="secondary-button" data-action="decide-additional-work" data-proposal-id="${p.id}" data-decision="Declined">Decline</button></div>`:''}</div>`).join('')}</div>
+        <div style="display:grid;gap:6px;margin-top:6px">${summary.proposals.map(p => `<div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:12px"><strong>${escapeHTML(p.description)}</strong> · ${moneyHTML(p.quotedAmount)} <span class="badge ${p.decision==='Approved'?'good':p.decision==='Declined'?'bad':'warn'}">${escapeHTML(p.decision)}</span>${p.decisionMethod?`<br><span class="muted">${escapeHTML(p.decisionMethod)}${p.decisionNote?' · '+escapeHTML(p.decisionNote):''}</span>`:''}${p.decision==='Pending'?`<div style="display:flex;gap:6px;margin-top:6px"><button class="secondary-button" data-action="decide-additional-work" data-proposal-id="${p.id}" data-decision="Approved">Approve</button><button class="secondary-button" data-action="decide-additional-work" data-proposal-id="${p.id}" data-decision="Declined">Decline</button></div>`:''}</div>`).join('')}</div>
       </div>` : ''}
     ${stateMessage}
     ${!terminal ? `<div style="border-top:1px solid var(--border);padding-top:12px">
@@ -122,7 +122,7 @@ export function ticketDetailModalHTML(id, modal) {
         </select>
       </div>
       <textarea id="td-note" placeholder="Add a note…"
-        style="width:100%;margin-top:8px;min-height:60px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);box-sizing:border-box">${cachedRoot?.update_note || ''}</textarea>
+        style="width:100%;margin-top:8px;min-height:60px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);box-sizing:border-box">${escapeHTML(cachedRoot?.update_note || '')}</textarea>
     </div>` : ''}
     <div class="modal-actions">
       <button class="secondary-button" data-close>Close</button>
@@ -168,17 +168,17 @@ export function repairCancellationModalHTML(modal) {
   return `<div class="modal-backdrop" data-no-backdrop-close><div class="modal modal-sm">
     <h2>Cancel Repair</h2>
     <div style="display:grid;gap:6px;padding:12px;background:var(--surface-2);border-radius:8px;margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between"><span>Current billed</span><strong>${money(s.effectiveObligation)}</strong></div>
-      <div style="display:flex;justify-content:space-between"><span>Net paid</span><strong>${money(s.netPayments)}</strong></div>
-      <div style="display:flex;justify-content:space-between"><span>Current balance</span><strong>${money(s.outstanding)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Current billed</span><strong>${moneyHTML(s.effectiveObligation)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Net paid</span><strong>${moneyHTML(s.netPayments)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Current balance</span><strong>${moneyHTML(s.outstanding)}</strong></div>
     </div>
     <label class="field"><span>Refund amount (0 allowed)</span><input id="repair-cancel-refund" data-repair-cancel-refund type="number" min="0" max="${paidAvailable}" step="any" value="0"></label>
     <label class="field"><span>Refund method</span><select id="repair-cancel-method">${['Cash','Raast','JazzCash','EasyPaisa','Bank Transfer'].map(x=>`<option>${x}</option>`).join('')}</select></label>
     <label class="field"><span>Reason</span><textarea id="repair-cancel-reason"></textarea></label>
     <div style="padding:10px;background:var(--surface-2);border-radius:8px;margin-top:10px">
-      <div style="display:flex;justify-content:space-between"><span>Customer receives</span><strong id="repair-cancel-customer">${money(0)}</strong></div>
-      <div style="display:flex;justify-content:space-between"><span>Shop retains</span><strong id="repair-cancel-retains">${money(paidAvailable)}</strong></div>
-      <div style="display:flex;justify-content:space-between"><span>Final obligation</span><strong id="repair-cancel-obligation">${money(paidAvailable)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Customer receives</span><strong id="repair-cancel-customer">${moneyHTML(0)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Shop retains</span><strong id="repair-cancel-retains">${moneyHTML(paidAvailable)}</strong></div>
+      <div style="display:flex;justify-content:space-between"><span>Final obligation</span><strong id="repair-cancel-obligation">${moneyHTML(paidAvailable)}</strong></div>
     </div>
     <div class="modal-actions"><button class="secondary-button" data-close>Close</button><button class="primary-button" style="background:var(--danger)" data-action="submit-repair-cancellation" data-ticket-id="${modal.rootId}">Cancel (PIN required)</button></div>
   </div></div>`

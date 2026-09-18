@@ -1,4 +1,4 @@
-import { escapeHTML } from '../../../html.js'
+import { escapeHTML, safeImageURL } from '../../../html.js'
 /* ═══════════════════════════════════════════════════════════════════
    features/pos/repairs/render.js
    Pure, presentational rendering for repair tickets -- POS-exclusive,
@@ -14,7 +14,7 @@ import { escapeHTML } from '../../../html.js'
    reaching back into a view file, preserving the one-way
    views -> features -> shared dependency direction.
 ═══════════════════════════════════════════════════════════════════ */
-import { state, CFG, money, currentTenant } from '../../../shared.js'
+import { state, CFG, money, moneyHTML, currentTenant } from '../../../shared.js'
 import { getDraft, calcDraftTotal, calcDraftPaid } from './state.js'
 import { findRepairFamilies, matchedRepairChild } from '../../repairs/family.js'
 
@@ -34,11 +34,11 @@ export function repairRowHTML(t, family = null) {
   return `
     <div class="list-row" style="margin-bottom:6px">
       <div>
-        <strong>${t.customer_name}</strong>
-        <span class="badge warn" style="margin-left:6px">${t.status}</span><br>
-        <small class="muted">${t.invoice_number || t.ticket_number} · ${t.device_brand} ${t.device_model}</small>
-        ${matchedChild ? `<br><small style="color:var(--primary)">Matched additional invoice: ${matchedChild.invoice_number || matchedChild.ticket_number}</small>` : ''}
-        ${total > 0 ? `<br><small class="muted">${balanceLine}</small>` : ''}
+        <strong>${escapeHTML(t.customer_name)}</strong>
+        <span class="badge warn" style="margin-left:6px">${escapeHTML(t.status)}</span><br>
+        <small class="muted">${escapeHTML(t.invoice_number || t.ticket_number)} · ${escapeHTML(t.device_brand)} ${escapeHTML(t.device_model)}</small>
+        ${matchedChild ? `<br><small style="color:var(--primary)">Matched additional invoice: ${escapeHTML(matchedChild.invoice_number || matchedChild.ticket_number)}</small>` : ''}
+        ${total > 0 ? `<br><small class="muted">${escapeHTML(balanceLine)}</small>` : ''}
       </div>
       <div style="display:flex;gap:6px">
         ${!CFG.technician_module_enabled ? `
@@ -61,7 +61,7 @@ export function repairCollectionHTML(searchQuery = '') {
     <div class="modal modal-md" style="max-height:85vh;overflow-y:auto">
       <h2>Repair Collection</h2>
       <input class="search" placeholder="Search name, phone, device, IMEI, ticket #…"
-        data-repair-search value="${searchQuery}"
+        data-repair-search value="${escapeHTML(searchQuery)}"
         style="width:100%;margin:10px 0;font-size:14px">
       <p class="muted" style="font-size:12px;margin-bottom:10px">${pending.length} pending ticket${pending.length!==1?'s':''}</p>
       ${pending.length ? `<div style="display:grid;gap:8px">${pending.map(family => repairRowHTML(family.root, family)).join('')}</div>` :
@@ -78,8 +78,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
   const draft    = getDraft()
   // Draft fields round-trip through HTML on edit and component/payment changes.
   const dInfo = Object.fromEntries(Object.entries(formInfo || {}).map(([key, value]) => [
-    key, String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;'),
+    key, escapeHTML(value),
   ]))
   const total    = calcDraftTotal(draft)
   const paid     = calcDraftPaid(draft)
@@ -128,7 +127,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
               <div>
                 <strong style="font-size:13px">${escapeHTML(c.name)}</strong><br>
                 <span class="muted" style="font-size:12px">
-                  ${c.tag === 'Custom' ? (c.customText || '—') : c.tag}
+                  ${escapeHTML(c.tag === 'Custom' ? (c.customText || '—') : c.tag)}
                 </span>
               </div>
               <input type="number" step="any" min="0" placeholder="Price (optional)"
@@ -157,7 +156,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
         </div>` : `
         <div style="display:flex;justify-content:space-between;align-items:center;
                     padding:10px;background:var(--surface-2);border-radius:8px;margin-bottom:12px">
-          <span style="font-size:14px;font-weight:600">Quote Total: ${money(total)}</span>
+          <span style="font-size:14px;font-weight:600">Quote Total: ${moneyHTML(total)}</span>
           <button type="button" data-action="draft-set-override" title="Enter one price manually"
             style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 8px;
                    font-size:16px;cursor:pointer">✏️</button>
@@ -168,7 +167,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
         ${draft.payments.length ? draft.payments.map((p,i) => `
           <div style="display:flex;justify-content:space-between;align-items:center;
                       padding:6px 10px;background:var(--surface-2);border-radius:6px;margin-bottom:6px;font-size:13px">
-            <span>${money(p.amount)} · ${p.method}</span>
+            <span>${moneyHTML(p.amount)} · ${escapeHTML(p.method)}</span>
             <button type="button" data-draft-payment-remove="${i}"
               style="color:var(--danger);background:none;border:none;font-size:16px;cursor:pointer">×</button>
           </div>`).join('') : `<p class="muted" style="font-size:13px">No payment recorded yet.</p>`}
@@ -185,14 +184,14 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
 
       <div style="display:grid;gap:6px;padding:12px;background:var(--surface-2);border-radius:8px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;font-size:14px">
-          <span>Quote Total</span><strong data-draft-total>${money(total)}</strong>
+          <span>Quote Total</span><strong data-draft-total>${moneyHTML(total)}</strong>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:14px;color:var(--success)">
-          <span>Paid So Far</span><strong data-draft-paid>${money(paid)}</strong>
+          <span>Paid So Far</span><strong data-draft-paid>${moneyHTML(paid)}</strong>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;
                     border-top:1px solid var(--border);padding-top:6px">
-          <span>Remaining Balance</span><span data-draft-balance>${money(balance)}</span>
+          <span>Remaining Balance</span><span data-draft-balance>${moneyHTML(balance)}</span>
         </div>
       </div>
 
@@ -233,28 +232,28 @@ export function ticketSlipPreview(ticket) {
   const t = currentTenant()
   const comps = ticket.components_noted || []
   return `<div class="receipt-preview">
-    <center>${t.logo?`<img src="${t.logo}" style="max-width:120px;max-height:44px;object-fit:contain;margin-bottom:6px"><br>`:''}
-    <strong>${t.name}</strong><br>${t.address||''}<br>${t.phone||''}</center>
+    <center>${t.logo?`<img src="${escapeHTML(safeImageURL(t.logo))}" style="max-width:120px;max-height:44px;object-fit:contain;margin-bottom:6px"><br>`:''}
+    <strong>${escapeHTML(t.name)}</strong><br>${escapeHTML(t.address||'')}<br>${escapeHTML(t.phone||'')}</center>
     <hr>
-    <center><strong>REPAIR TICKET</strong><br>${ticket.invoice_number||ticket.ticket_number}<br><span style="font-size:11px;color:#888">Ticket: ${ticket.ticket_number}</span></center>
+    <center><strong>REPAIR TICKET</strong><br>${escapeHTML(ticket.invoice_number||ticket.ticket_number)}<br><span style="font-size:11px;color:#888">Ticket: ${escapeHTML(ticket.ticket_number)}</span></center>
     <hr>
-    Customer: ${ticket.customer_name}<br>
-    Phone: ${ticket.customer_phone}<br>
-    Device: ${ticket.device_brand} ${ticket.device_model}<br>
-    ${ticket.imei ? `IMEI: <small>${ticket.imei}</small><br>` : ''}
+    Customer: ${escapeHTML(ticket.customer_name)}<br>
+    Phone: ${escapeHTML(ticket.customer_phone)}<br>
+    Device: ${escapeHTML(ticket.device_brand)} ${escapeHTML(ticket.device_model)}<br>
+    ${ticket.imei ? `IMEI: <small>${escapeHTML(ticket.imei)}</small><br>` : ''}
     Date: ${new Date(ticket.created_at||Date.now()).toLocaleString()}
     <hr>
     <strong>Issues Noted:</strong><br>
     ${comps.length ? comps.map(c => {
       const label = c.tag === 'Custom' ? (c.customText || '') : (c.tag || '')
-      return `· ${escapeHTML(c.name)}${label?` (${label})`:''}${Number(c.price)>0?` — ${money(c.price)}`:''}`
+      return `· ${escapeHTML(c.name)}${label?` (${escapeHTML(label)})`:''}${Number(c.price)>0?` — ${moneyHTML(c.price)}`:''}`
     }).join('<br>') : 'No components noted.'}
     <hr>
-    ${ticket.technician_note ? `<strong>Technician Note:</strong><br>${ticket.technician_note}<hr>` : ''}
-    ${Number(ticket.labour_cost)>0 ? `Labour Fee: <strong>${money(ticket.labour_cost)}</strong><br>` : ''}
-    Estimated Quote: <strong>${money(ticket.estimated_quote)}</strong><br>
-    ${Number(ticket.advance_payment)>0 ? `Advance Paid: <strong>${money(ticket.advance_payment)}</strong>${ticket.advance_method?` (${ticket.advance_method})`:''}<br>` : ''}
+    ${ticket.technician_note ? `<strong>Technician Note:</strong><br>${escapeHTML(ticket.technician_note)}<hr>` : ''}
+    ${Number(ticket.labour_cost)>0 ? `Labour Fee: <strong>${moneyHTML(ticket.labour_cost)}</strong><br>` : ''}
+    Estimated Quote: <strong>${moneyHTML(ticket.estimated_quote)}</strong><br>
+    ${Number(ticket.advance_payment)>0 ? `Advance Paid: <strong>${moneyHTML(ticket.advance_payment)}</strong>${ticket.advance_method?` (${escapeHTML(ticket.advance_method)})`:''}<br>` : ''}
     <hr>
-    <center>${t.receiptFooter||''}</center>
+    <center>${escapeHTML(t.receiptFooter||'')}</center>
   </div>`
 }

@@ -105,7 +105,7 @@ export async function finalizeCheckout({
     changeGiven:  saleData.changeGiven || 0,
   }
 
-  await logBillEvent()
+  logBillEvent(saleData)
   dlog('checkout.finalizeCheckout', `SUCCEEDED receiptNo=${sale.receiptNo} replay=${saleData.idempotentReplay}`)
   return { ok: true, sale }
 }

@@ -1,3 +1,4 @@
+import { escapeHTML } from "../../../html.js"
 /* ═══════════════════════════════════════════════════════════════════
    features/admin/ems/index.js
    Admin-exclusive EMS dashboard -- attendance/leave/salary tabs,
@@ -21,7 +22,7 @@
    file's header comment for why).
 ═══════════════════════════════════════════════════════════════════ */
 import {
-  sb, state, CFG, money,
+  sb, state, CFG, money, moneyHTML,
   _clearSession, showBlockingError, showToast,
 } from '../../../shared.js'
 import { navigate } from '../../../router.js'
@@ -129,8 +130,8 @@ function liveBanner(liveNow) {
                         background:var(--surface);border-radius:8px;font-size:13px">
               <span style="width:8px;height:8px;background:var(--success);
                            border-radius:50%;flex-shrink:0"></span>
-              <strong>${r.employees?.name || '—'}</strong>
-              <span class="muted">${r.employees?.role || ''}</span>
+              <strong>${escapeHTML(r.employees?.name || '—')}</strong>
+              <span class="muted">${escapeHTML(r.employees?.role || '')}</span>
               <span class="muted">· ${dur}</span>
             </div>`
         }).join('')}
@@ -156,7 +157,7 @@ function attendanceTab(emsData) {
   return `
     <div style="display:grid;gap:12px">
       <input class="search" placeholder="Search employee…"
-        data-ems-attendance-filter value="${emsState.attendanceFilter}"
+        data-ems-attendance-filter value="${escapeHTML(emsState.attendanceFilter)}"
         style="max-width:300px">
 
       ${Object.keys(byDate).length === 0
@@ -185,11 +186,11 @@ function attendanceTab(emsData) {
                   ? `${Math.floor(durMin/60)}h ${durMin%60}m`
                   : '—'
                 return `<tr>
-                  <td><strong>${r.employees?.name || '—'}</strong></td>
-                  <td>${r.employees?.role || '—'}</td>
+                  <td><strong>${escapeHTML(r.employees?.name || '—')}</strong></td>
+                  <td>${escapeHTML(r.employees?.role || '—')}</td>
                   <td>${inTime.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</td>
                   <td>${outTime ? outTime.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '<span class="badge warn">Active</span>'}</td>
-                  <td>${durStr}</td>
+                  <td>${escapeHTML(durStr)}</td>
                   <td>${outTime ? '<span class="badge good">Complete</span>' : '<span class="badge warn">On Shift</span>'}</td>
                 </tr>`
               }).join('')}
@@ -229,15 +230,15 @@ function leavesTab(emsData) {
             <div class="card" style="display:grid;gap:10px">
               <div style="display:flex;justify-content:space-between;align-items:start;gap:12px">
                 <div>
-                  <strong>${emp.name || '—'}</strong>
-                  <span class="muted" style="font-size:12px;margin-left:6px">${emp.role || ''}</span><br>
+                  <strong>${escapeHTML(emp.name || '—')}</strong>
+                  <span class="muted" style="font-size:12px;margin-left:6px">${escapeHTML(emp.role || '')}</span><br>
                   <span class="muted" style="font-size:12px">
-                    ${l.leave_type} · ${from} → ${to} · ${days} day${days!==1?'s':''}
+                    ${escapeHTML(l.leave_type)} · ${escapeHTML(from)} → ${escapeHTML(to)} · ${days} day${days!==1?'s':''}
                   </span>
                 </div>
-                <span class="badge ${badge}">${l.status}</span>
+                <span class="badge ${badge}">${escapeHTML(l.status)}</span>
               </div>
-              ${l.reason ? `<p style="font-size:13px">${l.reason}</p>` : ''}
+              ${l.reason ? `<p style="font-size:13px">${escapeHTML(l.reason)}</p>` : ''}
               ${l.status === 'Pending' ? `
                 <div style="display:flex;gap:8px">
                   <button class="primary-button" style="font-size:12px;padding:6px 14px"
@@ -250,7 +251,7 @@ function leavesTab(emsData) {
                   </button>
                 </div>` : `
                 <p class="muted" style="font-size:12px">
-                  ${l.status} ${l.reviewed_at
+                  ${escapeHTML(l.status)} ${l.reviewed_at
                     ? '· ' + new Date(l.reviewed_at).toLocaleDateString() : ''}
                 </p>`}
             </div>`
@@ -275,8 +276,8 @@ function salaryTab(emsData) {
           <div class="card" style="display:grid;gap:12px">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <div>
-                <strong>${emp.name}</strong>
-                <span class="muted" style="font-size:12px;margin-left:6px">${emp.role}</span>
+                <strong>${escapeHTML(emp.name)}</strong>
+                <span class="muted" style="font-size:12px;margin-left:6px">${escapeHTML(emp.role)}</span>
               </div>
               ${config ? `<span class="badge good">Configured</span>` : `<span class="badge warn">Not set</span>`}
             </div>
@@ -324,7 +325,7 @@ function slipsTab(emsData) {
             <span style="font-size:12px">Employee</span>
             <select name="employee_id">
               ${employees.map(e =>
-                `<option value="${e.id}" ${emsState.selectedEmployee===e.id?'selected':''}>${e.name}</option>`
+                `<option value="${e.id}" ${emsState.selectedEmployee===e.id?'selected':''}>${escapeHTML(e.name)}</option>`
               ).join('')}
             </select>
           </label>
@@ -362,12 +363,12 @@ function slipsTab(emsData) {
             </tr></thead>
             <tbody>
               ${emsData.slips.map(s => `<tr>
-                <td><strong>${s.employees?.name || '—'}</strong></td>
+                <td><strong>${escapeHTML(s.employees?.name || '—')}</strong></td>
                 <td>${months[s.month-1]} ${s.year}</td>
                 <td>${s.days_present}</td>
                 <td>${s.leaves_approved}</td>
                 <td>${s.days_absent}</td>
-                <td><strong>${money(s.net_salary)}</strong></td>
+                <td><strong>${moneyHTML(s.net_salary)}</strong></td>
                 <td>
                   <button class="secondary-button" style="font-size:12px;padding:4px 10px"
                     data-print-slip="${s.id}">Print</button>
@@ -403,8 +404,8 @@ export async function generateSalarySlip(employeeId, month, year, generatedBy) {
   const { data: attendance } = await sb.from('attendance')
     .select('*')
     .eq('employee_id', employeeId)
-    .gte('date', `${monthStr}-01`)
-    .lte('date', `${monthStr}-${daysInMonth}`)
+    .gte('date', `${escapeHTML(monthStr)}-01`)
+    .lte('date', `${escapeHTML(monthStr)}-${daysInMonth}`)
 
   const daysPresent = (attendance || []).filter(r => r.clock_out).length
 
@@ -413,11 +414,11 @@ export async function generateSalarySlip(employeeId, month, year, generatedBy) {
     .select('*')
     .eq('employee_id', employeeId)
     .eq('status', 'Approved')
-    .or(`from_date.gte.${monthStr}-01,to_date.lte.${monthStr}-${daysInMonth}`)
+    .or(`from_date.gte.${escapeHTML(monthStr)}-01,to_date.lte.${escapeHTML(monthStr)}-${daysInMonth}`)
 
   const leaveDays = (leaves || []).reduce((total, l) => {
-    const from = new Date(Math.max(new Date(l.from_date), new Date(`${monthStr}-01`)))
-    const to   = new Date(Math.min(new Date(l.to_date),   new Date(`${monthStr}-${daysInMonth}`)))
+    const from = new Date(Math.max(new Date(l.from_date), new Date(`${escapeHTML(monthStr)}-01`)))
+    const to   = new Date(Math.min(new Date(l.to_date),   new Date(`${escapeHTML(monthStr)}-${daysInMonth}`)))
     return total + Math.max(0, Math.ceil((to - from) / 86400000) + 1)
   }, 0)
 
@@ -473,23 +474,23 @@ export function buildSalarySlipHTML(slip, employeeName, shopName) {
   const months = ['January','February','March','April','May','June',
     'July','August','September','October','November','December']
   return `
-    <div class="c b lg">${shopName || 'RetailOS'}</div>
+    <div class="c b lg">${escapeHTML(shopName || 'RetailOS')}</div>
     <div class="ln"></div>
     <div class="c b">SALARY SLIP</div>
     <div class="c">${months[slip.month-1]} ${slip.year}</div>
     <div class="ln"></div>
-    <div class="row"><span>Employee</span><span>${employeeName}</span></div>
-    <div class="row"><span>Salary Type</span><span>${slip.salary_type}</span></div>
-    <div class="row"><span>Rate</span><span>${money(slip.rate)}${slip.salary_type==='Daily'?' / day':' / month'}</span></div>
+    <div class="row"><span>Employee</span><span>${escapeHTML(employeeName)}</span></div>
+    <div class="row"><span>Salary Type</span><span>${escapeHTML(slip.salary_type)}</span></div>
+    <div class="row"><span>Rate</span><span>${moneyHTML(slip.rate)}${slip.salary_type==='Daily'?' / day':' / month'}</span></div>
     <div class="ln"></div>
     <div class="row"><span>Working Days</span><span>${slip.days_in_month}</span></div>
     <div class="row"><span>Days Present</span><span>${slip.days_present}</span></div>
     <div class="row"><span>Approved Leaves</span><span>${slip.leaves_approved}</span></div>
     <div class="row"><span>Days Absent</span><span>${slip.days_absent}</span></div>
     <div class="ln"></div>
-    <div class="row"><span>Gross Salary</span><span>${money(slip.gross_salary)}</span></div>
-    ${slip.deductions > 0 ? `<div class="row"><span>Deductions</span><span>${money(slip.deductions)}</span></div>` : ''}
-    <div class="row b lg"><span>NET SALARY</span><span>${money(slip.net_salary)}</span></div>
+    <div class="row"><span>Gross Salary</span><span>${moneyHTML(slip.gross_salary)}</span></div>
+    ${slip.deductions > 0 ? `<div class="row"><span>Deductions</span><span>${moneyHTML(slip.deductions)}</span></div>` : ''}
+    <div class="row b lg"><span>NET SALARY</span><span>${moneyHTML(slip.net_salary)}</span></div>
     <div class="ln"></div>
     <div class="c sm">Generated ${new Date(slip.generated_at).toLocaleDateString()}</div>`
 }

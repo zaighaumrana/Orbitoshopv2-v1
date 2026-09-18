@@ -1,3 +1,4 @@
+import { escapeHTML } from "../../../html.js"
 /* ═══════════════════════════════════════════════════════════════════
    features/admin/checkout/render.js
    Admin-exclusive sales/receipts browsing -- verified by actual caller
@@ -9,7 +10,7 @@
    tit/adminState from admin.js -- same pattern as
    adminInventoryPage({filter, tit}) and reportsPage({tit}).
 ═══════════════════════════════════════════════════════════════════ */
-import { state, money } from '../../../shared.js'
+import { state, money, moneyHTML } from '../../../shared.js'
 import { localDateTime } from '../../../datetime.js'
 import { buildReceiptRecords, filterReceiptRecords } from './receipts.js'
 
@@ -31,7 +32,7 @@ export function receiptsPage({ tit, adminState }) {
     ${tit('Receipts Archive','Retail receipts and repair invoices in one searchable archive.','')}
     <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;align-items:flex-end">
       <div style="flex:1;min-width:200px">
-        <input class="search" data-receipt-search value="${search}"
+        <input class="search" data-receipt-search value="${escapeHTML(search)}"
           placeholder="Search invoice, ticket, customer, phone, device…"
           style="width:100%">
       </div>
@@ -45,13 +46,13 @@ export function receiptsPage({ tit, adminState }) {
       </label>
       <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)">
         From
-        <input type="date" value="${dateFrom}" data-receipt-from
+        <input type="date" value="${escapeHTML(dateFrom)}" data-receipt-from
           style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;
                  background:var(--surface);color:var(--text);font-size:13px">
       </label>
       <label style="display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)">
         To
-        <input type="date" value="${dateTo}" data-receipt-to
+        <input type="date" value="${escapeHTML(dateTo)}" data-receipt-to
           style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;
                  background:var(--surface);color:var(--text);font-size:13px">
       </label>
@@ -66,17 +67,17 @@ export function receiptsPage({ tit, adminState }) {
                     display:flex;justify-content:space-between;align-items:center;gap:12px">
           <div style="cursor:pointer;flex:1;min-width:0"
             data-action="open-receipt-modal" data-receipt-idx="${idx}">
-            <strong>${record.customerName}</strong>
-            <span class="badge ${record.type === 'repair' ? 'warn' : 'good'}" style="margin-left:6px">${record.label}</span><br>
+            <strong>${escapeHTML(record.customerName)}</strong>
+            <span class="badge ${record.type === 'repair' ? 'warn' : 'good'}" style="margin-left:6px">${escapeHTML(record.label)}</span><br>
             <span class="muted" style="font-size:12px">
-              <strong>${record.invoiceNumber}</strong>${record.ticketNumber ? ` · ${record.ticketNumber}` : ''}
-              ${record.parentInvoiceNumber ? `<br>Parent: ${record.parentInvoiceNumber}${record.parentTicketNumber ? ` · ${record.parentTicketNumber}` : ''}` : ''}
-              <br>${record.paymentMethod}${record.employeeName ? ` · ${record.employeeName}` : ''}
+              <strong>${escapeHTML(record.invoiceNumber)}</strong>${record.ticketNumber ? ` · ${escapeHTML(record.ticketNumber)}` : ''}
+              ${record.parentInvoiceNumber ? `<br>Parent: ${escapeHTML(record.parentInvoiceNumber)}${record.parentTicketNumber ? ` · ${escapeHTML(record.parentTicketNumber)}` : ''}` : ''}
+              <br>${escapeHTML(record.paymentMethod)}${record.employeeName ? ` · ${escapeHTML(record.employeeName)}` : ''}
             </span>
           </div>
           <div style="text-align:right;flex-shrink:0;display:flex;align-items:center;gap:10px">
             <div>
-              <div><strong>${money(record.total)}</strong></div>
+              <div><strong>${moneyHTML(record.total)}</strong></div>
               <span class="muted" style="font-size:11px">
                 ${localDateTime(record.createdAt)}
               </span>
@@ -100,13 +101,13 @@ export function udharListModalHTML() {
         ${outstanding.map(u => `
           <div style="padding:12px;background:var(--surface-2);border-radius:8px;display:grid;gap:8px">
             <div style="display:flex;justify-content:space-between">
-              <div><strong>${u.customerName}</strong> · ${u.customerPhone}<br>
-                <small class="muted">${u.kind === 'repair' ? 'Repair' : 'Retail'} · ${u.reference} · ${new Date(u.createdAt).toLocaleDateString()}</small></div>
-              <span class="badge ${u.status==='Settled'?'good':'bad'}">${u.status}</span>
+              <div><strong>${escapeHTML(u.customerName)}</strong> · ${escapeHTML(u.customerPhone)}<br>
+                <small class="muted">${u.kind === 'repair' ? 'Repair' : 'Retail'} · ${escapeHTML(u.reference)} · ${new Date(u.createdAt).toLocaleDateString()}</small></div>
+              <span class="badge ${u.status==='Settled'?'good':'bad'}">${escapeHTML(u.status)}</span>
             </div>
             <div style="display:flex;justify-content:space-between">
-              <span>Balance: <strong>${money(u.outstanding)}</strong></span>
-              <span class="muted">Current total: ${money(u.effectiveObligation)}</span>
+              <span>Balance: <strong>${moneyHTML(u.outstanding)}</strong></span>
+              <span class="muted">Current total: ${moneyHTML(u.effectiveObligation)}</span>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
               <input type="number" step="any" min="0" max="${u.outstanding}" placeholder="Amount to settle" data-settle-amount="${u.kind}:${u.sourceId}"
@@ -146,11 +147,11 @@ export function receiptDetailModalHTML(adminState) {
           <div><span class="muted">Date</span><br>
             <strong>${new Date(s.created_at).toLocaleString()}</strong></div>
           <div><span class="muted">Customer</span><br>
-            <strong>${s.customer_name||'Walk-in'}</strong></div>
+            <strong>${escapeHTML(s.customer_name||'Walk-in')}</strong></div>
           <div><span class="muted">Cashier</span><br>
-            <strong>${s.employee_name||'—'}</strong></div>
+            <strong>${escapeHTML(s.employee_name||'—')}</strong></div>
           <div><span class="muted">Payment</span><br>
-            <strong>${s.payment_method}</strong></div>
+            <strong>${escapeHTML(s.payment_method)}</strong></div>
           ${s.ticket_id ? `<div><span class="muted">Linked Ticket</span><br><strong>#${s.ticket_id}</strong></div>` : ''}
         </div>
 
@@ -168,12 +169,12 @@ export function receiptDetailModalHTML(adminState) {
                 <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;
                             padding:10px 12px;border-top:1px solid var(--border);font-size:13px">
                   <div>
-                    <strong>${i.name||'Item'}</strong>
-                    <br><span class="muted">${money(i.soldPrice||i.sold_price||0)} each
-                    ${(i.discount||0) > 0 ? ` · disc ${money(i.discount)}` : ''}</span>
+                    <strong>${escapeHTML(i.name||'Item')}</strong>
+                    <br><span class="muted">${moneyHTML(i.soldPrice||i.sold_price||0)} each
+                    ${(i.discount||0) > 0 ? ` · disc ${moneyHTML(i.discount)}` : ''}</span>
                   </div>
                   <span style="text-align:right">${i.qty||1}</span>
-                  <span style="text-align:right"><strong>${money((i.soldPrice||i.sold_price||0)*(i.qty||1))}</strong></span>
+                  <span style="text-align:right"><strong>${moneyHTML((i.soldPrice||i.sold_price||0)*(i.qty||1))}</strong></span>
                 </div>`).join('')}
             </div>` :
             `<p class="muted" style="font-size:13px">No item breakdown recorded.</p>`}
@@ -183,27 +184,27 @@ export function receiptDetailModalHTML(adminState) {
                     display:grid;gap:6px;font-size:13px">
           ${Number(s.labour_cost||0) > 0 ? `
             <div style="display:flex;justify-content:space-between">
-              <span>Labour</span><span>${money(s.labour_cost)}</span>
+              <span>Labour</span><span>${moneyHTML(s.labour_cost)}</span>
             </div>` : ''}
           ${Number(s.discount||0) > 0 ? `
             <div style="display:flex;justify-content:space-between;color:var(--success)">
-              <span>Discount</span><span>− ${money(s.discount)}</span>
+              <span>Discount</span><span>− ${moneyHTML(s.discount)}</span>
             </div>` : ''}
           ${Number(s.tax||0) > 0 ? `
             <div style="display:flex;justify-content:space-between">
-              <span>Tax</span><span>${money(s.tax)}</span>
+              <span>Tax</span><span>${moneyHTML(s.tax)}</span>
             </div>` : ''}
           <div style="display:flex;justify-content:space-between;
                       font-size:18px;font-weight:700;padding-top:6px;
                       border-top:1px solid var(--border)">
-            <span>Total</span><span>${money(s.total_bill)}</span>
+            <span>Total</span><span>${moneyHTML(s.total_bill)}</span>
           </div>
           ${s.cash_tendered > 0 ? `
             <div style="display:flex;justify-content:space-between;color:var(--muted)">
-              <span>Cash Received</span><span>${money(s.cash_tendered)}</span>
+              <span>Cash Received</span><span>${moneyHTML(s.cash_tendered)}</span>
             </div>
             <div style="display:flex;justify-content:space-between;color:var(--muted)">
-              <span>Change Given</span><span>${money(s.change_given||0)}</span>
+              <span>Change Given</span><span>${moneyHTML(s.change_given||0)}</span>
             </div>` : ''}
         </div>
 
@@ -236,41 +237,41 @@ function repairReceiptDetailHTML(record, index, totalRecords) {
       <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <div>
-            <h2 style="margin:0">${record.invoiceNumber}</h2>
-            <span class="badge warn" style="margin-top:6px">${record.label}</span>
+            <h2 style="margin:0">${escapeHTML(record.invoiceNumber)}</h2>
+            <span class="badge warn" style="margin-top:6px">${escapeHTML(record.label)}</span>
           </div>
           <button class="icon-button" data-close style="font-size:20px;line-height:1">×</button>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;padding:12px;background:var(--surface-2);border-radius:10px;font-size:13px;margin-bottom:16px">
           <div><span class="muted">Date</span><br><strong>${new Date(record.createdAt).toLocaleString()}</strong></div>
-          <div><span class="muted">Status</span><br><strong>${ticket.status || 'Pending'}</strong></div>
-          <div><span class="muted">Customer</span><br><strong>${record.customerName}</strong></div>
-          <div><span class="muted">Phone</span><br><strong>${record.customerPhone || '—'}</strong></div>
-          <div><span class="muted">Ticket</span><br><strong>${record.ticketNumber || '—'}</strong></div>
-          <div><span class="muted">Device</span><br><strong>${record.device || '—'}</strong></div>
-          ${record.parentInvoiceNumber ? `<div><span class="muted">Parent Invoice</span><br><strong>${record.parentInvoiceNumber}</strong></div>` : ''}
-          ${record.parentTicketNumber ? `<div><span class="muted">Parent Ticket</span><br><strong>${record.parentTicketNumber}</strong></div>` : ''}
-          <div><span class="muted">Created By</span><br><strong>${record.employeeName || '—'}</strong></div>
-          <div><span class="muted">Payment</span><br><strong>${record.paymentMethod}</strong></div>
+          <div><span class="muted">Status</span><br><strong>${escapeHTML(ticket.status || 'Pending')}</strong></div>
+          <div><span class="muted">Customer</span><br><strong>${escapeHTML(record.customerName)}</strong></div>
+          <div><span class="muted">Phone</span><br><strong>${escapeHTML(record.customerPhone || '—')}</strong></div>
+          <div><span class="muted">Ticket</span><br><strong>${escapeHTML(record.ticketNumber || '—')}</strong></div>
+          <div><span class="muted">Device</span><br><strong>${escapeHTML(record.device || '—')}</strong></div>
+          ${record.parentInvoiceNumber ? `<div><span class="muted">Parent Invoice</span><br><strong>${escapeHTML(record.parentInvoiceNumber)}</strong></div>` : ''}
+          ${record.parentTicketNumber ? `<div><span class="muted">Parent Ticket</span><br><strong>${escapeHTML(record.parentTicketNumber)}</strong></div>` : ''}
+          <div><span class="muted">Created By</span><br><strong>${escapeHTML(record.employeeName || '—')}</strong></div>
+          <div><span class="muted">Payment</span><br><strong>${escapeHTML(record.paymentMethod)}</strong></div>
         </div>
 
         <div style="margin-bottom:16px">
           <p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Repair items</p>
           ${components.length ? `<div style="display:grid;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden">
             ${components.map(component => `<div style="display:flex;justify-content:space-between;gap:8px;padding:10px 12px;border-top:1px solid var(--border);font-size:13px">
-              <span><strong>${component.name || 'Component'}</strong>${component.tag || component.condition ? `<br><span class="muted">${component.tag || component.condition}</span>` : ''}</span>
-              <strong>${money(component.price || 0)}</strong>
+              <span><strong>${escapeHTML(component.name || 'Component')}</strong>${component.tag || component.condition ? `<br><span class="muted">${escapeHTML(component.tag || component.condition)}</span>` : ''}</span>
+              <strong>${moneyHTML(component.price || 0)}</strong>
             </div>`).join('')}
           </div>` : `<p class="muted" style="font-size:13px">No component breakdown recorded.</p>`}
-          ${Number(ticket.labour_cost || 0) > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 12px;font-size:13px"><span>Labour</span><strong>${money(ticket.labour_cost)}</strong></div>` : ''}
-          ${ticket.technician_note ? `<p class="muted" style="font-size:13px;margin-top:8px">${ticket.technician_note}</p>` : ''}
+          ${Number(ticket.labour_cost || 0) > 0 ? `<div style="display:flex;justify-content:space-between;padding:10px 12px;font-size:13px"><span>Labour</span><strong>${moneyHTML(ticket.labour_cost)}</strong></div>` : ''}
+          ${ticket.technician_note ? `<p class="muted" style="font-size:13px;margin-top:8px">${escapeHTML(ticket.technician_note)}</p>` : ''}
         </div>
 
         <div style="border-top:1px solid var(--border);padding-top:12px;display:grid;gap:6px;font-size:13px">
-          <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700"><span>Invoice Total</span><span>${money(invoiceTotal)}</span></div>
-          <div style="display:flex;justify-content:space-between;color:var(--success)"><span>Paid</span><span>${money(amountPaid)}</span></div>
-          <div style="display:flex;justify-content:space-between"><span>Balance</span><span>${money(balanceDue)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700"><span>Invoice Total</span><span>${moneyHTML(invoiceTotal)}</span></div>
+          <div style="display:flex;justify-content:space-between;color:var(--success)"><span>Paid</span><span>${moneyHTML(amountPaid)}</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Balance</span><span>${moneyHTML(balanceDue)}</span></div>
         </div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">

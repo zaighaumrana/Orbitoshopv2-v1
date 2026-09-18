@@ -1,9 +1,10 @@
+import { escapeHTML, safeImageURL } from "../html.js"
 import { rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
   _clearSession,
   can, ACCESS, validatePassword,
-  money, fld, modalActions, statusBadge,
+  money, moneyHTML, fld, modalActions, statusBadge,
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   logBillEvent,
   myAccountModalHTML, handleChangePasswordSubmit,
@@ -18,6 +19,8 @@ import {
 import { findRepairFamilies, groupRepairFamilies, matchedRepairChild } from '../features/repairs/family.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
 import { reportsPage } from './pages/reports.js'
+import { billingUsagePage } from './pages/billing-usage.js'
+import { createPlatformBridge } from '../platform/bridge.js'
 import { catalogPage, qiVariantRowHTML, addQuickItemModalHTML } from '../features/admin/catalog/render.js'
 import { receiptsPage, udharListModalHTML, receiptDetailModalHTML } from '../features/admin/checkout/render.js'
 import { settleUdhar } from '../features/checkout/udhar/api.js'
@@ -38,6 +41,7 @@ const ADMIN_MODULES = [
   ['receipts',  '◉', 'Receipts'],
   ['ems',       '⏱', 'EMS'],
   ['settings',  '◐', 'Settings'],
+  ['billing-usage', '▧', 'Billing & Usage'],
 ]
 
 const adminState = {
@@ -54,6 +58,9 @@ const adminState = {
 }
 
 let SESSION = {}
+const platformBridge = createPlatformBridge(sb)
+let billingResult = null
+let resupplyBusy = false
 let _inv = null  // populated via dynamic import only when inventory_module_enabled
 
 /* ── Load ── */
@@ -64,6 +71,10 @@ async function load() {
     _inv = await import('../features/admin/inventory/index.js')
   }
   const mod = adminState.adminModule
+  if (mod === 'billing-usage' && can(mod, state.role)) {
+    try { billingResult = await platformBridge.readBilling() }
+    catch { billingResult = { available: false } }
+  }
   const needs = {
     tickets: ['dashboard','repairs','reports','receipts'].includes(mod),
     sales: ['dashboard','reports','receipts'].includes(mod),
@@ -142,10 +153,10 @@ function render() {
       <main class="main">
         <header class="topbar">
           <div class="brand top-brand">
-            <div class="logo">${tenant.logo ? `<img alt="" src="${tenant.logo}">` : tenant.name.slice(0,2).toUpperCase()}</div>
+            <div class="logo">${tenant.logo ? `<img alt="" src="${escapeHTML(safeImageURL(tenant.logo))}">` : escapeHTML(tenant.name.slice(0,2).toUpperCase())}</div>
             <div>
-              <strong>${tenant.name}</strong>
-              <span class="muted" style="font-size:12px">${state.role} · Back Office</span>
+              <strong>${escapeHTML(tenant.name)}</strong>
+              <span class="muted" style="font-size:12px">${escapeHTML(state.role)} · Back Office</span>
             </div>
           </div>
           <div class="top-actions">
@@ -155,8 +166,8 @@ function render() {
                 .join('')}
             </select>
             <span class="chip">
-              <strong style="font-size:12px">${SESSION.employee.name}</strong>
-              <span class="muted" style="font-size:11px"> · ${state.role}</span>
+              <strong style="font-size:12px">${escapeHTML(SESSION.employee.name)}</strong>
+              <span class="muted" style="font-size:11px"> · ${escapeHTML(state.role)}</span>
             </span>
             <span class="chip">
               <i class="dot ${state.online ? '' : 'offline'}"></i>
@@ -193,6 +204,7 @@ function render() {
 }
 
 function pageContent() {
+  if (adminState.adminModule === 'billing-usage') return adminShell(billingUsagePage(billingResult, resupplyBusy))
   const pages = { dashboard, repairs, inventory, catalog, reports, employees, receipts, settings }
   if (adminState.adminModule === 'ems') {
     return adminShell(adminState._emsHTML || '<div class="empty">Loading EMS…</div>')
@@ -205,7 +217,7 @@ function adminShell(content) {
   const modLabel = ADMIN_MODULES.find(([k]) => k === adminState.adminModule)?.[2] || ''
   return `
     <div class="admin-header">
-      <div><h1>${modLabel}</h1><p class="muted">${tenant.name}</p></div>
+      <div><h1>${escapeHTML(modLabel)}</h1><p class="muted">${escapeHTML(tenant.name)}</p></div>
     </div>
     ${content}`
 }
@@ -213,7 +225,7 @@ function adminShell(content) {
 const tit = (h, sub, action) =>
   `<div class="page-title"><div><h1>${h}</h1><p class="muted">${sub}</p></div><div>${action}</div></div>`
 const tlb = (ph) =>
-  `<div class="toolbar"><div class="toolbar-left"><input class="search" data-filter value="${adminState.filter}" placeholder="${ph}"></div></div>`
+  `<div class="toolbar"><div class="toolbar-left"><input class="search" data-filter value="${escapeHTML(adminState.filter)}" placeholder="${ph}"></div></div>`
 
 /* ═══════════════ PAGES ═══════════════ */
 function dashboard() {
@@ -238,7 +250,7 @@ function dashboard() {
         <div class="card kpi" style="cursor:pointer" data-kpi-target="${target}">
           <span class="label">${l}</span>
           <span class="value">${typeof v === 'number' && !['Open Tickets','Employees'].includes(l)
-            ? money(v) : v}</span>
+            ? moneyHTML(v) : v}</span>
         </div>`).join('')}
     </div>
     <div class="grid two-col">
@@ -249,9 +261,9 @@ function dashboard() {
           <tbody>
             ${sales.slice(0,8).map(s => `<tr>
               <td>${s.invoice_number||`INV-${s.id}`}</td>
-              <td>${s.customer_name||'Walk-in'}</td>
-              <td>${s.payment_method}</td>
-              <td>${money(s.total_bill)}</td>
+              <td>${escapeHTML(s.customer_name||'Walk-in')}</td>
+              <td>${escapeHTML(s.payment_method)}</td>
+              <td>${moneyHTML(s.total_bill)}</td>
             </tr>`).join('')}
           </tbody>
         </table></div>
@@ -287,16 +299,16 @@ function repairs() {
               const matchedChild = matchedRepairChild(family)
               return `
               <tr style="cursor:pointer" data-view-ticket="${r.id}">
-                <td><strong>${r.customer_name}</strong><br><small class="muted">${r.customer_phone}</small></td>
+                <td><strong>${escapeHTML(r.customer_name)}</strong><br><small class="muted">${escapeHTML(r.customer_phone)}</small></td>
                 <td>
-                  <span style="color:var(--primary);font-size:12px">${r.ticket_number}</span><br>
-                  <strong style="font-size:12px">${r.invoice_number || 'No invoice'}</strong>
+                  <span style="color:var(--primary);font-size:12px">${escapeHTML(r.ticket_number)}</span><br>
+                  <strong style="font-size:12px">${escapeHTML(r.invoice_number || 'No invoice')}</strong>
                   ${family.members.length > 1 ? `<br><small class="muted">${family.members.length - 1} child invoice${family.members.length === 2 ? '' : 's'}</small>` : ''}
-                  ${matchedChild ? `<br><small style="color:var(--primary)">Matched child: ${matchedChild.invoice_number || 'No invoice'} · ${matchedChild.ticket_number}</small>` : ''}
+                  ${matchedChild ? `<br><small style="color:var(--primary)">Matched child: ${escapeHTML(matchedChild.invoice_number || 'No invoice')} · ${escapeHTML(matchedChild.ticket_number)}</small>` : ''}
                 </td>
-                <td>${r.device_brand} ${r.device_model}</td>
-                <td>${Number(r.advance_payment||0)>0 ? money(r.advance_payment) : '—'}</td>
-                <td><span class="badge ${sc[r.status]||'warn'}">${r.status}</span></td>
+                <td>${escapeHTML(r.device_brand)} ${escapeHTML(r.device_model)}</td>
+                <td>${Number(r.advance_payment||0)>0 ? moneyHTML(r.advance_payment) : '—'}</td>
+                <td><span class="badge ${sc[r.status]||'warn'}">${escapeHTML(r.status)}</span></td>
                 <td>
                 <div style="display:flex;gap:6px;align-items:center">
                   <button class="secondary-button" style="font-size:12px;padding:4px 10px"
@@ -344,20 +356,20 @@ function employees() {
           <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
           <tbody>
             ${emps.map(e => `<tr>
-              <td><strong>${e.name}</strong></td>
-              <td class="muted" style="font-size:12px">${e.email||'—'}</td>
-              <td>${e.role}</td>
-              <td><span class="badge ${e.status==='Active'?'good':'bad'}">${e.status}</span></td>
+              <td><strong>${escapeHTML(e.name)}</strong></td>
+              <td class="muted" style="font-size:12px">${escapeHTML(e.email||'—')}</td>
+              <td>${escapeHTML(e.role)}</td>
+              <td><span class="badge ${e.status==='Active'?'good':'bad'}">${escapeHTML(e.status)}</span></td>
               <td style="display:flex;gap:6px">
                 ${state.role !== 'Manager' || ['Cashier','Technician'].includes(e.role) ? `<button class="secondary-button" style="font-size:12px"
                   data-action="edit-employee"
-                  data-emp-id="${e.id}" data-emp-name="${e.name}"
-                  data-emp-role="${e.role}" data-emp-status="${e.status}"
-                  data-emp-email="${e.email||''}">Edit</button>` : ''}
+                  data-emp-id="${e.id}" data-emp-name="${escapeHTML(e.name)}"
+                  data-emp-role="${escapeHTML(e.role)}" data-emp-status="${escapeHTML(e.status)}"
+                  data-emp-email="${escapeHTML(e.email||'')}">Edit</button>` : ''}
                 ${state.role !== 'Manager' || ['Cashier','Technician'].includes(e.role) ? `
                   <button class="secondary-button" style="font-size:12px;color:var(--warning)"
                     data-action="remove-employee"
-                    data-emp-id="${e.id}" data-emp-name="${e.name}"
+                    data-emp-id="${e.id}" data-emp-name="${escapeHTML(e.name)}"
                     data-emp-can-delete="false">Deactivate</button>` : ''}
               </td>
             </tr>`).join('')}
@@ -410,7 +422,7 @@ function settingsTabContent() {
           ['Break Tracking',    CFG.ems_track_breaks],
         ].map(([label, enabled]) => `
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:13px">${label}</span>
+            <span style="font-size:13px">${escapeHTML(label)}</span>
             <span class="badge ${enabled ? 'good' : 'bad'}">
               ${enabled ? 'Enabled' : 'Not enabled'}
             </span>
@@ -444,12 +456,12 @@ function settingsTabContent() {
       ${fld('Invoice Prefix','invoicePrefix',CFG.invoice_prefix||'INV')}
       ${fld('Ticket Prefix','ticketPrefix',CFG.ticket_prefix||'TK')}
       <p class="muted" style="grid-column:1/-1;font-size:12px;margin-top:-6px">
-        Full numbers look like <strong>${CFG.invoice_prefix||'INV'}20260712 0001</strong> and
-        <strong>${CFG.ticket_prefix||'TK'}20260712 0001</strong> — date stamped automatically,
+        Full numbers look like <strong>${escapeHTML(CFG.invoice_prefix||'INV')}20260712 0001</strong> and
+        <strong>${escapeHTML(CFG.ticket_prefix||'TK')}20260712 0001</strong> — date stamped automatically,
         sequence number never resets or repeats.
       </p>
       <label class="field" style="grid-column:1/-1"><span>Receipt Footer</span>
-        <textarea name="receiptFooter">${t.receiptFooter}</textarea></label>
+        <textarea name="receiptFooter">${escapeHTML(t.receiptFooter)}</textarea></label>
       <div class="modal-actions" style="grid-column:1/-1"><button class="primary-button">Save Receipt Settings</button></div>
     </form>`
 
@@ -513,10 +525,10 @@ function renderModal() {
           ${reqs.map(r => `
             <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;background:var(--surface-2);border-radius:8px">
               <div>
-                <strong>${r.email}</strong><br>
+                <strong>${escapeHTML(r.email)}</strong><br>
                 <span class="muted" style="font-size:12px">Requested ${new Date(r.requested_at).toLocaleString()}</span>
               </div>
-              <button class="secondary-button" data-action="resolve-reset" data-reset-id="${r.id}" data-reset-email="${r.email}">Set New Password</button>
+              <button class="secondary-button" data-action="resolve-reset" data-reset-id="${r.id}" data-reset-email="${escapeHTML(r.email)}">Set New Password</button>
             </div>`).join('')}
         </div>`}
       <div class="modal-actions"><button type="button" class="secondary-button" data-close>Close</button></div>
@@ -532,8 +544,8 @@ function renderModal() {
       return `<div class="modal-backdrop"><form class="modal modal-sm" data-form="edit-employee" data-emp-id="${e.id}">
         <h2>Edit Employee</h2>
         <div class="form-grid">
-          <label class="field"><span>Name</span><input name="name" value="${e.name||''}" required></label>
-          <label class="field"><span>Email</span><input name="email" type="email" value="${e.email||''}"></label>
+          <label class="field"><span>Name</span><input name="name" value="${escapeHTML(e.name||'')}" required></label>
+          <label class="field"><span>Email</span><input name="email" type="email" value="${escapeHTML(e.email||'')}"></label>
           <label class="field"><span>New Password (blank = keep)</span><input name="password" type="password" autocomplete="off" placeholder="Leave blank to keep"></label>
           <label class="field"><span>Role</span>
             <select name="role">
@@ -652,6 +664,19 @@ function attachEvents() {
       dlog('ADMIN.click', `DATA-CLOSE branch firing -- state.modal was type=${state.modal?.type} -- about to call ADMIN.render()`)
       if (state.modal?.type === 'pinPrompt') { cancelPinPrompt(render); return }
       state.modal = null; render(); return
+    }
+    if (el.dataset.action === 'paper-resupply') {
+      if (resupplyBusy || !can('billing-usage', state.role)) return
+      resupplyBusy = true; render()
+      try {
+        const { data: { user }, error } = await sb.auth.getUser()
+        if (error || !user) throw new Error('Please sign in again.')
+        const result = await platformBridge.requestResupply(user.id)
+        showTransactionSuccess(result.already_active ? 'A resupply request is already pending.' : 'Your resupply request has been received.', 'Paper Resupply')
+      } catch (error) {
+        showBlockingError(error.message || 'Could not send your request. Please retry.')
+      } finally { resupplyBusy = false; render() }
+      return
     }
     if (el.dataset.action === 'print-ticket-slip') {
       dlog('ADMIN.click', `PRINT-TICKET-SLIP branch firing -- state.modal.ticket=${JSON.stringify(state.modal?.ticket?.ticket_number)}`)

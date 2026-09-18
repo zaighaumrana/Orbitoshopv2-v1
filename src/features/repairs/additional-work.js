@@ -1,4 +1,5 @@
-import {state,money} from '../../shared.js'
+import { escapeHTML } from "../../html.js"
+import {state,money, moneyHTML} from '../../shared.js'
 import {recordAdditionalWork} from './api.js'
 
 export function createSubInvoiceModalHTML(modal, {technician = false, workshop = false} = {}) {
@@ -18,7 +19,7 @@ export function createSubInvoiceModalHTML(modal, {technician = false, workshop =
       <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
         <h2 style="margin-bottom:4px">Record Additional Work</h2>
         <p class="muted" style="font-size:13px;margin-bottom:16px">
-          Linked to ${tk.invoice_number} — ${tk.customer_name}, ${tk.device_brand} ${tk.device_model}
+          Linked to ${escapeHTML(tk.invoice_number)} — ${escapeHTML(tk.customer_name)}, ${escapeHTML(tk.device_brand)} ${escapeHTML(tk.device_model)}
         </p>
 
         <div style="display:grid;gap:8px;margin-bottom:14px">
@@ -26,9 +27,9 @@ export function createSubInvoiceModalHTML(modal, {technician = false, workshop =
           ${draft.length ? draft.map((c,i) => `
             <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
               <div>
-                <span style="font-size:13px"><strong>${c.name}</strong></span>
-                <span class="badge warn" style="font-size:11px;margin-left:6px">${c.tag || ''}</span>
-                ${c.customText ? `<span class="muted" style="font-size:12px"> — ${c.customText}</span>` : ''}
+                <span style="font-size:13px"><strong>${escapeHTML(c.name)}</strong></span>
+                <span class="badge warn" style="font-size:11px;margin-left:6px">${escapeHTML(c.tag || '')}</span>
+                ${c.customText ? `<span class="muted" style="font-size:12px"> — ${escapeHTML(c.customText)}</span>` : ''}
               </div>
               <input type="number" step="any" min="0" value="${c.price || ''}" placeholder="Price"
                 data-subinv-comp-price="${i}"
@@ -43,7 +44,7 @@ export function createSubInvoiceModalHTML(modal, {technician = false, workshop =
           <p class="muted" style="font-size:12px;margin-bottom:6px">Add component:</p>
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
             ${compDefs.map(c => `<button type="button" class="secondary-button" style="font-size:12px;padding:5px 12px"
-              data-add-draft-comp-name="${c.name}">${c.name}</button>`).join('')}
+              data-add-draft-comp-name="${escapeHTML(c.name)}">${escapeHTML(c.name)}</button>`).join('')}
           </div>
           <div style="display:flex;gap:8px">
             <input id="custom-comp-name" class="search" placeholder="Custom component name" style="flex:1">
@@ -73,7 +74,7 @@ export function createSubInvoiceModalHTML(modal, {technician = false, workshop =
 
         <div style="display:flex;justify-content:space-between;font-weight:600;padding:10px;
                     background:var(--surface-2);border-radius:8px;margin-bottom:16px;font-size:15px">
-          <span>Additional Work Quote</span><span id="subinv-draft-total">${money(total)}</span>
+          <span>Additional Work Quote</span><span id="subinv-draft-total">${moneyHTML(total)}</span>
         </div>
 
         <div class="modal-actions">

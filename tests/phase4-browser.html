@@ -1,0 +1,83 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Phase 4 isolated browser checks</title><link rel="stylesheet" href="/src/style.css"></head>
+<body><h1>Phase 4 isolated browser checks</h1><p>Fixture data only. No live Shop or Platform calls. Native printing is stubbed.</p>
+<button id="run">Run Phase 4 checks</button><pre id="results"></pre><div id="app"></div><div id="preview"></div>
+<script type="module">
+window.fetch=async()=>new Response('{}',{headers:{'Content-Type':'application/json'}})
+const errors=[]
+window.addEventListener('error',e=>errors.push(e.message))
+window.addEventListener('unhandledrejection',e=>errors.push(String(e.reason)))
+const {installThermalMeter,flushThermalQueue}=await import('/src/platform/thermal.js')
+const calls=[];let unavailable=false;let prints=0
+installThermalMeter({auth:{onAuthStateChange(callback){callback('INITIAL_SESSION',{user:{id:'fixture-owner'}})}},async rpc(name,args){
+  if(unavailable)return {error:{message:'Fixture offline'}}
+  calls.push({name,args});return {data:{accepted:true}}
+}})
+const {CFG,can,state,money,moneyHTML}=await import('/src/shared.js')
+const {billingUsagePage}=await import('/src/admin/pages/billing-usage.js')
+const {adminInventoryPage}=await import('/src/features/admin/inventory/render.js')
+const {repairTicketFormHTML}=await import('/src/features/pos/repairs/render.js')
+const {buildTicketSlip,buildReceiptSlip,buildSubInvoiceSlip,buildRepairSummary,buildReturnSlip,printThermal}=await import('/src/print/print.js')
+const append=document.body.appendChild.bind(document.body)
+document.body.appendChild=node=>{
+  const result=append(node)
+  if(node.tagName==='IFRAME')node.addEventListener('load',()=>{node.contentWindow.print=()=>{prints++}})
+  return result
+}
+const attack='\"><img src=x onerror="window.fixtureXss=true">'
+const parent={id:1,invoice_number:'PARENT',ticket_number:'TK1',customer_name:attack,customer_phone:'0300',device_brand:attack,device_model:'Test',components_noted:[{name:attack,price:100}],estimated_quote:100,created_at:new Date().toISOString()}
+const child={...parent,id:2,parent_ticket_id:1,invoice_number:'CHILD'}
+const sale={receiptNo:'RETAIL',items:[{name:attack,qty:1,soldPrice:100}],total:100}
+const summary={root:{invoiceNumber:'PARENT',customerName:attack},invoices:[],payments:[],refunds:[],adjustments:[],effectiveObligation:100,netPayments:0,outstanding:100}
+const preview=document.querySelector('#preview')
+const pause=()=>new Promise(r=>setTimeout(r,50))
+document.querySelector('#run').onclick=async()=>{
+ document.querySelector('#run').disabled=true
+ const lines=[];const check=(name,pass)=>{lines.push(`${pass?'PASS':'FAIL'} ${name}`);document.querySelector('#results').textContent=lines.join('\n')}
+ try {
+  await pause();calls.length=0
+  CFG.currency=attack
+  preview.innerHTML=moneyHTML(100)
+  check('Currency HTML is inert while plain text stays unchanged',!preview.querySelector('img')&&preview.textContent===money(100))
+  state.data.inventory=[{id:1,name:attack,sku:attack,category:attack,price:100,cost:10,qty:1,min_qty:0}]
+  preview.innerHTML=adminInventoryPage({filter:'',tit:()=>''})
+  check('Inventory stored name/category/SKU and currency render as inert text',!preview.querySelector('img')&&preview.textContent.includes(attack))
+  preview.innerHTML=repairTicketFormHTML({customerName:attack,deviceBrand:attack})
+  check('Repair input attribute breakout is harmless and value round-trips',!preview.querySelector('img')&&preview.querySelector('[name="customerName"]').value===attack)
+  check('Billing permission: Owner only; Support/Manager/Cashier/Technician denied',can('billing-usage','Business Owner')&&['Manager','Cashier','Technician','Orbito Support'].every(r=>!can('billing-usage',r)))
+  preview.innerHTML=billingUsagePage({available:false})
+  check('Missing projection says Unavailable, not a zero balance',preview.textContent.includes('Unavailable')&&!preview.textContent.includes('PKR 0'))
+  const projection={schema_version:1,currency:'PKR',platform_updated_at:'2026-01-01',usage:{BILL:1,INVENTORY:null},invoices:[{reference:attack,period:'September',status:'partially_paid',outstanding:70}],outstanding_total:70,estimated_current_charges:10,paper_resupply_enabled:true}
+  preview.innerHTML=billingUsagePage({available:true,last_synced_at:'2026-01-01',projection})
+  check('Billing escapes invoice, separates estimate, warns stale and shows flag-on button',!preview.querySelector('img')&&preview.textContent.includes(attack)&&preview.textContent.includes('Estimated Current Charges')&&preview.textContent.includes('out of date')&&!!preview.querySelector('[data-action="paper-resupply"]'))
+  projection.paper_resupply_enabled=false
+  preview.innerHTML=billingUsagePage({available:true,last_synced_at:'2026-01-01',projection})
+  check('Flag-off hides resupply',!preview.querySelector('[data-action="paper-resupply"]'))
+  for(const [name,html] of [['parent',buildTicketSlip(parent)],['child',buildSubInvoiceSlip(child,parent)],['retail',buildReceiptSlip(sale)],['summary',buildRepairSummary(summary)]]){
+    preview.innerHTML=html;await pause()
+    check(name+' hostile text is inert; preview does not meter',!preview.querySelector('img')&&!window.fixtureXss&&calls.length===0)
+  }
+  // Source-level focus persistence: same stable input survives delegated rerender.
+  const app=document.querySelector('#app');app.innerHTML='<input id="phase4-search" value="">'
+  app.addEventListener('input',e=>{const value=e.target.value;app.innerHTML='<input id="phase4-search">';app.querySelector('input').value=value},{once:true})
+  let input=app.querySelector('input');input.focus();input.value='abc';input.setSelectionRange(3,3);input.dispatchEvent(new Event('input',{bubbles:true}));await pause()
+  check('Global rerender restores input focus and caret',document.activeElement.id==='phase4-search'&&document.activeElement.selectionStart===3)
+  preview.innerHTML=''
+  for(const [name,html] of [['retail_receipt',buildReceiptSlip(sale)],['repair_parent',buildTicketSlip(parent)],['repair_child',buildSubInvoiceSlip(child,parent)],['repair_summary',buildRepairSummary(summary)],['return_slip',buildReturnSlip({invoiceNumber:'RETAIL',items:[],refund:0,method:'Cash'})]]){
+    await printThermal(html);await pause();await flushThermalQueue()
+    check(name+' print reaches metering and print hook',calls.some(c=>c.args.p_intent.document_type===name)&&prints>0)
+  }
+  const before=calls.length
+  await printThermal(buildReceiptSlip(sale,true),{copies:2});await pause();await flushThermalQueue()
+  const last=calls.at(-1)?.args.p_intent
+  check('Reprint is separate intent; explicit copies and 80mm retained',calls.length===before+1&&last.is_reprint&&last.copies===2&&last.paper_width_mm===80)
+  check('Measurement is positive integer or explicitly unavailable/null',calls.every(c=>{const m=c.args.p_intent;return m.measurement_status==='estimated'?Number.isInteger(m.estimated_mm)&&m.estimated_mm>0:m.estimated_mm===null}))
+  unavailable=true;const accepted=calls.length
+  await printThermal(buildTicketSlip(parent));await pause()
+  check('Shop outage does not block print',prints===7)
+  unavailable=false;await flushThermalQueue()
+  check('Durable pending intent delivered after recovery',calls.length===accepted+1)
+  check('No uncaught browser errors',errors.length===0)
+  document.querySelector('#results').textContent+='\nDONE '+lines.filter(l=>l.startsWith('PASS')).length+'/'+lines.length+' PASS'+(errors.length?'\n'+errors.join('\n'):'')
+ }catch(error){document.querySelector('#results').textContent+='\nFAIL fixture exception: '+error.stack}
+}
+</script></body></html>
