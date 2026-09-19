@@ -1,14 +1,23 @@
 ﻿# Orbitoshopv2 Client Database
 # Living Schema & Forensic Audit
 
-**Status:** Active stabilization document  
+**Status:** Integrated client baseline; Phases 1–4 client work completed  
 **Baseline captured:** 2026-09-02  
-**Working branch:** `phase2-auth-rls` (not merged into `development`)
+**Current integrated branch:** `development`
 **Baseline schema:** `supabase/baseline/orbitoshopv2-client-schema-2026-09-02.sql`
 
 ---
 
 ## Purpose
+
+Current deployment status is recorded in [PROJECT_STATUS.md](PROJECT_STATUS.md):
+all completed phases are merged, latest Supabase migrations and required Edge
+Functions are deployed, Cloudflare serves the latest frontend, and Phase 4 live
+smoke passed. Numeric-input and duplicate-retail-checkout follow-up fixes are
+also committed, pushed and deployed. This is project-owner confirmation, not
+a fresh database audit. Dated sections below preserve historical findings and
+checkpoint evidence. Final repo-wide regression/cleanup is the next client task;
+separate Orbito Platform modernization remains future work.
 
 This document preserves the database, security, financial, inventory and
 execution-flow problems discovered during Orbitoshopv2 V1 forensic review.
@@ -591,7 +600,9 @@ Define one authoritative rate-distribution mechanism.
 Immutable usage events must contain their effective rate/version at the
 time of creation.
 
-Status: DEFER until client transaction model is stable.
+Current disposition: Phase 4 delivered the Shop-side versioned bridge/projection
+contract. Authoritative Platform pricing distribution remains future Platform
+modernization work; it is not completed merely by deploying the client.
 
 ---
 
@@ -608,7 +619,11 @@ payment must not create another billable event.
 Define the billable-event contract and make usage-event creation
 idempotent.
 
-Status: DEFER until repair transaction semantics are stabilized.
+Current disposition: Phase 4 preserves the existing distinct BILL events for
+repair creation and direct payment, adds request-idempotent canonical capture,
+and prevents dual legacy/bridge ownership for new clients. Changing what BILL
+means commercially and completing the legacy billing cutover require the separate
+Platform modernization; no retroactive billing reinterpretation is claimed.
 
 ---
 
@@ -683,7 +698,13 @@ mutated in multiple places.
 
 ---
 
-# 12. Stabilization order
+# 12. Original stabilization proposal (historical, superseded)
+
+This original eleven-part proposal is not the current phase numbering or an
+outstanding task list. Actual delivered phases: Phase 1 login stabilization;
+Phase 2 Auth/RLS; Phase 3 canonical transactions and repair-family stabilization;
+Phase 4 client security, Platform bridge, billing and paper service. All four
+are completed and integrated into `development`. See [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 Phase 1
 Login / Turnstile / Orbito support entry
@@ -864,9 +885,9 @@ Cashier, and separated Orbito Support login/refresh/logout gate passed cleanly.
 - Final production build passed. Local and remote migrations match through
   `20260904001510`; the final linked dry-run reports the remote database is up
   to date.
-- Phase 2 is merge-ready subject to the documented plan-level leaked-password
+- At this historical checkpoint Phase 2 was merge-ready subject to the documented plan-level leaked-password
   risk and later-phase financial/workflow gaps. No merge was performed.
-- Kept `phase2-auth-rls` unmerged into `development`.
+- At that checkpoint `phase2-auth-rls` was held for review; it has since been merged into `development`.
 
 See `docs/PHASE2_AUTH_RLS_FORENSIC.md` for the complete evidence, residual gaps,
 and merge recommendation.
@@ -1116,7 +1137,7 @@ Applied `20260905030000_phase3_repair_family_summary.sql` to DEV.
   and remaining at creation.
 - Workshop to POS and collection handoff now use the canonical router, removing
   the direct initializer/path mismatch.
-- Production build passes. Automated Windows browser smoke is pending because
+- At this historical checkpoint the production build passed; automated Windows browser smoke was pending because
   the UI-control runtime failed to initialize twice; no browser pass is claimed.
 
 ### Phase 3K final evidence and security gate
@@ -1141,6 +1162,8 @@ Applied `20260905031000_phase3_repair_component_change_guard.sql` to DEV.
 - Advisors contain no critical Phase 3 finding. New callable-function notices
   are expected for the internally authorized RPC boundary, and unused-index
   notices are expected before sufficient production-like traffic.
-- Merge remains on hold solely for the explicit real-browser smoke and user
-  approval. No merge into `development` was performed.
+- The historical smoke/approval merge hold is superseded: Phase 3 and all
+  completed client phases are now merged into `development`; Phase 4 client
+  deployment and live smoke are complete. Final repo-wide regression/cleanup
+  is next, while separate Platform modernization remains future work.
 

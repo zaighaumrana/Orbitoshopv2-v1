@@ -1,6 +1,8 @@
 # Phase 4 client completion — implementation work log
 
-Status: SHOP-SIDE IMPLEMENTATION COMPLETE; LIVE ACCEPTANCE PENDING (2026-09-19). Estimated Phase 4 completion: 95% overall; implementation/documentation complete, remaining acceptance explicitly deferred to deployment/live smoke. Branch `codex/phase4-client-completion`, unchanged base HEAD `2c8641f`. No remote deployment, remote migration application, commit, push, or merge authorized or performed. Migrations have been exercised only in a disposable local PostgreSQL fixture. This is not a production-readiness certification or a claim that the separate Platform is modernized.
+Status: PHASE 4 CLIENT-SIDE WORK COMPLETE (100% of this client phase), merged into `development`, migrated to Supabase, required Edge Functions deployed, frontend pushed and deployed through Cloudflare, and live smoke PASSED. This status is based on the project owner's confirmation; no new validation was performed for this documentation update. `development` is the current integrated client baseline for completed Phases 1–4. The original implementation branch `codex/phase4-client-completion` and base `2c8641f` are historical, not the current HEAD. Separate Orbito Platform modernization remains future work. Final repo-wide regression/cleanup is the next planned client task, not completed work. See [PROJECT_STATUS.md](PROJECT_STATUS.md).
+
+Both post-deployment fixes are committed, pushed and deployed: missing/non-string numeric key handling, and duplicate retail checkout suppression through RPC completion and reload. Backend sale validation and request-ID retry behavior remain unchanged. The former 95%/pending-deployment status is superseded.
 
 ## Implementation map
 
@@ -21,20 +23,20 @@ The user's Phase 4 request controls scope. Reference documents describe intended
 
 Platform source is not required for independent Shop storage/UI/security implementation. Platform ingestion authentication, source binding, durable acknowledgements, projection publication and legacy reconciliation remain unverified external counterparts. Do not activate outbound billing or pretend the Platform is modernized. Publish the concrete implemented contract and required provisioning before cutover.
 
-## Implemented checkpoint (2026-09-18)
+## Implemented functionality (original checkpoint 2026-09-18; now integrated/deployed)
 
 - `20260917015216_phase4_pin_request_security.sql`: actor-keyed, service-only transactional verification; 5/8/10 failures impose 1/5/30 minute cooldowns. Correct PIN during cooldown does not bypass it; successful verification after cooldown resets attempts. Wrong/locked responses remain identical. Verification infrastructure failure stays distinct.
 - Request-scoped approvals bind actor, purpose, operation, request ID and full request payload. Separate requests cannot reuse an approval; identical retries may reuse their consumed approval after expiry. Private claim helper is not callable by browser roles. Seven Phase 3 consumer definitions retain their financial bodies with narrowly replaced authorization predicates. Concurrent distinct requests have exactly one winner; concurrent identical retries return the same approval (tested against separate database connections).
 - `src/security/password.js`: Web Crypto, rejection sampling, Fisher–Yates, existing character-class compatibility.
-- `public/ui-text.js` and `src/html.js`: shared HTML encoding and constrained image URL helper. Broad render-site hardening is staged, including nested EMS greeting text and currency text through `moneyHTML`; raw `money()` remains for textContent/dialogs. Browser tests cover customer/component payloads, invoices and print templates; expanded inventory/attribute/currency checks are included in the fixture. Final release regression is not complete.
+- `public/ui-text.js` and `src/html.js`: shared HTML encoding and constrained image URL helper. Render-site hardening is integrated and deployed, including nested EMS greeting text and currency text through `moneyHTML`; raw `money()` remains for textContent/dialogs. Browser tests cover customer/component payloads, invoices and print templates; inventory/attribute/currency checks are included in the fixture. Final repo-wide regression/cleanup remains the next task.
 - `20260917174024_phase4_platform_bridge.sql`: private source config, immutable events, separate leased outbox, complete versioned customer-safe billing projection, durable paper request and lifecycle mirror. Default delivery is disabled; no client binding is invented.
 - Owner-only `/admin/billing-usage` route/menu, guarded Shop RPC read, unavailable/stale presentation, issued outstanding separate from estimated current charges, escaped invoice fields. No Support/Manager/Cashier/Technician access. Staleness considers both local receipt time and Platform publication time, using a documented 24-hour UI threshold.
 - Minimal Paper Resupply button follows the projection flag. In-flight calls coalesce; the browser persists an actor-scoped request UUID before sending; timeout/reload uses the same ID. Server serializes requests and enforces one active request. Success is shown only after durable Shop acceptance, not as a claim of Platform fulfillment.
 - Atomic usage wrappers preserve the exact four existing financial function bodies as private cores. New public wrappers add one canonical usage event and route marker in the same transaction; browser roles cannot invoke cores directly. `settle_udhar` uses the private repair-payment core, preserving its non-BILL behavior. No financial calculation was changed.
 - Shared 80 mm print-intent capture and IndexedDB device retry queue are implemented. Retail, repair parent, child, family summary and return slips are metered. Shift stats and salary slips have no document marker and remain explicitly excluded in this phase.
-- Staged `platform-bridge` Edge Function provides service-only outbound delivery and inbound revision application, disabled by absent configuration and disabled database delivery. No Edge deployment or real Platform exchange has been performed.
+- The deployed Shop-side `platform-bridge` Edge Function provides service-only outbound delivery and inbound revision application, disabled by absent configuration and disabled database delivery. Deployment does not establish that Platform ingestion, scheduling or billing cutover is enabled; real counterpart exchange remains future Platform work.
 
-## Concrete Shop bridge contract v1 (staged)
+## Concrete Shop bridge contract v1 (implemented; Platform counterpart future)
 
 All new tables are in `app_private`, RLS-enabled, and revoked from anonymous and authenticated roles. No browser may read raw usage/outbox or directly edit projection/request state. Source UUID comes from server provisioning; the browser supplies neither source nor client identity.
 
@@ -46,7 +48,7 @@ All new tables are in `app_private`, RLS-enabled, and revoked from anonymous and
 
 Service-only `bridge_claim_outbox(limit)` leases due records for two minutes, up to 100 per batch. Disabled delivery returns no events. `bridge_finish_delivery(event_id, lease_id, accepted)` accepts only the current lease, ACKs each event independently, or queues a bounded retry delay (30 seconds per attempt, up to one hour). Expired leases are recoverable. Platform must atomically deduplicate event IDs and reject payload conflicts before returning an explicit per-event durable acknowledgement. Do not use a largest-sequence ACK as evidence of receiving a gap-free prefix.
 
-`usage_mode=legacy` creates usage outbox records as `held_legacy`; other kinds remain pending but cannot leave the Shop while delivery is disabled. Switching mode does not retroactively release held legacy events. Operational wrappers return `usageEventId` and `usageDelivery` (`legacy`, `bridge`, or `none` for a historical replay without a new event). Client legacy logging only runs for new legacy-owned operations. The adapter supports a pre-migration response without the route marker, but skips known idempotent replays. **Capture and transport code are staged; live cutover is NOT complete.**
+`usage_mode=legacy` creates usage outbox records as `held_legacy`; other kinds remain pending but cannot leave the Shop while delivery is disabled. Switching mode does not retroactively release held legacy events. Operational wrappers return `usageEventId` and `usageDelivery` (`legacy`, `bridge`, or `none` for a historical replay without a new event). Client legacy logging only runs for new legacy-owned operations. The adapter supports a pre-migration response without the route marker, but skips known idempotent replays. **Shop capture/transport code is deployed; the separate Platform billing cutover is still future work.**
 
 ### Transport contract and configuration
 
@@ -56,7 +58,7 @@ POST body: `{ schema_version: 1, source_id, client_binding, events: [...] }`. Pl
 
 Reply: `{ schema_version: 1, source_id, acknowledgements: [{ event_id, status: "accepted" | "duplicate" }], billing?: { sync_version, payload }, resupply_updates?: [{ request_id, sync_version, status, platform_updated_at }] }`. Only one matching accepted/duplicate ACK marks a leased event delivered; missing/conflicting ACKs remain retryable. An empty event batch may still fetch projection/lifecycle updates. Unknown extra ACK IDs do not affect local events. Monetary/lifecycle publication is validated again in SQL. Secret-bearing errors and raw remote payloads are not returned to callers. A billing-revision rejection does not undo already durable per-event ACKs.
 
-Scheduling/provisioning is intentionally NOT installed. Deno type-check/runtime transport verification remains pending: the approval system could not complete the request to use the standard Deno package. Production Vite build does not validate Edge Functions.
+The Shop implementation does not install Platform scheduling/provisioning. Required Edge Functions are now deployed and client live smoke passed. The earlier local Deno check was blocked by package approval; no separate Deno type-check result or real Platform transport test is invented here. Production Vite build does not validate Edge Functions. Counterpart scheduling/provisioning and end-to-end transport acceptance belong to future Platform modernization.
 
 ### Inbound billing revision
 
@@ -92,12 +94,12 @@ Legacy browser delivery is retained only in `src/platform/legacy.js` using exist
 
 Current captured triggers are retail checkout, root repair creation, direct repair collection, inventory item creation. Split tenders are one operation. Udhar repair settlement uses the same financial core without emitting a new BILL. Prints, returns, child proposals/invoices and summaries do not create new BILL usage by inference.
 
-Deferred acceptance and explicit limits (per final user scope):
+Remaining future work and historical evidence limits:
 
 1. Broad financial/security/final-release regression is intentionally outside this closeout; it was not repeated. The existing `admin` PIN UI gates (open ticket editor and employee deactivation shortcut) were not database step-up consumers: account-admin uses canonical role/target checks, and employee status is also editable through the authorized form. No new privilege or PIN requirement is invented for these role-authorized operations. Inventory create/adjust is likewise role-authorized, not a PIN consumer.
-2. Edge Function Deno type-check/runtime and actual transport behavior require the deployment smoke gate. The final code inspection covered service-only authentication, disabled configuration, HTTPS/no redirects, bounded fetch timeout, lease expiry recovery, explicit per-event ACKs and database-validated projection/lifecycle revisions. No required functional change was identified. This inspection is not a substitute for runtime testing. The response-size check occurs after reading the body, not as a streaming memory cap; the endpoint must be trusted and bounded.
+2. Required Edge deployment and client live smoke are complete. The earlier transport inspection covered service-only authentication, disabled configuration, HTTPS/no redirects, bounded fetch timeout, lease expiry recovery, explicit per-event ACKs and database-validated revisions. Actual future Platform counterpart acceptance is not implied by that inspection or client smoke approval. The response-size check occurs after reading the body, not as a streaming memory cap; the endpoint must be trusted and bounded.
 3. Queue reload, permanent rejection recovery, actor switching and public tracker payloads now pass isolated checks. Extensive multi-tab simulation is deliberately deferred. Native printer-dialog/output remains a manual check; the fixture stubs native printing and cannot prove physical output.
-4. No live Supabase JWT or real Platform session results for this Phase 4 build are claimed. Use the short smoke checklist below after separately authorized deployment. The stopped local fixture was not revived or revalidated during final closeout; earlier successful SQL evidence remains the reported result.
+4. Phase 4 client live smoke is now confirmed passed by the project owner. This does not add per-case JWT, hardware or Platform exchange evidence beyond what was actually recorded. The earlier local SQL evidence below remains historical; no database or regression checks were rerun during this status update.
 
 Platform modernization must implement authenticated per-source ingest, immutable dedup/conflict handling, durable per-event acknowledgements, billing revision publication and request lifecycle publication. Provision source/client binding server-side, reconcile legacy ownership, agree the cutover boundary, and verify both sides before enabling delivery. Shop code alone cannot make current Platform accept this contract safely.
 
@@ -116,13 +118,14 @@ Cutover must also retire/refresh cached older Shop bundles and close the Platfor
 - `tests/phase4-browser.html`: 22/22 PASS, with browser console errors/warnings empty, for Owner-only menu permission, unavailable/stale billing, flag show/hide, hostile text in print builders, inventory/attribute/currency escaping, focus/caret preservation, five thermal document types, reprint/copies/80 mm, preview exclusion and outage recovery.
 - `tests/phase4-queue-browser.html`: 6/6 PASS: actual reload retains request ID, permanent rejection retained, later valid intent not blocked, rejected intent not retried, different actor cannot deliver another actor's entry, original actor resumes. One deliberate rejection warning is expected. Test-owned rejected entry was removed; no queue-wide deletion.
 - `tests/phase4-tracker-browser.html`: 3/3 PASS using the actual tracker renderer with fixture transport: customer/device/invoice text, component name/tag/custom text and no payload execution. Initial fixture-only flag/completion-signal issues were corrected before the passing run. Total isolated browser checks: 31 PASS, not 31 live end-to-end checks.
-- Live sessions, live Platform transport, native printer output and final release acceptance: PENDING. No Phase 4 production-readiness claim.
+- Current deployment/live acceptance: client Phase 4 smoke PASSED, latest migrations applied, required Edge Functions and Cloudflare frontend deployed (project-owner confirmation). Real Platform counterpart transport and final repo-wide regression/cleanup remain future work; physical printer results are not inferred from overall smoke approval.
+- Numeric-input follow-up: exact missing-key exception reproduced and fixed; 21 automated tests and production build passed at that patch checkpoint. Retail-checkout follow-up: one focused duplicate-submit/retry test and production build passed. Both fixes are now committed, pushed and deployed. No new tests were run for this documentation update.
 
-## Short live smoke checklist
+## Smoke checklist reference (client smoke completed; Platform items future)
 
-Run only after explicitly authorizing deployment. Keep bridge delivery disabled and usage ownership in legacy mode until the Platform counterpart and cutover are ready.
+The client deployment and overall Phase 4 live smoke gate are complete. The original checklist below is retained as an operational reference, not a pending client-phase gate or a claim that every unrecorded subcase was separately tested. Keep bridge delivery disabled and usage ownership in legacy mode until the Platform counterpart and cutover are ready.
 
-1. Apply the two migrations in order and deploy `verify-pin` plus `platform-bridge`; type-check Edge code in the deployment environment. Verify deployed migration history. Keep server credentials out of VITE/browser configuration.
+1. Completed deployment: both migrations applied and required Edge Functions deployed. For future releases, retain ordered migrations, Edge type-checking and migration-history checks; keep server credentials out of VITE/browser configuration. No new ledger/type-check result is claimed in this status update.
 2. Owner, Cashier, Technician and Support: login/refresh; only Owner can open Billing & Usage. Verify a denied role cannot call the billing RPC or read private bridge tables. Technician operational access and financial restrictions must remain unchanged.
 3. PIN: wrong then correct; five wrong attempts then refresh must stay blocked until cooldown expires. Approve one protected request; same-ID retry must not duplicate it, a separate request must require a new approval. Network failure must not say incorrect PIN.
 4. One retail sale, root repair, direct repair payment and inventory creation: each produces one expected canonical usage event; retry creates none. With Platform unavailable, Shop operations still succeed. Do not enable dual legacy/bridge charging.
@@ -132,9 +135,9 @@ Run only after explicitly authorizing deployment. Keep bridge delivery disabled 
 
 Steps 6–7 involving Platform publication cannot complete until its counterpart exists. Scheduling, source binding and per-source secrets are deployment/provisioning work, not silently installed by this change.
 
-## Exact changed-file manifest
+## Historical implementation file manifest
 
-Paths below are repository-relative. There are 25 modified tracked files and 24 new untracked files at closeout. Nothing is staged or committed by this task. `git diff --stat` excludes the new files; include them when reviewing the eventual commit.
+Paths below are repository-relative. The original pre-merge checkpoint contained 25 modified files and 24 new files. These are now committed and integrated; the labels below describe their original change classification, not current Git status. Post-deployment fixes additionally touched `src/numeric-input.js`, `src/pos/pos.js`, `tests/numeric-keydown.test.mjs` and `tests/retail-checkout-submit.test.mjs`.
 
 ```text
 Modified:
@@ -191,4 +194,4 @@ tests/phase4-tracker-browser.html
 tests/phase4-usage.sql
 ```
 
-Final closeout changes documentation only; the already successful production build, automated tests and browser evidence above were not rerun merely to generate another PASS count. Financial semantics, Technician permissions and existing applied migration files remain unchanged.
+This current status update changes documentation only. Historical build/test evidence above was not rerun. Financial semantics, Technician permissions and applied migration files are unchanged. Next: final repo-wide client regression/cleanup; separately, Orbito Platform modernization.

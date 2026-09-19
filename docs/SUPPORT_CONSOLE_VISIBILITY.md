@@ -2,6 +2,12 @@
 
 Date: 2026-09-15
 
+Current status: integrated into `development` and deployed. Phase 4 client live
+smoke passed, per project-owner confirmation. The table below preserves this
+batch's isolated test evidence; its unrecorded individual live cases are not
+automatically claimed passed by the overall smoke confirmation. See
+[project status](PROJECT_STATUS.md). Final client regression/cleanup is next.
+
 ## Root cause and audit
 
 index.html loads debuglog.js before main.js. Many modules also import that same
@@ -55,7 +61,7 @@ check private verified access. This is not a claim that client JavaScript is a
 security boundary against someone rewriting their own browser runtime; doing so
 does not confer any backend privileges. No weaker authorization substitute added.
 
-## Test matrix
+## Historical test matrix (original batch evidence)
 
 Tests use an isolated fake Auth/profile client, not real account credentials.
 
@@ -78,9 +84,9 @@ Tests use an isolated fake Auth/profile client, not real account credentials.
 - PASS: git diff --check.
 - No live DB writes, migrations, financial or role-permission changes.
 
-Ready for manual authenticated smoke. Actual login/logout/page-refresh persistence
-and full Workshop/Owner layouts require that manual pass; they are not claimed as
-live-tested here. Previous uncommitted dialog work was preserved. No commit,
-merge or repo-wide forensic cleanup performed.
+The original batch deferred individual authenticated smoke cases listed above.
+Current integrated client deployment and overall Phase 4 live smoke are complete;
+per-case results not recorded here remain unspecified, not a current merge hold.
+Repo-wide regression/cleanup remains the next planned client task.
 
 Reference checked: [Supabase getUser](https://supabase.com/docs/reference/javascript/auth-getuser).

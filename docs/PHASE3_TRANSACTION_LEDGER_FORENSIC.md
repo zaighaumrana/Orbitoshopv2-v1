@@ -8,7 +8,12 @@ Branch: `phase3-transaction-ledger`
 
 Starting HEAD: `972005ddf1d1f4b212c9735630b4971e727926`
 
-Merge status: not merged into `development`
+Merge status: Phase 3 completed and merged into `development`.
+
+Current integrated baseline: all completed client phases are in `development`;
+latest migrations, required Edge Functions and Cloudflare frontend are deployed,
+and Phase 4 live smoke passed (project-owner confirmation). The dated stage
+results below are historical, not new validation. See [project status](PROJECT_STATUS.md).
 
 This record intentionally contains no customer names, phone numbers, device
 identifiers, passwords, PINs, hashes, service keys, access tokens, refresh
@@ -578,8 +583,9 @@ Phase 3K server/build/data release gates passed:
   transaction/read RPCs plus the documented Phase 2 baseline; performance
   advisors report only unused-new-index and unrelated legacy index notices
 
-Not yet run: the final real-browser smoke; server-side authorization regression
-is complete.
+At this historical checkpoint the final real-browser smoke had not run.
+The current phase/merge hold is superseded by the integrated status above;
+individual historical test results are not being retroactively expanded.
 
 Security advisor baseline has no critical Phase 3 finding. Existing Phase 2
 notices remain: deliberately closed RLS/no-policy service tables, deliberately
@@ -619,23 +625,23 @@ Any rollback must switch readers/writers while
 retaining the backfilled financial and Inventory-opening records; it must not
 touch any legacy table or Phase 2 helper.
 
-After the ambiguity decision, deployment remains staged: ledger foundation,
+The historical deployment sequence after the ambiguity decision was: ledger foundation,
 deterministic backfill, atomic retail, atomic repair, additional work,
 adjustments/cancellation/delivery, returns/Inventory, unified reads/reporting,
 UI/printing, then the full financial and Phase 2 regression gate. Each database
-stage requires dry-run, DEV-only apply, verification, advisors and documentation.
+stage required dry-run, DEV-only apply, verification, advisors and documentation.
 
 ## 13. Residual risks and merge recommendation
 
 - Historical Inventory movements/restock cannot be reconstructed.
 - Two legacy Ready timestamps are not physical-delivery evidence.
-- The complete real-browser regression remains for Phase 3K/manual validation;
-  the automated Windows browser-control runtime could not initialize.
+- The early Phase 3 browser checkpoint was limited by browser-control startup.
+  It is historical evidence, not a current merge blocker. Final repo-wide
+  regression/cleanup is now the next planned client task.
 - Existing `SECURITY DEFINER`, leaked-password-plan and unindexed-FK notices
   remain documented Phase 2/baseline risks.
 
-Recommendation: HOLD merge only for the explicit real-browser smoke. Database,
-authorization, migration, build and data-integrity gates are green. Preserve
-the documented legacy Inventory/delivery exceptions, do not invent historical
-values, and do not merge `phase3-transaction-ledger` into `development` without
-explicit approval.
+Current disposition: Phase 3 is completed and merged into `development`; the
+former smoke/merge hold is superseded. Preserve documented legacy
+Inventory/delivery exceptions without inventing historical values. Separate
+Platform modernization remains future work.

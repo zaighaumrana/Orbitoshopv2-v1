@@ -1,11 +1,12 @@
 # Phase 2 Auth/RLS Forensic Record
 
-> Phase 4 development note (2026-09-18): this document records the historical
-> deployed Phase 2 state. The uncommitted, **not remotely applied** Phase 4
-> security migration adds actor-backed PIN cooldowns and one-request approval
-> consumption, replacing reusable time-window checks. See
-> [Phase 4 work log](PHASE4_PLATFORM_BRIDGE_BILLING_PAPER.md) for staged code and
-> local-only test evidence; these changes do not alter this record's live claims.
+> Current status: Phase 2 is completed and merged into `development`. Phase 4
+> client work is also merged, migrated, deployed and live-smoke tested, as confirmed
+> by the project owner. Its security migration replaces reusable time-window
+> approvals with actor-backed PIN cooldowns and one-request approval consumption.
+> The evidence below is the historical Phase 2 record; see
+> [current integrated status](PROJECT_STATUS.md) and the
+> [Phase 4 report](PHASE4_PLATFORM_BRIDGE_BILLING_PAPER.md) for subsequent work.
 
 Date completed: 2026-09-04
 
@@ -13,7 +14,7 @@ Supabase DEV project: `kxmovywgshyltwusghhj`
 
 Branch: `phase2-auth-rls`
 
-Merge status: not merged into `development`
+Merge status: completed; integrated into `development` (original implementation branch retained below as history).
 
 This record intentionally contains no passwords, PINs, hashes, service keys,
 access tokens, refresh tokens, or authorization headers.
@@ -27,8 +28,8 @@ public tables have RLS enabled, and the complete executable anonymous/role/PIN/
 suspension matrix passed.
 
 The required Owner, existing Cashier, Orbito Support, disposable Manager and
-disposable Technician real-session gates all passed cleanly. The branch remains
-intentionally unmerged.
+disposable Technician real-session gates all passed cleanly. The completed work
+has since been merged into `development`.
 
 ## Repository and deployment preflight
 
@@ -331,7 +332,11 @@ No critical authorization finding was reported. Known notices are:
 - INFO: several existing foreign keys lack covering indexes; this is a
   performance backlog, not an authorization bypass
 
-## Residual gaps and deferred work
+## Historical residual gaps and subsequent disposition
+
+The identity counts and plan limitations below describe the Phase 2 audit
+snapshot, not a fresh inspection. Deployment confirmation alone does not prove
+that remaining identity/plan risks were removed.
 
 - Nine fully linked disposable Auth/app/employee identity chains remain
   Inactive. They are not authorization-capable or orphaned, but permanent
@@ -344,12 +349,14 @@ No critical authorization finding was reported. Known notices are:
   screening is a release requirement. Until then, password strength rules,
   reset controls and server-side role enforcement do not detect a password that
   appears in the Have I Been Pwned corpus.
-- Ticket updates are row-authorized but not yet column/transition-specific.
-- Step-up rows are exact-purpose and short-lived but reusable during their
-  approximately 75-second lifetime.
-- Atomic retail/Udhar/inventory, repair payment allocation, returns accounting,
-  repair workflow/financial state separation and billing reconciliation remain
-  explicitly deferred to later stabilization phases.
+- Phase 3 subsequently added guarded repair transaction/transition paths; see
+  its forensic record for the precise boundaries rather than the old Phase 2 limitation.
+- Phase 4 replaced reusable approximately 75-second step-up approvals with
+  request-scoped consumption and actor-backed PIN throttling; deployed.
+- Atomic retail/Udhar/inventory, repair payment allocation, returns accounting
+  and repair workflow/financial separation were delivered in Phase 3. Phase 4
+  delivered the client billing bridge/projection. Separate Platform billing
+  modernization/reconciliation remains future work.
 
 ## Rollback boundary
 
@@ -367,8 +374,7 @@ and Technician sessions passed; local and remote migration histories match; the
 linked dry-run is up to date; and disposable test cleanup has no active or
 orphaned identities.
 
-Recommendation: Phase 2 is merge-ready subject to explicit acceptance of the
-documented Supabase-plan leaked-password risk and the residual later-phase
-items above. Keep `phase2-auth-rls` unmerged until the requested review/merge
-decision. The exact final commit SHA is reported by Git after this document is
-committed, because a commit cannot contain its own hash.
+Current disposition: Phase 2 is completed and merged into `development`.
+The former hold-for-review recommendation is superseded. Historical residual
+items must be read alongside completed Phase 3/4 work; the documented
+Supabase-plan leaked-password risk is not newly certified resolved here.

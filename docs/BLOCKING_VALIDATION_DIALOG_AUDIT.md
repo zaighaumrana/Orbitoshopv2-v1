@@ -2,6 +2,10 @@
 
 Date: 2026-09-14
 
+Current status: integrated into `development` and deployed with the completed
+client phases. Phase 4 live smoke passed (project-owner confirmation). Historical
+audit/test details below are unchanged; see [project status](PROJECT_STATUS.md).
+
 ## Result
 
 Converted 94 explicit blocking toast call sites across seven frontend modules, plus the shared dialog action exception handler. No global toast interception: success/information toasts remain available, and transient numeric-input feedback and existing inline PIN/login validation remain unchanged.
@@ -169,4 +173,4 @@ The action catch handler now shows its failure inside the current centered dialo
 
 ## Release status
 
-Ready for review. No commit or merge performed. Business rules and backend access controls unchanged.
+Completed, merged and deployed. Business rules and backend access controls unchanged.

@@ -1,5 +1,13 @@
 # DEBUG INSTRUMENTATION — REMOVAL CHECKLIST
 
+> HISTORICAL CHECKLIST — not the current diagnostics design or an instruction to
+> delete deployed functionality. The logger subsequently became a default-deny,
+> Support-only console; see [current console design](docs/SUPPORT_CONSOLE_VISIBILITY.md).
+> Phases 1–4 client work is merged into `development` and deployed. Final repo-wide
+> regression/cleanup is next; any diagnostic removal must be scoped there and
+> preserve intended Support behavior. The original inventory below may contain
+> obsolete paths/line counts. See [project status](docs/PROJECT_STATUS.md).
+
 This is temporary logging added to catch the exact function responsible for the
 "Admin creates first repair ticket → app redirects to Dashboard" bug. Logging
 now covers the whole app, not just the POS/Admin/router path.
@@ -9,7 +17,8 @@ Every addition is either a new standalone file, a new `<script>` tag, a new
 (a few are inline with an existing one-line guard clause — called out below).
 **Nothing existing was deleted, reordered, or changed in behavior.**
 
-Once the bug is found and fixed, remove everything listed below, in this order.
+Original proposal (superseded): remove the listed temporary instrumentation once
+the bug is fixed. Do not execute this inventory as a current removal plan.
 
 ---
 

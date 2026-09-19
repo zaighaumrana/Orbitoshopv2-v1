@@ -1,8 +1,15 @@
 # Phase 3 final consistency stabilization
 
+Current status: Phase 3 and these follow-ups are completed and merged into the
+integrated `development` baseline. Latest frontend is deployed through Cloudflare;
+Phase 4 client live smoke passed, per project-owner confirmation. Dated fixture
+results below remain historical evidence, not newly run live checks. See
+[project status](PROJECT_STATUS.md). Next client task: final repo-wide
+regression/cleanup. Separate Platform modernization remains future work.
+
 ## Final Workshop and intake patch — 2026-09-17
 
-Two additional consistency fixes are implemented, uncommitted and unmerged.
+Two additional consistency fixes were implemented in this checkpoint and are now merged and deployed.
 
 ### Approved operational family scope
 
@@ -39,9 +46,9 @@ Verification: 11/11 Node tests pass, covering approved child work exactly once, 
 
 Final console recheck: no error-level entries, but one Cloudflare Turnstile warning (`300030`) was captured in the development browser session. The first fixture run had no warnings; the later session included a rebuild/reload. Its origin was not established, so this is not a blanket clean-console certification of live authentication.
 
-Limitations: browser RPCs are stubbed; these results do not claim a live saved-ticket transaction, live JWT/RLS retest, or physical print. Persistence support was verified against the existing SQL/client payload, not by creating a live test ticket. Existing API row limits still bound large queue reads. Ready for focused online acceptance; no wider smoke test, cleanup, commit, or merge performed.
+Historical fixture limitations: browser RPCs were stubbed; these results do not independently prove a live saved-ticket transaction, live JWT/RLS retest, or physical print. Persistence support was checked against the existing SQL/client payload, not by creating a live test ticket. Existing API row limits still bound large queue reads. The original acceptance/merge hold is superseded by the current integrated deployment status above.
 
-Date: 2026-09-16. Implementation complete for review; not committed or merged.
+Original checkpoint date: 2026-09-16. This implementation is now committed, merged and deployed.
 
 ## Scope and safety
 
@@ -113,6 +120,7 @@ Node regressions cover offset-less/offset-aware UTC equivalence, Asia/Karachi ne
 
 ## Limitations / review recommendation
 
-Ready for code review and targeted online acceptance, not a claim of a new completed live smoke test. Live additional-work persistence, role-authenticated sessions, actual printer output/pagination, and browser navigation during real transactions were not retested in this isolated fixture. The fixture blocks outbound fetch and uses disposable in-memory data; it is not shipped by the production entry point. Browser locale controls the displayed date/time convention. Legacy offset-less database timestamps are assumed UTC, matching the existing backend write convention.
+This batch is now integrated and deployed. The original isolated fixture did not retest live additional-work persistence, role-authenticated sessions, actual printer output/pagination, or navigation during real transactions; that evidence limitation remains distinct from the subsequently confirmed Phase 4 live smoke pass. The fixture blocks outbound fetch and uses disposable in-memory data; it is not shipped by the production entry point. Browser locale controls the displayed date/time convention. Legacy offset-less database timestamps are assumed UTC, matching the existing backend write convention.
 
-No wider smoke testing, cleanup, commit, push, or merge was performed for this batch.
+No wider smoke testing or cleanup was performed in the original fixture batch.
+Its former commit/merge hold is superseded by the integrated deployment status above.

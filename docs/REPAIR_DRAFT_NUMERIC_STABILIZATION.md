@@ -1,7 +1,19 @@
 # Repair draft editing and numeric-input stabilization
 
 Date: 2026-09-14. Scope: the two additional online-smoke findings only.
-No schema/migration, financial-ledger semantics, commit, merge, or wider smoke-test changes.
+Original batch made no schema/migration or financial-ledger semantic changes.
+Current status: completed, committed, merged into `development` and deployed.
+See [project status](PROJECT_STATUS.md) for the integrated Phases 1–4 baseline.
+
+## Deployed numeric-input runtime follow-up
+
+The document-level numeric `keydown` listener assumed `event.key` was always a
+string and read `.length` when a synthetic event could omit it. A string-type
+guard now ignores missing/non-string keys without weakening normal numeric
+validation. This pre-existing issue was reproduced and fixed; the focused test,
+21-test automated run and production build passed at that patch checkpoint.
+The follow-up is committed, pushed and deployed per project-owner confirmation.
+No new test run was performed for this documentation update.
 
 ## Root causes and implementation
 
@@ -97,7 +109,7 @@ and was preserved, not modified by this batch.
 
 ## Readiness and remaining limits
 
-Ready for code review and commit of this scoped batch; no commit or merge performed.
-Live database persistence, physical mobile-keyboard testing, and the broader
-online-smoke sequence remain separate verification work. No claim of a full
-live regression pass is made here.
+This batch is integrated and deployed; its review/commit hold is superseded.
+Phase 4 client live smoke passed. The fixture evidence above does not establish
+physical mobile-keyboard coverage or a full repo-wide regression pass. Final
+repo-wide regression/cleanup is the next client task.
