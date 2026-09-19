@@ -27,12 +27,21 @@ begin
   assert r->>'usageDelivery'='bridge','New operation route not bridge';
   assert (select count(*)=2 from app_private.bridge_events),'Root not captured';
   r:=public.record_repair_payment('44444444-4444-4444-8444-444444444444',root_id,'[{"amount":10,"method":"Cash","cashTendered":10}]');
-  assert (select count(*)=3 from app_private.bridge_events),'Direct collection not BILL';
+  assert (select count(*)=2 from app_private.bridge_events),'Direct collection incorrectly creates BILL';
+  assert r->>'usageDelivery'='none','Payment returned billable route';
   perform public.record_repair_payment('44444444-4444-4444-8444-444444444444',root_id,'[{"amount":10,"method":"Cash","cashTendered":10}]');
-  assert (select count(*)=3 from app_private.bridge_events),'Collection replay duplicated';
+  assert (select count(*)=2 from app_private.bridge_events),'Collection replay created BILL';
   perform public.create_inventory_item('55555555-5555-4555-8555-555555555555','Fixture','','General',10,5,1,0);
-  assert (select count(*)=4 from app_private.bridge_events),'Inventory not captured';
+  assert (select count(*)=3 from app_private.bridge_events),'Inventory not captured';
   assert (select body->>'metric'='INVENTORY' from app_private.bridge_events where operation='create_inventory_item');
+  r:=public.approve_additional_work('88888888-8888-4888-8888-888888888888',root_id,
+    'Fixture work','{"components":[],"labourCost":5}',5);
+  assert (select count(*)=4 from app_private.bridge_events),'Child invoice not captured';
+  assert r->>'usageDelivery'='bridge','Child missing bridge route';
+  second:=public.approve_additional_work('88888888-8888-4888-8888-888888888888',root_id,
+    'Fixture work','{"components":[],"labourCost":5}',5);
+  assert second->>'usageEventId'=r->>'usageEventId','Child retry event changed';
+  assert (select count(*)=4 from app_private.bridge_events),'Child retry rebilled';
   -- Stage an existing authorized repair credit account in this test only.
   perform public.verify_override_pin_guarded(auth.uid(),'1234','udhar');
   approval:=app_private.claim_step_up('udhar','66666666-6666-4666-8666-666666666666','fixture','{}');

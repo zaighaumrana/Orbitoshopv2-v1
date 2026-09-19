@@ -15,7 +15,7 @@
    file importing from a view-owned one would invert the intended
    dependency direction.
 ═══════════════════════════════════════════════════════════════════ */
-import { sb } from '../../shared.js'
+import { sb, logBillEvent } from '../../shared.js'
 import { dlog, dstack } from '../../debuglog.js'
 
 const pendingAdditionalWorkRequests = new Map()
@@ -137,18 +137,25 @@ export async function recordAdditionalWork(rootTicketId, description, components
   })
   if (error) return { ok:false, error:error.message }
   additionalWorkAttempts.delete(key)
+  if (data.ticket && data.usageEventId) logBillEvent(data)
   return { ok:true, proposal:data.proposal, ticket:data.ticket }
 }
 
+const additionalDecisionAttempts = new Map()
 export async function decideAdditionalWork(proposalId, decision, method, note) {
+  const key = JSON.stringify([proposalId, decision, method, note])
+  const requestId = additionalDecisionAttempts.get(key) || crypto.randomUUID()
+  additionalDecisionAttempts.set(key, requestId)
   const { data, error } = await sb.rpc('decide_additional_work', {
-    p_request_id: crypto.randomUUID(),
+    p_request_id: requestId,
     p_proposal_id: proposalId,
     p_decision: decision,
     p_decision_method: method,
     p_decision_note: note || '',
   })
   if (error) return { ok:false, error:error.message }
+  additionalDecisionAttempts.delete(key)
+  if (data.ticket && data.usageEventId) logBillEvent(data)
   return { ok:true, proposal:data.proposal, ticket:data.ticket }
 }
 

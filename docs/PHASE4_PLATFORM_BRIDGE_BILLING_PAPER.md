@@ -6,6 +6,37 @@ Both post-deployment fixes are committed, pushed and deployed: missing/non-strin
 
 ## Implementation map
 
+### Forward billing-semantics correction (local, not yet applied/deployed)
+
+`20260919043803_phase4_invoice_creation_bill_semantics.sql` supersedes the
+original compatibility semantics described later in this historical report.
+BILL now means creation of one customer-facing invoice: one retail sale
+(any items/payment method), one parent repair, or one approved child invoice.
+Pending/Declined proposals and all later payments, settlement, status changes,
+refunds/returns, adjustments/cancellation and printing create no additional BILL.
+Reprints still produce separate thermal intents; INVENTORY usage is unchanged.
+
+The additional-work decision wrapper captures at successful canonical child
+creation through the existing private bridge helper, keyed by the child's stable
+`tickets.request_id` and operation `create_repair_subinvoice`. Both direct
+decisions and `approve_additional_work` pass through it. Retries deduplicate;
+historical creation retries are not backfilled. The financial core is unchanged.
+Payment returns `usageDelivery=none`, and its frontend no longer logs BILL.
+Child frontend logging respects the existing bridge/legacy ownership marker.
+
+Existing immutable payment events and outbox history are not deleted/repriced.
+Existing `legacy` mode still holds canonical events as `held_legacy`; `bridge`
+mode queues them for delivery. This correction does not silently enable delivery,
+release held history, or double-send legacy-owned usage. Retire cached older
+frontends at deployment; reconciling historical legacy billing remains a separate
+explicit Platform cutover decision.
+
+Validation: three focused Node contract/client tests and production build PASS;
+diff sanity PASS. Updated SQL usage fixture is supplied but was not executed
+against a database in this correction. Apply migration before the updated frontend,
+then smoke the ten requested invoice/payment/print cases and same-ID retries.
+This local correction does not change the completed base Phase 4 deployment status.
+
 1. S1: extend existing `src/html.js` escaping across Admin, POS, Workshop, repairs, inventory, EMS, receipts, and public tracker. Preserve trusted markup and numeric identifiers; validate URL contexts separately.
 2. S9: replace temporary-password `Math.random` with rejection-sampled Web Crypto and guaranteed existing password-policy character classes.
 3. S2: service-only transactional PIN verification/attempt state/authorization issuance, actor-keyed cooldowns; distinguish infrastructure errors from wrong/locked PIN.

@@ -69,7 +69,7 @@ export async function collectTicketPayment(ticket, payAmount, payMethod, request
     }],
   })
   if (error) { dlog('pos.repairs.collectTicketPayment', `FAILED: ${error.message}`); return { ok: false, error: error.message } }
-  logBillEvent(data)
+  // Collection is not invoice creation; no BILL (thermal printing is separate).
   dlog('pos.repairs.collectTicketPayment', `SUCCEEDED replay=${data.idempotentReplay}`)
   return { ok: true, data }
 }
