@@ -207,7 +207,7 @@ function workshopView() {
               <span class="muted" style="font-size:12px">
                 ${escapeHTML(t.invoice_number || t.ticket_number)}
                 ${t.customer_phone ? '· ' + escapeHTML(t.customer_phone) : ''}
-                ${t._matchedChild ? `<br><span style="color:var(--primary)">Matched: ${t._matchedChild.invoice_number || t._matchedChild.ticket_number}</span>` : ''}
+                ${t._matchedChild ? `<br><span style="color:var(--primary)">Matched: ${escapeHTML(t._matchedChild.invoice_number || t._matchedChild.ticket_number)}</span>` : ''}
               </span>
             </div>
             <span class="badge ${statusColors[t.status] || 'warn'}"
@@ -223,7 +223,7 @@ function workshopView() {
           <!-- Components -->
           ${t._work.some(work => work.components.length || work.hasLabour || work.note) ? t._work.map(work => `
             <div style="display:grid;gap:6px">
-              ${t._work.length > 1 ? `<small class="muted">${work.additional ? 'Additional Work' : 'Original Repair'} · ${work.invoice || ''}</small>` : ''}
+              ${t._work.length > 1 ? `<small class="muted">${work.additional ? 'Additional Work' : 'Original Repair'} · ${escapeHTML(work.invoice || '')}</small>` : ''}
               ${work.components.map(c => `
                 <div style="display:flex;justify-content:space-between;
                             align-items:center;padding:7px 10px;

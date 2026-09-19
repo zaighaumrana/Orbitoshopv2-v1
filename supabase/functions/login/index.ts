@@ -192,40 +192,9 @@ async function verifyLegacyIdentity(
     return (data?.[0] as LegacyIdentity | undefined) ?? null
   }
 
-  // Transitional compatibility only; the vault migration removes this path's data source.
-  const { data: config, error: configError } = await admin
-    .from('shop_config')
-    .select('owner_email, owner_password')
-    .eq('id', 1)
-    .single()
-  if (configError) throw new Error('Owner identity lookup failed.')
-  if (normalizeEmail(config.owner_email ?? '') === email && config.owner_password === password) {
-    return {
-      normalized_email: email,
-      identity_type: 'owner',
-      employee_id: null,
-      display_name: 'Admin',
-      app_role: 'Business Owner',
-      app_status: 'Active',
-    }
-  }
-
-  const { data: employee, error: employeeError } = await admin
-    .from('employees')
-    .select('id, name, role, status, email, password')
-    .ilike('email', email)
-    .maybeSingle()
-  if (employeeError) throw new Error('Employee identity lookup failed.')
-  if (!employee || employee.password !== password || employee.status !== 'Active') return null
-  if (!['Manager', 'Cashier', 'Technician'].includes(employee.role)) return null
-  return {
-    normalized_email: email,
-    identity_type: 'employee',
-    employee_id: employee.id,
-    display_name: employee.name,
-    app_role: employee.role,
-    app_status: employee.status,
-  } as LegacyIdentity
+  // Applied Phase 2 constraints require legacy plaintext columns to stay NULL.
+  // Unmigrated accounts may still use the hash vault above, never plaintext.
+  return null
 }
 
 async function migrateLegacyLogin(
@@ -355,8 +324,10 @@ async function bootstrapSupportSession(
       return { ok: false, error: 'Support session could not be created.' }
     }
   } else {
-    const authUser = await findAuthUserByEmail(admin, supportEmail)
-    if (!authUser || authUser.id !== profile.auth_user_id || profile.employee_id !== null) {
+    const { data, error } = await admin.auth.admin.getUserById(profile.auth_user_id)
+    const authUser = data?.user
+    if (error || !authUser || authUser.id !== profile.auth_user_id
+      || normalizeEmail(authUser.email ?? '') !== supportEmail || profile.employee_id !== null) {
       return { ok: false, error: 'Client support identity requires administrator recovery.' }
     }
   }

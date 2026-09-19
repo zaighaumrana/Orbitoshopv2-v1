@@ -123,6 +123,10 @@ window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault(); state.installPrompt = e
 })
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js')
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {
+    console.warn('Service worker registration unavailable; continuing online-only.')
+  })
+}
 
 boot()
