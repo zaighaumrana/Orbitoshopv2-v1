@@ -19,12 +19,13 @@ import { escapeHTML } from "../../../html.js"
    from admin.js -- same pattern as adminInventoryPage({filter, tit})
    and reportsPage({tit}).
 ═══════════════════════════════════════════════════════════════════ */
-import { state, money, moneyHTML, fld, modalActions } from '../../../shared.js'
+import { state, CFG, money, moneyHTML, fld, modalActions } from '../../../shared.js'
 
 export function catalogPage({ tit, adminState, isAllowed }) {
   if (!isAllowed)
     return `<div class="card"><p class="muted">Catalog is available to Managers and the Business Owner only.</p></div>`
-  const tabs = { quickitems:'Quick Items', components:'Components' }
+  const tabs = { quickitems:'Quick Items', ...(CFG.repair_module_enabled ? { components:'Components' } : {}) }
+  if (!tabs[adminState.catalogTab]) adminState.catalogTab = 'quickitems'
   return `
     ${tit('Catalog','Quick sale items and repair components.','')}
     <div class="settings-tabs">
@@ -36,7 +37,7 @@ export function catalogPage({ tit, adminState, isAllowed }) {
 }
 
 export function catalogTabContent(adminState) {
-  if (adminState.catalogTab === 'components') {
+  if (adminState.catalogTab === 'components' && CFG.repair_module_enabled) {
     const comps = state.data.repairComponents || []
     return `
       <div class="card" style="display:grid;gap:14px">

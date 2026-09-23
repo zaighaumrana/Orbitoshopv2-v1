@@ -4,7 +4,7 @@ import { escapeHTML } from "../../../html.js"
    Admin-exclusive EMS dashboard -- attendance/leave/salary tabs,
    salary slip generation, and the mega click/submit handler covering
    all three. Verified by actual caller: loadEMSData/emsView/
-   attachEMSEvents/resetEMSEvents/generateSalarySlip/buildSalarySlipHTML
+   attachEMSEvents/generateSalarySlip/buildSalarySlipHTML
    are called only from admin.js.
 
    The shared clock-in gate (checkClockIn, called from main.js) and the
@@ -22,7 +22,7 @@ import { escapeHTML } from "../../../html.js"
    file's header comment for why).
 ═══════════════════════════════════════════════════════════════════ */
 import {
-  sb, state, CFG, money, moneyHTML,
+  sb, state, CFG, money, moneyHTML, can,
   _clearSession, showBlockingError, showToast,
 } from '../../../shared.js'
 import { navigate } from '../../../router.js'
@@ -500,11 +500,13 @@ export function buildSalarySlipHTML(slip, employeeName, shopName) {
    Call attachEMSEvents(app, emsData, reloadFn, sess) from admin.js
 ════════════════════════════════════════════════════════════════ */
 export function attachEMSEvents(app, getEMSData, reloadFn, sess) {
+  SESSION = sess
   if (_eventsAttached) return
   _eventsAttached = true
   SESSION = sess
 
   app.addEventListener('click', async e => {
+    if (window.location.pathname !== '/admin/ems' || !can('ems', state.role)) return
     const el = e.target.closest(
       '[data-ems-tab],[data-ems-leave-filter],[data-ems-leave-action],[data-print-slip]'
     )
@@ -525,7 +527,7 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess) {
       const action  = el.dataset.emsLeaveAction
       const { error } = await sb.from('leaves').update({
         status:      action,
-        reviewed_by: sess.employee?.id || null,
+        reviewed_by: SESSION.employee?.id || null,
         reviewed_at: new Date().toISOString(),
       }).eq('id', leaveId)
       if (error) { showBlockingError('Error: ' + error.message); return }
@@ -544,6 +546,7 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess) {
   })
 
   app.addEventListener('input', e => {
+    if (window.location.pathname !== '/admin/ems' || !can('ems', state.role)) return
     const t = e.target
     if (t.dataset.emsAttendanceFilter !== undefined) {
       emsState.attendanceFilter = t.value; reloadFn()
@@ -551,6 +554,7 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess) {
   })
 
   app.addEventListener('submit', async e => {
+    if (window.location.pathname !== '/admin/ems' || !can('ems', state.role)) return
     const form = e.target
     if (!form.dataset.form) return
     e.preventDefault()
@@ -576,16 +580,11 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess) {
       if (!empId || !month || !year) { showBlockingError('Please fill all fields.'); return }
       const btn = form.querySelector('button[type="submit"]') || form.querySelector('button')
       if (btn) { btn.disabled = true; btn.textContent = 'Generating…' }
-      const result = await generateSalarySlip(empId, month, year, sess.employee?.id)
+      const result = await generateSalarySlip(empId, month, year, SESSION.employee?.id)
       if (btn) { btn.disabled = false; btn.textContent = 'Generate' }
       if (!result.ok) { showBlockingError('Error: ' + result.error); return }
       showToast('Salary slip generated successfully.', 'success')
       await reloadFn(); return
     }
   })
-}
-
-/* Reset events flag when EMS view is unmounted */
-export function resetEMSEvents() {
-  _eventsAttached = false
 }

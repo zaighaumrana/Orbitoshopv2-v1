@@ -3,7 +3,7 @@ import { rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../featu
 import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
   _clearSession,
-  can, ACCESS, validatePassword,
+  can, modalEntitled, ACCESS, validatePassword,
   money, moneyHTML, fld, modalActions, statusBadge,
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   logBillEvent,
@@ -65,8 +65,18 @@ let _inv = null  // populated via dynamic import only when inventory_module_enab
 
 /* ── Load ── */
 async function load() {
+  const loadSession = SESSION
+  const loadPath = window.location.pathname
   dlog('ADMIN.load', `ENTRY adminModule=${adminState.adminModule}`)
   await loadConfig()
+  if (!window.location.pathname.startsWith('/admin') || state.role !== SESSION.employee?.role) return
+  if (!can(adminState.adminModule, state.role)) {
+    state.modal = null
+    adminState.adminModule = 'dashboard'
+    const { navigate } = await import('../router.js')
+    navigate('/admin/dashboard', { replace:true })
+    return
+  }
   if (CFG.inventory_module_enabled && !_inv) {
     _inv = await import('../features/admin/inventory/index.js')
   }
@@ -76,7 +86,7 @@ async function load() {
     catch { billingResult = { available: false } }
   }
   const needs = {
-    tickets: ['dashboard','repairs','reports','receipts'].includes(mod),
+    tickets: CFG.repair_module_enabled && ['dashboard','repairs','reports','receipts'].includes(mod),
     sales: ['dashboard','reports','receipts'].includes(mod),
     employees: ['dashboard','employees'].includes(mod),
     udhar: ['dashboard','reports','receipts'].includes(mod),
@@ -84,7 +94,7 @@ async function load() {
     returns: ['reports','receipts'].includes(mod),
     inventory: mod === 'inventory' && CFG.inventory_module_enabled,
     quickItems: mod === 'catalog',
-    repairComponents: mod === 'catalog' || mod === 'repairs',
+    repairComponents: CFG.repair_module_enabled && (mod === 'catalog' || mod === 'repairs'),
   }
   const skip = { data: [] }
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
@@ -105,6 +115,7 @@ async function load() {
     needs.quickItems ? sb.from('quick_items').select('*').order('sort_order') : skip,
     needs.repairComponents ? sb.from('repair_components').select('*').order('sort_order') : skip,
   ])
+  if (SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== loadPath) return
   state.data = {
     tickets:          tickets.data          || [],
     sales:            sales.data            || [],
@@ -120,14 +131,16 @@ async function load() {
   applyBranding()
   dlog('ADMIN.load', `DATA READY (queries resolved) adminModule=${adminState.adminModule}`)
 
-  if (adminState.adminModule === 'ems') {
+  if (adminState.adminModule === 'ems' && can('ems', state.role)) {
     const { loadEMSData, emsView, attachEMSEvents } = await import('../features/admin/ems/index.js')
+    if (!can('ems', state.role) || window.location.pathname !== '/admin/ems') return
     const emsData = await loadEMSData()
     adminState._emsData = emsData
     adminState._emsHTML = emsView(emsData, SESSION)
     render()
     const app = document.getElementById('app')
     attachEMSEvents(app, () => adminState._emsData, async () => {
+      if (!can('ems', state.role) || window.location.pathname !== '/admin/ems') return
       const fresh = await loadEMSData()
       adminState._emsData = fresh
       adminState._emsHTML = emsView(fresh, SESSION)
@@ -143,6 +156,7 @@ async function load() {
 let _eventsAttached = false
 
 function render() {
+  if (!window.location.pathname.startsWith('/admin') || state.role !== SESSION.employee?.role) return
   dstack('ADMIN.render', `*** #app REWRITE *** adminModule=${adminState.adminModule}`)
   const tenant = currentTenant()
   if (!can(adminState.adminModule, state.role)) adminState.adminModule = 'dashboard'
@@ -175,7 +189,7 @@ function render() {
             </span>
             ${(SESSION.isAdmin || state.role === 'Business Owner') ? `
               <button class="secondary-button" data-action="go-pos">POS</button>
-              ${CFG.technician_module_enabled
+              ${can('workshop', state.role)
                 ? `<button class="secondary-button" data-action="go-workshop">Workshop</button>`
                 : ''}
             ` : ''}
@@ -246,7 +260,7 @@ function dashboard() {
     ${tit('Dashboard','Live overview of sales, tickets, and operations.',
       `<button class="primary-button" data-action="go-pos">Go to POS</button>`)}
     <div class="grid kpi-grid">
-      ${kpis.map(([l,v,target]) => `
+      ${kpis.filter(([, ,target]) => target === 'udharList' || can(target, state.role)).map(([l,v,target]) => `
         <div class="card kpi" style="cursor:pointer" data-kpi-target="${target}">
           <span class="label">${l}</span>
           <span class="value">${typeof v === 'number' && !['Open Tickets','Employees'].includes(l)
@@ -271,7 +285,7 @@ function dashboard() {
       <div class="card">
         <h2>Operational Alerts</h2>
         <div class="list">
-          <div class="list-row"><span>Pending Repairs</span><strong>${pending}</strong></div>
+          ${CFG.repair_module_enabled ? `<div class="list-row"><span>Pending Repairs</span><strong>${pending}</strong></div>` : ''}
           <div class="list-row"><span>Outstanding Udhar</span><strong>${(state.data.udharAccounts||[]).length}</strong></div>
           <div class="list-row"><span>Today's Payment Events</span><strong>${Number(todayFinancial.paymentCount || 0)}</strong></div>
           <div class="list-row"><span>Active Employees</span><strong>${(state.data.employees||[]).filter(e=>e.status==='Active').length}</strong></div>
@@ -508,6 +522,7 @@ function settingsTabContent() {
 /* ═══════════════ MODALS ═══════════════ */
 function renderModal() {
   if (!state.modal) return ''
+  if (!modalEntitled(state.modal.type)) { state.modal = null; return '' }
   const { type, id } = state.modal
 
   if (type === 'pinPrompt') return `<div class="modal-backdrop">${pinPromptHTML(state.modal.purpose)}</div>`
@@ -640,6 +655,7 @@ function attachEvents() {
 
   // Click delegation
   app.addEventListener('click', async e => {
+    if (!can(adminState.adminModule, state.role) || !modalEntitled(state.modal?.type)) return
     // Route guard: this listener is permanently attached to #app for the
     // rest of the session once /admin has been visited once, even after
     // navigating to /pos or /workshop. Without this check, a click on a
@@ -666,7 +682,7 @@ function attachEvents() {
       state.modal = null; render(); return
     }
     if (el.dataset.action === 'paper-resupply') {
-      if (resupplyBusy || !can('billing-usage', state.role)) return
+      if (resupplyBusy || !can('billing-usage', state.role) || billingResult?.projection?.paper_resupply_enabled !== true) return
       resupplyBusy = true; render()
       try {
         const { data: { user }, error } = await sb.auth.getUser()
@@ -711,17 +727,22 @@ function attachEvents() {
       return
     }
     if (el.dataset.catalogTab) {
+      if (el.dataset.catalogTab === 'components' && !CFG.repair_module_enabled) return
       const { navigate } = await import('../router.js')
       navigate(`/admin/catalog?tab=${el.dataset.catalogTab}`, { replace: true, force: true })
       return
     }
-    if (el.dataset.modal) { state.modal = { type:el.dataset.modal, id:el.dataset.id }; render(); return }
+    if (el.dataset.modal) {
+      if (!modalEntitled(el.dataset.modal)) return
+      state.modal = { type:el.dataset.modal, id:el.dataset.id }; render(); return
+    }
 
     if (el.dataset.action === 'go-pos') {
       const { navigate } = await import('../router.js')
       navigate('/pos'); return
     }
     if (el.dataset.action === 'go-workshop') {
+      if (!can('workshop', state.role)) return
       const { navigate } = await import('../router.js')
       navigate('/workshop'); return
     }
@@ -1247,6 +1268,7 @@ function attachEvents() {
 
   // Submit
   app.addEventListener('submit', async e => {
+    if (!can(adminState.adminModule, state.role) || !modalEntitled(state.modal?.type)) { e.preventDefault(); return }
     if (!window.location.pathname.startsWith('/admin')) return
     e.preventDefault()
     const form = e.target
@@ -1348,7 +1370,7 @@ function attachEvents() {
       showToast('Override PIN updated.', 'success'); return
     }
 
-    if ((type === 'inv-add' || type === 'inv-edit' || type === 'inv-adjust') && _inv) {
+    if ((type === 'inv-add' || type === 'inv-edit' || type === 'inv-adjust') && CFG.inventory_module_enabled && _inv) {
       const fn = type === 'inv-add' ? _inv.submitInvAdd
         : type === 'inv-edit' ? _inv.submitInvEdit : _inv.submitInvAdjust
       const { ok } = await fn(data)
