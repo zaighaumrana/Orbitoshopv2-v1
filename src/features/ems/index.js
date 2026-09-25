@@ -56,6 +56,7 @@ export async function checkClockIn(sess, cfg, onProceed) {
     .limit(1)
 
   const record = data?.[0] || null
+  if (!CFG.ems_enabled || state.role !== sess.employee?.role) return
 
   if (record && !record.clock_out) {
     // Already clocked in today
@@ -238,6 +239,7 @@ function _greeting() {
    Called by admin.js when adminModule === 'ems'
 ════════════════════════════════════════════════════════════════ */
 export function leaveRequestHTML() {
+  if (!CFG.ems_enabled) return ''
   return `
     <div class="modal-backdrop">
       <form class="modal modal-sm" data-form="leave-request">
@@ -274,6 +276,7 @@ export function leaveRequestHTML() {
 
 /* ── Submit leave request (called from pos.js / workshop.js submit handler) ── */
 export async function submitLeaveRequest(sess, formData) {
+  if (!CFG.ems_enabled) return { ok: false, error: 'Employee management is unavailable for this client.' }
   dlog('EMS.submitLeaveRequest', `ENTRY employee=${sess.employee?.name}`)
   const from = formData.from_date
   const to   = formData.to_date
@@ -297,17 +300,20 @@ export async function submitLeaveRequest(sess, formData) {
    CLOCK OUT BUTTON HTML — inject into topbar for non-owner roles
 ════════════════════════════════════════════════════════════════ */
 export function clockOutButtonHTML() {
+  if (!CFG.ems_enabled) return ''
   return `<button class="secondary-button" data-action="ems-clock-out"
     style="font-size:12px">🕐 Clock Out</button>`
 }
 
 export async function handleClockOut(sess, onComplete) {
+  if (!CFG.ems_enabled) return
   dlog('EMS.handleClockOut', `ENTRY employee=${sess.employee?.name}`)
   const outcome = await confirmAction({
     title: 'Clock out?',
     message: 'Clock out and end your current shift?',
     confirmLabel: 'Clock out',
     action: async () => {
+      if (!CFG.ems_enabled || state.role !== sess.employee?.role) return false
       const today = new Date().toISOString().slice(0, 10)
       const { data } = await sb.from('attendance')
         .select('id')

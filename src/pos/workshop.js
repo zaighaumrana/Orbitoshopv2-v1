@@ -13,7 +13,7 @@ import {
 
 import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
-  _clearSession, money, moneyHTML, fld, modalActions,
+  _clearSession, can, modalEntitled, money, moneyHTML, fld, modalActions,
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   myAccountModalHTML, handleChangePasswordSubmit,
   showTransactionSuccess, showBlockingError, showToast, confirmAction, runInstallPrompt,
@@ -38,8 +38,15 @@ let _eventsAttached = false
 
 /* ── Load ── */
 async function load() {
+  const loadSession = SESSION
   dlog('WORKSHOP.load', 'ENTRY')
   await loadConfig()
+  if (window.location.pathname !== '/workshop' || state.role !== SESSION.employee?.role) return
+  if (!can('workshop', state.role)) {
+    state.modal = null
+    document.getElementById('app').textContent = 'Workshop is unavailable for this client. Contact your administrator.'
+    return
+  }
   const [tickets, repairComponents] = await Promise.all([
     sb.from('tickets')
       .select('*')
@@ -55,6 +62,7 @@ async function load() {
     .in('parent_ticket_id', roots.map(ticket => ticket.id))
     .order('created_at', {ascending:true}) : {data:[]}
   if (tickets.error || children.error) showBlockingError('Repair work could not be loaded completely. Reload to retry.')
+  if (SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== '/workshop' || !can('workshop', state.role)) return
   state.data.tickets = [...roots, ...(children.data || [])]
   state.data.repairComponents = repairComponents.data || []
   wsState.familySummaries = new Map()
@@ -72,6 +80,7 @@ async function load() {
 
 /* ── Render ── */
 function render() {
+  if (window.location.pathname !== '/workshop' || !can('workshop', state.role) || state.role !== SESSION.employee?.role) return
   dstack('WORKSHOP.render', '*** #app REWRITE ***')
   if (!SESSION.employee) { navigate('/login'); return }
 
@@ -297,6 +306,7 @@ function workshopView() {
 ═══════════════════════════════════════════════════════════════════ */
 function renderModal() {
   if (!state.modal) return ''
+  if (!modalEntitled(state.modal.type)) { state.modal = null; return '' }
   const { type, id } = state.modal
 
   if (type === 'leave-request') return leaveRequestHTML()
@@ -467,6 +477,7 @@ function attachEvents() {
 
   /* ── Click ── */
   app.addEventListener('click', async e => {
+    if (!can('workshop', state.role) || !modalEntitled(state.modal?.type)) return
     // Route guard: see the matching comment in admin.js's attachEvents()
     // for the full explanation -- this is the listener whose collision
     // with admin.js's own sub-invoice actions (same data-action strings,
@@ -692,6 +703,7 @@ function attachEvents() {
 
   /* ── Submit ── */
   app.addEventListener('submit', async e => {
+    if (!can('workshop', state.role) || !modalEntitled(state.modal?.type)) { e.preventDefault(); return }
     if (!window.location.pathname.startsWith('/workshop')) return
     e.preventDefault()
     const form = e.target
@@ -731,6 +743,7 @@ function attachEvents() {
 
   /* ── Keyboard ── */
   document.addEventListener('keydown', e => {
+    if (window.location.pathname !== '/workshop' || !can('workshop', state.role)) return
     if (e.key === 'Enter') {
       const map = {
         'custom-comp-name': 'add-custom-draft-comp',

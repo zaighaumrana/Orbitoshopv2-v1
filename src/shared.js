@@ -175,6 +175,7 @@ export async function _clearSession() {
       .forEach(k => sessionStorage.removeItem(k))
   } catch {}
   state.role = null
+  resetClientEntitlements()
   await sb.auth.signOut({ scope: 'local' }).catch(() => {})
 }
 
@@ -186,18 +187,39 @@ export let CFG = {
   terms_text: 'Warranty: 30 days on parts replaced.',
   discount_pin_required: true,
   partial_udhar_allowed: true,
-  repair_module_enabled: true, inventory_module_enabled: false,
-  technician_module_enabled: true, live_tracking_enabled: false,
+  repair_module_enabled: false, inventory_module_enabled: false,
+  technician_module_enabled: false, live_tracking_enabled: false,
   ems_enabled: false, suspended: false,
 }
 
+const entitlementKeys = ['repair_module_enabled','inventory_module_enabled','technician_module_enabled','live_tracking_enabled','ems_enabled']
+let configGeneration = 0
+export function resetClientEntitlements() {
+  configGeneration++
+  for (const key of entitlementKeys) CFG[key] = false
+  state.modal = null
+  try { sessionStorage.removeItem('retailos_collect_ticket') } catch {}
+}
+
 export async function loadConfig(publicOnly = false) {
+  const generation = ++configGeneration
   const rpc = publicOnly ? 'get_public_shop_config' : 'get_app_config'
   dlog('shared.loadConfig', `ENTRY -- rpc=${rpc}`)
-  const { data, error } = await sb.rpc(rpc)
-  if (error) { dlog('shared.loadConfig', `FAILED: ${error.message}`); console.warn('Config load failed:', error.message); return }
-  Object.assign(CFG, data)
+  let data, error
+  try { ({ data, error } = await sb.rpc(rpc)) } catch (failure) { error = failure }
+  if (generation !== configGeneration) return false
+  for (const key of entitlementKeys) CFG[key] = !error && data?.[key] === true
+  if (error || !data) {
+    state.modal = null
+    console.warn('Config unavailable; optional modules disabled.')
+    return false
+  }
+  // Ignore retired config keys from a server not yet on the cleanup migration.
+  for (const [key, value] of Object.entries(data)) {
+    if (key !== 'workshop_enabled' && !entitlementKeys.includes(key)) CFG[key] = value
+  }
   dlog('shared.loadConfig', `DONE -- suspended=${CFG.suspended} ems_enabled=${CFG.ems_enabled}`)
+  return true
 }
 
 export async function loadQuickItems() {
@@ -236,7 +258,7 @@ export function currentTenant() {
     currency:            CFG.currency         || 'Rs.',
     taxRate:             Number(CFG.tax_rate  || 0),
     receiptFooter:       CFG.terms_text       || '',
-    repairModuleEnabled: CFG.repair_module_enabled !== false,
+    repairModuleEnabled: CFG.repair_module_enabled === true,
   }
 }
 
@@ -564,9 +586,17 @@ export function can(mod, role) {
   if (mod === 'repairs'   && !CFG.repair_module_enabled)    { dlog('shared.can', `DENY mod=${mod} role=${role} -- repair_module_enabled=false`); return false }
   if (mod === 'inventory' && !CFG.inventory_module_enabled) { dlog('shared.can', `DENY mod=${mod} role=${role} -- inventory_module_enabled=false`); return false }
   if (mod === 'workshop'  && !CFG.technician_module_enabled) { dlog('shared.can', `DENY mod=${mod} role=${role} -- technician_module_enabled=false`); return false }
+  if (mod === 'ems' && !CFG.ems_enabled) return false
   const allowed = ACCESS[role]?.includes(mod) ?? false
   dlog('shared.can', `mod=${mod} role=${role} -> ${allowed}`)
   return allowed
+}
+
+export function modalEntitled(type) {
+  if (type === 'leave-request') return CFG.ems_enabled === true
+  if (['inv-add','inv-edit','inv-adjust'].includes(type)) return CFG.inventory_module_enabled === true
+  if (['repair','repair-collection','ticket-payment','ticketDetail','edit-components','mark-not-needed','create-sub-invoice','repair-adjustment','repair-cancellation','add-comp-tag','comp-tag-picker'].includes(type)) return CFG.repair_module_enabled === true
+  return true
 }
 
 /* ── Auth ── */

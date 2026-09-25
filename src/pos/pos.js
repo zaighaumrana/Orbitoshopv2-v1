@@ -13,7 +13,7 @@ import {
 
 import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
-  _clearSession,
+  _clearSession, can, modalEntitled,
   money, moneyHTML, fld, modalActions,
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   myAccountModalHTML, handleChangePasswordSubmit,
@@ -71,8 +71,12 @@ let checkoutInFlight = false
 
 /* ── Load ── */
 async function load() {
+  const loadSession = SESSION
   dlog('POS.load', 'ENTRY')
   await loadConfig()
+  if (window.location.pathname !== '/pos' || state.role !== SESSION.employee?.role) return
+  if (!CFG.repair_module_enabled) posState.cart = posState.cart.filter(item => !item.isTicket)
+  if (!CFG.inventory_module_enabled) posState.cart = posState.cart.filter(item => !item.isInventory)
   if (CFG.inventory_module_enabled && !_inv) {
     _inv = await import('../features/pos/inventory/render.js')
   }
@@ -82,7 +86,7 @@ async function load() {
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
   const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
   const [tickets, sales, udharAccounts, shiftFinancial, returns_, inv, quickItems, repairComponents] = await Promise.all([
-    sb.from('tickets').select('*').order('id', { ascending: false }),
+    CFG.repair_module_enabled ? sb.from('tickets').select('*').order('id', { ascending: false }) : { data:[] },
     sb.from('sales').select('*').order('id', { ascending: false }),
     sb.rpc('get_unified_udhar_accounts'),
     sb.rpc('get_financial_report', {
@@ -91,8 +95,9 @@ async function load() {
     sb.from('returns').select('*').order('id', { ascending: false }),
     fetchInv,
     sb.from('quick_items').select('*').order('sort_order'),
-    sb.from('repair_components').select('*').order('sort_order'),
+    CFG.repair_module_enabled ? sb.from('repair_components').select('*').order('sort_order') : { data:[] },
   ])
+  if (SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== '/pos') return
   state.data = {
     tickets:          tickets.data          || [],
     sales:            sales.data            || [],
@@ -119,6 +124,7 @@ async function load() {
 
 /* ── Render ── */
 function render() {
+  if (window.location.pathname !== '/pos' || state.role !== SESSION.employee?.role) return
   dstack('POS.render', `*** #app REWRITE ***`)
   if (!SESSION.employee) { navigate('/login'); return }
   if (CFG.suspended) {
@@ -150,7 +156,7 @@ function render() {
             <span class="chip"><i class="dot ${state.online?'':'offline'}"></i>${state.online?'Online':'Offline'}</span>
             ${(SESSION.isAdmin || SESSION.employee?.role === 'Business Owner') ? `
               <button class="secondary-button" data-action="go-admin">Admin</button>
-              ${CFG.technician_module_enabled
+              ${can('workshop', state.role)
                 ? `<button class="secondary-button" data-action="go-workshop">Workshop</button>`
                 : ''}
             ` : ''}
@@ -554,6 +560,7 @@ async function openCollectTicket(ticket) {
 /* ── Modal dispatcher ── */
 function renderModal() {
   if (!state.modal) return ''
+  if (!modalEntitled(state.modal.type)) { state.modal = null; return '' }
   const { type } = state.modal
 
   if (type === 'leave-request') return leaveRequestHTML()
@@ -1032,6 +1039,7 @@ function attachEvents() {
 
   /* ── Click ── */
   app.addEventListener('click', async e => {
+    if (!can('pos', state.role) || !modalEntitled(state.modal?.type)) return
     // Route guard: see the matching comment in admin.js's attachEvents()
     // for the full explanation -- this listener stays attached for the
     // rest of the session once /pos has been visited, even after
@@ -1048,6 +1056,9 @@ function attachEvents() {
     )
     if (!el) return
     if (placingOrder) return
+    if (!CFG.repair_module_enabled && (el.dataset.ticketId || el.dataset.collectTicket || ['open-repair-collection','edit-cart-repair','place-order'].includes(el.dataset.action))) return
+    if (el.dataset.action === 'go-workshop' && !can('workshop', state.role)) return
+    if (el.dataset.action === 'open-leave-request' && !CFG.ems_enabled) return
     dlog('POS.click', `el MATCHED selector -- action=${el.dataset.action} close=${el.dataset.close} tag=${el.tagName}`)
 
     /* PIN numpad */
@@ -1064,6 +1075,7 @@ function attachEvents() {
 
     /* Modal openers */
     if (el.dataset.modal) {
+      if (!modalEntitled(el.dataset.modal)) return
       if (el.dataset.modal === 'repair') resetDraft() // starting a genuinely new ticket, not a mid-flow modal switch
       state.modal = { type: el.dataset.modal, id: el.dataset.id }; render(); return
     }
@@ -1391,7 +1403,7 @@ function attachEvents() {
     }
 
     /* ── Inventory POS tap ── */
-    if (el.dataset.invPosAdd && _inv) {
+    if (el.dataset.invPosAdd && CFG.inventory_module_enabled && _inv) {
       _inv.handleInvPosAdd(el, posState)
       render(); return
     }
@@ -1586,6 +1598,7 @@ function attachEvents() {
 
   /* ── Submit ── */
   app.addEventListener('submit', async e => {
+    if (!can('pos', state.role) || !modalEntitled(state.modal?.type)) { e.preventDefault(); return }
     if (!window.location.pathname.startsWith('/pos')) return
     e.preventDefault()
     const form = e.target
