@@ -5,6 +5,10 @@ import {
   showBlockingError, showToast,
 } from './shared.js'
 import { dlog, dstack } from './debuglog.js'
+import { startLoginBackground } from './features/login/background.js'
+import './features/login/login.css'
+
+let cleanupLoginBackground = () => {}
 
 let _onLoginSuccess = null
 let _turnstileWidgetId = null
@@ -112,6 +116,7 @@ function setLoginMode(mode) {
 }
 
 export function renderLogin(onSuccess) {
+  cleanupLoginBackground()
   cleanupTurnstile()
   _loginMode = 'shop'
 
@@ -119,13 +124,14 @@ export function renderLogin(onSuccess) {
   _onLoginSuccess = onSuccess
   const app = document.getElementById('app')
   app.innerHTML = `
-    <div style="min-height:100vh;display:grid;place-items:center;background:var(--bg);padding:16px;position:relative">
-      <div class="card" style="width:min(400px,95vw);display:grid;gap:20px;padding:32px">
+    <div class="orbito-login">
+      <div class="login-backdrop" aria-hidden="true"><div class="login-fibers"></div></div>
+      <div class="card login-card">
         <div style="text-align:center;display:grid;gap:8px">
-          <div class="logo" style="margin:0 auto 8px;width:72px;height:72px;font-size:20px;overflow:hidden">
+          <div class="login-logo">
             ${CFG.shop_logo
-              ? `<img src="${escapeHTML(safeImageURL(CFG.shop_logo))}" style="width:100%;height:100%;object-fit:contain;border-radius:inherit">`
-              : CFG.shop_name?.slice(0,2).toUpperCase() || 'FP'}
+              ? `<img src="${escapeHTML(safeImageURL(CFG.shop_logo))}" alt="Shop logo">`
+              : escapeHTML(CFG.shop_name?.slice(0,2).toUpperCase() || 'FP')}
           </div>
           <div
            id="support-mode-badge"
@@ -219,10 +225,7 @@ z-index:100
           import.meta.env.VITE_TURNSTILE_SITE_KEY ||
           '0x4AAAAAADl87EDGnxcg5eJZ',
 
-        theme:
-          state.theme === 'dark'
-            ? 'dark'
-            : 'light',
+        theme: 'dark',
 
         callback: () => {
           if (generation === _turnstileGeneration && btn?.isConnected) btn.disabled = false
@@ -263,6 +266,7 @@ z-index:100
   document.getElementById('login-password').addEventListener('keydown', e => {
     if (e.key === 'Enter') submitLogin()
   })
+  cleanupLoginBackground = startLoginBackground(app.querySelector('.orbito-login'))
 }
 
 function resetTurnstile() {

@@ -1,0 +1,98 @@
+.orbito-login {
+  --primary: #7371ed;
+  --secondary: #a9a8ff;
+  --bg: #070711;
+  --surface: #151524;
+  --surface-2: #202035;
+  --text: #f5f5ff;
+  --muted: #b3b3c9;
+  --border: rgba(255,255,255,.16);
+  --danger: #ff9eac;
+  --warning: #f0c880;
+  color-scheme: dark;
+  color: var(--text);
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 60px 16px 32px;
+}
+.login-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 45%, #11112a 0%, #070711 50%, #030307 100%);
+}
+.login-fibers {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  opacity: .03;
+  transform: scale(1.015);
+  filter: blur(6px);
+  transition: opacity 3800ms cubic-bezier(.22,1,.36,1), transform 3200ms cubic-bezier(.22,1,.36,1), filter 2400ms ease;
+}
+.login-fibers.is-ready { opacity: 1; transform: scale(1); filter: blur(0); }
+.login-fibers canvas { display: block; width: 100%; height: 100%; }
+.login-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(0,0,0,.02), rgba(0,0,0,.32));
+}
+.orbito-login .login-card {
+  width: min(410px, 100%);
+  min-width: 0;
+  display: grid;
+  gap: 20px;
+  padding: 34px;
+  border-radius: 22px;
+  background: rgba(9,9,22,.78);
+  border: 1px solid rgba(255,255,255,.11);
+  box-shadow: 0 30px 80px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.04);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.orbito-login .login-logo {
+  margin: 0 auto 10px;
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(255,255,255,.14), rgba(255,255,255,.055));
+  border: 1px solid rgba(255,255,255,.16);
+  box-shadow: 0 12px 32px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.1);
+  backdrop-filter: blur(14px);
+  font-size: 22px;
+  font-weight: 700;
+}
+.login-logo img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.65)) drop-shadow(0 0 1px rgba(255,255,255,.65));
+}
+.orbito-login .field input { background: rgba(255,255,255,.045); font-size: 16px !important; }
+.orbito-login .field input:focus-visible { outline: 2px solid #a9a8ff; outline-offset: 2px; }
+.orbito-login .field input::placeholder { color: #9090aa; }
+.orbito-login #login-title { overflow-wrap: anywhere; }
+.orbito-login #login-btn { background: #6260d7; border-color: #8583ed; color: #fff; border-radius: 10px; }
+.orbito-login #login-btn:hover:not(:disabled) { background: #7371ed; }
+.orbito-login #login-btn:disabled { opacity: .55; cursor: not-allowed; }
+.orbito-login #forgot-btn { color: #bab9ff !important; }
+.orbito-login #support-access-btn { color: #c7c7df !important; opacity: .85 !important; }
+.orbito-login #cf-turnstile-wrap { min-width: 0; }
+@media (max-width: 390px) {
+  .orbito-login { padding-inline: 8px; }
+  .orbito-login .login-card { padding: 24px 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-fibers { display: none; transition: none; }
+}
