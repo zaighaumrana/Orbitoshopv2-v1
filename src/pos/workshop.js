@@ -1,4 +1,5 @@
 import { escapeHTML, safeImageURL } from '../html.js'
+import { helpLink } from '../legal/links.js'
 import { createSubInvoiceModalHTML, rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 /* ═══════════════════════════════════════════════════════════════════
    RetailOS — workshop.js
@@ -125,6 +126,7 @@ function render() {
               <button class="secondary-button" style="font-size:12px"
                 data-action="ems-clock-out">🕐 Clock Out</button>
             ` : ''}
+            ${helpLink()}
             <button class="icon-button" data-action="logout"
               style="color:var(--danger)">Logout</button>
           </div>

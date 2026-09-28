@@ -1,4 +1,7 @@
 import { escapeHTML, safeImageURL } from "../html.js"
+import { helpLink } from '../legal/links.js'
+import { readLegalStatus } from '../legal/api.js'
+import { legalSettingsHTML } from '../legal/acceptance.js'
 import { rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
@@ -61,6 +64,7 @@ let SESSION = {}
 const platformBridge = createPlatformBridge(sb)
 let billingResult = null
 let resupplyBusy = false
+let legalStatus = null
 let _inv = null  // populated via dynamic import only when inventory_module_enabled
 
 /* ── Load ── */
@@ -81,6 +85,12 @@ async function load() {
     _inv = await import('../features/admin/inventory/index.js')
   }
   const mod = adminState.adminModule
+  if (mod === 'settings') {
+    legalStatus = null
+    if (state.role === 'Business Owner') {
+      try { legalStatus = await readLegalStatus(sb) } catch {}
+    }
+  }
   if (mod === 'billing-usage' && can(mod, state.role)) {
     try { billingResult = await platformBridge.readBilling() }
     catch { billingResult = { available: false } }
@@ -197,6 +207,7 @@ function render() {
             <button class="icon-button" data-action="theme">
               ${state.theme === 'dark' ? 'Light' : 'Dark'}
             </button>
+            ${helpLink()}
             <button class="icon-button" data-action="logout" style="color:var(--danger)">Logout</button>
           </div>
         </header>
@@ -401,7 +412,7 @@ function settings() {
   if (state.role !== 'Business Owner' && state.role !== 'Orbito Support')
     return `<div class="card"><p class="muted">Settings are available to Business Owner only.</p></div>`
   const t = currentTenant()
-  const tabs = { branding:'Branding', contact:'Contact', receipt:'Receipt & Tax', staff:'Staff & Security' }
+  const tabs = { branding:'Branding', contact:'Contact', receipt:'Receipt & Tax', staff:'Staff & Security', legal:'Legal & Privacy' }
   return `
     ${tit('Business Settings','Branding, contact, receipt, staff.','')}
     <div class="settings-tabs">
@@ -418,6 +429,7 @@ function catalog() {
 }
 
 function settingsTabContent() {
+  if (adminState.settingsTab === 'legal') return legalSettingsHTML(legalStatus, state.role === 'Business Owner')
   const t = currentTenant()
 
   const platformFlags = `

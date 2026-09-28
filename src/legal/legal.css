@@ -1,0 +1,32 @@
+.legal-shell { max-width: 1120px; margin: 0 auto; padding: 28px 20px 60px; line-height: 1.7; }
+.legal-shell a, .legal-links a { color: var(--primary); text-underline-offset: 3px; }
+.legal-shell a:focus-visible, .legal-links a:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
+.legal-shell h1 { line-height: 1.25; font-size: clamp(1.8rem, 4vw, 2.6rem); }
+.legal-shell h2, .legal-shell h3 { line-height: 1.4; margin-top: 2em; scroll-margin-top: 24px; }
+.legal-shell article { max-width: 72ch; overflow-wrap: anywhere; }
+.legal-shell p, .legal-shell li { font-size: 1rem; }
+.legal-shell li + li { margin-top: .5em; }
+.legal-header, .legal-links { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.legal-header { justify-content: space-between; margin-bottom: 24px; }
+.legal-links { margin: 16px 0; }
+.legal-links [aria-current="page"] { font-weight: 700; text-decoration-thickness: 2px; }
+.legal-reading { display: grid; grid-template-columns: minmax(190px, 240px) minmax(0, 1fr); gap: 36px; }
+.legal-reading aside { align-self: start; position: sticky; top: 20px; max-height: 80vh; overflow-y: auto; }
+.legal-reading aside nav { display: grid; gap: 10px; padding-top: 12px; }
+.legal-reading summary { cursor: pointer; font-weight: 600; }
+.legal-shell footer { border-top: 1px solid var(--border); margin-top: 40px; padding-top: 20px; }
+.legal-acceptance { max-width: 760px; padding-top: 48px; }
+.legal-consent { display: flex; gap: 12px; align-items: start; margin: 28px 0; }
+.legal-consent input { width: 20px; height: 20px; flex: 0 0 auto; margin-top: 4px; }
+#legal-acceptance-error { color: var(--danger); }
+.legal-skip:not(:focus) { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
+.orbito-login .legal-links { justify-content: center; gap: 10px 16px; margin: 0; font-size: 13px; }
+.orbito-login .legal-links a { color: #c7c6ff; }
+@media (max-width: 760px) {
+  .legal-reading { grid-template-columns: 1fr; gap: 12px; }
+  .legal-reading aside { position: static; max-height: none; }
+}
+@media print {
+  .legal-header, .legal-links, .legal-reading aside, .legal-skip { display: none; }
+  .legal-reading { display: block; }
+}

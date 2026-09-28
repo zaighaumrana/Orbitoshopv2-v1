@@ -7,6 +7,8 @@ import {
 import { dlog, dstack } from './debuglog.js'
 import { startLoginBackground } from './features/login/background.js'
 import './features/login/login.css'
+import { legalLinks } from './legal/links.js'
+import './legal/legal.css'
 
 let cleanupLoginBackground = () => {}
 
@@ -182,6 +184,7 @@ export function renderLogin(onSuccess) {
                 <p class="muted" style="text-align:center;font-size:12px;margin:0">
           ${escapeHTML(CFG.shop_address || '')}
         </p>
+        ${legalLinks()}
       </div>
 
       <button

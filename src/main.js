@@ -2,6 +2,7 @@ import { sb, loadConfig, applyBranding, loadCurrentSession, _clearSession, reset
 import { renderLogin } from './auth.js'
 import { registerRoute, registerNotFound, startRouter, navigate } from './router.js'
 import { dlog } from './debuglog.js'
+import { ensureOwnerAcceptance } from './legal/acceptance.js'
 
 let applicationGeneration = 0
 
@@ -122,10 +123,13 @@ async function enterApplication(session) {
     routeForRole(role)
     startRouter()
   }
-  if (!CFG.ems_enabled) { proceed(); return }
-  const { checkClockIn } = await import('./features/ems/index.js')
-  if (generation !== applicationGeneration || state.role !== role) return
-  checkClockIn(session, CFG, proceed)
+  const current = () => generation === applicationGeneration && state.role === role
+  await ensureOwnerAcceptance(sb, session, async () => {
+    if (!current()) return
+    if (!CFG.ems_enabled) { proceed(); return }
+    const { checkClockIn } = await import('./features/ems/index.js')
+    if (current()) checkClockIn(session, CFG, proceed)
+  }, async () => { await _clearSession(); showLogin() }, current)
 }
 
 async function onLoginSuccess(session) {
