@@ -6,7 +6,10 @@ const resolved = value => typeof value === 'string' && value.trim() !== '' && !/
 
 // An additional presentation safeguard, NOT authority to publish or accept.
 export function legalConfigurationReady(config = metadata, providers = subprocessors) {
-  return config.requiredCompanyFields.every(key => resolved(config.company[key]))
+  return resolved(config.productBrand) && resolved(config.shortProductBrand)
+    && ['terms','privacy','dpa'].every(key => resolved(config.documents[key].version) && resolved(config.documents[key].effectiveDate))
+    && config.requiredCompanyFields.every(key => resolved(config.company[key]))
+    && config.company.LEGAL_EMAIL.trim().toLowerCase() !== config.company.PRIVACY_EMAIL.trim().toLowerCase()
     && config.subprocessorScheduleReviewed === true && providers.length > 0
     && providers.every(provider => ['provider','purpose','location','reference','status'].every(key => resolved(provider[key])))
 }
@@ -16,7 +19,7 @@ export function customerDocument(key, source, publication, config = metadata, pr
   const matches = publication?.required_revision === config.requiredRevision
     && ['terms','privacy','dpa'].every(doc => publication[doc + '_version'] === config.documents[doc].version)
   if (publication?.published !== true || !matches || !legalConfigurationReady(config,providers)) {
-    return {text:'# ' + finalizingMessage,finalized:false}
+    return {text:'',finalized:false}
   }
   const schedule = providers.map(p=>`- ${p.provider}: ${p.purpose}. Location: ${p.location}. ${p.status}. Reference: ${p.reference}`).join('\n')
   const text = source.replace(/\{\{([A-Z_]+)\}\}/g, (_,key) => {
@@ -25,7 +28,7 @@ export function customerDocument(key, source, publication, config = metadata, pr
     return config.company[key] || '{{' + key + '}}'
   })
   // Unknown template tokens also fail closed instead of appearing contractual.
-  if (/\{\{|\}\}/.test(text)) return {text:'# ' + finalizingMessage,finalized:false}
+  if (/\{\{|\}\}|\[PLACEHOLDER:/.test(text)) return {text:'',finalized:false}
   return {text,finalized:true}
 }
 

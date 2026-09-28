@@ -40,4 +40,4 @@ Authorized Admin users open Receipts and search a retail or repair invoice. Repa
 
 Use Dashboard and Reports to compare invoiced amounts, payments collected and outstanding balances. The Owner's Billing & Usage is the Orbito service account, not your Shop's sales total.
 
-If a feature is missing, ask about role and plan settings. Keep individual accounts, deactivate departing staff, do not share approval PINs, and use Help & Privacy for the full guide. Normal transactions require connectivity.
+If a feature is missing, ask about role and plan settings. Keep individual accounts, deactivate departing staff, do not share approval PINs, and use Profile / Account → Help & User Guide for the full guide. Normal transactions require connectivity to the Shop backend.

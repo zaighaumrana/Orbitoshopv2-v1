@@ -41,6 +41,9 @@ test('isolated PostgreSQL: Owner persistence, tenant binding, staff/anonymous de
     await identity('', 'anon')
     const publication = (await db.query('select public.get_legal_publication() as result')).rows[0].result
     assert.equal(publication.published,false)
+    assert.equal(publication.terms_version,'[PLACEHOLDER: TERMS_VERSION]')
+    assert.equal(publication.privacy_version,'[PLACEHOLDER: PRIVACY_VERSION]')
+    assert.equal(publication.dpa_version,'[PLACEHOLDER: DPA_VERSION]')
     assert.deepEqual(Object.keys(publication).sort(),['dpa_version','privacy_version','published','required_revision','terms_version'])
     await assert.rejects(status,/permission denied/)
     await assert.rejects(()=>accept(),/permission denied/)
@@ -60,7 +63,8 @@ test('isolated PostgreSQL: Owner persistence, tenant binding, staff/anonymous de
     await assert.rejects(()=>db.exec('update app_private.legal_policy set published=true'),/permission denied/)
     await db.exec('reset role')
     assert.equal((await db.query('select count(*)::int as n from app_private.legal_acceptances')).rows[0].n,0)
-    await db.exec('update app_private.legal_policy set published=true')
+    // Publish finalized test-only versions in the disposable database, never production.
+    await db.exec("update app_private.legal_policy set terms_version='1.0', privacy_version='1.0', dpa_version='1.0', published=true")
     for (const name of [null,'','   ','\t\n']) {
       await db.query('update public.app_users set display_name=$1 where auth_user_id=$2',[name,owner])
       await identity(owner)
@@ -84,6 +88,11 @@ test('isolated PostgreSQL: Owner persistence, tenant binding, staff/anonymous de
     const records = (await db.query('select * from app_private.legal_acceptances')).rows
     assert.equal(records.length,1)
     assert.equal(records[0].auth_user_id,owner)
+    assert.equal(records[0].accepted_role,'Business Owner')
+    assert.equal(records[0].required_revision,'2026-09-27.1')
+    assert.equal(records[0].terms_version,'1.0')
+    assert.equal(records[0].privacy_version,'1.0')
+    assert.equal(records[0].dpa_version,'1.0')
     assert.equal(records[0].shop_id,(await db.query('select shop_id from app_private.legal_policy')).rows[0].shop_id)
     assert.ok(Math.abs(Date.now()-Date.parse(records[0].accepted_at)) < 60000)
     // Copy-only update preserves required revision: old acceptance remains valid.

@@ -3,11 +3,18 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import { renderDocument } from '../src/legal/render.js'
-import { legalLinks } from '../src/legal/links.js'
+import { legalLinks, helpLink } from '../src/legal/links.js'
 import { escapeHTML } from '../src/html.js'
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url),'utf8')
-const metadata = JSON.parse(read('src/legal/metadata.json'))
+const draftMetadata = JSON.parse(read('src/legal/metadata.json'))
+// Reviewed publication fixture only; production metadata remains unresolved.
+const metadata = structuredClone(draftMetadata)
+metadata.productBrand = 'Fixture Product'
+metadata.shortProductBrand = 'Fixture'
+for (const key of metadata.requiredCompanyFields) metadata.company[key] = 'Reviewed value for ' + key
+metadata.subprocessorScheduleReviewed = true
+for (const key of ['terms','privacy','dpa']) Object.assign(metadata.documents[key], {version:'1.0',effectiveDate:'2026-09-29'})
 const versions = {published:true,required_revision:metadata.requiredRevision,terms_version:'1.0',privacy_version:'1.0',dpa_version:'1.0'}
 function functions(path, context) {
   const ctx = vm.createContext({legalConfigurationReady:()=>true, finalizingMessage:'Legal documents are being finalized.', ...context})
@@ -66,7 +73,7 @@ test('Owner gate requires checkbox, coalesces submit, retries safely; staff bypa
   assert.equal(submits,1)
 })
 
-test('public documents render safely from canonical Markdown; login links need no auth', () => {
+test('canonical Markdown is safe; login has no document links and Help is separate from legal', () => {
   for (const path of ['docs/legal/TERMS_OF_SERVICE.md','docs/legal/PRIVACY_NOTICE.md','docs/legal/DATA_PROCESSING_ADDENDUM.md','docs/user-guide/ORBITOSHOP_USER_GUIDE.md','docs/user-guide/QUICK_START_GUIDE.md']) {
     const result = renderDocument(read(path).replace(/\r/g,''))
     assert.match(result.body,/<h1 /)
@@ -75,8 +82,13 @@ test('public documents render safely from canonical Markdown; login links need n
   }
   assert.doesNotMatch(renderDocument('# <script>alert(1)</script>').body,/<script>/)
   assert.match(renderDocument('# Title\r\n\r\n## Section\r\n').body,/<h2 /)
-  for (const doc of ['terms','privacy','dpa','guide']) assert.ok(legalLinks().includes('?doc='+doc))
-  assert.match(read('src/auth.js'),/\$\{legalLinks\(\)\}/)
+  for (const doc of ['terms','privacy','dpa']) assert.ok(legalLinks().includes('?doc='+doc))
+  assert.doesNotMatch(legalLinks(), /doc=guide/)
+  assert.match(helpLink(), /Help &amp; User Guide/)
+  assert.doesNotMatch(helpLink(), /doc=terms|doc=privacy|doc=dpa/)
+  assert.doesNotMatch(read('src/auth.js'),/legalLinks|helpLink|legal\.html|PLACEHOLDER/)
+  assert.match(read('src/auth.js'), /A project of ABCD Ventures/)
+  assert.match(read('src/shared.js').split('export function myAccountModalHTML')[1].split('/** Shared handler')[0], /\$\{helpLink\(\)\}/)
   assert.doesNotMatch(read('src/legal/page.js'),/shared\.js|supabase|turnstile|ghost-fibers/)
   assert.match(read('legal.html'),/src\/legal\/page.js/)
   assert.match(read('vite.config.js'),/legal: 'legal.html'/)
@@ -121,7 +133,7 @@ test('unpublished Owner entry proceeds without acceptance even when bundled conf
 
 test('public reader hides unpublished or unfinished contracts and suppresses optional placeholders', async () => {
   const providers = [{provider:'Test provider',purpose:'Hosting',location:'Confirmed region',reference:'https://example.com',status:'Reviewed'}]
-  const ctx = functions('src/legal/readiness.js',{metadata,subprocessors:providers,AbortSignal})
+  const ctx = functions('src/legal/readiness.js',{metadata:draftMetadata,subprocessors:providers,AbortSignal})
   const source = '# Terms\n\n{{ENTITY}} {{DPO}} {{EU_REP}} {{UK_REP}} {{SUBPROCESSORS}}'
   assert.equal(ctx.customerDocument('terms',source,versions).finalized,false)
   const configured = structuredClone(metadata)
@@ -133,10 +145,65 @@ test('public reader hides unpublished or unfinished contracts and suppresses opt
   assert.doesNotMatch(result.text,/\{\{|\[DPO|\[EU REPRESENTATIVE|\[UK REPRESENTATIVE/)
   assert.match(result.text,/Not listed; contact/)
   assert.equal(ctx.customerDocument('terms',source+' {{UNKNOWN}}',versions,configured,providers).finalized,false)
+  assert.equal(ctx.customerDocument('terms',source+' [PLACEHOLDER: UNKNOWN]',versions,configured,providers).finalized,false)
+  const sameEmail = structuredClone(configured)
+  sameEmail.company.PRIVACY_EMAIL = sameEmail.company.LEGAL_EMAIL.toUpperCase()
+  assert.equal(ctx.legalConfigurationReady(sameEmail,providers),false)
+  for (const key of ['terms','privacy','dpa']) {
+    const unfinished = structuredClone(configured)
+    unfinished.documents[key].version = draftMetadata.documents[key].version
+    assert.equal(ctx.legalConfigurationReady(unfinished,providers),false)
+  }
   assert.equal(ctx.customerDocument('guide','# Guide',null).text,'# Guide')
   assert.equal(await ctx.readPublicPublication('https://example.com','key',async()=>{throw Error('offline')}),null)
   assert.notEqual(metadata.company.ENTITY,metadata.projectOwner)
   for (const path of ['docs/legal/TERMS_OF_SERVICE.md','docs/legal/PRIVACY_NOTICE.md','docs/legal/DATA_PROCESSING_ADDENDUM.md']) {
     assert.doesNotMatch(read(path),/\u00e2\u20ac|\u00c3[\u0080-\u00bf]|\ufffd/)
   }
+})
+
+test('unpublished Settings exposes no contracts; direct legal URL redirects to Help without rendering draft', async () => {
+  const settings = functions('src/legal/acceptance.js', {metadata,legalLinks,esc:escapeHTML,
+    versionsMatch:()=>true,legalConfigurationReady:()=>true})
+  for (const status of [null,{...versions,published:false}]) {
+    assert.doesNotMatch(settings.legalSettingsHTML(status,true), /href=|PLACEHOLDER|being finalized/)
+  }
+  for (const doc of ['terms','privacy','dpa','guide']) {
+    let redirect = null
+    const page = {innerHTML:''}
+    const ctx = functions('src/legal/readiness.js', {
+      metadata:draftMetadata,subprocessors:[],AbortSignal,URLSearchParams,
+      location:{search:'?doc='+doc,replace:value=>{redirect=value}},
+      document:{documentElement:{dataset:{}},getElementById:()=>page},
+      localStorage:{getItem:()=>null},renderDocument,esc:escapeHTML,
+      terms:'# PRIVATE DRAFT',privacy:'# PRIVATE DRAFT',dpa:'# PRIVATE DRAFT',guide:'# Guide',quickStart:'# Quick Start',
+      env:{},
+    })
+    vm.runInContext(read('src/legal/page.js').replace(/^import .*$/gm,'').replaceAll('import.meta.env','env').replace('void showPage()','globalThis.ready = showPage()'),ctx)
+    await ctx.ready
+    if (doc === 'guide') {
+      assert.equal(redirect,null)
+      assert.match(page.innerHTML, /Guide/)
+      assert.doesNotMatch(page.innerHTML, /doc=terms|doc=privacy|doc=dpa|PRIVATE DRAFT|PLACEHOLDER/)
+    } else {
+      assert.equal(redirect,'/legal.html?doc=guide')
+      assert.equal(page.innerHTML,'')
+    }
+  }
+})
+
+test('business decisions remain unpublished, Pakistan-focused and free of invented caps or identities', () => {
+  const terms = read('docs/legal/TERMS_OF_SERVICE.md')
+  assert.match(terms,/ABCD Ventures is the Parent Company \(Holding Company\) that owns this sole proprietorship\./)
+  assert.match(terms,/due immediately upon invoice/)
+  assert.match(terms,/3 Working Days/)
+  assert.doesNotMatch(terms,/LIABILITY_CAP|SUBPROCESSOR_NOTICE|OrbitoShop|\bOrbito\b/)
+  assert.equal(draftMetadata.company.TAX_NUMBER,'5842096')
+  assert.equal(draftMetadata.company.REGISTRATION,'5842096')
+  assert.equal(draftMetadata.company.GOVERNING_LAW,'Pakistan')
+  assert.equal(draftMetadata.company.COURTS,'Gujranwala, Punjab, Pakistan')
+  assert.equal(draftMetadata.company.EXPORT_WINDOW,'30 days after cancellation or termination')
+  assert.equal(draftMetadata.company.ENTITY,'[PLACEHOLDER: OFFICIAL_LEGAL_BUSINESS_NAME]')
+  assert.equal(draftMetadata.subprocessorScheduleReviewed,false)
+  assert.match(read('docs/user-guide/ORBITOSHOP_USER_GUIDE.md'), /Feature availability: This guide covers features available across OrbitoShop plans\. Some features may not be available to your account depending on your subscription, enabled modules, business configuration, or supported services in your region\./)
 })

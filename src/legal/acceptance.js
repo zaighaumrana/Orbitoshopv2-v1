@@ -2,7 +2,7 @@ import { escapeHTML as esc } from '../html.js'
 import { legalLinks } from './links.js'
 import { readLegalStatus, acceptLegalTerms, versionsMatch } from './api.js'
 import metadata from './metadata.json'
-import { legalConfigurationReady, finalizingMessage } from './readiness.js'
+import { legalConfigurationReady } from './readiness.js'
 import './legal.css'
 
 // Only the canonical Owner contracts for the Shop. Staff and Support never accept.
@@ -18,9 +18,8 @@ export async function ensureOwnerAcceptance(client, session, proceed, logout, is
   if (status?.accepted === true && matching) { proceed(); return }
   app.innerHTML = `<main class="legal-shell legal-acceptance">
     <h1 tabindex="-1">Your business agreement</h1>
-    <p>By continuing, I confirm that I am authorized to act for this business and agree to the OrbitoShop Terms of Service, Privacy Notice and Data Processing Terms.</p>
-    ${legalLinks()}
-    <p>Terms v${esc(metadata.documents.terms.version)} · Privacy v${esc(metadata.documents.privacy.version)} · Data Processing v${esc(metadata.documents.dpa.version)}</p>
+    <p>By continuing, I confirm that I am authorized to act for this business and agree to the Service's Terms of Service, Privacy Notice and Data Processing Terms.</p>
+    ${matching ? legalLinks() + `<p>Terms v${esc(metadata.documents.terms.version)} · Privacy v${esc(metadata.documents.privacy.version)} · Data Processing v${esc(metadata.documents.dpa.version)}</p>` : ''}
     <p class="muted">Review each document before accepting. Privacy acknowledgment is not blanket consent for data processing. You may sign out without accepting.</p>
     <form id="legal-acceptance-form">
       <label class="legal-consent"><input name="authorized" type="checkbox" required ${matching ? '' : 'disabled'}> I am authorized to accept these terms for this business.</label>
@@ -62,12 +61,11 @@ export async function ensureOwnerAcceptance(client, session, proceed, logout, is
 }
 
 export function legalSettingsHTML(status, owner) {
-  if (status?.published === false || !legalConfigurationReady()) {
-    return `<section class="card"><h2>Legal &amp; Privacy</h2>${legalLinks()}<p>${finalizingMessage}</p><p><a href="/legal.html?doc=quick-start" target="_blank" rel="noopener">Quick Start Guide</a></p></section>`
+  if (status?.published !== true || !versionsMatch(status) || !legalConfigurationReady()) {
+    return '<section class="card"><h2>Legal &amp; Privacy</h2><p>No published legal documents are currently available here.</p></section>'
   }
   const receipt = status?.receipt
   return `<section class="card"><h2>Legal &amp; Privacy</h2>${legalLinks()}
-    <p><a href="/legal.html?doc=quick-start" target="_blank" rel="noopener">Quick Start Guide</a> · <a href="/legal.html?doc=guide" target="_blank" rel="noopener">User Guide</a></p>
     <p>Current Terms: v${esc(metadata.documents.terms.version)} · Privacy: v${esc(metadata.documents.privacy.version)} · Data Processing: v${esc(metadata.documents.dpa.version)}</p>
     ${owner ? receipt ? `<p>Accepted by: ${esc(receipt.accepted_name)}<br>Accepted on: ${esc(new Date(receipt.accepted_at).toLocaleString())}</p><p>Accepted versions: Terms ${esc(receipt.terms_version)}, Privacy ${esc(receipt.privacy_version)}, Data Processing ${esc(receipt.dpa_version)}.</p>`
       : '<p>No acceptance record available. An unavailable status is not evidence of acceptance.</p>' : '<p>Business agreement evidence is available to the Business Owner.</p>'}

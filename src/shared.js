@@ -1,4 +1,5 @@
 import { escapeHTML } from "./html.js"
+import { helpLink } from './legal/links.js'
 import { createClient } from '@supabase/supabase-js'
 import { dlog, dstack, initializeSupportConsole, revokeSupportConsole } from './debuglog.js'
 import { installNumericInputValidation } from './numeric-input.js'
@@ -789,6 +790,7 @@ export function myAccountModalHTML(session) {
   const isSupport = session.isSupportAdmin === true
   return `<div class="modal-backdrop"><div class="modal" style="max-width:420px">
     <h2>My Account</h2>
+    <div class="legal-links">${helpLink()}</div>
     ${state.installPrompt ? `
       <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">
         <button type="button" class="secondary-button" data-action="install" style="width:100%">⬇ Install App</button>

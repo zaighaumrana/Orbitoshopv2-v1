@@ -2,6 +2,8 @@
 
 ## Welcome
 
+Feature availability: This guide covers features available across OrbitoShop plans. Some features may not be available to your account depending on your subscription, enabled modules, business configuration, or supported services in your region.
+
 OrbitoShop helps you record sales, repairs, customer balances, stock and staff activity. Your Shop may not have every optional module. A missing module can be a plan setting, not an error. Use your own account and ask the Owner about access.
 
 ## Roles and accounts
@@ -12,7 +14,7 @@ OrbitoShop helps you record sales, repairs, customer balances, stock and staff a
 - Technician: Workshop only when enabled. Operational job information and additional-work workflow remain available; canonical financial summaries are unavailable for this role. No general employee, salary, Admin or POS access.
 - Orbito Support: a separately verified support identity with administrative support access, not the Shop Owner and not an Owner billing account.
 
-The Business Owner accepts the commercial terms for the Shop. Staff do not receive that contracting prompt. Everyone can open Help and Privacy.
+The authorized Business Owner accepts published commercial terms for the Shop when a new required revision needs acceptance. Staff do not receive that contracting prompt, and an unpublished policy does not block Owner entry. Everyone with an appropriate account can open Profile / Account → Help & User Guide. Published legal documents and acceptance status are separate, in Business Owner Settings → Legal & Privacy.
 
 ## Make a retail sale
 
@@ -128,4 +130,4 @@ Paper Resupply is separate from printing and thermal estimates. Turning it off d
 - Offline: normal transactions require connectivity. A queued print estimate is not an offline sale.
 - Suspected unauthorized access: stop using the affected account/device and contact the Owner and support promptly.
 
-Use Help & Privacy from the app header or login footer. Legal documents and both guides can be read before signing in. Customer privacy requests should normally go to the Shop first; Orbito assists where required.
+Use Profile / Account → Help & User Guide (also available from the app's Help button). Login has no document links. Help is separate from Settings → Legal & Privacy, and unpublished contracts are not shown. Customer privacy requests should normally go to the Shop first; the service provider assists where required.

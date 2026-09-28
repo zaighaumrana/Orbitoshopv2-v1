@@ -11,7 +11,7 @@ create table app_private.legal_policy (
 );
 insert into app_private.legal_policy
   (singleton, required_revision, terms_version, privacy_version, dpa_version)
-values (true, '2026-09-27.1', '1.0', '1.0', '1.0');
+values (true, '2026-09-27.1', '[PLACEHOLDER: TERMS_VERSION]', '[PLACEHOLDER: PRIVACY_VERSION]', '[PLACEHOLDER: DPA_VERSION]');
 
 create table app_private.legal_acceptances (
   id uuid primary key default extensions.gen_random_uuid(),
