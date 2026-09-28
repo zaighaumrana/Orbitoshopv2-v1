@@ -1,4 +1,5 @@
 import { escapeHTML, safeImageURL } from "./html.js"
+import { PRODUCT_NAME, SHORT_BRAND_NAME, PROJECT_ATTRIBUTION } from './config/brand.js'
 import {
   state, CFG, _saveSession, _clearSession,
   loginViaEdgeFunction, establishLoginSession, applyBranding, currentTenant,
@@ -53,7 +54,7 @@ function setLoginMode(mode) {
   if (_loginMode === 'support') {
     if (title)
       title.textContent =
-        'Orbito Support Access'
+        `${SHORT_BRAND_NAME} Support Access`
 
     if (subtitle)
       subtitle.textContent =
@@ -82,14 +83,14 @@ function setLoginMode(mode) {
     if (subtitle)
       subtitle.textContent =
         CFG.suspended
-          ? 'Shop access is suspended — Orbito Support remains available'
+          ? `Shop access is suspended — ${SHORT_BRAND_NAME} Support remains available`
           : 'Sign in to continue'
 
     badge?.classList.add('hidden')
 
     if (supportBtn)
       supportBtn.textContent =
-        'Orbito Support'
+        `${SHORT_BRAND_NAME} Support`
 
     forgotBtn?.classList.remove('hidden')
 
@@ -182,6 +183,9 @@ export function renderLogin(onSuccess) {
                 <p class="muted" style="text-align:center;font-size:12px;margin:0">
           ${escapeHTML(CFG.shop_address || '')}
         </p>
+        <p class="muted" style="text-align:center;font-size:12px;margin:0">
+          ${escapeHTML(PRODUCT_NAME)}<br>${escapeHTML(PROJECT_ATTRIBUTION)}
+        </p>
       </div>
 
       <button
@@ -201,7 +205,7 @@ padding:6px 8px;
 z-index:100
         "
       >
-        Orbito Support
+        ${escapeHTML(SHORT_BRAND_NAME)} Support
       </button>
     </div>`
 

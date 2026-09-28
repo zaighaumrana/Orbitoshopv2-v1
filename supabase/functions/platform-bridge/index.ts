@@ -14,9 +14,9 @@ async function sameSecret(left: string, right: string) {
 
 Deno.serve(async req => {
   if (req.method !== 'POST') return reply(405, { error: 'POST required' })
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  const callSecret = Deno.env.get('PLATFORM_BRIDGE_CALL_SECRET') ?? ''
   const token = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1] ?? ''
-  if (!await sameSecret(token, serviceKey)) return reply(401, { error: 'Not authorized' })
+  if (!await sameSecret(token, callSecret)) return reply(401, { error: 'Not authorized' })
 
   const endpoint = Deno.env.get('PLATFORM_BRIDGE_ENDPOINT') ?? ''
   const secret = Deno.env.get('PLATFORM_BRIDGE_SOURCE_SECRET') ?? ''
@@ -27,6 +27,8 @@ Deno.serve(async req => {
     if (destination.protocol !== 'https:' || destination.username || destination.password) throw new Error()
   } catch { return reply(503, { error: 'Bridge configuration unavailable' }) }
 
+  // Caller authentication above is separate from privileged Shop DB access.
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   const admin = createClient(Deno.env.get('SUPABASE_URL') ?? '', serviceKey,
     { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } })
   try {

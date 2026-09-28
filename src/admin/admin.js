@@ -1,4 +1,5 @@
 import { escapeHTML, safeImageURL } from "../html.js"
+import { SHORT_BRAND_NAME } from '../config/brand.js'
 import { rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
@@ -424,7 +425,7 @@ function settingsTabContent() {
     <div class="card" style="display:grid;gap:10px;padding:14px 16px;margin-bottom:4px">
       <p style="font-size:12px;font-weight:600;color:var(--muted);
                 text-transform:uppercase;letter-spacing:.5px">
-        Plan Features — Managed by RetailOS Platform
+        Plan Features — Managed by ${escapeHTML(SHORT_BRAND_NAME)} Platform
       </p>
       <div style="display:grid;gap:8px">
         ${[
