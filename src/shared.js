@@ -1,4 +1,5 @@
 import { escapeHTML } from "./html.js"
+import { SHORT_BRAND_NAME } from './config/brand.js'
 import { createClient } from '@supabase/supabase-js'
 import { dlog, dstack, initializeSupportConsole, revokeSupportConsole } from './debuglog.js'
 import { installNumericInputValidation } from './numeric-input.js'
@@ -802,7 +803,7 @@ export function myAccountModalHTML(session) {
     ` : ''}
     ${isSupport ? `
       <p class="muted" style="font-size:13px">
-        This support session was issued through Orbito platform authentication.
+        This support session was issued through ${escapeHTML(SHORT_BRAND_NAME)} platform authentication.
         The client-project support identity has no reusable password.
       </p>
       <div class="modal-actions">

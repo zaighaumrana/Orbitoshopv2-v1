@@ -1,0 +1,4 @@
+# Opaque per-Shop bearer; the handler strictly authenticates every invocation.
+# All other functions retain their existing/default gateway JWT behavior.
+[functions.platform-bridge]
+verify_jwt = false
