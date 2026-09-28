@@ -1,4 +1,22 @@
-# Opaque per-Shop bearer; the handler strictly authenticates every invocation.
-# All other functions retain their existing/default gateway JWT behavior.
+# Shop Edge Function deployment configuration.
+# Existing Shop functions retain normal Supabase gateway JWT verification.
+# platform-bridge is the only exception because it authenticates the
+# Platform using its own opaque per-Shop bearer credential.
+
+[functions.account-admin]
+verify_jwt = true
+
+[functions.login]
+verify_jwt = true
+
+[functions.password-reset-request]
+verify_jwt = true
+
+[functions.public-track]
+verify_jwt = true
+
+[functions.verify-pin]
+verify_jwt = true
+
 [functions.platform-bridge]
 verify_jwt = false
