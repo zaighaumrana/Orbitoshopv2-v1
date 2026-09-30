@@ -1,3 +1,5 @@
+import { settingsUpdates } from '../settings-data.js'
+import { managedFeatures } from '../onboarding-state.js'
 import { escapeHTML, safeImageURL } from "../html.js"
 import { SHORT_BRAND_NAME } from '../config/brand.js'
 import { rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
@@ -428,14 +430,7 @@ function settingsTabContent() {
         Plan Features — Managed by ${escapeHTML(SHORT_BRAND_NAME)} Platform
       </p>
       <div style="display:grid;gap:8px">
-        ${[
-          ['Repair Module',     CFG.repair_module_enabled],
-          ['Inventory Module',  CFG.inventory_module_enabled],
-          ['Technician Module', CFG.technician_module_enabled],
-          ['Live Tracking',     CFG.live_tracking_enabled],
-          ['EMS',               CFG.ems_enabled],
-          ['Break Tracking',    CFG.ems_track_breaks],
-        ].map(([label, enabled]) => `
+        ${managedFeatures(CFG).map(([label, enabled]) => `
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span style="font-size:13px">${escapeHTML(label)}</span>
             <span class="badge ${enabled ? 'good' : 'bad'}">
@@ -485,11 +480,11 @@ function settingsTabContent() {
       <div style="display:grid;gap:16px">
         <div class="card" style="display:grid;gap:14px">
           <h2>Owner Login</h2>
-          <p class="muted" style="font-size:13px">The owner email stays synchronized with Supabase Auth. Owners change their own password from My Account.</p>
+          <p class="muted" style="font-size:13px">${CFG.onboarding_version === 2 ? 'The invited Business Owner identity is reserved and cannot be changed here.' : 'The owner email stays synchronized with Supabase Auth.'} Owners change their own password from My Account.</p>
           <form class="form-grid" data-form="owner-login">
-            ${fld('Owner Email','owner_email',SESSION.employee?.role === 'Business Owner' ? SESSION.employee.email : '','email')}
+            ${fld('Owner Email','owner_email',SESSION.employee?.role === 'Business Owner' ? SESSION.employee.email : '','email').replace('<input ', `<input ${CFG.onboarding_version === 2 ? 'readonly ' : ''}`)}
             <div class="modal-actions" style="grid-column:1/-1">
-              <button class="primary-button">Save Owner Login</button>
+              <button class="primary-button" ${CFG.onboarding_version === 2 ? 'disabled' : ''}>Save Owner Login</button>
             </div>
           </form>
         </div>
@@ -1332,25 +1327,8 @@ function attachEvents() {
     }
 
     if (type === 'settings') {
-      const updates = {}
-      const logoFile = form.querySelector('[name="logo"]')?.files?.[0]
-      if (logoFile) {
-        const base64 = await new Promise(res => {
-          const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(logoFile)
-        })
-        updates.shop_logo = base64
-      }
-      if (data.name)                updates.shop_name        = data.name
-      if (data.address)             updates.shop_address     = data.address
-      if (data.phone)               updates.shop_phone       = data.phone
-      if (data.primaryColor)        updates.primary_color    = data.primaryColor
-      if (data.secondaryColor)      updates.secondary_color  = data.secondaryColor
-      if (data.currency)            updates.currency         = data.currency
-      if (data.taxRate)             updates.tax_rate         = Number(data.taxRate)
-      if (data.invoicePrefix)       updates.invoice_prefix   = data.invoicePrefix.trim().toUpperCase()
-      if (data.ticketPrefix)        updates.ticket_prefix    = data.ticketPrefix.trim().toUpperCase()
-      if (data.receiptFooter)       updates.terms_text       = data.receiptFooter
-      if (data.businessDescription) updates.shop_description = data.businessDescription
+      let updates
+      try { updates = await settingsUpdates(form) } catch (error) { showBlockingError(error.message); return }
       const result = await invokeAccountAdmin('update-config', { updates })
       if (!result.ok) { showBlockingError('Settings error: '+result.error); return }
       state.modal = null; await load(); return

@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Local onboarding UI test</title><link rel="stylesheet" href="/src/style.css"></head><body><div id="app"></div><script type="module">
+// Real wizard renderer with in-memory service boundaries. No hosted access.
+const mock = `
+import { escapeHTML } from '${location.origin}/src/html.js';
+export const CFG={shop_name:'Your Business',shop_description:'',primary_color:'#126c5b',secondary_color:'#e9b949',shop_address:'',shop_phone:'',shop_email:'',currency:'Rs.',tax_rate:0,invoice_prefix:'INV',ticket_prefix:'TK',terms_text:'',repair_module_enabled:true,inventory_module_enabled:false,technician_module_enabled:true,live_tracking_enabled:true,ems_enabled:false,ems_track_breaks:false,paper_resupply_enabled:false};
+export const sb={};
+export const fld=(label,name,value='',type='text')=>'<label class="field"><span>'+escapeHTML(label)+'</span><input name="'+name+'" type="'+type+'" value="'+escapeHTML(value)+'"'+(type==='number'?' step="any"':'')+'></label>';
+export const loadConfig=async()=>true;
+export const applyBranding=()=>{};
+export const _clearSession=async()=>{document.getElementById('app').textContent='Signed out (local fixture)'};
+export const validatePassword=()=>null;
+export async function invokeAccountAdmin(action,body){if(action==='update-config')Object.assign(CFG,body.updates);if(action==='complete-onboarding')CFG.onboarding_completed_at=new Date().toISOString();return {ok:true}}
+`;
+const shared=URL.createObjectURL(new Blob([mock],{type:'text/javascript'}));
+const code=(await (await fetch('/src/onboarding.js')).text()).replace(/(['"])(?:\.\/|\/src\/)shared\.js\1/g,JSON.stringify(shared)).replace(/from ['"](?:\.\/|\/src\/)(.*?)['"]/g,(_,path)=>'from '+JSON.stringify(location.origin+'/src/'+path));
+const {renderOnboarding}=await import(URL.createObjectURL(new Blob([code],{type:'text/javascript'})));
+renderOnboarding({employee:{role:'Business Owner',email:'owner@example.test'}},()=>{document.getElementById('app').innerHTML='<main class="card"><h1>Local wizard completed successfully</h1><p>No remote calls were made.</p></main>'});
+</script></body></html>

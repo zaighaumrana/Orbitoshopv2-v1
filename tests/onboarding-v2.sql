@@ -1,0 +1,75 @@
+-- Disposable LOCAL database only, after all migrations. Every fixture rolls back.
+begin;
+create function pg_temp.assert(ok boolean, message text) returns void language plpgsql as $$
+begin if ok is distinct from true then raise exception 'ASSERT: %',message; end if; end $$;
+select pg_temp.assert((select shop_name='Your Business' and onboarding_completed_at is null and onboarding_version=0 from public.shop_config where id=1),'fresh baseline is neutral');
+select pg_temp.assert(not has_function_privilege('authenticated','public.bridge_onboarding(text,jsonb)','EXECUTE'),'browser cannot bootstrap');
+select pg_temp.assert(not has_function_privilege('anon','public.complete_shop_onboarding(uuid)','EXECUTE'),'anonymous cannot complete');
+do $$
+declare p jsonb:='{"request_id":"10000000-0000-4000-8000-000000000001","platform_client_id":50,"client_binding":"orbito-client-50","business_name":"Test Shop","owner_name":"Test Owner","owner_email":"owner@example.test","billing_currency":"PKR","shop_url":"https://shop.example.test","modules":{"repair_module_enabled":true,"inventory_module_enabled":false,"technician_module_enabled":false,"live_tracking_enabled":false,"ems_enabled":false,"ems_track_breaks":false},"paper_resupply_enabled":false,"onboarding_version":2}';
+ r jsonb; blocked boolean;
+begin
+ foreach r in array array[jsonb_set(p,'{platform_client_id}','null'),jsonb_set(p,'{onboarding_version}','null'),jsonb_set(p,'{request_id}','null')] loop
+  blocked:=false;
+  begin perform public.bridge_onboarding('claim',r); exception when others then blocked:=true; end;
+  perform pg_temp.assert(blocked,'null bootstrap identity rejected');
+ end loop;
+ r:=public.bridge_onboarding('claim',p);
+ perform pg_temp.assert(r ? 'lease_id','first claim reserves owner');
+ perform pg_temp.assert((select id=1 and platform_client_id=50 and onboarding_version=2 from public.shop_config where id=1),'tenant ID does not replace singleton ID');
+ blocked:=false;
+ begin perform public.bridge_onboarding('claim',p); exception when others then blocked:=true; end;
+ perform pg_temp.assert(blocked,'concurrent claims serialize');
+ blocked:=false;
+ begin perform public.bridge_onboarding('claim',jsonb_set(p,'{owner_email}','"other@example.test"')); exception when others then blocked:=true; end;
+ perform pg_temp.assert(blocked,'conflicting owner fails closed');
+ perform public.bridge_onboarding('failed',jsonb_build_object('lease_id',r->>'lease_id'));
+ perform pg_temp.assert(public.bridge_onboarding('status','{}')->>'owner_invite'='owner_invite_failed','SMTP failure is explicit');
+ r:=public.bridge_onboarding('claim',p);
+ -- Simulate Auth committing an invitation before the HTTP response is lost.
+ insert into auth.users(id,email,invited_at,raw_user_meta_data) values('20000000-0000-4000-8000-000000000001','owner@example.test',now(),jsonb_build_object('orbito_bootstrap_request',p->>'request_id'));
+ update app_private.owner_bootstrap set lease_until=now()-interval '1 second';
+ r:=public.bridge_onboarding('claim',p);
+ perform pg_temp.assert((r->>'already_provisioned')::boolean,'lost invitation response recovered');
+ perform pg_temp.assert((select count(*)=1 from public.app_users where role='Business Owner' and employee_id is null),'one canonical owner, no employee');
+ perform pg_temp.assert((select count(*)=0 from public.employees),'no owner employee created');
+ r:=public.bridge_onboarding('claim',jsonb_set(p,'{request_id}','"10000000-0000-4000-8000-000000000002"'));
+ perform pg_temp.assert((r->>'already_provisioned')::boolean,'new request with same identity does not duplicate');
+ perform pg_temp.assert((select count(*)=1 from auth.users where email='owner@example.test'),'one Auth identity');
+ perform pg_temp.assert(public.bridge_onboarding('status','{}')->>'owner_invite'='owner_invite_sent','sent tracked separately from accepted');
+ blocked:=false;
+ begin perform public.complete_shop_onboarding('20000000-0000-4000-8000-000000000001'); exception when others then blocked:=true; end;
+ perform pg_temp.assert(blocked,'cannot complete without password and required settings');
+ update auth.users set email_confirmed_at=now(),encrypted_password=extensions.crypt('test-only-value',extensions.gen_salt('bf')) where id='20000000-0000-4000-8000-000000000001';
+ update public.shop_config set shop_address='Test address',shop_phone='+92 123',shop_email='business@example.test',invoice_prefix='INV',ticket_prefix='TK' where id=1;
+ perform public.set_override_pin('4829');
+ perform public.complete_shop_onboarding('20000000-0000-4000-8000-000000000001');
+ perform pg_temp.assert(public.bridge_onboarding('status','{}')->>'onboarding'='onboarding_complete','completion persists');
+ perform pg_temp.assert(public.bridge_onboarding('status','{}')->>'owner_invite'='owner_invite_accepted','confirmed Auth reported');
+ r:=public.bridge_onboarding('claim',p);
+ perform pg_temp.assert((r->>'already_provisioned')::boolean and r->>'owner_invite'='owner_invite_accepted','retry after acceptance retains identity');
+ perform set_config('request.jwt.claim.sub','20000000-0000-4000-8000-000000000001',true);
+ perform pg_temp.assert(public.get_owner_invite_context()->>'owner_email'='owner@example.test','verified reserved owner can accept');
+ perform set_config('request.jwt.claim.sub','90000000-0000-4000-8000-000000000001',true);
+ blocked:=false;
+ begin perform public.get_owner_invite_context(); exception when insufficient_privilege then blocked:=true; end;
+ perform pg_temp.assert(blocked,'arbitrary authenticated user cannot accept owner invite');
+ perform set_config('request.jwt.claim.sub','20000000-0000-4000-8000-000000000001',true);
+ update auth.users set email='other@example.test' where id='20000000-0000-4000-8000-000000000001';
+ blocked:=false;
+ begin perform public.get_owner_invite_context(); exception when insufficient_privilege then blocked:=true; end;
+ perform pg_temp.assert(blocked,'owner session with mismatched Auth email rejected');
+ update auth.users set email='owner@example.test' where id='20000000-0000-4000-8000-000000000001';
+ update public.shop_config set tax_rate=null where id=1;
+ blocked:=false;
+ begin perform public.complete_shop_onboarding('20000000-0000-4000-8000-000000000001'); exception when others then blocked:=true; end;
+ perform pg_temp.assert(blocked,'null tax cannot complete setup');
+ update public.shop_config set tax_rate=0 where id=1;
+ update public.shop_config set shop_name='Owner custom brand' where id=1;
+ perform public.bridge_onboarding('claim',p);
+ perform pg_temp.assert((select shop_name='Owner custom brand' from public.shop_config where id=1),'retry never resets saved branding');
+ blocked:=false;
+ begin perform public.bridge_onboarding('claim',p||'{"password":"forbidden"}'); exception when others then blocked:=true; end;
+ perform pg_temp.assert(blocked,'password payload rejected');
+end $$;
+rollback;

@@ -100,7 +100,9 @@ test('duplicate-status ACK works, duplicate/missing ACK entries do not; failed l
 
 test('only bridge opts out of gateway JWT; opaque call secret is not an account-admin credential', async () => {
   const config = read('supabase/config.toml').replace(/\r\n/g, '\n').replace(/^#.*$/gm, '').trim()
-  assert.equal(config, '[functions.platform-bridge]\nverify_jwt = false')
+  const functions = [...config.matchAll(/\[functions\.([^\]]+)\]\s*verify_jwt = (true|false)/g)]
+  assert.deepEqual(functions.filter(entry => entry[2] === 'false').map(entry => entry[1]), ['platform-bridge'])
+  assert.ok(functions.some(entry => entry[1] === 'platform-bridge'))
   for (const entry of readdirSync(new URL('../supabase/functions/', import.meta.url), { withFileTypes: true })) {
     if (!entry.isDirectory() || entry.name === 'platform-bridge') continue
     assert.doesNotMatch(read(`supabase/functions/${entry.name}/index.ts`), /PLATFORM_BRIDGE_CALL_SECRET/)

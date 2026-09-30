@@ -171,6 +171,24 @@ async function signInMappedUser(
   return loginResponse(profile, data.session)
 }
 
+async function signInReservedOwner(auth: ReturnType<typeof createClient>, email: string, password: string) {
+  const { data, error } = await auth.auth.signInWithPassword({ email, password })
+  if (error || !data.user || !data.session) return { ok: false, error: 'Incorrect email or password.' }
+  const { data: verified, error: verifyError } = await auth.auth.getUser(data.session.access_token)
+  if (verifyError || !verified.user || verified.user.id !== data.user.id || normalizeEmail(verified.user.email ?? '') !== email) {
+    return { ok: false, error: 'Authentication could not be verified.' }
+  }
+  // The signed-in client invokes a no-argument RPC: UUID comes from the verified
+  // JWT, while email/name/role come from the protected Shop reservation.
+  const { data: profile, error: claimError } = await auth.rpc('activate_reserved_owner')
+  if (claimError || !profile || profile.auth_user_id !== verified.user.id || profile.email !== email
+    || profile.role !== 'Business Owner' || profile.employee_id !== null || profile.status !== 'Active') {
+    await auth.auth.signOut({ scope: 'local' })
+    return { ok: false, error: 'This account is not authorized for this Shop, or owner activation is not ready. Contact your operator.' }
+  }
+  return loginResponse(profile, data.session)
+}
+
 async function verifyLegacyIdentity(
   admin: ReturnType<typeof createClient>,
   email: string,
@@ -401,6 +419,14 @@ Deno.serve(async (req: Request) => {
     const mapped = await findAppProfile(admin, email)
     if (mapped) {
       const result = await signInMappedUser(admin, auth, mapped, password)
+      return json(result, result.ok ? 200 : 401)
+    }
+    const { data: setup, error: setupError } = await admin.from('shop_config')
+      .select('onboarding_version,onboarding_completed_at,suspended').eq('id', 1).single()
+    if (setupError || !setup) throw new Error('Shop access state is unavailable.')
+    if (setup.onboarding_version === 2 && !setup.onboarding_completed_at) {
+      if (setup.suspended) return json({ ok: false, error: 'This shop account is suspended. Contact your service provider.' }, 401)
+      const result = await signInReservedOwner(auth, email, password)
       return json(result, result.ok ? 200 : 401)
     }
     const legacy = await verifyLegacyIdentity(admin, email, password)
