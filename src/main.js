@@ -1,7 +1,8 @@
 import { sb, loadConfig, applyBranding, loadCurrentSession, _clearSession, resetClientEntitlements, state, CFG, can } from './shared.js'
 import { renderLogin } from './auth.js'
-import { registerRoute, registerNotFound, startRouter, navigate } from './router.js'
+import { registerRoute, registerNotFound, startRouter, navigate, clearRoutes } from './router.js'
 import { dlog } from './debuglog.js'
+import { needsOnboarding } from './onboarding-state.js'
 
 let applicationGeneration = 0
 
@@ -12,6 +13,16 @@ function canonicalRole(session) {
 async function boot() {
   await loadConfig(true)
   applyBranding()
+
+  if (location.pathname === '/invite/accept') {
+    const { acceptInvite } = await import('./onboarding.js')
+    await acceptInvite(async () => {
+      const session = await loadCurrentSession()
+      if (!session) throw new Error('Owner profile is still provisioning. Retry shortly.')
+      await onLoginSuccess(session)
+    })
+    return
+  }
 
   const session = await loadCurrentSession()
   if (!session) {
@@ -26,13 +37,12 @@ async function boot() {
     return
   }
 
-  await loadConfig(false)
-  applyBranding()
-  await enterApplication(session)
+  await onLoginSuccess(session)
 }
 
 function showLogin() {
   applicationGeneration++
+  clearRoutes()
   state.role = null
   resetClientEntitlements()
   const render = () => renderLogin(onLoginSuccess)
@@ -48,6 +58,7 @@ function showLogin() {
 }
 
 function setupRoutes(session) {
+  clearRoutes()
   const generation = applicationGeneration
   const role = canonicalRole(session)
   state.role = role
@@ -116,6 +127,15 @@ async function enterApplication(session) {
   const generation = ++applicationGeneration
   const role = canonicalRole(session)
   state.role = role
+  if (needsOnboarding(session, CFG)) {
+    const { renderOnboarding } = await import('./onboarding.js')
+    if (generation !== applicationGeneration || state.role !== role) return
+    clearRoutes()
+    const wizard = () => renderOnboarding(session, () => enterApplication(session))
+    registerRoute('/onboarding', wizard)
+    registerNotFound(() => navigate('/onboarding', { replace:true }))
+    navigate('/onboarding', { replace:true }); startRouter(); return
+  }
   const proceed = () => {
     if (generation !== applicationGeneration || state.role !== role) return
     setupRoutes(session)
@@ -132,7 +152,25 @@ async function onLoginSuccess(session) {
   const role = canonicalRole(session)
   state.role = role
   dlog('main.onLoginSuccess', `canonical role=${role}`)
-  await loadConfig(false)
+  if (!await loadConfig(false)) {
+    applicationGeneration++
+    clearRoutes()
+    state.role = null
+    const blocked = () => {
+      document.getElementById('app').innerHTML = '<main class="card" style="max-width:480px;margin:8vh auto;padding:28px"><h1>Shop setup unavailable</h1><p>Your account is signed in, but Shop access and setup could not be checked. Reconnect and retry.</p><button id="setup-retry" class="primary-button">Retry</button><button id="setup-signout" class="secondary-button">Sign out</button></main>'
+      document.getElementById('setup-retry').onclick = () => location.reload()
+      document.getElementById('setup-signout').onclick = () => void _clearSession()
+    }
+    registerNotFound(blocked)
+    blocked()
+    startRouter()
+    return
+  }
+  if (CFG.suspended && role !== 'Orbito Support') {
+    await _clearSession()
+    showLogin()
+    return
+  }
   applyBranding()
   await enterApplication(session)
 }

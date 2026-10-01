@@ -1,0 +1,62 @@
+-- Disposable local PostgreSQL only. No hosted Auth or SMTP calls.
+begin;
+create function pg_temp.assert(ok boolean,message text) returns void language plpgsql as $$
+begin if ok is distinct from true then raise exception 'ASSERT: %',message; end if; end $$;
+select pg_temp.assert(not has_function_privilege('anon','public.activate_reserved_owner()','EXECUTE'),'anonymous activation denied');
+select pg_temp.assert(not has_function_privilege('service_role','public.activate_reserved_owner()','EXECUTE'),'manual activation requires authenticated JWT');
+select pg_temp.assert(not has_function_privilege('authenticated','app_private.activate_bootstrap_owner(uuid,boolean)','EXECUTE'),'caller cannot choose identity or invitation mode');
+select pg_temp.assert(has_function_privilege('authenticated','public.activate_reserved_owner()','EXECUTE'),'authenticated no-argument claim available');
+do $$
+declare p jsonb:='{"request_id":"10000000-0000-4000-8000-000000000001","platform_client_id":50,"client_binding":"orbito-client-50","business_name":"Test Shop","owner_name":"Test Owner","owner_email":"owner@example.test","billing_currency":"PKR","shop_url":"https://shop.example.test","modules":{"repair_module_enabled":true,"inventory_module_enabled":false,"technician_module_enabled":false,"live_tracking_enabled":false,"ems_enabled":false,"ems_track_breaks":false},"paper_resupply_enabled":false,"onboarding_version":2}';
+ r jsonb; blocked boolean; owner_id uuid:='21000000-0000-4000-8000-000000000001';
+begin
+ r:=public.bridge_onboarding('reserve',p);
+ perform pg_temp.assert(r->>'infrastructure'='ready' and r->>'owner_setup'='owner_setup_pending' and r->>'owner_invite'='owner_invite_not_started','SMTP-free manual infrastructure');
+ perform pg_temp.assert((select lease_id is null and owner_auth_id is null from app_private.owner_bootstrap),'manual reservation has no Auth invitation lease');
+ perform pg_temp.assert(not exists(select 1 from auth.users),'reserve never creates Auth account');
+ perform pg_temp.assert(public.bridge_onboarding('reserve',p)=r,'duplicate reservation idempotent');
+ -- Optional delivery rejection precedes external creation of the manual account.
+ r:=public.bridge_onboarding('claim',p);
+ perform public.bridge_onboarding('failed',jsonb_build_object('lease_id',r->>'lease_id'));
+ perform pg_temp.assert(public.bridge_onboarding('status','{}')->>'infrastructure'='ready','failed optional invitation preserves infrastructure');
+ insert into auth.users(id,email,email_confirmed_at,encrypted_password) values(owner_id,'OWNER@EXAMPLE.TEST',null,'local-auth-placeholder'),('21000000-0000-4000-8000-000000000002','stranger@example.test',now(),'local-auth-placeholder');
+ perform set_config('request.jwt.claim.sub',owner_id::text,true);
+ blocked:=false;
+ begin perform public.activate_reserved_owner(); exception when insufficient_privilege then blocked:=true; end;
+ perform pg_temp.assert(blocked,'unconfirmed Auth identity denied');
+ perform set_config('request.jwt.claim.sub','21000000-0000-4000-8000-000000000002',true);
+ blocked:=false;
+ begin perform public.activate_reserved_owner(); exception when insufficient_privilege then blocked:=true; end;
+ perform pg_temp.assert(blocked and not exists(select 1 from public.app_users),'different authenticated email denied without owner mapping');
+ perform set_config('request.jwt.claim.sub','21000000-0000-4000-8000-000000000099',true);
+ blocked:=false;
+ begin perform public.activate_reserved_owner(); exception when insufficient_privilege then blocked:=true; end;
+ perform pg_temp.assert(blocked,'unknown authenticated UUID denied');
+ update auth.users set email_confirmed_at=now() where id=owner_id;
+ perform set_config('request.jwt.claim.sub',owner_id::text,true);
+ update public.shop_config set suspended=true where id=1;
+ blocked:=false;
+ begin perform public.activate_reserved_owner(); exception when insufficient_privilege then blocked:=true; end;
+ perform pg_temp.assert(blocked,'suspension enforced before profile creation');
+ update public.shop_config set suspended=false,onboarding_completed_at=now() where id=1;
+ blocked:=false;
+ begin perform public.activate_reserved_owner(); exception when insufficient_privilege then blocked:=true; end;
+ perform pg_temp.assert(blocked,'initialized Shop cannot enter first claim');
+ update public.shop_config set onboarding_completed_at=null where id=1;
+ insert into public.app_users(auth_user_id,employee_id,email,display_name,role,status) values('21000000-0000-4000-8000-000000000002',null,'stranger@example.test','Existing Owner','Business Owner','Active');
+ blocked:=false;
+ begin perform public.activate_reserved_owner(); exception when insufficient_privilege then blocked:=true; end;
+ perform pg_temp.assert(blocked and (select auth_user_id='21000000-0000-4000-8000-000000000002' from public.app_users where role='Business Owner'),'existing canonical owner cannot be replaced');
+ delete from public.app_users where auth_user_id='21000000-0000-4000-8000-000000000002';
+ r:=public.activate_reserved_owner();
+ perform pg_temp.assert(r->>'role'='Business Owner' and r->'employee_id'='null'::jsonb and r->>'email'='owner@example.test','manual account becomes canonical owner without employee');
+ perform pg_temp.assert(public.activate_reserved_owner()=r,'duplicate claim idempotent');
+ perform pg_temp.assert((select count(*)=1 from public.app_users where role='Business Owner') and not exists(select 1 from public.employees),'one owner, zero employees');
+ perform pg_temp.assert(public.bridge_onboarding('status','{}')->>'owner_setup'='owner_active' and public.bridge_onboarding('status','{}')->>'onboarding'='onboarding_pending','manual active owner still requires wizard');
+ update public.shop_config set shop_address='Address',shop_phone='+92 123',shop_email='business@example.test',invoice_prefix='INV',ticket_prefix='TK' where id=1;
+ perform public.set_override_pin('4829');
+ perform public.complete_shop_onboarding(owner_id);
+ perform pg_temp.assert(public.bridge_onboarding('status','{}')->>'onboarding'='onboarding_complete','completion does not require invitation or SMTP');
+ perform pg_temp.assert(public.activate_reserved_owner()=r,'completed canonical owner is confirmed idempotently');
+end $$;
+rollback;

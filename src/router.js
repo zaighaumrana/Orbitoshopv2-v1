@@ -10,6 +10,12 @@ const routes = new Map()
 let notFoundHandler = null
 let currentPath = null
 
+export function clearRoutes() {
+  routes.clear()
+  notFoundHandler = null
+  currentPath = null
+}
+
 /**
  * Register a route.
  * @param {string} path - e.g. '/admin/inventory' or '/admin/repairs/:id'

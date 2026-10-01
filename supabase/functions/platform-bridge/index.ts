@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.108.2'
+import { onboardingOperation } from './onboarding.ts'
 
 // Server-to-server only. No browser CORS or caller-supplied destination/source.
 // Leave deployment and scheduling disabled until Platform implements contract v1.
@@ -17,6 +18,21 @@ Deno.serve(async req => {
   const callSecret = Deno.env.get('PLATFORM_BRIDGE_CALL_SECRET') ?? ''
   const token = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1] ?? ''
   if (!await sameSecret(token, callSecret)) return reply(401, { error: 'Not authorized' })
+
+  let operation: any = {}
+  try {
+    const text = await req.text()
+    if (text.length > 16384) return reply(413, { error: 'Request too large' })
+    operation = text ? JSON.parse(text) : {}
+  } catch { return reply(400, { error: 'Invalid bridge request' }) }
+  if (operation?.operation) {
+    const admin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+        global: { fetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, redirect:'error',
+          signal: AbortSignal.any([AbortSignal.timeout(20000), ...(init?.signal ? [init.signal] : [])]) }) } })
+    try { return reply(200, await onboardingOperation(admin, operation)) }
+    catch (error) { return reply(409, { error: error instanceof Error ? error.message : 'Onboarding unavailable' }) }
+  }
 
   const endpoint = Deno.env.get('PLATFORM_BRIDGE_ENDPOINT') ?? ''
   const secret = Deno.env.get('PLATFORM_BRIDGE_SOURCE_SECRET') ?? ''

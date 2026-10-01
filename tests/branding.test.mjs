@@ -36,7 +36,7 @@ test('login copy uses configured brand while tenant title/logo and auth controls
 })
 
 test('HTML title and dev/build manifest derive names from the same config', () => {
-  const plugin = config.plugins.find(p => p.name === 'product-branding')
+  const plugin = (typeof config==='function'?config({mode:'test'}):config).plugins.find(p => p.name === 'product-branding')
   const html = plugin.transformIndexHtml.handler(read('index.html'))
   assert.ok(html.includes(`<title>${escapeHTML(brand.PRODUCT_NAME)}</title>`))
   assert.doesNotMatch(html, /%PRODUCT_NAME%/)

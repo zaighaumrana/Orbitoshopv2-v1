@@ -1,3 +1,4 @@
+import { runtimeProbe } from '../_shared/runtime-preflight.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.108.2'
 
 const TURNSTILE_SECRET = Deno.env.get('TURNSTILE_SECRET') ?? ''
@@ -29,6 +30,8 @@ async function turnstile(token: string, remoteIp: string | null) {
 }
 
 Deno.serve(async (req: Request) => {
+  const preflight = await runtimeProbe(req,'password-reset-request',["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY","TURNSTILE_SECRET"])
+  if (preflight) return preflight
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
   if (req.method !== 'POST') return json({ ok: false }, 405)
   try {

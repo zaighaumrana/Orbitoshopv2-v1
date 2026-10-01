@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import { readFileSync } from 'node:fs'
 import { PRODUCT_NAME, SHORT_BRAND_NAME } from './src/config/brand.js'
 import { escapeHTML } from './src/html.js'
@@ -9,9 +9,15 @@ const manifest = JSON.stringify({
   name: PRODUCT_NAME, short_name: SHORT_BRAND_NAME,
 })
 
-export default defineConfig({
+export default defineConfig(({mode}) => {
+  const env=loadEnv(mode,process.cwd(),'VITE_');
+  return {
   plugins: [{
     name: 'product-branding',
+    buildStart() {
+      const missing=['VITE_SUPABASE_URL','VITE_SUPABASE_ANON','VITE_TURNSTILE_SITE_KEY'].filter(k=>!(process.env[k]||env[k])?.trim());
+      if(missing.length)throw new Error('Shop browser configuration missing: '+missing.join(', '));
+    },
     transformIndexHtml: { order: 'pre', handler: html => html.replaceAll('%PRODUCT_NAME%', escapeHTML(PRODUCT_NAME)) },
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
@@ -31,4 +37,5 @@ export default defineConfig({
   esbuild: {
     target: 'es2020',
   }
+};
 })

@@ -1,3 +1,4 @@
+import { runtimeProbe } from '../_shared/runtime-preflight.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.108.2'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -22,7 +23,7 @@ type Profile = {
 const employeeRoles: Role[] = ['Manager', 'Cashier', 'Technician']
 const statuses = ['Active', 'Inactive']
 const configKeys = new Set([
-  'shop_name', 'shop_address', 'shop_phone', 'shop_logo', 'shop_description',
+  'shop_name', 'shop_address', 'shop_phone', 'shop_email', 'shop_logo', 'shop_description',
   'primary_color', 'secondary_color', 'currency', 'tax_rate',
   'discount_pin_required', 'partial_udhar_allowed', 'terms_text',
   'invoice_prefix', 'ticket_prefix',
@@ -228,6 +229,9 @@ async function updateOwner(admin: any, caller: Profile, body: any) {
   }
   const email = emailOf(body.email)
   if (!email) return { ok: false, error: 'A valid owner email is required.' }
+  const { data: shop, error: shopError } = await admin.from('shop_config').select('onboarding_version').eq('id', 1).single()
+  if (shopError || !shop) return { ok: false, error: 'Owner identity could not be checked.' }
+  if (shop.onboarding_version === 2) return { ok: false, error: 'The invited Business Owner identity cannot be changed through ordinary settings.' }
   const { data: owner } = await admin.from('app_users').select('*').eq('role', 'Business Owner').maybeSingle()
   if (!owner) return { ok: false, error: 'Owner must complete Auth migration before changing email.' }
   const oldEmail = owner.email
@@ -255,12 +259,24 @@ async function updateConfig(admin: any, caller: Profile, body: any) {
   for (const [key, value] of Object.entries(body.updates ?? {})) {
     if (configKeys.has(key)) updates[key] = value
   }
+  if (updates.tax_rate !== undefined && (typeof updates.tax_rate !== 'number' || !Number.isFinite(updates.tax_rate) || updates.tax_rate<0 || updates.tax_rate>100)) return { ok:false,error:'Tax rate must be between 0 and 100.' }
+  if (updates.shop_email !== undefined && updates.shop_email !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(updates.shop_email))) return { ok:false,error:'Valid business email required.' }
+  if (updates.shop_logo !== undefined) {
+    let valid = false
+    if (typeof updates.shop_logo==='string' && updates.shop_logo.length<=699100) {
+      const encoded = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(updates.shop_logo)?.[2]
+      try { valid = Boolean(encoded && encoded.length%4===0 && atob(encoded).length<=512*1024) } catch {}
+    }
+    if (!valid) return {ok:false,error:'Choose a PNG, JPEG or WebP logo under 512 KB.'}
+  }
   if (!Object.keys(updates).length) return { ok: false, error: 'No permitted settings were provided.' }
   const { error } = await admin.from('shop_config').update(updates).eq('id', 1)
   return error ? { ok: false, error: 'Settings could not be updated.' } : { ok: true }
 }
 
 Deno.serve(async (req: Request) => {
+  const preflight = await runtimeProbe(req,'account-admin',["SUPABASE_URL","SUPABASE_ANON_KEY","SUPABASE_SERVICE_ROLE_KEY"])
+  if (preflight) return preflight
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
   if (req.method !== 'POST') return json({ ok: false, error: 'Method not allowed.' }, 405)
   try {
@@ -284,6 +300,12 @@ Deno.serve(async (req: Request) => {
       }
       case 'update-owner': result = await updateOwner(ctx.admin, ctx.caller, body); break
       case 'update-config': result = await updateConfig(ctx.admin, ctx.caller, body); break
+      case 'complete-onboarding': {
+        if (ctx.caller.role !== 'Business Owner') { result = { ok: false, error: 'Business Owner required.' }; break }
+        const { error } = await ctx.admin.rpc('complete_shop_onboarding', { p_owner: ctx.caller.auth_user_id })
+        result = error ? { ok: false, error: 'Complete all required business settings, confirm your owner Auth account and set an override PIN.' } : { ok: true }
+        break
+      }
       case 'set-pin': {
         if (ctx.caller.role !== 'Business Owner' && ctx.caller.role !== 'Orbito Support') {
           result = { ok: false, error: 'PIN changes are not permitted.' }

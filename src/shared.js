@@ -148,11 +148,18 @@ export async function loadCurrentSession() {
   try { sessionStorage.removeItem('retailos_session') } catch {}
   const { data: userData, error: userError } = await sb.auth.getUser()
   if (userError || !userData.user) return null
-  const { data: profile, error: profileError } = await sb
+  let { data: profile, error: profileError } = await sb
     .from('app_users')
     .select('auth_user_id, employee_id, email, display_name, role, status')
     .eq('auth_user_id', userData.user.id)
     .single()
+  if (!profile) {
+    const activation = await sb.rpc('activate_reserved_owner')
+    if (!activation.error && activation.data?.auth_user_id === userData.user.id) {
+      profile = activation.data
+      profileError = null
+    }
+  }
   if (profileError || !profile || profile.status !== 'Active') {
     await sb.auth.signOut({ scope: 'local' })
     return null
@@ -747,7 +754,11 @@ export async function invokeAccountAdmin(action, payload = {}) {
   const { data, error } = await sb.functions.invoke('account-admin', {
     body: { action, ...payload },
   })
-  if (error || !data?.ok) return { ok: false, error: data?.error || error?.message || 'Request failed.' }
+  if (error || !data?.ok) {
+    let message = data?.error;
+    try { if (!message && error?.context) message = (await error.context.clone().json()).error; } catch {}
+    return { ok:false,error:typeof message==='string' && message.length<=300 ? message : 'Shop settings request failed. Check your session and runtime setup, then retry.' };
+  }
   return data
 }
 

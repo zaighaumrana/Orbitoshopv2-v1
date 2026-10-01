@@ -1,3 +1,4 @@
+import { runtimeProbe } from '../_shared/runtime-preflight.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.108.2'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -15,6 +16,8 @@ function json(body: unknown, status = 200) {
 }
 
 Deno.serve(async (req: Request) => {
+  const preflight = await runtimeProbe(req,'verify-pin',["SUPABASE_URL","SUPABASE_ANON_KEY","SUPABASE_SERVICE_ROLE_KEY"])
+  if (preflight) return preflight
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
   if (req.method !== 'POST') return json({ ok: false, error: 'Method not allowed.' }, 405)
   const authorization = req.headers.get('authorization') ?? ''
