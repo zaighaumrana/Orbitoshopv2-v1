@@ -754,7 +754,11 @@ export async function invokeAccountAdmin(action, payload = {}) {
   const { data, error } = await sb.functions.invoke('account-admin', {
     body: { action, ...payload },
   })
-  if (error || !data?.ok) return { ok: false, error: data?.error || error?.message || 'Request failed.' }
+  if (error || !data?.ok) {
+    let message = data?.error;
+    try { if (!message && error?.context) message = (await error.context.clone().json()).error; } catch {}
+    return { ok:false,error:typeof message==='string' && message.length<=300 ? message : 'Shop settings request failed. Check your session and runtime setup, then retry.' };
+  }
   return data
 }
 

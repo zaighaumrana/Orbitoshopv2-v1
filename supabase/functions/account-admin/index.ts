@@ -1,3 +1,4 @@
+import { runtimeProbe } from '../_shared/runtime-preflight.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.108.2'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -260,13 +261,22 @@ async function updateConfig(admin: any, caller: Profile, body: any) {
   }
   if (updates.tax_rate !== undefined && (typeof updates.tax_rate !== 'number' || !Number.isFinite(updates.tax_rate) || updates.tax_rate<0 || updates.tax_rate>100)) return { ok:false,error:'Tax rate must be between 0 and 100.' }
   if (updates.shop_email !== undefined && updates.shop_email !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(updates.shop_email))) return { ok:false,error:'Valid business email required.' }
-  if (updates.shop_logo !== undefined && (String(updates.shop_logo).length>720000 || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(String(updates.shop_logo)))) return { ok:false,error:'Choose a PNG, JPEG or WebP logo under 512 KB.' }
+  if (updates.shop_logo !== undefined) {
+    let valid = false
+    if (typeof updates.shop_logo==='string' && updates.shop_logo.length<=699100) {
+      const encoded = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(updates.shop_logo)?.[2]
+      try { valid = Boolean(encoded && encoded.length%4===0 && atob(encoded).length<=512*1024) } catch {}
+    }
+    if (!valid) return {ok:false,error:'Choose a PNG, JPEG or WebP logo under 512 KB.'}
+  }
   if (!Object.keys(updates).length) return { ok: false, error: 'No permitted settings were provided.' }
   const { error } = await admin.from('shop_config').update(updates).eq('id', 1)
   return error ? { ok: false, error: 'Settings could not be updated.' } : { ok: true }
 }
 
 Deno.serve(async (req: Request) => {
+  const preflight = await runtimeProbe(req,'account-admin',["SUPABASE_URL","SUPABASE_ANON_KEY","SUPABASE_SERVICE_ROLE_KEY"])
+  if (preflight) return preflight
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
   if (req.method !== 'POST') return json({ ok: false, error: 'Method not allowed.' }, 405)
   try {
@@ -293,7 +303,7 @@ Deno.serve(async (req: Request) => {
       case 'complete-onboarding': {
         if (ctx.caller.role !== 'Business Owner') { result = { ok: false, error: 'Business Owner required.' }; break }
         const { error } = await ctx.admin.rpc('complete_shop_onboarding', { p_owner: ctx.caller.auth_user_id })
-        result = error ? { ok: false, error: 'Complete all required business settings, confirm your invite and set an override PIN.' } : { ok: true }
+        result = error ? { ok: false, error: 'Complete all required business settings, confirm your owner Auth account and set an override PIN.' } : { ok: true }
         break
       }
       case 'set-pin': {

@@ -20,7 +20,7 @@ function fixture({already=false,conflict=false,inviteError=false,unknown=false,f
   }}}}
   const source=[read('supabase/functions/platform-bridge/onboarding.ts'),read('supabase/functions/platform-bridge/index.ts')].join('\n').replace(/^import .*$/gm,'').replace(/^export /gm,'')
   vm.runInNewContext(stripTypeScriptTypes(source),{
-    Response,URL,TextEncoder,Uint8Array,crypto,AbortSignal,
+    Response,URL,TextEncoder,Uint8Array,crypto,AbortSignal,checkRuntime:async (_admin,status)=>status,
     Deno:{serve:fn=>handler=fn,env:{get:key=>({PLATFORM_BRIDGE_CALL_SECRET:'test-call',SUPABASE_URL:'https://shop.example.test',SUPABASE_SERVICE_ROLE_KEY:'private-shop-key'})[key]}},
     createClient:(url,key)=>{clients.push({url,key});return admin},
     console:{log:()=>assert.fail('no logging'),error:()=>assert.fail('no logging')},

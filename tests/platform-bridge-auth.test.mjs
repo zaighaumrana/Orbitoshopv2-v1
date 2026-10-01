@@ -104,7 +104,7 @@ test('only bridge opts out of gateway JWT; opaque call secret is not an account-
   assert.deepEqual(functions.filter(entry => entry[2] === 'false').map(entry => entry[1]), ['platform-bridge'])
   assert.ok(functions.some(entry => entry[1] === 'platform-bridge'))
   for (const entry of readdirSync(new URL('../supabase/functions/', import.meta.url), { withFileTypes: true })) {
-    if (!entry.isDirectory() || entry.name === 'platform-bridge') continue
+    if (!entry.isDirectory() || entry.name === 'platform-bridge' || entry.name.startsWith('_')) continue
     assert.doesNotMatch(read(`supabase/functions/${entry.name}/index.ts`), /PLATFORM_BRIDGE_CALL_SECRET/)
   }
   const ctx = vm.createContext({ Response, URL, Deno: { serve() {}, env: { get: () => 'fixture' } },
