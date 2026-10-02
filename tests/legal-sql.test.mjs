@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { readFileSync, existsSync } from 'node:fs'
 const runtime = new URL('../node_modules/.legal-test-runtime/node_modules/@electric-sql/pglite/dist/index.js',import.meta.url)
 const migration = readFileSync(new URL('../supabase/migrations/20261002015159_legal_acceptance.sql',import.meta.url),'utf8')
+const policyUpdate = readFileSync(new URL('../supabase/migrations/20261002071259_legal_policy_metadata.sql',import.meta.url),'utf8')
+const metadata = JSON.parse(readFileSync(new URL('../src/legal/metadata.json',import.meta.url),'utf8'))
 const foundation = readFileSync(new URL('../supabase/migrations/20260903165753_phase2_auth_foundation.sql',import.meta.url),'utf8')
 
 test('isolated PostgreSQL: Owner persistence, tenant binding, staff/anonymous denial, immutable evidence and version policy', {skip:!existsSync(runtime)}, async () => {
@@ -28,6 +30,7 @@ test('isolated PostgreSQL: Owner persistence, tenant binding, staff/anonymous de
       await db.exec(foundation.slice(start,foundation.indexOf('$$;',start)+3))
     }
     await db.exec(migration)
+    await db.exec(policyUpdate)
     const owner = '00000000-0000-0000-0000-000000000001'
     const staff = '00000000-0000-0000-0000-000000000002'
     const identity = async (id,role='authenticated') => {
@@ -35,15 +38,14 @@ test('isolated PostgreSQL: Owner persistence, tenant binding, staff/anonymous de
       await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id])
       await db.exec('set role '+role)
     }
-    const accept = (authority=true,revision='2026-09-27.1',terms='1.0') =>
+    const accept = (authority=true,revision=metadata.requiredRevision,terms='1.0') =>
       db.query('select public.accept_legal_terms($1,$2,$3,$4,$5) as result',[authority,revision,terms,'1.0','1.0'])
     const status = async()=> (await db.query('select public.get_legal_status() as result')).rows[0].result
     await identity('', 'anon')
     const publication = (await db.query('select public.get_legal_publication() as result')).rows[0].result
     assert.equal(publication.published,false)
-    assert.equal(publication.terms_version,'[PLACEHOLDER: TERMS_VERSION]')
-    assert.equal(publication.privacy_version,'[PLACEHOLDER: PRIVACY_VERSION]')
-    assert.equal(publication.dpa_version,'[PLACEHOLDER: DPA_VERSION]')
+    assert.equal(publication.required_revision,metadata.requiredRevision)
+    for (const key of ['terms','privacy','dpa']) assert.equal(publication[key+'_version'],metadata.documents[key].version)
     assert.deepEqual(Object.keys(publication).sort(),['dpa_version','privacy_version','published','required_revision','terms_version'])
     await assert.rejects(status,/permission denied/)
     await assert.rejects(()=>accept(),/permission denied/)
@@ -75,7 +77,7 @@ test('isolated PostgreSQL: Owner persistence, tenant binding, staff/anonymous de
     await identity(owner)
     await assert.rejects(()=>accept(false),/Confirm your authority/)
     await assert.rejects(()=>accept(true,'old'),/Legal documents changed/)
-    await assert.rejects(()=>accept(true,'2026-09-27.1','forged'),/Legal documents changed/)
+    await assert.rejects(()=>accept(true,metadata.requiredRevision,'forged'),/Legal documents changed/)
     const accepted = (await accept()).rows[0].result
     assert.equal(accepted.accepted,true)
     assert.equal(accepted.receipt.accepted_name,'Owner Fixture')
@@ -89,7 +91,7 @@ test('isolated PostgreSQL: Owner persistence, tenant binding, staff/anonymous de
     assert.equal(records.length,1)
     assert.equal(records[0].auth_user_id,owner)
     assert.equal(records[0].accepted_role,'Business Owner')
-    assert.equal(records[0].required_revision,'2026-09-27.1')
+    assert.equal(records[0].required_revision,metadata.requiredRevision)
     assert.equal(records[0].terms_version,'1.0')
     assert.equal(records[0].privacy_version,'1.0')
     assert.equal(records[0].dpa_version,'1.0')

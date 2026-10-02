@@ -8,9 +8,9 @@ Edit **`src/config/brand.js`** for public product branding. It is a pure module 
 | SHORT_BRAND_NAME | RetraSell | Short brand used in support/Platform copy |
 | PROJECT_OWNER_NAME | ABCD Ventures | Project/parent attribution |
 | PROJECT_ATTRIBUTION | A project of ABCD Ventures | Derived from project owner |
-| LEGAL_ENTITY_NAME | null | Unresolved; not rendered or used to fill legal configuration |
+| LEGAL_ENTITY_NAME | RetraSell | Confirmed contracting name; not used to publish or fill legal configuration |
 
-Product and short names can be changed for a reviewed rename. Project owner must change only on an actual ownership/attribution decision. `A project of ABCD Ventures` is attribution, not evidence that ABCD Ventures is the contracting entity. Assigning a future legal entity requires a separate legal decision/review; changing this field alone does not configure or publish a legal package.
+Product and short names can be changed for a reviewed rename. Project owner must change only on an actual ownership/attribution decision. `A project of ABCD Ventures` is plain-text attribution without a website link, not evidence that ABCD Ventures is the contracting entity. RetraSell is the business-supplied contracting name, matching company.ENTITY in legal metadata; changes must be coordinated with that legal source. Changing this field alone does not configure or publish a legal package.
 
 ## Current consumers
 
@@ -20,7 +20,7 @@ Product and short names can be changed for a reviewed rename. Project owner must
 - `index.html`: `%PRODUCT_NAME%` title replaced by the small Vite hook in `vite.config.js` before HTML processing.
 - `public/manifest.webmanifest`: metadata template. Its names are injected from brand config by Vite in development and production output; do not serve the source tree as a production build. Rebuild/restart Vite after a config rename. Existing installed apps may need a browser-managed metadata refresh.
 
-The legal reader and user-guide templates also resolve public branding from this module. Legal metadata contains business/document fields, not a second product-name source. `legal.html` uses the same Vite title hook. Onboarding copy uses SHORT_BRAND_NAME without changing its activation or six-step behavior. Changing branding does not publish a legal policy or configure the unresolved contracting entity.
+The legal reader and user-guide templates also resolve public branding from this module. Legal metadata contains business/document fields, not a second product-name source. `legal.html` uses the same Vite title hook. Onboarding copy uses SHORT_BRAND_NAME without changing its activation or six-step behavior. Changing branding does not publish a legal policy; professional legal/provider review remains pending.
 
 ## Intentional exceptions and non-brand identifiers
 

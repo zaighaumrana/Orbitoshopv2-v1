@@ -6,7 +6,7 @@ These terms supplement the Shop's agreement with {{ENTITY}}, {{ADDRESS}}. They a
 
 The provider's independent account administration, service billing, security and compliance processing is described separately in the Privacy Notice. These terms do not label all processing as being on the Shop's behalf. Applicable mandatory transfer terms prevail, then these Data Processing Terms on processing matters, then the commercial agreement.
 
-Unpublished draft for business customers initially in Pakistan. Party details, schedules and operational commitments require completion. This draft has not been reviewed by a lawyer. Mentioning a legal instrument does not execute it.
+Unpublished draft for business customers initially in Pakistan. Business details and document versions are supplied; provider schedules and operational commitments still require professional review. This draft has not been reviewed by a lawyer. Mentioning a legal instrument does not execute it.
 
 ## 2. Instructions and permitted processing
 
@@ -19,6 +19,8 @@ The provider will not use covered Shop personal information for unrelated advert
 The provider will restrict access to authorized personnel who reasonably need it for troubleshooting, support, security, abuse investigation, recovery or maintenance and are subject to confidentiality obligations, including after access ends. Access is limited to what is reasonably necessary and logged where supported by the system; not every action is guaranteed to be logged. It will maintain risk-appropriate technical and organizational measures and not materially reduce agreed protection without an appropriate replacement. Annex B separates code-supported controls from measures requiring operational confirmation. No certification is implied.
 
 The Shop is responsible for lawful instructions, appropriate account permissions, endpoint security, notices and collecting only needed information. These responsibilities do not relieve the provider of its own duties.
+
+Provider-managed infrastructure is distinct from customer-owned or customer-controlled infrastructure. If the Shop elects to use its own Supabase project, database, hosting/cloud account, credentials or similar environment, the Shop owns or controls it. RetraSell may assist with initial setup or integration for RetraSell POS. The Shop remains responsible for that provider account, billing, credentials, availability, backups, recovery arrangements and infrastructure administration. RetraSell does not guarantee that independent infrastructure. To the maximum extent permitted by applicable law, RetraSell is not responsible for data loss, database failure, provider outage, suspension, deletion, corruption, credential loss or backup/recovery failure to the extent arising from the customer's infrastructure, actions or omissions, or its provider. This does not exclude responsibility for RetraSell's own actions, breach or negligence where legally applicable, or liability that cannot legally be excluded, and does not remove its duties for processing it actually performs.
 
 ## 4. Subprocessors
 
@@ -42,7 +44,7 @@ The provider will assess government/legal requests, disclose only what is legall
 
 ## 7. Duration, return and deletion
 
-Processing lasts for the service term and necessary agreed wind-down. The Shop may request export/return of covered personal information within {{EXPORT_WINDOW}}. Return/deletion requests and formats are arranged with support; no universal automated export/erase tool is promised. After the window, data may be deleted subject to legal obligations, operational requirements, backups, fraud/security requirements and applicable retention obligations. Deletion from active systems may occur before residual backup copies naturally expire. Backup retention policy: {{BACKUP_RETENTION_POLICY}}. Retained data remains protected and processing is limited to the applicable retention purpose; this does not authorize unrelated reuse.
+Processing lasts for the service term and necessary agreed wind-down. Former customers may request export or return of available service data, including covered personal information, for up to {{EXPORT_WINDOW}}. Return/deletion requests and formats are arranged with support; no universal self-service backup, export, restore or erasure system, or recovery of data that no longer exists, is promised. After the window, data may be deleted subject to legal obligations, operational requirements, backups, fraud/security requirements and applicable retention obligations; deletion is not automatic exactly on day 30. Deletion from active systems may occur before residual backup copies naturally expire. {{BACKUP_RETENTION_POLICY}}. No guaranteed residual-backup deletion period is promised. Retained data remains protected and processing is limited to the applicable retention purpose; this does not authorize unrelated reuse. Customer-managed infrastructure responsibilities in section 3 do not remove applicable provider processing duties.
 
 The commercial agreement governs liability only so far as permitted by applicable law and mandatory transfer instruments. Nothing limits individuals' non-excludable rights.
 
@@ -67,7 +69,7 @@ These controls are not a guarantee against every incident. Deployment configurat
 
 {{SUBPROCESSORS}}
 
-This register distinguishes providers evidenced by the repository from business-identified services whose actual data flow depends on configuration; it is not completed vendor due diligence. Confirm contracting entities, roles, processing regions, vendor terms and change notices. A code-distribution vendor is not automatically a processor for all Shop data. Support access and other vendors used outside this repo must be added if relevant.
+This register lists infrastructure providers evidenced by the repository, not completed vendor due diligence or a claim that every provider receives Shop contents. Confirm contracting entities, roles, processing regions, vendor terms and change notices; customer-controlled provider accounts must be distinguished from provider-managed services. A code-distribution vendor is not automatically a processor for all Shop data. GitHub source/deployment hosting alone does not make it a Shop-data subprocessor. The current Gmail business mailbox is a communication channel for enquiries, not an application email feature. The Service is not currently marketed as providing SMS or email services. Support communications and any actual additional recipients must be assessed during provider review.
 
 ## Annex D - International transfers
 

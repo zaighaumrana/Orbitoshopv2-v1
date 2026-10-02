@@ -4,14 +4,18 @@ Updated 2026-10-02. Branch: `feature/legal-finalization-v2`; legal donor: `featu
 
 ## Confirmed business decisions
 
-- Contracting name remains unresolved; structure is Sole Proprietor. Registration and NTN are both `5842096` (business supplied, not independently registry-verified).
+- Contracting entity: RetraSell; structure: Sole Proprietor (business supplied, not independently verified). Registration/NTN are deliberately absent from customer documents, metadata and publication-readiness fields; no replacement identifiers are invented.
 - Address: Ground Zero, Hospital Road, Gujranwala, Punjab, Pakistan.
 - Preserve verbatim: **ABCD Ventures is the Parent Company (Holding Company) that owns this sole proprietorship.** This requested relationship statement is not an independently verified legal conclusion. ABCD Ventures is not assigned as the direct contracting party.
-- Preserve attribution: **A project of ABCD Ventures**. Login has no document links or legal placeholders. Public product names now come solely from src/config/brand.js: RetraSell POS / RetraSell. Merchant names remain tenant-configured; LEGAL_ENTITY_NAME stays null. No separate legal product-name placeholders remain.
+- Preserve attribution: **A project of ABCD Ventures**, plain text, without a website/link. Login already has this attribution and no document links or legal placeholders. Public product names come solely from src/config/brand.js: RetraSell POS / RetraSell. Merchant names remain tenant-configured; LEGAL_ENTITY_NAME is RetraSell, matching legal metadata, not ABCD Ventures.
+- Support, legal and privacy enquiries intentionally share `ranazaighaum@gmail.com`; phone: `+92-552139051`. Gmail is the current business communication channel, not an application email service. Monitor and appropriately handle each enquiry type; distinct mailboxes are not a publication requirement.
 - Client-specific commercial documents govern pricing, billing basis, modules, rates, limits and special arrangements; no individual prices in general Terms.
 - Payment due immediately upon invoice unless written client terms differ. Three Working Days grace before overdue suspension. Ordinary cancellation/termination uses three Working Days notice unless agreed otherwise; serious/material breach may justify immediate termination. Refunds depend on client agreement and mandatory law, not a universal entitlement.
-- Draft Working Days definition: Monday–Friday excluding Punjab public holidays unless the client agreement says otherwise. This calendar definition is an assumption for clarity, not an additional supplied decision; confirm before publication.
-- Former customers have 30 days after cancellation/termination to request export/return. Afterwards data may be deleted subject to legal, operational, backup, fraud/security and retention requirements. Active deletion may precede backup expiry. No invented backup duration or automated export/erase capability.
+- Confirmed Working Days: Monday–Friday excluding public holidays observed in Punjab, Pakistan, unless client terms define otherwise.
+- Former customers may request export/return of available service data for up to 30 days after cancellation/termination. Afterwards data may be deleted subject to legal, operational, backup, fraud/security and retention requirements. Active deletion may precede backup expiry. RetraSell does not currently guarantee a separate backup-retention period, residual-backup deletion duration, recovery of nonexistent data or universal self-service backup/export/restore.
+- Customer-managed/BYO Supabase projects, databases, hosting/cloud accounts and credentials remain customer-controlled. RetraSell may assist initial integration; customer account/billing/credentials/availability/backups/recovery/admin responsibilities are explicit. Qualified infrastructure exclusions preserve RetraSell's own breach/negligence responsibility where applicable and non-excludable liability in Terms, Privacy and DPA.
+- Terms/Privacy/DPA versions: 1.0; effective date: 2026-10-03; required revision: 2026-10-03.1. These supplied metadata values do not authorize publication or acceptance.
+- Analytics: None. Error monitoring: None. Other unrelated subprocessors: None apart from the evidenced infrastructure register.
 - Online infrastructure dependencies, maintenance, upgrades, emergency/security work and outside-control outages are explained. Shop backend dependency remains distinct from Platform availability. No numeric SLA/uptime or monetary liability cap.
 - Indirect-loss exclusions are qualified by applicable law; no absolute exemption from all liability. Non-excludable-rights/fraud/deliberate-misconduct carve-outs need professional review.
 - Pakistan law; preferred courts in Gujranwala, Punjab, subject to mandatory jurisdiction. Good-faith informal resolution precedes proceedings without mandatory arbitration or restricting urgent relief/mandatory deadlines.
@@ -24,34 +28,20 @@ Examples below describe format only, **not production values**. M = `src/legal/m
 
 | Current placeholder | Information / example format | Exact fields and sections affected | Blocks publication |
 | --- | --- | --- | --- |
-| `[PLACEHOLDER: OFFICIAL_LEGAL_BUSINESS_NAME]` | Verified contracting proprietor/business name matching official records | M `company.ENTITY`; T §1, P Short notice, D §1 via `{{ENTITY}}` | Yes |
-| `[PLACEHOLDER: GENERAL_SUPPORT_EMAIL]` | Monitored support mailbox, `local-part@approved-domain` | M `company.SUPPORT_EMAIL`; T §1, P Contacts | Yes |
-| `[PLACEHOLDER: LEGAL_NOTICES_EMAIL]` | Monitored legal mailbox, `legal-local-part@approved-domain` | M `company.LEGAL_EMAIL`; T §1/§10, P Short notice/Contacts | Yes; distinct from privacy |
-| `[PLACEHOLDER: PRIVACY_REQUEST_EMAIL]` | Monitored privacy mailbox, `privacy-local-part@approved-domain` | M `company.PRIVACY_EMAIL`; P Short notice/Legal bases/Rights/Contacts, D Annex D | Yes; distinct from legal |
-| `[PLACEHOLDER: SUPPORT_PHONE]` | Approved phone/WhatsApp including country code, `+92 …` | M `company.SUPPORT_PHONE`; T §1, P Contacts | Yes |
-| `[PLACEHOLDER: BACKUP_RETENTION_POLICY]` | Verified copy/expiry/exception policy, not a guessed duration | M `company.BACKUP_RETENTION_POLICY`; T §9, P Retention, D §7 | Yes |
-| `[PLACEHOLDER: ANALYTICS_PROVIDER_OR_NONE]` | Actual provider/purpose or confirmed `None` | M matching company key; P Recipients; add applicable S rows | Yes |
-| `[PLACEHOLDER: ERROR_MONITORING_PROVIDER_OR_NONE]` | Actual provider/purpose or confirmed `None` | M matching company key; P Recipients; add applicable S rows | Yes |
-| `[PLACEHOLDER: OTHER_SUBPROCESSORS_OR_NONE]` | Additional recipients/purposes or confirmed `None` | M matching company key; P Recipients; D Annex C via S | Yes |
-| `[PLACEHOLDER: TERMS_VERSION]` | Approved first version; suggested future `1.0` | M `documents.terms.version`; legal migration seed `terms_version`; reader/gate/evidence | Yes |
-| `[PLACEHOLDER: PRIVACY_VERSION]` | Approved first version; suggested future `1.0` | M `documents.privacy.version`; legal migration seed `privacy_version`; reader/gate/evidence | Yes |
-| `[PLACEHOLDER: DPA_VERSION]` | Approved first version; suggested future `1.0` | M `documents.dpa.version`; legal migration seed `dpa_version`; reader/gate/evidence | Yes |
-| `[PLACEHOLDER: EFFECTIVE_DATE]` | Approved date, `YYYY-MM-DD` | M `documents.terms/privacy/dpa.effectiveDate`; reader version line | Yes |
 | `[CONFIRM PROJECT REGIONS AND SUPPORT LOCATIONS]` | Actual Supabase hosting/support locations, plain-language list | S Supabase `location`; D Annex C | Yes |
 | `[CONFIRM CONTRACT AND PROCESSING LOCATIONS]` | Verified Cloudflare Pages/Turnstile processing/support locations | S Cloudflare row `location`; D Annex C | Yes |
 | `[CONFIRM CDN PROCESSING LOCATIONS]` | Verified jsDelivr network processing arrangement | S jsDelivr `location`; D Annex C | Yes |
 | `[CONFIRM DISTRIBUTION LOCATIONS]` | Verified esm.sh distribution/metadata arrangement | S esm.sh `location`; D Annex C | Yes |
-| `[PLACEHOLDER: EMAIL_PROCESSING_LOCATIONS]` | Actual locations/roles for each used email service | S Resend/Gmail/SpaceMail `location`; D Annex C; P Recipients | Yes; remove rows if confirmed unused |
-| `[PLACEHOLDER: SMS_PROVIDER_OR_NONE]` | Carrier/provider or explicit unused determination | S SMS `provider`; D Annex C; P Recipients | Yes; remove row if confirmed unused |
-| `[PLACEHOLDER: SMS_PROCESSING_LOCATIONS_OR_NOT_APPLICABLE]` | Actual SMS location or justified inapplicability | S SMS `location`; D Annex C | Yes unless unused row removed |
 
 Optional/conditional: M `company.DPO`, `EU_REP`, `UK_REP` remain `null`, not appointed contacts. They do not render literal placeholders. Review applicability before expansion; do not invent appointments.
 
-M `subprocessorScheduleReviewed` remains **false**. Non-placeholder text is not proof of review. Resolve contracting entities, data categories, purposes, regions, roles and agreements, then explicitly approve the schedule. `requiredRevision=2026-09-27.1` is an existing draft cohort, not production approval; approve its production value in the coordinated release process.
+Business identity/contact, backup statement, monitoring decisions, versions and effective-date placeholders have been replaced with the confirmed values above. Template substitution tokens are not unresolved business decisions. The already-applied initial migration retains its historical placeholders; only the forward metadata migration replaces them in the policy row. Do not edit migration history.
+
+M `subprocessorScheduleReviewed` remains **false**. Non-placeholder text is not proof of review. Resolve contracting entities, data categories, purposes, regions, roles and agreements, then explicitly approve the schedule. `requiredRevision=2026-10-03.1` is the confirmed revision, not publication approval. Review support-mailbox processing and privacy-request handling operationally without describing an application email service.
 
 ## Provider evidence and operational follow-up
 
-Supabase, Cloudflare Pages/Turnstile, jsDelivr barcode delivery and esm.sh dependency delivery are evidenced in source. Resend, Gmail and SpaceMail were identified by the business; no direct Shop-data feed to each was found in this client repository. Confirm project SMTP, mailboxes, support processes and any separate Platform use without assuming identical flows. SMS depends on carrier/client configuration. No company-wide no-sale/compliance/encryption/backup/transfer assurance is inferred from a code search.
+Supabase, Cloudflare Pages/Turnstile, jsDelivr barcode delivery and esm.sh dependency delivery are evidenced in source. Only those four infrastructure entries remain. Resend, SpaceMail, the legacy application-email Gmail row and SMS placeholders are removed. The software is not currently marketed as providing email/SMS services. The current Gmail business mailbox handles enquiries voluntarily submitted to it; assess those communications separately. GitHub source/deployment hosting alone is not evidence of Shop-data processing. No company-wide no-sale/compliance/encryption/backup/transfer assurance is inferred from a code search.
 
 Keep provider rows conditional until actual recipients are confirmed. Script distribution does not make a vendor a processor for every Shop record. Platform telemetry remains distinct from Shop database contents; BILL/INVENTORY/THERMAL and reprint/resupply semantics are unchanged.
 
@@ -59,8 +49,8 @@ Assign people/processes for privacy requests, notices, incidents, export deliver
 
 ## Publication, acceptance and customer UX
 
-- The new forward migration 20261002015159_legal_acceptance.sql ports the reviewed donor schema after the onboarding migrations. Its private policy retains `published boolean NOT NULL DEFAULT false`. Draft versions remain placeholders; donor RLS, RPC restrictions, name guard and evidence semantics are preserved. No migration is applied. Never rewrite an already-applied migration in deployment; use a reviewed forward migration if an installation already has this legal schema.
-- Only a reviewed server action may publish. Final frontend/server versions and revision must match. Readiness rejects unfinished mandatory fields, versions/dates, unreviewed provider schedule and identical legal/privacy contacts. Browser readiness is not publication authority.
+- The already-applied 20261002015159_legal_acceptance.sql is unchanged. New local forward migration 20261002071259_legal_policy_metadata.sql updates only revision/versions and explicitly retains `published=false`; it is not applied to a hosted database in this task. No schema, RLS, RPC, grant or evidence change.
+- Only a separately reviewed server action may publish. Frontend/server versions and revision must match. Readiness rejects unfinished mandatory fields, versions/dates and an unreviewed provider schedule, but allows the intentionally shared support/legal/privacy mailbox. Browser readiness is not publication authority.
 - Onboarding V2 completes before any legal evaluation. Explicit unpublished status bypasses the Owner gate; staff/Manager/Support bypass it regardless. Unknown/error status remains fail-closed with a neutral Agreement status unavailable state and Retry/Sign out only. Version/readiness mismatch similarly shows a neutral configuration state. Neither state requests acceptance or renders an agreement checkbox.
 - Canonical Business Owner represents the authorized business administrator; this task does not grant contracting authority to Manager. Material Terms revisions need a new required revision and renewed Owner acceptance. Minor version changes retain the cohort and do not force reacceptance after the matching frontend loads.
 - Evidence remains server-derived identity, Shop, name, role, timestamp and exact policy versions/revision. Blank names are rejected. Archive each finalized text/metadata/provider schedule with its version before publication.

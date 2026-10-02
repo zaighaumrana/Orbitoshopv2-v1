@@ -10,7 +10,7 @@ import { needsOnboarding } from '../src/onboarding-state.js'
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url),'utf8')
 const draftMetadata = JSON.parse(read('src/legal/metadata.json'))
-// Reviewed publication fixture only; production metadata remains unresolved.
+// Reviewed publication fixture only; production provider review remains incomplete.
 const metadata = structuredClone(draftMetadata)
 for (const key of metadata.requiredCompanyFields) metadata.company[key] = 'Reviewed value for ' + key
 metadata.subprocessorScheduleReviewed = true
@@ -151,10 +151,10 @@ test('public reader hides unpublished or unfinished contracts and suppresses opt
   assert.equal(ctx.customerDocument('terms',source+' [PLACEHOLDER: UNKNOWN]',versions,configured,providers).finalized,false)
   const sameEmail = structuredClone(configured)
   sameEmail.company.PRIVACY_EMAIL = sameEmail.company.LEGAL_EMAIL.toUpperCase()
-  assert.equal(ctx.legalConfigurationReady(sameEmail,providers),false)
+  assert.equal(ctx.legalConfigurationReady(sameEmail,providers),true,'shared legal/privacy mailbox is intentional')
   for (const key of ['terms','privacy','dpa']) {
     const unfinished = structuredClone(configured)
-    unfinished.documents[key].version = draftMetadata.documents[key].version
+    unfinished.documents[key].version = '[PLACEHOLDER: DOCUMENT_VERSION]'
     assert.equal(ctx.legalConfigurationReady(unfinished,providers),false)
   }
   assert.equal(ctx.customerDocument('guide','# Guide',null).text,'# Guide')
@@ -203,15 +203,52 @@ test('business decisions remain unpublished, Pakistan-focused and free of invent
   assert.match(terms,/due immediately upon invoice/)
   assert.match(terms,/3 Working Days/)
   assert.doesNotMatch(terms,/LIABILITY_CAP|SUBPROCESSOR_NOTICE|OrbitoShop|\bOrbito\b/)
-  assert.equal(draftMetadata.company.TAX_NUMBER,'5842096')
-  assert.equal(draftMetadata.company.REGISTRATION,'5842096')
+  for (const key of ['TAX_NUMBER','REGISTRATION']) {
+    assert.ok(!(key in draftMetadata.company))
+    assert.ok(!draftMetadata.requiredCompanyFields.includes(key))
+  }
   assert.equal(draftMetadata.company.GOVERNING_LAW,'Pakistan')
   assert.equal(draftMetadata.company.COURTS,'Gujranwala, Punjab, Pakistan')
   assert.equal(draftMetadata.company.EXPORT_WINDOW,'30 days after cancellation or termination')
-  assert.equal(draftMetadata.company.ENTITY,'[PLACEHOLDER: OFFICIAL_LEGAL_BUSINESS_NAME]')
+  assert.equal(draftMetadata.company.ENTITY,'RetraSell')
+  assert.equal(draftMetadata.company.BUSINESS_STRUCTURE,'Sole Proprietor')
+  assert.equal(draftMetadata.company.ADDRESS,'Ground Zero, Hospital Road, Gujranwala, Punjab, Pakistan')
+  for (const key of ['SUPPORT_EMAIL','LEGAL_EMAIL','PRIVACY_EMAIL']) assert.equal(draftMetadata.company[key],'ranazaighaum@gmail.com')
+  assert.equal(draftMetadata.company.SUPPORT_PHONE,'+92-552139051')
+  assert.equal(draftMetadata.requiredRevision,'2026-10-03.1')
+  for (const key of ['terms','privacy','dpa']) {
+    assert.equal(draftMetadata.documents[key].version,'1.0')
+    assert.equal(draftMetadata.documents[key].effectiveDate,'2026-10-03')
+  }
+  assert.equal(draftMetadata.company.BACKUP_RETENTION_POLICY,'RetraSell does not currently guarantee a separate backup-retention period')
+  assert.equal(draftMetadata.company.ANALYTICS_PROVIDER_OR_NONE,'None')
+  assert.equal(draftMetadata.company.ERROR_MONITORING_PROVIDER_OR_NONE,'None')
   assert.equal(draftMetadata.subprocessorScheduleReviewed,false)
   const ctx = functions('src/legal/readiness.js',{metadata:draftMetadata,subprocessors:[],AbortSignal})
   assert.match(ctx.customerDocument('guide',read('docs/user-guide/ORBITOSHOP_USER_GUIDE.md'),null).text, /Feature availability: This guide covers features available across RetraSell POS plans\. Some features may not be available to your account depending on your subscription, enabled modules, business configuration, or supported services in your region\./)
+})
+
+test('current provider register and documents preserve data-return limits and qualified customer infrastructure responsibility', () => {
+  const providers = JSON.parse(read('src/legal/subprocessors.json'))
+  assert.deepEqual(providers.map(p=>p.provider),['Supabase','Cloudflare Pages / Cloudflare Turnstile','jsDelivr','esm.sh'])
+  const ctx = functions('src/legal/readiness.js',{metadata:draftMetadata,subprocessors:providers})
+  assert.equal(ctx.legalConfigurationReady(),false,'confirmed identity and versions do not complete provider review')
+  for (const path of ['docs/legal/TERMS_OF_SERVICE.md','docs/legal/PRIVACY_NOTICE.md','docs/legal/DATA_PROCESSING_ADDENDUM.md']) {
+    const source = read(path)
+    assert.doesNotMatch(source,/REGISTRATION|TAX_NUMBER|5842096|Resend|SpaceMail|contacts are separate/)
+    assert.match(source,/available service data/)
+    assert.match(source,/\{\{EXPORT_WINDOW\}\}/)
+    assert.match(source,/\{\{BACKUP_RETENTION_POLICY\}\}/)
+    assert.match(source,/data that no longer exists/)
+    assert.match(source,/day 30/)
+    assert.match(source,/customer-owned or customer-controlled|owned or controlled by the customer/)
+    assert.match(source,/own Supabase project/)
+    assert.match(source,/initial setup or integration/)
+    assert.match(source,/billing, credentials, availability, backups, recovery arrangements/)
+    assert.match(source,/RetraSell's own actions, breach or negligence|RetraSell's responsibility for its own actions, breach or negligence/)
+    assert.match(source,/liability that cannot legally be excluded|non-excludable liability/)
+    assert.match(source,/guaranteed residual-backup deletion period/)
+  }
 })
 
 test('current enterApplication completes Onboarding V2 before legal and keeps normal routing behind the gate', async () => {

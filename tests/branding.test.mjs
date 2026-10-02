@@ -8,12 +8,14 @@ import config from '../vite.config.js'
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8')
 
-test('public brand, project attribution and unresolved legal entity are distinct', () => {
+test('public brand, project attribution and confirmed contracting entity remain distinct', () => {
   assert.equal(brand.PRODUCT_NAME, 'RetraSell POS')
   assert.equal(brand.SHORT_BRAND_NAME, 'RetraSell')
   assert.equal(brand.PROJECT_OWNER_NAME, 'ABCD Ventures')
   assert.equal(brand.PROJECT_ATTRIBUTION, 'A project of ABCD Ventures')
-  assert.equal(brand.LEGAL_ENTITY_NAME, null)
+  assert.equal(brand.LEGAL_ENTITY_NAME, 'RetraSell')
+  assert.notEqual(brand.LEGAL_ENTITY_NAME, brand.PROJECT_OWNER_NAME)
+  assert.equal(JSON.parse(read('src/legal/metadata.json')).company.ENTITY,brand.LEGAL_ENTITY_NAME)
 })
 
 test('login copy uses configured brand while tenant title/logo and auth controls remain separate', () => {
@@ -26,6 +28,7 @@ test('login copy uses configured brand while tenant title/logo and auth controls
   assert.match(html, /RetraSell POS<br>A project of ABCD Ventures/)
   assert.match(html, /RetraSell Support/)
   assert.doesNotMatch(html, /legal\.html|PLACEHOLDER/)
+  assert.doesNotMatch(html, /<a\b[^>]*>[\s\S]*?A project of ABCD Ventures/)
   assert.match(read('src/onboarding.js'), /escapeHTML\(SHORT_BRAND_NAME/)
   assert.doesNotMatch(read('src/onboarding.js'), /Managed by Orbito Platform|ORBITO · WELCOME/)
   assert.doesNotMatch(html, /null|LEGAL_ENTITY_NAME/)

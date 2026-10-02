@@ -9,7 +9,6 @@ const resolved = value => typeof value === 'string' && value.trim() !== '' && !/
 export function legalConfigurationReady(config = metadata, providers = subprocessors) {
   return ['terms','privacy','dpa'].every(key => resolved(config.documents[key].version) && resolved(config.documents[key].effectiveDate))
     && config.requiredCompanyFields.every(key => resolved(config.company[key]))
-    && config.company.LEGAL_EMAIL.trim().toLowerCase() !== config.company.PRIVACY_EMAIL.trim().toLowerCase()
     && config.subprocessorScheduleReviewed === true && providers.length > 0
     && providers.every(provider => ['provider','purpose','location','reference','status'].every(key => resolved(provider[key])))
 }
