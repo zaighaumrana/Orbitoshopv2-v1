@@ -3,6 +3,7 @@ import { renderLogin } from './auth.js'
 import { registerRoute, registerNotFound, startRouter, navigate, clearRoutes } from './router.js'
 import { dlog } from './debuglog.js'
 import { needsOnboarding } from './onboarding-state.js'
+import { ensureOwnerAcceptance } from './legal/acceptance.js'
 
 let applicationGeneration = 0
 
@@ -142,10 +143,18 @@ async function enterApplication(session) {
     routeForRole(role)
     startRouter()
   }
-  if (!CFG.ems_enabled) { proceed(); return }
-  const { checkClockIn } = await import('./features/ems/index.js')
-  if (generation !== applicationGeneration || state.role !== role) return
-  checkClockIn(session, CFG, proceed)
+  const afterLegal = async () => {
+    if (generation !== applicationGeneration || state.role !== role) return
+    if (!CFG.ems_enabled) { proceed(); return }
+    const { checkClockIn } = await import('./features/ems/index.js')
+    if (generation !== applicationGeneration || state.role !== role) return
+    checkClockIn(session, CFG, proceed)
+  }
+  // Onboarding remains first. No previously registered route bypasses this gate.
+  clearRoutes()
+  await ensureOwnerAcceptance(sb, session, afterLegal,
+    async () => { await _clearSession(); showLogin() },
+    () => generation === applicationGeneration && state.role === role)
 }
 
 async function onLoginSuccess(session) {

@@ -1,0 +1,76 @@
+{
+  "requiredRevision": "2026-10-03.1",
+  "requiredCompanyFields": [
+    "ENTITY",
+    "ADDRESS",
+    "BUSINESS_STRUCTURE",
+    "SUPPORT_EMAIL",
+    "LEGAL_EMAIL",
+    "PRIVACY_EMAIL",
+    "SUPPORT_PHONE",
+    "GOVERNING_LAW",
+    "COURTS",
+    "EXPORT_WINDOW",
+    "BACKUP_RETENTION_POLICY",
+    "ANALYTICS_PROVIDER_OR_NONE",
+    "ERROR_MONITORING_PROVIDER_OR_NONE",
+    "OTHER_SUBPROCESSORS_OR_NONE"
+  ],
+  "optionalCompanyFields": [
+    "DPO",
+    "EU_REP",
+    "UK_REP"
+  ],
+  "subprocessorScheduleReviewed": false,
+  "documents": {
+    "terms": {
+      "version": "1.0",
+      "effectiveDate": "2026-10-03",
+      "slug": "terms",
+      "title": "Terms of Service"
+    },
+    "privacy": {
+      "version": "1.0",
+      "effectiveDate": "2026-10-03",
+      "slug": "privacy",
+      "title": "Privacy Notice"
+    },
+    "dpa": {
+      "version": "1.0",
+      "effectiveDate": "2026-10-03",
+      "slug": "dpa",
+      "title": "Data Processing Terms"
+    },
+    "guide": {
+      "version": "1.0",
+      "effectiveDate": "2026-09-27",
+      "slug": "guide",
+      "title": "User Guide"
+    },
+    "quick-start": {
+      "version": "1.0",
+      "effectiveDate": "2026-09-27",
+      "slug": "quick-start",
+      "title": "Quick Start Guide"
+    }
+  },
+  "company": {
+    "ENTITY": "RetraSell",
+    "BUSINESS_STRUCTURE": "Sole Proprietor",
+    "ADDRESS": "Ground Zero, Hospital Road, Gujranwala, Punjab, Pakistan",
+    "SUPPORT_EMAIL": "ranazaighaum@gmail.com",
+    "LEGAL_EMAIL": "ranazaighaum@gmail.com",
+    "PRIVACY_EMAIL": "ranazaighaum@gmail.com",
+    "SUPPORT_PHONE": "+92-552139051",
+    "GOVERNING_LAW": "Pakistan",
+    "COURTS": "Gujranwala, Punjab, Pakistan",
+    "DPO": null,
+    "EU_REP": null,
+    "UK_REP": null,
+    "EXPORT_WINDOW": "30 days after cancellation or termination",
+    "BACKUP_RETENTION_POLICY": "RetraSell does not currently guarantee a separate backup-retention period",
+    "ANALYTICS_PROVIDER_OR_NONE": "None",
+    "ERROR_MONITORING_PROVIDER_OR_NONE": "None",
+    "OTHER_SUBPROCESSORS_OR_NONE": "None apart from the current infrastructure providers documented in the provider register"
+  }
+}
