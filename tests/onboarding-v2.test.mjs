@@ -84,7 +84,7 @@ function applicationFixture({loaded=true,suspended=false,role='Business Owner',v
  const ctx={CFG:{suspended,onboarding_version:version,onboarding_completed_at:complete},state:{},
   loadConfig:async()=>loaded,applyBranding(){},_clearSession:async()=>{cleared++},resetClientEntitlements(){},dlog(){},
   sb:{auth:{onAuthStateChange(){}}},renderLogin(){},loadCurrentSession:async()=>null,
-  needsOnboarding,can:()=>true,renderOnboarding(){},
+  needsOnboarding,can:()=>true,renderOnboarding(){},ensureOwnerAcceptance:async(_client,_session,proceed)=>proceed(),
   clearRoutes(){routes.clear()},registerRoute:(p,fn)=>routes.set(p,fn),registerNotFound:fn=>notFound=fn,
   navigate:p=>navigation.push(p),startRouter(){},
   document:{getElementById:id=>id==='app'?app:(elements.get(id)||elements.set(id,{}).get(id))},
