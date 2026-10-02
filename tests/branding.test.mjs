@@ -9,8 +9,8 @@ import config from '../vite.config.js'
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8')
 
 test('public brand, project attribution and unresolved legal entity are distinct', () => {
-  assert.equal(brand.PRODUCT_NAME, 'OrbitoShop')
-  assert.equal(brand.SHORT_BRAND_NAME, 'Orbito')
+  assert.equal(brand.PRODUCT_NAME, 'RetraSell POS')
+  assert.equal(brand.SHORT_BRAND_NAME, 'RetraSell')
   assert.equal(brand.PROJECT_OWNER_NAME, 'ABCD Ventures')
   assert.equal(brand.PROJECT_ATTRIBUTION, 'A project of ABCD Ventures')
   assert.equal(brand.LEGAL_ENTITY_NAME, null)
@@ -23,8 +23,11 @@ test('login copy uses configured brand while tenant title/logo and auth controls
   const html = vm.runInNewContext(template, { ...brand, escapeHTML, safeImageURL,
     CFG: { shop_name: 'Merchant & Sons', shop_address: 'Shop street', shop_logo: '' } })
   assert.match(html, /Merchant &amp; Sons/)
-  assert.match(html, /OrbitoShop<br>A project of ABCD Ventures/)
-  assert.match(html, /Orbito Support/)
+  assert.match(html, /RetraSell POS<br>A project of ABCD Ventures/)
+  assert.match(html, /RetraSell Support/)
+  assert.doesNotMatch(html, /legal\.html|PLACEHOLDER/)
+  assert.match(read('src/onboarding.js'), /escapeHTML\(SHORT_BRAND_NAME/)
+  assert.doesNotMatch(read('src/onboarding.js'), /Managed by Orbito Platform|ORBITO · WELCOME/)
   assert.doesNotMatch(html, /null|LEGAL_ENTITY_NAME/)
   for (const id of ['login-email', 'login-password', 'login-btn', 'forgot-btn', 'cf-turnstile-wrap', 'support-access-btn']) {
     assert.match(html, new RegExp(`id="${id}"`))
@@ -40,6 +43,7 @@ test('HTML title and dev/build manifest derive names from the same config', () =
   const html = plugin.transformIndexHtml.handler(read('index.html'))
   assert.ok(html.includes(`<title>${escapeHTML(brand.PRODUCT_NAME)}</title>`))
   assert.doesNotMatch(html, /%PRODUCT_NAME%/)
+  assert.ok(plugin.transformIndexHtml.handler(read('legal.html')).includes(`<title>${escapeHTML(brand.PRODUCT_NAME)} — Documents</title>`))
   let asset, middleware, served, contentType, next = false
   plugin.generateBundle.call({ emitFile: value => { asset = value } })
   plugin.configureServer({ middlewares: { use: fn => { middleware = fn } } })

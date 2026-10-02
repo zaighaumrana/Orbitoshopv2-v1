@@ -4,8 +4,8 @@ Edit **`src/config/brand.js`** for public product branding. It is a pure module 
 
 | Field | Current value | Meaning |
 | --- | --- | --- |
-| PRODUCT_NAME | OrbitoShop | Temporary full public product name |
-| SHORT_BRAND_NAME | Orbito | Temporary short brand used in support/Platform copy |
+| PRODUCT_NAME | RetraSell POS | Full public product name |
+| SHORT_BRAND_NAME | RetraSell | Short brand used in support/Platform copy |
 | PROJECT_OWNER_NAME | ABCD Ventures | Project/parent attribution |
 | PROJECT_ATTRIBUTION | A project of ABCD Ventures | Derived from project owner |
 | LEGAL_ENTITY_NAME | null | Unresolved; not rendered or used to fill legal configuration |
@@ -20,7 +20,7 @@ Product and short names can be changed for a reviewed rename. Project owner must
 - `index.html`: `%PRODUCT_NAME%` title replaced by the small Vite hook in `vite.config.js` before HTML processing.
 - `public/manifest.webmanifest`: metadata template. Its names are injected from brand config by Vite in development and production output; do not serve the source tree as a production build. Rebuild/restart Vite after a config rename. Existing installed apps may need a browser-managed metadata refresh.
 
-This branch does not contain `legal.html` or the separate legal package. Do not merge or rewrite that feature for branding. When it is integrated later, review its public presentation separately without changing policy publication, evidence, readiness, Owner validation or contractual text.
+The legal reader and user-guide templates also resolve public branding from this module. Legal metadata contains business/document fields, not a second product-name source. `legal.html` uses the same Vite title hook. Onboarding copy uses SHORT_BRAND_NAME without changing its activation or six-step behavior. Changing branding does not publish a legal policy or configure the unresolved contracting entity.
 
 ## Intentional exceptions and non-brand identifiers
 

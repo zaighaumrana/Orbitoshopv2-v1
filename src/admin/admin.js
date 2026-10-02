@@ -2,6 +2,8 @@ import { settingsUpdates } from '../settings-data.js'
 import { managedFeatures } from '../onboarding-state.js'
 import { escapeHTML, safeImageURL } from "../html.js"
 import { SHORT_BRAND_NAME } from '../config/brand.js'
+import { readLegalStatus } from '../legal/api.js'
+import { legalSettingsHTML } from '../legal/acceptance.js'
 import { rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
@@ -63,6 +65,7 @@ const adminState = {
 let SESSION = {}
 const platformBridge = createPlatformBridge(sb)
 let billingResult = null
+let legalStatus = null
 let resupplyBusy = false
 let _inv = null  // populated via dynamic import only when inventory_module_enabled
 
@@ -84,6 +87,11 @@ async function load() {
     _inv = await import('../features/admin/inventory/index.js')
   }
   const mod = adminState.adminModule
+  legalStatus = null
+  if (mod === 'settings' && SESSION.employee?.role === 'Business Owner') {
+    try { legalStatus = await readLegalStatus(sb) } catch {}
+    if (SESSION !== loadSession || window.location.pathname !== loadPath) return
+  }
   if (mod === 'billing-usage' && can(mod, state.role)) {
     try { billingResult = await platformBridge.readBilling() }
     catch { billingResult = { available: false } }
@@ -404,7 +412,7 @@ function settings() {
   if (state.role !== 'Business Owner' && state.role !== 'Orbito Support')
     return `<div class="card"><p class="muted">Settings are available to Business Owner only.</p></div>`
   const t = currentTenant()
-  const tabs = { branding:'Branding', contact:'Contact', receipt:'Receipt & Tax', staff:'Staff & Security' }
+  const tabs = { branding:'Branding', contact:'Contact', receipt:'Receipt & Tax', staff:'Staff & Security', legal:'Legal & Privacy' }
   return `
     ${tit('Business Settings','Branding, contact, receipt, staff.','')}
     <div class="settings-tabs">
@@ -422,6 +430,7 @@ function catalog() {
 
 function settingsTabContent() {
   const t = currentTenant()
+  if (adminState.settingsTab === 'legal') return legalSettingsHTML(legalStatus, state.role === 'Business Owner')
 
   const platformFlags = `
     <div class="card" style="display:grid;gap:10px;padding:14px 16px;margin-bottom:4px">

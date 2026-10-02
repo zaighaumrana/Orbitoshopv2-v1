@@ -1,0 +1,80 @@
+{
+  "requiredRevision": "2026-09-27.1",
+  "requiredCompanyFields": [
+    "ENTITY",
+    "ADDRESS",
+    "BUSINESS_STRUCTURE",
+    "REGISTRATION",
+    "TAX_NUMBER",
+    "SUPPORT_EMAIL",
+    "LEGAL_EMAIL",
+    "PRIVACY_EMAIL",
+    "SUPPORT_PHONE",
+    "GOVERNING_LAW",
+    "COURTS",
+    "EXPORT_WINDOW",
+    "BACKUP_RETENTION_POLICY",
+    "ANALYTICS_PROVIDER_OR_NONE",
+    "ERROR_MONITORING_PROVIDER_OR_NONE",
+    "OTHER_SUBPROCESSORS_OR_NONE"
+  ],
+  "optionalCompanyFields": [
+    "DPO",
+    "EU_REP",
+    "UK_REP"
+  ],
+  "subprocessorScheduleReviewed": false,
+  "documents": {
+    "terms": {
+      "version": "[PLACEHOLDER: TERMS_VERSION]",
+      "effectiveDate": "[PLACEHOLDER: EFFECTIVE_DATE]",
+      "slug": "terms",
+      "title": "Terms of Service"
+    },
+    "privacy": {
+      "version": "[PLACEHOLDER: PRIVACY_VERSION]",
+      "effectiveDate": "[PLACEHOLDER: EFFECTIVE_DATE]",
+      "slug": "privacy",
+      "title": "Privacy Notice"
+    },
+    "dpa": {
+      "version": "[PLACEHOLDER: DPA_VERSION]",
+      "effectiveDate": "[PLACEHOLDER: EFFECTIVE_DATE]",
+      "slug": "dpa",
+      "title": "Data Processing Terms"
+    },
+    "guide": {
+      "version": "1.0",
+      "effectiveDate": "2026-09-27",
+      "slug": "guide",
+      "title": "User Guide"
+    },
+    "quick-start": {
+      "version": "1.0",
+      "effectiveDate": "2026-09-27",
+      "slug": "quick-start",
+      "title": "Quick Start Guide"
+    }
+  },
+  "company": {
+    "ENTITY": "[PLACEHOLDER: OFFICIAL_LEGAL_BUSINESS_NAME]",
+    "BUSINESS_STRUCTURE": "Sole Proprietor",
+    "ADDRESS": "Ground Zero, Hospital Road, Gujranwala, Punjab, Pakistan",
+    "REGISTRATION": "5842096",
+    "TAX_NUMBER": "5842096",
+    "SUPPORT_EMAIL": "[PLACEHOLDER: GENERAL_SUPPORT_EMAIL]",
+    "LEGAL_EMAIL": "[PLACEHOLDER: LEGAL_NOTICES_EMAIL]",
+    "PRIVACY_EMAIL": "[PLACEHOLDER: PRIVACY_REQUEST_EMAIL]",
+    "SUPPORT_PHONE": "[PLACEHOLDER: SUPPORT_PHONE]",
+    "GOVERNING_LAW": "Pakistan",
+    "COURTS": "Gujranwala, Punjab, Pakistan",
+    "DPO": null,
+    "EU_REP": null,
+    "UK_REP": null,
+    "EXPORT_WINDOW": "30 days after cancellation or termination",
+    "BACKUP_RETENTION_POLICY": "[PLACEHOLDER: BACKUP_RETENTION_POLICY]",
+    "ANALYTICS_PROVIDER_OR_NONE": "[PLACEHOLDER: ANALYTICS_PROVIDER_OR_NONE]",
+    "ERROR_MONITORING_PROVIDER_OR_NONE": "[PLACEHOLDER: ERROR_MONITORING_PROVIDER_OR_NONE]",
+    "OTHER_SUBPROCESSORS_OR_NONE": "[PLACEHOLDER: OTHER_SUBPROCESSORS_OR_NONE]"
+  }
+}
