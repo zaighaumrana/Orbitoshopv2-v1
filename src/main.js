@@ -4,6 +4,9 @@ import { registerRoute, registerNotFound, startRouter, navigate, clearRoutes } f
 import { dlog } from './debuglog.js'
 import { needsOnboarding } from './onboarding-state.js'
 import { ensureOwnerAcceptance } from './legal/acceptance.js'
+import { takeSupportHandoff, startSupportHandoff } from './support-handoff.js'
+
+let supportHandoff=takeSupportHandoff(location,history)
 
 let applicationGeneration = 0
 
@@ -12,6 +15,7 @@ function canonicalRole(session) {
 }
 
 async function boot() {
+  if(supportHandoff!==null){const token=supportHandoff;supportHandoff=null;await startSupportHandoff(token,onLoginSuccess);return}
   await loadConfig(true)
   applyBranding()
 

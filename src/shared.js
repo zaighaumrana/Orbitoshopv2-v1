@@ -615,6 +615,7 @@ export async function loginViaEdgeFunction(
   turnstileToken,
   mode = 'shop'
 ) {
+  if (mode !== 'shop') return { ok: false, error: 'Open Shop as Support from Platform.' }
   dlog('shared.loginViaEdgeFunction', `ENTRY email=${email}`)
   const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/login`
   let res

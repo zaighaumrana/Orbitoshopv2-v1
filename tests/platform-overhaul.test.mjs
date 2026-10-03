@@ -26,7 +26,7 @@ test('approved server release exactly matches current migrations and all six fun
   for(const file of f.files){assert.ok(!file.path.includes('\\') && !file.path.includes('..') && file.path.endsWith('.ts'));assert.equal(file.content,read('supabase/functions/'+file.path));assert.equal(file.sha256,sha(file.content));}
   assert.equal(f.sha256,sha(JSON.stringify({name:f.name,entrypoint:f.entrypoint,verify_jwt:f.verify_jwt,files:f.files})));
  }
- assert.deepEqual(release.functions.find(f=>f.name==='account-admin').files.map(f=>f.path),['_shared/runtime-preflight.ts','account-admin/index.ts']);
+ assert.deepEqual(release.functions.find(f=>f.name==='account-admin').files.map(f=>f.path),['_shared/runtime-preflight.ts','_shared/support-handoff.ts','account-admin/index.ts']);
  const {sha256,...contents}=release;assert.equal(sha256,sha(JSON.stringify(contents)));
  assert.deepEqual(release,buildRelease());assert.deepEqual(buildRelease(),buildRelease());
  assert.doesNotMatch(read('src/main.js'),/shop-release\.json/);

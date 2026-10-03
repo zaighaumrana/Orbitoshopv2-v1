@@ -83,6 +83,7 @@ function applicationFixture({loaded=true,suspended=false,role='Business Owner',v
  const routes=new Map(), navigation=[], app={innerHTML:''}, elements=new Map();let notFound,cleared=0;
  const ctx={CFG:{suspended,onboarding_version:version,onboarding_completed_at:complete},state:{},
   loadConfig:async()=>loaded,applyBranding(){},_clearSession:async()=>{cleared++},resetClientEntitlements(){},dlog(){},
+  takeSupportHandoff:()=>null,history:{},
   sb:{auth:{onAuthStateChange(){}}},renderLogin(){},loadCurrentSession:async()=>null,
   needsOnboarding,can:()=>true,renderOnboarding(){},ensureOwnerAcceptance:async(_client,_session,proceed)=>proceed(),
   clearRoutes(){routes.clear()},registerRoute:(p,fn)=>routes.set(p,fn),registerNotFound:fn=>notFound=fn,
