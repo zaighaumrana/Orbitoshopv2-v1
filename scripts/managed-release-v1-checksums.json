@@ -1,0 +1,37 @@
+{
+  "contract": "orbito-managed-release-v1-stage-checksums",
+  "release_sha256": "a9810bbefd8975dfa929bd0946c8e89a752207e803d1e9d53ccd08f3456dfb4f",
+  "migrations_sha256": "0ce05c8b1e837bcadcc097adf0b1d73e4f3502916ad6b2e3fff41505ec3a9077",
+  "functions": [
+    {
+      "name": "account-admin",
+      "source_sha256": "4ce254dc4fdf82106c92a0eaf1ddfed08cff2b49797310f2d8239807b839c528",
+      "stage_sha256": "e829f27176815565ef431a4e6ca1d5fcb632455f99bf771dca2fefc7f2b08f23"
+    },
+    {
+      "name": "login",
+      "source_sha256": "59c8225b2a6e85379611c973c889b4cf3cbff26d86b1f247219d0dcb5edb5ce6",
+      "stage_sha256": "31b071125912db38bc3381328b5b8c428f09fc4aabc2d6e36c9da2dabc81bf17"
+    },
+    {
+      "name": "password-reset-request",
+      "source_sha256": "35cc268dbaaf69c076415433f694ab544eda24686cdb2228745cadf5c90f2c13",
+      "stage_sha256": "204d558512cf1dc478b653d8242ff6626312032c7a7d3b5379474959fbb66298"
+    },
+    {
+      "name": "public-track",
+      "source_sha256": "60c036085fd00c493b1a7a246173dddbe6cacdf044bd1c3a3dbd978947c08464",
+      "stage_sha256": "8838304201f3a08e4eb1d0ef24228621eabed474f822c128067cf842bb4e1e9b"
+    },
+    {
+      "name": "verify-pin",
+      "source_sha256": "952d4cea1dd42b6ac8368af1c48417feba8739ced94dd8ac88bd0007db6451df",
+      "stage_sha256": "e8c431d320e0fb6e993870c9041ff93a1ad7f7f840d4c9c89c2172adec20645d"
+    },
+    {
+      "name": "platform-bridge",
+      "source_sha256": "2b151e7010906bfd94dae123874c400d281349a83e352331914e1adf6414f061",
+      "stage_sha256": "b9a232cc9af730ba2dc50c8282b056674a00c08d6de715fa6aa556f62801551b"
+    }
+  ]
+}
