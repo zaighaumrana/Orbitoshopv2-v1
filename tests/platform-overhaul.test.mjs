@@ -34,8 +34,10 @@ test('approved server release exactly matches current migrations and all six fun
 
 test('source-file release preserves shipped stage checksums only for unchanged approved inputs',()=>{
  const release=buildRelease(),legacy=JSON.parse(read('scripts/managed-release-v1-checksums.json'));
- assert.equal(release.stage_checksums.migrations,legacy.release_sha256);assert.equal(release.stage_checksums.functions,legacy.release_sha256);
- for(const f of release.functions)assert.equal(f.stage_sha256,legacy.functions.find(old=>old.name===f.name).stage_sha256);
+ assert.equal(release.stage_checksums.migrations,legacy.release_sha256);
+ const unchanged=release.functions.every(f=>legacy.functions.some(old=>old.name===f.name && old.source_sha256===f.sha256));
+ if(unchanged)assert.equal(release.stage_checksums.functions,legacy.release_sha256);else assert.notEqual(release.stage_checksums.functions,legacy.release_sha256);
+ for(const f of release.functions){const old=legacy.functions.find(old=>old.name===f.name && old.source_sha256===f.sha256);assert.equal(f.stage_sha256,old?old.stage_sha256:f.sha256);}
  assert.notEqual(release.sha256,legacy.release_sha256);
 });
 

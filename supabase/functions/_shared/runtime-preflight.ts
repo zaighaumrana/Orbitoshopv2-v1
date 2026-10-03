@@ -8,7 +8,8 @@ export async function runtimeProbe(req: Request, name: string, required: string[
   const digest = async (value: string) => new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))
   const [a,b] = await Promise.all([digest(supplied),digest(expected)])
   if (req.method !== 'POST' || !expected || !supplied || a.reduce((n,v,i)=>n|(v^b[i]),0)) return Response.json({error:'Not authorized'},{status:401})
-  return Response.json({contract:RUNTIME_CONTRACT,function:name,configured:required.every(k=>Boolean(Deno.env.get(k)?.trim())),runtime_checks:Object.fromEntries(required.map(k=>[k,Boolean(Deno.env.get(k)?.trim())]))},
+  return Response.json({contract:RUNTIME_CONTRACT,function:name,configured:required.every(k=>Boolean(Deno.env.get(k)?.trim())),runtime_checks:Object.fromEntries(required.map(k=>[k,Boolean(Deno.env.get(k)?.trim())])),
+    ...(name==='login'?{support_auth_configured:['PLATFORM_SUPABASE_URL','PLATFORM_SUPABASE_ANON','PLATFORM_AUTH_EMAIL'].every(k=>Boolean(Deno.env.get(k)?.trim()))}:{})},
     {headers:{'Cache-Control':'no-store'}})
 }
 
@@ -37,7 +38,7 @@ export async function checkRuntime(admin: any, status: any) {
       if (!response.ok) { await response.body?.cancel();return [name,false,false,false] }
       const result = await response.json()
       const deployed = result?.contract===RUNTIME_CONTRACT && result.function===name
-      return [name,deployed,deployed && result.configured===true,deployed && result.runtime_checks?.TURNSTILE_SECRET===true]
+      return [name,deployed,deployed && result.configured===true,deployed && result.runtime_checks?.TURNSTILE_SECRET===true,deployed && result.support_auth_configured===true]
     } catch { return [name,false,false,false] }
   }))
   checks.edge_functions = functions.every(([,deployed])=>deployed===true)
@@ -53,6 +54,6 @@ export async function checkRuntime(admin: any, status: any) {
   const safeChecks = Object.fromEntries(keys.map(k=>[k,checks[k]===true]))
   const ownerAccount = ['missing','unconfirmed','ready','active','conflict'].includes(data?.owner_account) ? data.owner_account : 'missing'
   return {...status,contract:RUNTIME_CONTRACT,checks:safeChecks,owner_account:ownerAccount,
-    runtime_details:{functions:Object.fromEntries(functions.map(([name,deployed])=>[name,deployed===true])),turnstile:functions.filter(([name])=>['login','password-reset-request'].includes(String(name))).every(([, , ,turnstile])=>turnstile===true)},
+    runtime_details:{functions:Object.fromEntries(functions.map(([name,deployed])=>[name,deployed===true])),turnstile:functions.filter(([name])=>['login','password-reset-request'].includes(String(name))).every(([, , ,turnstile])=>turnstile===true),support_auth_configured:functions.find(([name])=>name==='login')?.[4]===true},
     infrastructure:keys.every(k=>safeChecks[k]) && ownerAccount!=='conflict' ? 'ready':'pending'}
 }
