@@ -1,5 +1,7 @@
 # Client module entitlement audit
 
+> Repository status update — 2026-10-04: Module hardening was later committed (ea5596a/7f4c31b) and pushed. The local-only/staged-migration wording below records the original audit, not current Git status; it does not prove hosted migration application. Local HEAD and the live GitHub `feature/platform-overhaul-v1` head match at `68885d4`. Current integration target is `developmentv2`. Preserve the original validation/deployment evidence below as a point-in-time record; Git does not prove hosted deployment. See [engineering history](../ENGINEERING_HISTORY.md) for the owner-reported hosted checkpoint and pending smoke gate.
+
 Date: 2026-09-24. Local changes only; no commit, deployment or migration application.
 
 ## Canonical flags

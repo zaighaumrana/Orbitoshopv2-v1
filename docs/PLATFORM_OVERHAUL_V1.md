@@ -1,5 +1,7 @@
 # RetraSell Platform Overhaul V1 — Shop contract
 
+> Repository status update — 2026-10-04: Overhaul support (62f3d47), release correction (8c96515) and subsequent support handoff (68885d4) are committed and pushed. Local HEAD and the live GitHub `feature/platform-overhaul-v1` head match at `68885d4`. Current integration target is `developmentv2`. Preserve the original validation/deployment evidence below as a point-in-time record; Git does not prove hosted deployment. See [engineering history](../ENGINEERING_HISTORY.md) for the owner-reported hosted checkpoint and pending smoke gate.
+
 This checkpoint is on `feature/platform-overhaul-v1`, based on `developmentv2` including Onboarding V2 and legal finalization. No hosted changes were made.
 
 The new forward migration `20261003121000_config_request_journal.sql` journals the UUID and boolean changes already supplied by Platform to `config-write`. One transaction applies the write and records its response. Exact replay returns that response without reapplying an old write after a newer request. A changed payload for an existing ID is rejected. Legacy callers without a request ID retain their existing behavior; Platform always sends one. The journal and bridge RPC remain service-only. BILL, INVENTORY, THERMAL, payment/repair ledgers, support identity and suspension rules are unchanged.
