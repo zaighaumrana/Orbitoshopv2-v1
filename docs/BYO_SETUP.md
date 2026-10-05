@@ -1,5 +1,7 @@
 # Brand-new cross-account BYO Shop setup
 
+> Repository status update — 2026-10-04: BYO/runtime stabilization was later committed (c4b4776), integrated into developmentv2 (1794ac2) and pushed. The optional password-support configuration is superseded by the managed one-time handoff; it remains compatibility-only, and BYO handoff is not currently enabled. Local HEAD and the live GitHub `feature/platform-overhaul-v1` head match at `68885d4`. Current integration target is `developmentv2`. Preserve the original validation/deployment evidence below as a point-in-time record; Git does not prove hosted deployment. See [engineering history](../ENGINEERING_HISTORY.md) for the owner-reported hosted checkpoint and pending smoke gate.
+
 This procedure targets a **new blank Shop**, not Client 1 (`kxmovywgshyltwusghhj` / `orbito-client-1`). Nothing here resets a database or changes accounting cutover. Manual confirmed Auth creation is the default; SMTP and invitation delivery are optional.
 
 ## The three inputs

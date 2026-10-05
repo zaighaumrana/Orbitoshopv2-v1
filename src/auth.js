@@ -16,110 +16,10 @@ let _turnstileWidgetId = null
 let _turnstileContainer = null
 let _turnstileMountTimer = null
 let _turnstileGeneration = 0
-let _loginMode = 'shop'
-
-function setLoginMode(mode) {
-  _loginMode =
-    mode === 'support'
-      ? 'support'
-      : 'shop'
-
-  const title =
-    document.getElementById('login-title')
-
-  const subtitle =
-    document.getElementById('login-subtitle')
-
-  const badge =
-    document.getElementById('support-mode-badge')
-
-  const supportBtn =
-    document.getElementById('support-access-btn')
-
-  const forgotBtn =
-    document.getElementById('forgot-btn')
-
-  const loginBtn =
-    document.getElementById('login-btn')
-
-  const emailEl =
-    document.getElementById('login-email')
-
-  const passEl =
-    document.getElementById('login-password')
-
-  const errEl =
-    document.getElementById('login-error')
-
-  if (_loginMode === 'support') {
-    if (title)
-      title.textContent =
-        `${SHORT_BRAND_NAME} Support Access`
-
-    if (subtitle)
-      subtitle.textContent =
-        'Platform super admin authentication'
-
-    badge?.classList.remove('hidden')
-
-    if (supportBtn)
-      supportBtn.textContent =
-        '← Shop login'
-
-    forgotBtn?.classList.add('hidden')
-
-    if (loginBtn)
-      loginBtn.textContent =
-        'Enter Support Mode'
-
-    if (emailEl)
-      emailEl.placeholder =
-        'Platform admin email'
-  } else {
-    if (title)
-      title.textContent =
-        CFG.shop_name || 'RetailOS'
-
-    if (subtitle)
-      subtitle.textContent =
-        CFG.suspended
-          ? `Shop access is suspended — ${SHORT_BRAND_NAME} Support remains available`
-          : 'Sign in to continue'
-
-    badge?.classList.add('hidden')
-
-    if (supportBtn)
-      supportBtn.textContent =
-        `${SHORT_BRAND_NAME} Support`
-
-    forgotBtn?.classList.remove('hidden')
-
-    if (loginBtn)
-      loginBtn.textContent =
-        'Login'
-
-    if (emailEl)
-      emailEl.placeholder =
-        'your@email.com'
-  }
-
-  if (emailEl)
-    emailEl.value = ''
-
-  if (passEl)
-    passEl.value = ''
-
-  errEl?.classList.add('hidden')
-
-  resetTurnstile()
-
-  emailEl?.focus()
-}
 
 export function renderLogin(onSuccess) {
   cleanupLoginBackground()
   cleanupTurnstile()
-  _loginMode = 'shop'
 
   dstack('auth.renderLogin', '*** #app REWRITE *** (login screen)')
   _onLoginSuccess = onSuccess
@@ -261,11 +161,7 @@ z-index:100
   document
   .getElementById('support-access-btn')
   .addEventListener('click', () => {
-    setLoginMode(
-      _loginMode === 'support'
-        ? 'shop'
-        : 'support'
-    )
+    showBlockingError('Open this Shop from Platform using Open Shop as Support. No Platform password is entered here.')
   })
   document.getElementById('login-password').addEventListener('keydown', e => {
     if (e.key === 'Enter') submitLogin()
@@ -328,7 +224,7 @@ async function submitLogin() {
    email,
    pass,
    turnstileToken,
-   _loginMode
+   'shop'
   )
   if (res.ok) {
     const established = await establishLoginSession(res)
@@ -358,10 +254,7 @@ async function submitLogin() {
     dlog('auth.submitLogin', `LOGIN FAILED: ${res.error}`)
     if (btn) {
   btn.disabled = false
-  btn.textContent =
-    _loginMode === 'support'
-      ? 'Enter Support Mode'
-      : 'Login'
+  btn.textContent = 'Login'
 }
     if (errEl) { errEl.textContent = res.error || 'Incorrect email or password.'; errEl.classList.remove('hidden') }
     if (passEl) {
@@ -374,7 +267,6 @@ resetTurnstile()
 }
 
 async function forgotPassword() {
-  if (_loginMode === 'support') return
   const email = document.getElementById('login-email')?.value?.trim()
   if (!email) { showBlockingError('Enter your email address first.'); return }
   const turnstileToken = document.querySelector('[name="cf-turnstile-response"]')?.value || ''

@@ -1,13 +1,11 @@
 import { runtimeProbe } from '../_shared/runtime-preflight.ts'
+import { exchangeSupportHandoff } from '../_shared/support-handoff.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.108.2'
 
 const TURNSTILE_SECRET = Deno.env.get('TURNSTILE_SECRET') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SUPABASE_ANON = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 const SUPABASE_SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-const PLATFORM_SUPABASE_URL = Deno.env.get('PLATFORM_SUPABASE_URL') ?? ''
-const PLATFORM_SUPABASE_ANON = Deno.env.get('PLATFORM_SUPABASE_ANON') ?? ''
-const PLATFORM_AUTH_EMAIL = normalizeEmail(Deno.env.get('PLATFORM_AUTH_EMAIL') ?? '')
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -52,7 +50,7 @@ function clientSupportEmail() {
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   })
 }
 
@@ -160,8 +158,9 @@ async function signInMappedUser(
   profile: AppProfile,
   password: string,
 ) {
+  if (profile.role === 'Orbito Support') return { ok: false, error: 'Open Shop as Support from Platform.' }
   if (profile.status !== 'Active') return { ok: false, error: 'Incorrect email or password.' }
-  if (profile.role !== 'Orbito Support' && await shopIsSuspended(admin)) {
+  if (await shopIsSuspended(admin)) {
     return { ok: false, error: 'This shop account is suspended. Contact your service provider.' }
   }
   const { data, error } = await auth.auth.signInWithPassword({ email: profile.email, password })
@@ -269,33 +268,6 @@ async function migrateLegacyLogin(
   return loginResponse(profile, signedIn.session)
 }
 
-async function verifyPlatformSupport(email: string, password: string) {
-  if (!PLATFORM_SUPABASE_URL || !PLATFORM_SUPABASE_ANON || !PLATFORM_AUTH_EMAIL) {
-    return { ok: false, error: 'Support access is not configured for this client.' }
-  }
-  if (email !== PLATFORM_AUTH_EMAIL) return { ok: false, error: 'Incorrect support credentials.' }
-
-  try {
-    const response = await fetch(
-      `${PLATFORM_SUPABASE_URL.replace(/\/$/, '')}/auth/v1/token?grant_type=password`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: PLATFORM_SUPABASE_ANON },
-        body: JSON.stringify({ email, password }),
-      },
-    )
-    const result = await response.json().catch(() => ({}))
-    const authenticatedEmail = normalizeEmail(result?.user?.email ?? '')
-    if (!response.ok || !result?.user?.id || authenticatedEmail !== PLATFORM_AUTH_EMAIL) {
-      return { ok: false, error: 'Incorrect support credentials.' }
-    }
-    return { ok: true, userId: String(result.user.id), email: authenticatedEmail }
-  } catch (error) {
-    console.error('Platform authentication request failed.', error instanceof Error ? error.message : 'unknown error')
-    return { ok: false, error: 'Support authentication service is unavailable.' }
-  }
-}
-
 async function bootstrapSupportSession(
   admin: ReturnType<typeof createClient>,
   auth: ReturnType<typeof createClient>,
@@ -391,16 +363,27 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS })
   if (req.method !== 'POST') return json({ ok: false, error: 'Method not allowed.' }, 405)
 
-  let body: { email?: string; password?: string; turnstileToken?: string; mode?: string }
+  let body: { email?: string; password?: string; turnstileToken?: string; mode?: string; token?: string }
   try {
     body = await req.json()
   } catch {
     return json({ ok: false, error: 'Invalid request body.' }, 400)
   }
 
+  if(body?.mode==='support')return json({ok:false,error:'Open Shop as Support from Platform. Password support login is no longer available.'},401)
+  if(body?.mode==='support-handoff'){
+    if(Object.keys(body).some(k=>!['mode','token'].includes(k)))return json({ok:false,error:'Invalid support authorization.'},400)
+    try {
+      const {admin,auth}=clients()
+      const identity=await exchangeSupportHandoff(admin,body.token || '')
+      if(!identity)return json({ok:false,error:'Support authorization invalid, expired or already used. Open a new support session from Platform.'},401)
+      const result=await bootstrapSupportSession(admin,auth,identity.userId,identity.email,req.headers.get('user-agent'))
+      return json(result,result.ok?200:401)
+    } catch {return json({ok:false,error:'Secure support session unavailable. Open a new support session from Platform.'},503)}
+  }
+
   const email = normalizeEmail(body.email ?? '')
   const password = body.password ?? ''
-  const mode = body.mode === 'support' ? 'support' : 'shop'
   if (!email || !password) return json({ ok: false, error: 'Email and password are required.' }, 400)
 
   const remoteIp = req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for')
@@ -410,14 +393,6 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { admin, auth } = clients()
-    if (mode === 'support') {
-      const support = await verifyPlatformSupport(email, password)
-      if (!support.ok || !support.userId || !support.email) return json(support, 401)
-      const result = await bootstrapSupportSession(
-        admin, auth, support.userId, support.email, req.headers.get('user-agent'),
-      )
-      return json(result, result.ok ? 200 : 401)
-    }
 
     const mapped = await findAppProfile(admin, email)
     if (mapped) {

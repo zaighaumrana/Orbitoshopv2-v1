@@ -23,7 +23,7 @@ export function billingUsagePage(result, busy = false, now = Date.now()) {
     <h2>Estimated Current Charges</h2>
     <p>${amount(p.estimated_current_charges, p.currency)}</p>
     <p class="muted">Un-invoiced usage estimate, separate from issued invoices.</p>
-    <h2>Recent Billing</h2><p>${p.recent_billing ? esc(p.recent_billing) : unavailable}</p>
+    <h2>Recent Billing</h2><p>${invoices.length?'Showing up to the latest 25 issued invoices. Outstanding total includes all issued invoices.':'No issued invoices yet.'}</p>
     <p class="muted">Last synced: ${Number.isFinite(synced) ? esc(new Date(synced).toLocaleString()) : unavailable}</p>
     ${stale ? '<p role="status">Billing information may be out of date.</p>' : ''}
     ${p.paper_resupply_enabled === true ? `<h2>Paper Resupply</h2><button class="primary-button" data-action="paper-resupply" ${busy ? 'disabled' : ''}>${busy ? 'Requesting…' : 'Request Resupply'}</button>` : ''}

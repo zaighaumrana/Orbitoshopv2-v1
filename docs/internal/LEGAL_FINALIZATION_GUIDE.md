@@ -1,5 +1,7 @@
 # Legal finalization guide — INTERNAL ONLY
 
+> Repository status update — 2026-10-04: Legal finalization was later committed (f966f72), integrated into developmentv2 (d626dcf) and pushed. Original scope statements below are historical; legal publication remains gated and published=false. Local HEAD and the live GitHub `feature/platform-overhaul-v1` head match at `68885d4`. Current integration target is `developmentv2`. Preserve the original validation/deployment evidence below as a point-in-time record; Git does not prove hosted deployment. See [engineering history](../../ENGINEERING_HISTORY.md) for the owner-reported hosted checkpoint and pending smoke gate.
+
 Updated 2026-10-02. Branch: `feature/legal-finalization-v2`; legal donor: `feature/legal-privacy-help`. Initial market: small business customers in Pakistan. These are business-directed drafts, **not lawyer-reviewed documents**. Never link this guide in customer navigation. No publication, deployment, merge, live DB update or production acceptance requirement is authorized by this work.
 
 ## Confirmed business decisions

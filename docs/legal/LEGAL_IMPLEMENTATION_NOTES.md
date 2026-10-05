@@ -1,5 +1,7 @@
 # Legal / Help implementation notes — INTERNAL
 
+> Repository status update — 2026-10-04: Legal work was later committed (b0ba811/f966f72), integrated into developmentv2 (d626dcf) and pushed. Historical no-commit/merge statements below describe their original tasks. This is not legal publication or professional approval. Local HEAD and the live GitHub `feature/platform-overhaul-v1` head match at `68885d4`. Current integration target is `developmentv2`. Preserve the original validation/deployment evidence below as a point-in-time record; Git does not prove hosted deployment. See [engineering history](../../ENGINEERING_HISTORY.md) for the owner-reported hosted checkpoint and pending smoke gate.
+
 Ported 2026-10-02 from the legal donor into feature/legal-finalization-v2 after Onboarding V2. Earlier donor work was prepared 2026-09-27 and updated 2026-09-29. Current release checklist: [LEGAL_FINALIZATION_GUIDE.md](../internal/LEGAL_FINALIZATION_GUIDE.md). Historical research below is not lawyer review or a promise to international customers.
 
 ## Status and publication blocker

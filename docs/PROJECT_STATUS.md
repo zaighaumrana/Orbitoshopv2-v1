@@ -1,5 +1,7 @@
 # OrbitoShop integrated client status
 
+> Repository status update — 2026-10-04: The development baseline and future-Platform wording below describe the earlier Phase 4 checkpoint. Onboarding/legal work was later integrated into developmentv2; current overhaul/support work is committed and pushed. Local HEAD and the live GitHub `feature/platform-overhaul-v1` head match at `68885d4`. Current integration target is `developmentv2`. Preserve the original validation/deployment evidence below as a point-in-time record; Git does not prove hosted deployment. See [engineering history](../ENGINEERING_HISTORY.md) for the owner-reported hosted checkpoint and pending smoke gate.
+
 ## Current baseline
 
 `development` is the current integrated OrbitoShop client baseline. The following status is based on the project owner's confirmation, not a new deployment inspection or regression run performed during this documentation update.
