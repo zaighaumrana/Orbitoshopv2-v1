@@ -77,7 +77,7 @@ export async function runSetup(args,deps={}){
   report('Installing '+label+' settings.');invoke(cli,['secrets','set','--project-ref',opt['project-ref'],'--env-file',path]);
  }
  for(const name of [...FUNCTIONS,...(runtime.values.PLATFORM_SUPPORT_TICKETS_SECRET?['support-tickets']:[])]) { report('Deploying '+name+'.');invoke(cli,['functions','deploy',name,'--project-ref',opt['project-ref'],'--use-api']); }
- report('PASS: required secrets installed and six functions deployed.');
+ report('PASS: required secrets installed and '+(runtime.values.PLATFORM_SUPPORT_TICKETS_SECRET?'seven functions (including customer Support)':'six functions')+' deployed.');
  const fetcher=deps.fetch||fetch;
  const response=await fetcher('https://'+opt['project-ref']+'.supabase.co/functions/v1/platform-bridge',{
   method:'POST',redirect:'error',signal:AbortSignal.timeout(30000),headers:{Authorization:'Bearer '+pairing.values.PLATFORM_BRIDGE_CALL_SECRET,'Content-Type':'application/json'},body:'{"operation":"preflight"}',

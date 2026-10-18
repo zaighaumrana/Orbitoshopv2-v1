@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync,writeFileSync,mkdtempSync,rmSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdtempSync,rmSync,mkdirSync} from 'node:fs';
+import {pathToFileURL} from 'node:url';
 import {tmpdir} from 'node:os';
 import {join,resolve,sep} from 'node:path';
 import {createSupportClient} from '../src/platform/support.js';
@@ -58,5 +59,14 @@ test('split-operator BYO export shares only a hash and exact target metadata, wi
   const shared=JSON.parse(readFileSync(enrollment,'utf8')),secret=supportEnv(readFileSync(runtime,'utf8'),c).PLATFORM_SUPPORT_TICKETS_SECRET;
   assert.ok(!JSON.stringify(shared).includes(secret),'plaintext never enters enrollment handoff');assert.equal(shared.secret_sha256.length,64);assert.equal(shared.request_id,sid);
   await assert.rejects(()=>runSupportSetup(['--config',config,'--action','prepare','--enrollment-file',enrollment]),/--apply/);
+ }finally{assert.ok(resolve(dir).startsWith(resolve(tmpdir())+sep+'support-export-'));rmSync(dir,{recursive:true,force:true});}
+});
+test('a customer with only a Shop checkout can generate private BYO settings without a sibling Platform checkout',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'support-export-'));
+ try{
+  const scripts=join(dir,'shop','scripts');mkdirSync(scripts,{recursive:true});const copied=join(scripts,'support-setup.mjs');writeFileSync(copied,readFileSync(new URL('../scripts/support-setup.mjs',import.meta.url),'utf8'));
+  const standalone=await import(pathToFileURL(copied).href),config=join(dir,'target.json'),runtime=join(dir,'private.env');
+  writeFileSync(config,JSON.stringify({platform_ref:'ukbhyerxshteyetwomqy',project_ref:'tufvoxxlgfydoknxczoy',client_id:42,source_id:id,request_id:sid,client_binding:'fixture',pairing_mode:'byo',scopes:['ticket:create','ticket:read']}));
+  await standalone.runSupportSetup(['--config',config,'--action','generate','--runtime-file',runtime]);assert.match(readFileSync(runtime,'utf8'),/^PLATFORM_SUPPORT_TICKETS_SECRET=[a-f0-9]{64}\n/);
  }finally{assert.ok(resolve(dir).startsWith(resolve(tmpdir())+sep+'support-export-'));rmSync(dir,{recursive:true,force:true});}
 });

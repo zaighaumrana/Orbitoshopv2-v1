@@ -427,3 +427,19 @@ CF-Pages-Skip commit/push and coordinated Draft PRs targeting development, unmer
 Final SHAs and PR links are recorded by the delivery response/PR descriptions.
 Real hosted cross-project/different-account BYO acceptance, release promotion and
 legacy-sender compatibility remain before-use gates; no production-ready claim.
+
+
+## 2026-10-18 — Standalone customer BYO installation portability
+
+Final review found support-setup's physical-path check assumed the Platform sibling
+checkout exists. Customer installations can have only the Shop repository. Use the
+real path when an excluded repository exists, otherwise retain its absolute lexical
+exclusion; keep private-file/symlink protections. A regression copies the actual
+installer into an isolated customer-only checkout and executes private generation
+without a sibling Platform. BYO deployment messages now report the optional seventh
+function accurately. Final Shop suite: 100/101, retaining only the same preexisting
+accepted artifact/runtime-preflight byte gate; new Support groups 8/8. No frontend,
+SQL, release candidate bytes or hosted systems changed in this follow-up. Existing
+Draft Shop PR #1 and Platform PR #5 remain unmerged against development. Earlier
+feature pushes were independently confirmed skipped by Cloudflare for commit_message;
+this follow-up also uses CF-Pages-Skip. Updated the shared validation ledger.

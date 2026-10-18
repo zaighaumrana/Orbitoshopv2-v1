@@ -24,7 +24,7 @@ function privatePath(p){
  for(const repo of [root,resolve(root,'../orbito')]){const rel=relative(repo,candidate);if(!isAbsolute(rel)&&rel!=='..'&&!rel.startsWith('..'+sep))throw Error('Keep Support credentials outside both repositories.');}
  // Resolve existing parent/file paths too; a symlink must not bypass this check.
  const physical=existsSync(candidate)?realpathSync(candidate):resolve(realpathSync(resolve(candidate,'..')),candidate.split(/[\\/]/).at(-1));
- for(const repo of [root,resolve(root,'../orbito')]){const rel=relative(realpathSync(repo),physical);if(!isAbsolute(rel)&&rel!=='..'&&!rel.startsWith('..'+sep))throw Error('Private path resolves inside a repository.');}
+ for(const repo of [root,resolve(root,'../orbito')]){const base=existsSync(repo)?realpathSync(repo):repo;const rel=relative(base,physical);if(!isAbsolute(rel)&&rel!=='..'&&!rel.startsWith('..'+sep))throw Error('Private path resolves inside a repository.');}
  return candidate;
 }
 export async function runSupportSetup(args){
