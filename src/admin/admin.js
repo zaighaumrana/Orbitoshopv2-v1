@@ -1,3 +1,5 @@
+import { createSupportClient } from '../platform/support.js'
+import { supportPage } from './pages/support.js'
 import { settingsUpdates } from '../settings-data.js'
 import { managedFeatures } from '../onboarding-state.js'
 import { escapeHTML, safeImageURL } from "../html.js"
@@ -47,6 +49,7 @@ const ADMIN_MODULES = [
   ['ems',       '⏱', 'EMS'],
   ['settings',  '◐', 'Settings'],
   ['billing-usage', '▧', 'Billing & Usage'],
+  ['customer-support', '◈', 'Help & Support'],
 ]
 
 const adminState = {
@@ -66,6 +69,7 @@ let SESSION = {}
 const platformBridge = createPlatformBridge(sb)
 let billingResult = null
 let legalStatus = null
+const customerSupport = createSupportClient(sb)
 let resupplyBusy = false
 let _inv = null  // populated via dynamic import only when inventory_module_enabled
 
@@ -95,6 +99,10 @@ async function load() {
   if (mod === 'billing-usage' && can(mod, state.role)) {
     try { billingResult = await platformBridge.readBilling() }
     catch { billingResult = { available: false } }
+  }
+  if (mod === 'customer-support' && can(mod, state.role)) {
+    try { await customerSupport.list(customerSupport.view.offset) } catch(error) { customerSupport.view.error=error.message }
+    if (SESSION !== loadSession || window.location.pathname !== loadPath) return
   }
   const needs = {
     tickets: CFG.repair_module_enabled && ['dashboard','repairs','reports','receipts'].includes(mod),
@@ -229,6 +237,7 @@ function render() {
 }
 
 function pageContent() {
+  if (adminState.adminModule === 'customer-support') return adminShell(supportPage(customerSupport.view))
   if (adminState.adminModule === 'billing-usage') return adminShell(billingUsagePage(billingResult, resupplyBusy))
   const pages = { dashboard, repairs, inventory, catalog, reports, employees, receipts, settings }
   if (adminState.adminModule === 'ems') {
@@ -658,6 +667,10 @@ function attachEvents() {
 
   dlog('ADMIN.attachEvents', 'listeners attached to #app (click + submit)')
 
+  app.addEventListener('input',e=>{
+    const field=e.target.dataset.supportField
+    if(window.location.pathname==='/admin/customer-support' && ['subject','category','message'].includes(field) && !customerSupport.view.pending)customerSupport.view.draft[field]=e.target.value
+  })
   // Click delegation
   app.addEventListener('click', async e => {
     if (!can(adminState.adminModule, state.role) || !modalEntitled(state.modal?.type)) return
@@ -678,6 +691,17 @@ function attachEvents() {
       '[data-mark-not-needed],[data-subinv-comp-remove],[data-add-draft-comp-name],[data-tag-select]'
     )
     if (!el) return
+    if (el.dataset.action?.startsWith('customer-support-')) {
+      if (!can('customer-support',state.role)||customerSupport.view.busy)return
+      const session=SESSION,path=window.location.pathname,v=customerSupport.view
+      v.busy=true;v.error='';render()
+      try {
+        if(el.dataset.action==='customer-support-detail')await customerSupport.get(el.dataset.ticketId)
+        else await customerSupport.list(el.dataset.action==='customer-support-next'?v.offset+50:el.dataset.action==='customer-support-previous'?Math.max(0,v.offset-50):v.offset)
+      }catch(error){if(SESSION===session)v.error=error.message}
+      finally{v.busy=false;if(SESSION===session&&window.location.pathname===path)render()}
+      return
+    }
     dlog('ADMIN.click', `el MATCHED selector -- action=${el.dataset.action} close=${el.dataset.close} tag=${el.tagName}`)
 
     if (el.dataset.ppKey !== undefined) { handlePpKey(el.dataset.ppKey); return }
@@ -1281,6 +1305,15 @@ function attachEvents() {
     const type = form.dataset.form
     dlog('ADMIN.submit', `ENTRY form.dataset.form=${type}`)
 
+    if (type === 'customer-support') {
+      if(!can('customer-support',state.role)||customerSupport.view.busy)return
+      const session=SESSION,path=window.location.pathname,v=customerSupport.view
+      if(!v.pending)v.draft={subject:data.subject,category:data.category,message:data.message}
+      v.busy=true;v.error='';render()
+      try {await customerSupport.create();await customerSupport.list(0)}catch(error){if(SESSION===session)v.error=error.message}
+      finally{v.busy=false;if(SESSION===session&&window.location.pathname===path)render()}
+      return
+    }
     if (type === 'add-quick-item') {
       const itemName = data.itemName?.trim()
       if (!itemName) { showBlockingError('Item name is required.'); return }

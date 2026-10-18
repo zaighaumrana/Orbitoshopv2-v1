@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "byo:setup": "node scripts/byo-setup.mjs"
+    "byo:setup": "node scripts/byo-setup.mjs",
+    "test:support": "node --test tests/customer-support.test.mjs",
+    "release:support": "node scripts/build-platform-release.mjs --support"
   },
   "devDependencies": {
     "vite": "^8.1.0"

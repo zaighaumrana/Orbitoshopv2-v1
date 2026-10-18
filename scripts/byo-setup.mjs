@@ -5,6 +5,7 @@ import {spawnSync} from 'node:child_process';
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const FUNCTIONS=['login','account-admin','verify-pin','password-reset-request','public-track','platform-bridge'];
 const REQUIRED=['migrations','database_privileges','rpc_privileges','sequence_privileges','private_config','storage','database_reachable','bridge_configuration','edge_functions','runtime_configuration','authentication'];
+const TICKETS=['PLATFORM_SUPPORT_TICKETS_ENDPOINT','PLATFORM_SUPPORT_TICKETS_SECRET'];
 const SUPPORT=['PLATFORM_SUPABASE_URL','PLATFORM_SUPABASE_ANON','PLATFORM_AUTH_EMAIL'];
 class SetupError extends Error {}
 function fail(message){throw new SetupError(message)}
@@ -27,6 +28,8 @@ export function validateInputs(ref,pairing,runtime){
  let endpoint;try{endpoint=new URL(p.PLATFORM_BRIDGE_ENDPOINT);}catch{fail('Invalid Platform bridge destination.');}
  if(!/^https:\/\/[a-z]{20}\.supabase\.co\/functions\/v1\/platform-bridge$/.test(endpoint.href)||endpoint.hostname===ref+'.supabase.co')fail('Platform and Shop must be different Supabase projects.');
  if(!runtime.values.TURNSTILE_SECRET?.trim())fail('Missing server-only TURNSTILE_SECRET in the private runtime file.');
+ const tickets=TICKETS.filter(k=>runtime.values[k]);
+ if(tickets.length && (tickets.length!==2 || !/^[a-f0-9]{64}$/.test(runtime.values.PLATFORM_SUPPORT_TICKETS_SECRET||'') || [p.PLATFORM_BRIDGE_CALL_SECRET,p.PLATFORM_BRIDGE_SOURCE_SECRET].includes(runtime.values.PLATFORM_SUPPORT_TICKETS_SECRET) || runtime.values.PLATFORM_SUPPORT_TICKETS_ENDPOINT!==p.PLATFORM_BRIDGE_ENDPOINT.replace('/platform-bridge','/platform-support-tickets')))fail('Optional customer Support requires its distinct dedicated credential and paired Platform endpoint.');
  const support=SUPPORT.filter(k=>runtime.values[k]);if(support.length && support.length!==SUPPORT.length)fail('Optional support login needs all three support settings; omit the group for normal Shop login.');
 }
 function privateFile(path,root){
@@ -55,12 +58,12 @@ export async function runSetup(args,deps={}){
   if(result.error || result.status!==0)fail('Local CLI operation failed. Check authorised project access, CLI installation and migrations. Raw CLI output is suppressed to protect credentials.');
   return result.stdout;
  });
- if(invoke('git',['branch','--show-current']).trim()!=='feature/onboarding-v2')fail('Run from the Shop feature/onboarding-v2 branch.');
+ if(!['feature/onboarding-v2','development','feature/verified-customer-support-shop'].includes(invoke('git',['branch','--show-current']).trim()))fail('Run from a reviewed Shop development/release branch.');
  const file=deps.privateFile||privateFile,pairPath=file(opt['pairing-file'],root),runtimePath=file(opt['runtime-file'],root);
  if(pairPath===runtimePath)fail('Keep pairing and application runtime files separate.');
  const read=deps.read||((path)=>readFileSync(path,'utf8'));
  const pairing=parseEnv(read(pairPath),['PLATFORM_BRIDGE_CALL_SECRET','PLATFORM_BRIDGE_SOURCE_SECRET','PLATFORM_BRIDGE_ENDPOINT']);
- const runtime=parseEnv(read(runtimePath),['TURNSTILE_SECRET',...SUPPORT]);validateInputs(opt['project-ref'],pairing,runtime);
+ const runtime=parseEnv(read(runtimePath),['TURNSTILE_SECRET',...SUPPORT,...TICKETS]);validateInputs(opt['project-ref'],pairing,runtime);
  const cli=opt.cli||'supabase';if(/\.(cmd|bat|ps1)$/i.test(cli))fail('Use the Supabase executable, not a shell wrapper.');
  invoke(cli,['--version']);
  const deploymentHelp=invoke(cli,['functions','deploy','--help']);
@@ -73,7 +76,7 @@ export async function runSetup(args,deps={}){
  for(const [label,path] of [['application runtime',runtimePath],['bridge pairing',pairPath]]) {
   report('Installing '+label+' settings.');invoke(cli,['secrets','set','--project-ref',opt['project-ref'],'--env-file',path]);
  }
- for(const name of FUNCTIONS) { report('Deploying '+name+'.');invoke(cli,['functions','deploy',name,'--project-ref',opt['project-ref'],'--use-api']); }
+ for(const name of [...FUNCTIONS,...(runtime.values.PLATFORM_SUPPORT_TICKETS_SECRET?['support-tickets']:[])]) { report('Deploying '+name+'.');invoke(cli,['functions','deploy',name,'--project-ref',opt['project-ref'],'--use-api']); }
  report('PASS: required secrets installed and six functions deployed.');
  const fetcher=deps.fetch||fetch;
  const response=await fetcher('https://'+opt['project-ref']+'.supabase.co/functions/v1/platform-bridge',{
