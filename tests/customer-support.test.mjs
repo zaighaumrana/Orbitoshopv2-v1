@@ -70,3 +70,13 @@ test('a customer with only a Shop checkout can generate private BYO settings wit
   await standalone.runSupportSetup(['--config',config,'--action','generate','--runtime-file',runtime]);assert.match(readFileSync(runtime,'utf8'),/^PLATFORM_SUPPORT_TICKETS_SECRET=[a-f0-9]{64}\n/);
  }finally{assert.ok(resolve(dir).startsWith(resolve(tmpdir())+sep+'support-export-'));rmSync(dir,{recursive:true,force:true});}
 });
+
+test('account switch while parsing a late error cannot clear the new account retry identity',async()=>{
+ let current=session(),release,parsing,changed;
+ const waiting=new Promise(resolve=>{parsing=resolve;});
+ const sb={auth:{getSession:async()=>({data:{session:current}}),onAuthStateChange:fn=>{changed=fn;}},functions:{invoke:async()=>({error:{context:{status:400,json:async()=>{parsing();return new Promise(resolve=>{release=resolve;});}}}})}};
+ const c=createSupportClient(sb);c.view.draft={subject:'Old',category:'technical',message:'Old'};
+ const old=c.create();await waiting;current={...session(),user:{id:sid}};changed('SIGNED_IN',current);
+ c.view.pending={request_id:'replacement-request'};release({error:'Invalid old request'});
+ await assert.rejects(old,/changed/);assert.equal(c.view.pending.request_id,'replacement-request');
+});

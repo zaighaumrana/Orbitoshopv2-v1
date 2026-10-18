@@ -14,9 +14,13 @@ export function createSupportClient(sb) {
  sb.auth.onAuthStateChange?.((_event,s)=>{const identity=identityOf(s);if(identity!==owner){reset();owner=identity;}});
  async function call(body){const identity=await session(),generation=epoch;
   const {data,error}=await sb.functions.invoke('support-tickets',{body});
-  await session();if(owner!==identity||epoch!==generation)throw Error('Support session changed.');
+  let failure;
   if(error||data?.error){let message=data?.error;try{message=(await error?.context?.json())?.error||message;}catch{}
-   const failure=Error(message||'Support is unavailable or not enabled. Retry the same request when access is restored.');failure.status=error?.context?.status;throw failure;}
+   failure=Error(message||'Support is unavailable or not enabled. Retry the same request when access is restored.');failure.status=error?.context?.status;}
+  // Error body parsing can yield too. Recheck AFTER every asynchronous response
+  // step, before a stale 400 can clear a replacement account's pending request.
+  await session();if(owner!==identity||epoch!==generation)throw Error('Support session changed.');
+  if(failure){if([401,403].includes(failure.status))Object.assign(view,{tickets:[],detail:null,receipt:null});throw failure;}
   return data;
  }
  return {view,reset,
