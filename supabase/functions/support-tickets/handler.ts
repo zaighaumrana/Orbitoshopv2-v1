@@ -14,8 +14,9 @@ export function ticketHandler(env: (key:string)=>string|undefined,fetcher: typeo
     if(supplied.length!==64 || await sha(supplied)!==await sha(await sha(secret)))throw new SupportError(401);
     if(!raw || raw.action!=='capability'||!UUID.test(raw.challenge||'')||Object.keys(raw).some(k=>!['action','challenge'].includes(k)))throw new SupportError(400);
     const service=env('SUPABASE_SERVICE_ROLE_KEY')||'';
-    const c=await rpc(fetcher,url,service,service,'support_ticket_capability_context',{});
-    const signed=[CONTRACT,raw.challenge,ref,c.source_id,c.client_binding,c.platform_client_id,target];
+    const c=await rpc(fetcher,url,service,service,'support_ticket_installation_context',{});
+    if(c.ready!==true||c.installation_version!==2)throw new SupportError(503);
+    const signed=[CONTRACT,raw.challenge,ref,c.source_id,c.client_binding,c.platform_client_id,target,2,true];
     return Response.json({contract:CONTRACT,challenge:raw.challenge,project_ref:ref,...c,endpoint:target,proof:await proof(await sha(secret),signed)},{headers:cors});
    }
    const body=fields(raw),token=bearer(req),context=await actor(fetcher,url,key,token);

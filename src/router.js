@@ -9,11 +9,15 @@ import { dlog, dstack, callerInfo } from './debuglog.js'
 const routes = new Map()
 let notFoundHandler = null
 let currentPath = null
+let currentURL = null
+let navigationGeneration = 0
 
 export function clearRoutes() {
   routes.clear()
   notFoundHandler = null
   currentPath = null
+  currentURL = null
+  navigationGeneration++
 }
 
 /**
@@ -38,8 +42,10 @@ export function navigate(path, options = {}) {
   dstack('router.navigate', `ENTRY path=${path} opts=${JSON.stringify(options)} currentPath=${currentPath}`)
   const url = new URL(path, window.location.origin)
   const pathname = url.pathname
+  if (url.origin !== window.location.origin) throw new Error('Navigation must stay inside this Shop.')
+  const target = pathname + url.search
 
-  if (pathname === currentPath && !options.force) {
+  if (target === currentURL && !options.force) {
     // Already here — just re-resolve (e.g. query string changed)
     dlog('router.navigate', `SAME-PATH re-resolve pathname=${pathname}`)
     resolve(pathname, url.search)
@@ -48,10 +54,10 @@ export function navigate(path, options = {}) {
 
   if (options.replace) {
     dlog('router.navigate', `history.replaceState -> ${path}`)
-    history.replaceState({}, '', path)
+    history.replaceState(history.state || {}, '', target)
   } else {
     dlog('router.navigate', `history.pushState -> ${path}`)
-    history.pushState({}, '', path)
+    history.pushState({}, '', target)
   }
   resolve(pathname, url.search)
 }
@@ -94,12 +100,14 @@ function parseQuery(search) {
 function resolve(pathname, search = '') {
   dlog('router.resolve', `ENTRY pathname=${pathname} caller=[${callerInfo()}]`)
   currentPath = pathname
+  currentURL = pathname + search
+  const generation = ++navigationGeneration
   const match = matchRoute(pathname)
   const query = parseQuery(search)
 
   if (match) {
     dlog('router.resolve', `MATCHED route -> handler invoked (unawaited)`)
-    match.handler(match.params, query)
+    match.handler(match.params, query, { isCurrent: () => generation === navigationGeneration })
   } else if (notFoundHandler) {
     dlog('router.resolve', `NOT-FOUND -> calling notFoundHandler`)
     notFoundHandler(pathname)
@@ -122,7 +130,7 @@ export function startRouter() {
       resolve(window.location.pathname, window.location.search)
     })
   }
-    if (currentPath !== window.location.pathname) {
+    if (currentURL !== window.location.pathname + window.location.search) {
     resolve(
       window.location.pathname,
       window.location.search

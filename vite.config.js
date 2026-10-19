@@ -10,7 +10,7 @@ const manifest = JSON.stringify({
 })
 
 export default defineConfig(({mode}) => {
-  const env=loadEnv(mode,process.cwd(),'VITE_');
+  const env=process.env.RETRASELL_CLEAN_PUBLIC_BUILD==='1'?{}:loadEnv(mode,process.cwd(),'VITE_');
   return {
   plugins: [{
     name: 'product-branding',

@@ -5,16 +5,23 @@ import { dlog } from './debuglog.js'
 import { needsOnboarding } from './onboarding-state.js'
 import { ensureOwnerAcceptance } from './legal/acceptance.js'
 import { takeSupportHandoff, startSupportHandoff } from './support-handoff.js'
+import {RECOVERY_KEY} from './platform/support-recovery.js'
 
 let supportHandoff=takeSupportHandoff(location,history)
 
 let applicationGeneration = 0
+let observedAuthIdentity = null
+const authIdentity = session => {
+  try { return session.user.id+':'+JSON.parse(atob(session.access_token.split('.')[1].replaceAll('-','+').replaceAll('_','/'))).session_id } catch { return null }
+}
+const clearPrivateRecovery = () => {try{sessionStorage.removeItem(RECOVERY_KEY);history.replaceState({...history.state,shop_view:null},'',location.pathname+location.search)}catch{}}
 
 function canonicalRole(session) {
   return session?.employee?.role || ''
 }
 
 async function boot() {
+  const generation = applicationGeneration
   if(supportHandoff!==null){const token=supportHandoff;supportHandoff=null;await startSupportHandoff(token,onLoginSuccess);return}
   await loadConfig(true)
   applyBranding()
@@ -30,7 +37,9 @@ async function boot() {
   }
 
   const session = await loadCurrentSession()
+  if(generation!==applicationGeneration)return
   if (!session) {
+    clearPrivateRecovery()
     showLogin()
     return
   }
@@ -69,37 +78,38 @@ function setupRoutes(session) {
   state.role = role
   registerRoute('/login', () => renderLogin(onLoginSuccess))
 
-  registerRoute('/pos', async () => {
+  registerRoute('/pos', async (_params, _query, navigation) => {
     if (state.role !== role) return showLogin()
     if (!can('pos', role)) return routeForRole(role, true)
     state.modal = null
     document.getElementById('app').textContent = 'Loading…'
     const { initPOS } = await import('./pos/pos.js')
-    if (generation !== applicationGeneration || state.role !== role || window.location.pathname !== '/pos') return
+    if (!navigation.isCurrent() || generation !== applicationGeneration || state.role !== role || window.location.pathname !== '/pos') return
     initPOS(session)
   })
 
-  registerRoute('/workshop', async () => {
+  registerRoute('/workshop', async (_params, _query, navigation) => {
     if (state.role !== role) return showLogin()
     if (!can('workshop', role)) return routeForRole(role, true)
     state.modal = null
     document.getElementById('app').textContent = 'Loading…'
     const { initWorkshop } = await import('./pos/workshop.js')
-    if (generation !== applicationGeneration || state.role !== role || window.location.pathname !== '/workshop') return
+    if (!navigation.isCurrent() || generation !== applicationGeneration || state.role !== role || window.location.pathname !== '/workshop') return
     initWorkshop(session)
   })
 
-  const adminModules = ['dashboard','repairs','inventory','reports','employees','receipts','ems','settings','catalog','billing-usage']
+  const adminModules = ['dashboard','repairs','inventory','reports','employees','receipts','ems','settings','catalog','billing-usage','customer-support']
+
   adminModules.forEach(mod => {
-    registerRoute(`/admin/${mod}`, async (_params, query) => {
+    registerRoute(`/admin/${mod}`, async (_params, query, navigation) => {
       if (state.role !== role) return showLogin()
       // Reject before loading the Admin bundle or issuing any module queries.
       if (!can(mod, role)) return routeForRole(role, true)
       state.modal = null
       document.getElementById('app').textContent = 'Loading…'
       const { initAdmin } = await import('./admin/admin.js')
-      if (generation !== applicationGeneration || state.role !== role || window.location.pathname !== `/admin/${mod}`) return
-      initAdmin(session, mod, query)
+      if (!navigation.isCurrent() || generation !== applicationGeneration || state.role !== role || window.location.pathname !== `/admin/${mod}`) return
+      initAdmin(session, mod, query, navigation.isCurrent)
     })
   })
 
@@ -144,7 +154,10 @@ async function enterApplication(session) {
   const proceed = () => {
     if (generation !== applicationGeneration || state.role !== role) return
     setupRoutes(session)
-    routeForRole(role)
+    // Only resolve the live URL after all gates passed. Registered routes still
+    // enforce current role and module access before importing operational code.
+    if (['/', '/login', '/onboarding'].includes(window.location.pathname)) routeForRole(role, true)
+    else navigate(window.location.pathname + window.location.search, { replace: true })
     startRouter()
   }
   const afterLegal = async () => {
@@ -162,10 +175,13 @@ async function enterApplication(session) {
 }
 
 async function onLoginSuccess(session) {
+  const generation = ++applicationGeneration
   const role = canonicalRole(session)
   state.role = role
   dlog('main.onLoginSuccess', `canonical role=${role}`)
-  if (!await loadConfig(false)) {
+  const configReady = await loadConfig(false)
+  if (generation !== applicationGeneration || state.role !== role) return
+  if (!configReady) {
     applicationGeneration++
     clearRoutes()
     state.role = null
@@ -188,8 +204,22 @@ async function onLoginSuccess(session) {
   await enterApplication(session)
 }
 
-sb.auth.onAuthStateChange((event) => {
+sb.auth.onAuthStateChange((event, authSession) => {
+  const identity=authIdentity(authSession)
+  const changed=observedAuthIdentity!==null && identity!==observedAuthIdentity
+  observedAuthIdentity=identity
+  if((event==='SIGNED_IN'&&changed)||event==='USER_UPDATED'){
+    clearPrivateRecovery()
+    showLogin()
+    const generation=applicationGeneration
+    // Supabase auth callbacks must not await another Auth operation.
+    setTimeout(async()=>{
+      try{const verified=await loadCurrentSession();if(generation===applicationGeneration&&verified)await onLoginSuccess(verified)}catch{if(generation===applicationGeneration)showLogin()}
+    },0)
+    return
+  }
   if (event !== 'SIGNED_OUT') return
+  clearPrivateRecovery()
   state.role = null
   try {
     sessionStorage.removeItem('retailos_session')

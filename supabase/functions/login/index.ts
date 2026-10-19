@@ -1,6 +1,9 @@
 import { runtimeProbe } from '../_shared/runtime-preflight.ts'
 import { exchangeSupportHandoff } from '../_shared/support-handoff.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.108.2'
+// Bind the actual public schema; ReturnType of the uninstantiated generic SDK
+// factory infers an unknown schema and collapses RPC/table results to never.
+type ShopClient = ReturnType<typeof createClient<any, 'public'>>
 
 const TURNSTILE_SECRET = Deno.env.get('TURNSTILE_SECRET') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
@@ -115,13 +118,13 @@ function clients() {
   }
 }
 
-async function shopIsSuspended(admin: ReturnType<typeof createClient>) {
+async function shopIsSuspended(admin: ShopClient) {
   const { data, error } = await admin.from('shop_config').select('suspended').eq('id', 1).single()
   if (error || !data) throw new Error('Shop access state is unavailable.')
   return data.suspended === true
 }
 
-async function findAppProfile(admin: ReturnType<typeof createClient>, email: string): Promise<AppProfile | null> {
+async function findAppProfile(admin: ShopClient, email: string): Promise<AppProfile | null> {
   const { data, error } = await admin
     .from('app_users')
     .select('auth_user_id, employee_id, email, display_name, role, status')
@@ -131,7 +134,7 @@ async function findAppProfile(admin: ReturnType<typeof createClient>, email: str
   return data as AppProfile | null
 }
 
-async function findSupportProfile(admin: ReturnType<typeof createClient>): Promise<AppProfile | null> {
+async function findSupportProfile(admin: ShopClient): Promise<AppProfile | null> {
   const { data, error } = await admin
     .from('app_users')
     .select('auth_user_id, employee_id, email, display_name, role, status')
@@ -141,7 +144,7 @@ async function findSupportProfile(admin: ReturnType<typeof createClient>): Promi
   return data as AppProfile | null
 }
 
-async function findAuthUserByEmail(admin: ReturnType<typeof createClient>, email: string) {
+async function findAuthUserByEmail(admin: ShopClient, email: string) {
   for (let page = 1; page <= 100; page += 1) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
     if (error) throw new Error('Authentication identity lookup failed.')
@@ -153,8 +156,8 @@ async function findAuthUserByEmail(admin: ReturnType<typeof createClient>, email
 }
 
 async function signInMappedUser(
-  admin: ReturnType<typeof createClient>,
-  auth: ReturnType<typeof createClient>,
+  admin: ShopClient,
+  auth: ShopClient,
   profile: AppProfile,
   password: string,
 ) {
@@ -171,7 +174,7 @@ async function signInMappedUser(
   return loginResponse(profile, data.session)
 }
 
-async function signInReservedOwner(auth: ReturnType<typeof createClient>, email: string, password: string) {
+async function signInReservedOwner(auth: ShopClient, email: string, password: string) {
   const { data, error } = await auth.auth.signInWithPassword({ email, password })
   if (error || !data.user || !data.session) return { ok: false, error: 'Incorrect email or password.' }
   const { data: verified, error: verifyError } = await auth.auth.getUser(data.session.access_token)
@@ -190,7 +193,7 @@ async function signInReservedOwner(auth: ReturnType<typeof createClient>, email:
 }
 
 async function verifyLegacyIdentity(
-  admin: ReturnType<typeof createClient>,
+  admin: ShopClient,
   email: string,
   password: string,
 ): Promise<LegacyIdentity | null> {
@@ -216,8 +219,8 @@ async function verifyLegacyIdentity(
 }
 
 async function migrateLegacyLogin(
-  admin: ReturnType<typeof createClient>,
-  auth: ReturnType<typeof createClient>,
+  admin: ShopClient,
+  auth: ShopClient,
   identity: LegacyIdentity,
   password: string,
 ) {
@@ -269,8 +272,8 @@ async function migrateLegacyLogin(
 }
 
 async function bootstrapSupportSession(
-  admin: ReturnType<typeof createClient>,
-  auth: ReturnType<typeof createClient>,
+  admin: ShopClient,
+  auth: ShopClient,
   platformUserId: string,
   platformEmail: string,
   userAgent: string | null,

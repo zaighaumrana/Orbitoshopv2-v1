@@ -1,0 +1,56 @@
+// Actual index.html → main.js → gates → router → admin/POS/auth. Only SDK and
+// Turnstile transports are synthetic; every non-loopback request is blocked.
+import {createServer} from 'vite';
+import {pathToFileURL} from 'node:url';
+import assert from 'node:assert/strict';
+const {chromium}=await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE_PATH).href);
+const server=await createServer({configFile:false,envFile:false,root:process.cwd(),server:{host:'127.0.0.1',port:0},define:{'import.meta.env.VITE_SUPABASE_URL':JSON.stringify('https://synthetic.invalid'),'import.meta.env.VITE_SUPABASE_ANON':JSON.stringify('synthetic-public'),'import.meta.env.VITE_TURNSTILE_SITE_KEY':JSON.stringify('synthetic-site')},plugins:[{name:'entry-sdk',enforce:'pre',resolveId:id=>id==='@supabase/supabase-js'?'\0entry-sdk':null,load:id=>id==='\0entry-sdk'?'export const createClient=()=>window.fixtureSDK;':null}]});
+function fixture(){
+ const q=new URL(location.href).searchParams,uid='97000000-0000-4000-8000-000000000001',sid='97000000-0000-4000-8000-000000000002';
+ if(q.has('fixtureRole'))sessionStorage.setItem('fixtureRole',q.get('fixtureRole'));
+ let role=sessionStorage.getItem('fixtureRole')||'Business Owner';
+ if(q.has('fixtureAuth'))sessionStorage.setItem('fixtureAuth',q.get('fixtureAuth'));
+ const session={user:{id:uid},access_token:'x.'+btoa(JSON.stringify({session_id:sid}))+'.x'};
+ const listeners=[],signed=()=>sessionStorage.getItem('fixtureAuth')!=='none';
+ window.fixtureCalls=[];window.fixtureUncertain=sessionStorage.getItem('fixtureUncertain')!=='done';
+ const originalFetch=window.fetch.bind(window);window.fetch=async(url,settings)=>{
+  if(String(url)==='https://synthetic.invalid/functions/v1/login'){window.fixtureCalls.push({function:'login'});await new Promise(r=>setTimeout(r,150));return window.fixtureLoginSuccess?Response.json({ok:true,session:{...session,refresh_token:'synthetic-refresh'}}):Response.json({ok:false,error:'Synthetic denial'},{status:401})}
+  return originalFetch(url,settings);
+ };
+ const config={shop_name:'Synthetic Shop',onboarding_version:2,onboarding_completed_at:'2026-10-01',suspended:q.get('fixtureSuspended')==='true',repair_module_enabled:true,inventory_module_enabled:true,technician_module_enabled:true,ems_enabled:false,currency:'PKR'};
+ window.fixtureSetRole=value=>{role=value;sessionStorage.setItem('fixtureRole',value);for(const fn of listeners)fn('USER_UPDATED',session)};
+ const query=table=>{const builder={select:()=>builder,eq:()=>builder,is:()=>builder,in:()=>builder,neq:()=>builder,gte:()=>builder,lte:()=>builder,not:()=>builder,order:()=>builder,limit:()=>builder,single:async()=>({data:table==='app_users'?{auth_user_id:uid,employee_id:role==='Manager'?1:null,email:'owner@example.test',display_name:'Synthetic User',role,status:'Active'}:{}}),then:fn=>Promise.resolve({data:[]}).then(fn)};return builder;};
+ window.fixtureSDK={from:query,auth:{getUser:async()=>({data:{user:signed()?session.user:null}}),getSession:async()=>({data:{session:signed()?session:null}}),setSession:async()=>{sessionStorage.setItem('fixtureAuth','signed');for(const fn of listeners)fn('SIGNED_IN',session);return {}},onAuthStateChange:fn=>{listeners.push(fn);queueMicrotask(()=>fn('INITIAL_SESSION',signed()?session:null));return {data:{subscription:{unsubscribe(){}}}}},signOut:async()=>{sessionStorage.setItem('fixtureAuth','none');for(const fn of listeners)fn('SIGNED_OUT',null);return {}}},
+ rpc:async(name)=>{window.fixtureCalls.push({rpc:name});if(name==='get_app_config'&&window.fixtureHoldConfig){window.fixtureHoldConfig=false;return new Promise(resolve=>window.fixtureReleaseConfig=()=>resolve({data:config}))}if(['get_public_shop_config','get_app_config'].includes(name))return {data:config};if(name==='get_legal_status')return {data:{published:false}};if(name==='support_ticket_actor_context')return {data:{auth_user_id:uid,session_id:sid,role,employee_id:role==='Manager'?1:null,source_id:'98000000-0000-4000-8000-000000000001',client_binding:'fixture-client',platform_client_id:42}};return {data:[]};},
+ functions:{invoke:async(name,{body})=>{window.fixtureCalls.push({function:name,body});if(name==='login'){await new Promise(r=>setTimeout(r,150));return {data:{ok:false,error:'Synthetic denial'}};}if(body.action==='create'){if(window.fixtureUncertain){sessionStorage.setItem('fixtureUncertain','done');window.fixtureUncertain=false;return {error:Error('lost response')}}return {data:{accepted:true,ticket_id:body.request_id,status:'Open'}};}return {data:body.action==='list'?{tickets:[],has_more:false}:{ticket:null}};}}};
+ window.turnstile={render(wrap,options){window.fixtureCaptcha=options;const input=document.createElement('input');input.name='cf-turnstile-response';input.value='synthetic-token';input.type='hidden';wrap.append(input);queueMicrotask(options.callback);return 'synthetic-widget'},reset(){},remove(){}};
+}
+let browser;const errors=[],external=[];
+try{
+ await server.listen();const origin='http://127.0.0.1:'+server.httpServer.address().port;
+ browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH});
+ const context=await browser.newContext();await context.route('**/*',r=>r.request().url().startsWith(origin+'/')?r.continue():r.request().url()==='https://challenges.cloudflare.com/turnstile/v0/api.js'?r.fulfill({contentType:'application/javascript',body:'/* synthetic Turnstile fixture */'}):(external.push(r.request().url()),r.abort()));await context.addInitScript(fixture);
+ const page=await context.newPage();page.setDefaultTimeout(15000);page.on('pageerror',e=>errors.push(e.message));
+ for(const role of ['Business Owner','Manager']){
+  await page.goto(origin+'/admin/customer-support?fixtureRole='+encodeURIComponent(role));await page.getByRole('heading',{name:'New support request'}).waitFor();
+  await page.reload();await page.getByRole('heading',{name:'New support request'}).waitFor();assert.equal(new URL(page.url()).pathname,'/admin/customer-support');
+ }
+ await page.locator('[data-support-field="subject"]').fill('Scanner recovery');await page.locator('[data-support-field="message"]').fill('Disconnects after checkout.');await page.getByRole('button',{name:'Submit request',exact:true}).click();await page.getByRole('button',{name:'Retry original request'}).waitFor();
+ const original=await page.evaluate(()=>window.fixtureCalls.find(c=>c.body?.action==='create').body);
+ await page.reload();await page.getByRole('button',{name:'Retry original request'}).waitFor();assert.equal(await page.locator('[data-support-field="subject"]').inputValue(),original.subject);await page.getByRole('button',{name:'Retry original request'}).click();await page.getByRole('status').filter({hasText:'Request received'}).waitFor();assert.deepEqual(await page.evaluate(()=>window.fixtureCalls.find(c=>c.body?.action==='create').body),original);
+ await page.goto(origin+'/admin/settings?fixtureRole=Business%20Owner&tab=contact');await page.locator('[data-settings-tab="contact"].active').waitFor();await page.reload();await page.locator('[data-settings-tab="contact"].active').waitFor();
+ await page.locator('[data-settings-tab="receipt"]').click();await page.locator('[data-settings-tab="receipt"].active').waitFor();await page.goBack();await page.locator('[data-settings-tab="contact"].active').waitFor();await page.goForward();await page.locator('[data-settings-tab="receipt"].active').waitFor();
+ await page.evaluate(async()=>{window.fixtureHoldConfig=true;const {navigate}=await import('/src/router.js');navigate('/admin/settings?tab=contact')});await page.waitForFunction(()=>typeof window.fixtureReleaseConfig==='function');
+ await page.evaluate(async()=>{const {navigate}=await import('/src/router.js');navigate('/admin/customer-support')});await page.getByRole('heading',{name:'New support request'}).waitFor();await page.evaluate(()=>window.fixtureReleaseConfig());await page.waitForTimeout(50);assert.equal(await page.locator('select[data-action="admin-module"]').inputValue(),'customer-support');
+ for(const role of ['Cashier','Technician','Orbito Support']){
+  await page.goto(origin+'/admin/customer-support?fixtureRole='+encodeURIComponent(role));await page.waitForFunction(()=>location.pathname!=='/admin/customer-support');assert.equal(await page.locator('select[data-action="admin-module"] option[value="customer-support"]').count(),0);assert.equal(await page.evaluate(()=>window.fixtureCalls.filter(c=>c.function==='support-tickets').length),0);
+ }
+ await page.goto(origin+'/admin/customer-support?fixtureRole=Business%20Owner&fixtureSuspended=true');await page.locator('#login-form').waitFor();assert.equal(await page.evaluate(()=>window.fixtureCalls.filter(c=>c.function==='support-tickets').length),0);
+ await page.goto(origin+'/login?fixtureAuth=none');await page.locator('#login-form').waitFor();await page.locator('#login-email').fill('owner@example.test');await page.locator('#login-password').fill('SyntheticPassword');
+ await page.locator('#login-email').press('Enter');await page.evaluate(()=>{window.fixtureCaptcha.callback();document.getElementById('login-form').requestSubmit()});await page.waitForTimeout(250);assert.equal(await page.evaluate(()=>window.fixtureCalls.filter(c=>c.function==='login').length),1);
+ assert.equal(await page.locator('#login-btn').getAttribute('type'),'submit');assert.equal(await page.locator('#forgot-btn').getAttribute('type'),'button');
+ await page.evaluate(()=>window.fixtureCaptcha['expired-callback']());await page.locator('#login-password').fill('SyntheticPassword');await page.locator('#login-password').press('Enter');assert.equal(await page.evaluate(()=>window.fixtureCalls.filter(c=>c.function==='login').length),1);
+ await page.evaluate(()=>{window.fixtureLoginSuccess=true;window.fixtureCaptcha.callback()});await page.getByRole('button',{name:'Login',exact:true}).click();await page.waitForURL('**/admin/dashboard');assert.equal(await page.evaluate(()=>window.fixtureCalls.filter(c=>c.function==='login').length),2);
+ await page.evaluate(()=>window.fixtureSetRole('Cashier'));await page.waitForURL('**/pos');assert.equal(await page.locator('select[data-action="admin-module"] option[value="customer-support"]').count(),0);
+ assert.deepEqual(errors,[]);assert.deepEqual(external,[]);console.log('PASS: real Shop entry/router refresh, Owner/Manager Support, denied Cashier/Technician/Support, suspension, query Back/Forward, uncertain-request reload, semantic Enter/inflight single submission; no page errors or external traffic.');
+}finally{await browser?.close();await server.close();}

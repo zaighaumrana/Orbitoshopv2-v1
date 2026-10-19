@@ -1,5 +1,6 @@
 import { createSupportClient } from '../platform/support.js'
 import { supportPage } from './pages/support.js'
+import {readAdminView,saveAdminView,safeAdminState} from './navigation-state.js'
 import { settingsUpdates } from '../settings-data.js'
 import { managedFeatures } from '../onboarding-state.js'
 import { escapeHTML, safeImageURL } from "../html.js"
@@ -72,14 +73,24 @@ let legalStatus = null
 const customerSupport = createSupportClient(sb)
 let resupplyBusy = false
 let _inv = null  // populated via dynamic import only when inventory_module_enabled
+let adminNavigationIsCurrent = () => true
+let adminLoadGeneration = 0
+let restoreScroll = null
+const saveNavigation = () => {
+  if(adminNavigationIsCurrent() && state.role===SESSION.employee?.role)saveAdminView(history,location,SESSION,adminState,window.scrollY)
+}
+window.addEventListener('pagehide',saveNavigation)
+window.addEventListener('scroll',saveNavigation,{passive:true})
 
 /* ── Load ── */
 async function load() {
+  const generation = ++adminLoadGeneration
   const loadSession = SESSION
   const loadPath = window.location.pathname
+  const current = () => generation === adminLoadGeneration && adminNavigationIsCurrent() && SESSION === loadSession && state.role === loadSession.employee?.role && window.location.pathname === loadPath
   dlog('ADMIN.load', `ENTRY adminModule=${adminState.adminModule}`)
   await loadConfig()
-  if (!window.location.pathname.startsWith('/admin') || state.role !== SESSION.employee?.role) return
+  if (!current() || !window.location.pathname.startsWith('/admin')) return
   if (!can(adminState.adminModule, state.role)) {
     state.modal = null
     adminState.adminModule = 'dashboard'
@@ -89,20 +100,26 @@ async function load() {
   }
   if (CFG.inventory_module_enabled && !_inv) {
     _inv = await import('../features/admin/inventory/index.js')
+    if (!current()) return
   }
   const mod = adminState.adminModule
   legalStatus = null
   if (mod === 'settings' && SESSION.employee?.role === 'Business Owner') {
-    try { legalStatus = await readLegalStatus(sb) } catch {}
-    if (SESSION !== loadSession || window.location.pathname !== loadPath) return
+    let result = null
+    try { result = await readLegalStatus(sb) } catch {}
+    if (!current()) return
+    legalStatus = result
   }
   if (mod === 'billing-usage' && can(mod, state.role)) {
-    try { billingResult = await platformBridge.readBilling() }
-    catch { billingResult = { available: false } }
+    let result
+    try { result = await platformBridge.readBilling() }
+    catch { result = { available: false } }
+    if (!current()) return
+    billingResult = result
   }
   if (mod === 'customer-support' && can(mod, state.role)) {
     try { await customerSupport.list(customerSupport.view.offset) } catch(error) { customerSupport.view.error=error.message }
-    if (SESSION !== loadSession || window.location.pathname !== loadPath) return
+    if (!current()) return
   }
   const needs = {
     tickets: CFG.repair_module_enabled && ['dashboard','repairs','reports','receipts'].includes(mod),
@@ -134,7 +151,7 @@ async function load() {
     needs.quickItems ? sb.from('quick_items').select('*').order('sort_order') : skip,
     needs.repairComponents ? sb.from('repair_components').select('*').order('sort_order') : skip,
   ])
-  if (SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== loadPath) return
+  if (!current()) return
   state.data = {
     tickets:          tickets.data          || [],
     sales:            sales.data            || [],
@@ -152,15 +169,17 @@ async function load() {
 
   if (adminState.adminModule === 'ems' && can('ems', state.role)) {
     const { loadEMSData, emsView, attachEMSEvents } = await import('../features/admin/ems/index.js')
-    if (!can('ems', state.role) || window.location.pathname !== '/admin/ems') return
+    if (!current() || !can('ems', state.role) || window.location.pathname !== '/admin/ems') return
     const emsData = await loadEMSData()
+    if (!current()) return
     adminState._emsData = emsData
     adminState._emsHTML = emsView(emsData, SESSION)
     render()
     const app = document.getElementById('app')
     attachEMSEvents(app, () => adminState._emsData, async () => {
-      if (!can('ems', state.role) || window.location.pathname !== '/admin/ems') return
+      if (!current() || !can('ems', state.role) || window.location.pathname !== '/admin/ems') return
       const fresh = await loadEMSData()
+      if (!current()) return
       adminState._emsData = fresh
       adminState._emsHTML = emsView(fresh, SESSION)
       render()
@@ -175,7 +194,7 @@ async function load() {
 let _eventsAttached = false
 
 function render() {
-  if (!window.location.pathname.startsWith('/admin') || state.role !== SESSION.employee?.role) return
+  if (!adminNavigationIsCurrent() || !window.location.pathname.startsWith('/admin') || state.role !== SESSION.employee?.role) return
   dstack('ADMIN.render', `*** #app REWRITE *** adminModule=${adminState.adminModule}`)
   const tenant = currentTenant()
   if (!can(adminState.adminModule, state.role)) adminState.adminModule = 'dashboard'
@@ -234,6 +253,8 @@ function render() {
     const m = document.querySelector('.modal')
     if (m) m.scrollTop = _modalScroll
   }
+  if(restoreScroll!==null){const scroll=restoreScroll;restoreScroll=null;requestAnimationFrame(()=>{if(adminNavigationIsCurrent())window.scrollTo(0,scroll)})}
+  saveNavigation()
 }
 
 function pageContent() {
@@ -752,13 +773,13 @@ function attachEvents() {
 
     if (el.dataset.settingsTab) {
       const { navigate } = await import('../router.js')
-      navigate(`/admin/settings?tab=${el.dataset.settingsTab}`, { replace: true, force: true })
+      navigate(`/admin/settings?tab=${el.dataset.settingsTab}`)
       return
     }
     if (el.dataset.catalogTab) {
       if (el.dataset.catalogTab === 'components' && !CFG.repair_module_enabled) return
       const { navigate } = await import('../router.js')
-      navigate(`/admin/catalog?tab=${el.dataset.catalogTab}`, { replace: true, force: true })
+      navigate(`/admin/catalog?tab=${el.dataset.catalogTab}`)
       return
     }
     if (el.dataset.modal) {
@@ -1433,7 +1454,9 @@ function _addComponentToDraft(name, tag, customText) {
 }
 
 /* ── Public ── */
-export async function initAdmin(sess, module, query) {
+export async function initAdmin(sess, module, query, isCurrent = () => true) {
+  if (!isCurrent()) return
+  adminNavigationIsCurrent = isCurrent
   dlog('ADMIN.initAdmin', `ENTRY module=${module} _eventsAttached=${_eventsAttached} caller=[${callerInfo()}]`)
   SESSION    = sess
   state.role = sess.employee?.role || null
@@ -1444,7 +1467,9 @@ export async function initAdmin(sess, module, query) {
     return
   }
   if (module) adminState.adminModule = module
-  if (module === 'settings' && query?.tab) adminState.settingsTab = query.tab
-  if (module === 'catalog'  && query?.tab) adminState.catalogTab  = query.tab
+  const saved=readAdminView(history,location,sess)
+  if(saved){Object.assign(adminState,saved.values);restoreScroll=saved.scroll}
+  if (module === 'settings') adminState.settingsTab = safeAdminState({settingsTab:query?.tab}).settingsTab || saved?.values.settingsTab || 'branding'
+  if (module === 'catalog') adminState.catalogTab = safeAdminState({catalogTab:query?.tab}).catalogTab || saved?.values.catalogTab || 'quickitems'
   await load()
 }

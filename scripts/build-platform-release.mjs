@@ -1,5 +1,5 @@
 // Local, deterministic, source-only release. Never reads .env or contacts Supabase.
-import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { resolve, relative, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -25,7 +25,7 @@ const functions=['account-admin','login','password-reset-request','public-track'
  const previous=legacy.functions.find(f=>f.name===name && f.source_sha256===sha256);
  return {...fn,sha256,stage_sha256:previous?.stage_sha256 || sha256};
 });
-const migrations=readdirSync(resolve(sourceRoot,'supabase/migrations')).filter(p=>/^\d+_.+\.sql$/.test(p) && (support || !p.endsWith('_customer_support_actor.sql'))).sort().map(file=>{
+const migrations=readdirSync(resolve(sourceRoot,'supabase/migrations')).filter(p=>/^\d+_.+\.sql$/.test(p) && (support || p.split('_')[0]<='20261003121000')).sort().map(file=>{
  const sql=readFileSync(resolve(sourceRoot,'supabase/migrations',file),'utf8').replaceAll('\r\n','\n');return {version:file.split('_')[0],name:file.slice(file.indexOf('_')+1,-4),sql,sha256:sha(sql)};
 });
 const migrationsSha=sha(JSON.stringify(migrations));
@@ -37,8 +37,12 @@ return artifact;
 }
 if(process.argv[1] && resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const support=process.argv.includes('--support');
- const output=resolve(process.argv.slice(2).find(arg=>arg!=='--support') || (support?'../orbito/supabase/releases/shop-release-support-v1.json':'../orbito/supabase/functions/_shared/shop-release.json'));
+ const output=resolve(process.argv.slice(2).find(arg=>arg!=='--support') || (support?'../orbito/supabase/releases/shop-release-support-v2.json':'../orbito/supabase/functions/_shared/shop-release.json'));
  if(support && output===resolve('../orbito/supabase/functions/_shared/shop-release.json'))throw Error('Support release must be staged separately until explicitly approved.');
- const artifact=buildRelease(root,{support});mkdirSync(dirname(output),{recursive:true});writeFileSync(output,JSON.stringify(artifact)+'\n');
+ if(output.endsWith('shop-release-support-v1.json'))throw Error('The reviewed Support v1 candidate is immutable. Build a new version.');
+ if(output===resolve(root,'../orbito/supabase/functions/_shared/shop-release.json')&&existsSync(output))throw Error('The accepted release is frozen. Write a new versioned artifact for owner review.');
+ const artifact=buildRelease(root,{support});
+ if(existsSync(output)&&JSON.parse(readFileSync(output,'utf8')).sha256!==artifact.sha256)throw Error('Existing release fingerprint differs. Choose a new versioned artifact path; pinned packages are immutable.');
+ mkdirSync(dirname(output),{recursive:true});writeFileSync(output,JSON.stringify(artifact)+'\n');
  console.log(`Source-only release: ${artifact.migrations.length} migrations, ${artifact.functions.length} functions, ${artifact.sha256}`);
 }

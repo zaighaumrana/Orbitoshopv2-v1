@@ -1,5 +1,10 @@
 # Owner deployment runbook — verified customer Support v1
 
+**Latest staged workflow:** [SUPPORT_AUTOMATION.md](SUPPORT_AUTOMATION.md) documents
+the immutable Support-v2 candidate, new readiness migration, complete customer
+BYO migration/function installation and hash handoff. The older manual steps
+below are historical/recovery reference. Existing applied migrations stay fixed.
+
 This is a manual handoff, not evidence of deployment. During implementation, neither hosted Supabase project nor Cloudflare was changed. Never run these hosted commands as part of local tests.
 
 ## Review and compatibility gates

@@ -491,3 +491,40 @@ Support ticket/implementation-evidence/STABILIZATION_REPORT.md. Conditional GO f
 owner-controlled additive development deployment after exact dry-run/prerequisites;
 customer use and production remain blocked on real hosted managed/BYO/Auth/gateway,
 deployed-sender inventory and explicit release/closure/acceptance decisions.
+
+## 2026-10-19 — Refresh, semantic login and staged Support integration
+
+Integrated the owner's uncommitted /admin/customer-support route correction.
+The actual entry/router preserves authorized URL/query only after live identity,
+configuration, suspension, onboarding, legal and clock-in gates. Query Back/Forward
+and async navigation/authorization generations prevent stale imports/loads from
+replacing a newer view. Safe scoped history retains whitelisted tabs, receipt
+filters and bounded scroll; transaction drafts/actions are excluded. Login now
+uses one semantic form submission, independent in-flight and Turnstile verified/
+expiry/error guards; auxiliary actions and existing visuals/PWA remain intact.
+
+Attempted uncertain Support requests can recover the same UUID/canonical payload
+from tab storage only after live Auth and actor/source/binding proof. Recovery is
+scoped, expires after six hours and clears on account/role/binding/authorization
+changes, logout or receipt; no JWT/server credential is persisted. Unsent drafts
+remain memory-only. Added a forward-only service readiness RPC requiring a
+confirmed active owner and complete onboarding; old deployed actor SQL is fixed.
+A concrete public-schema SDK type annotation resolves Deno inference errors in
+login without runtime auth changes.
+
+Added customer-authorized full/additive BYO migration/function installation,
+private dedicated Support secret recovery and hash-only operator handoff. Added
+explicit public-input builds and compiled target/digest verification. Accepted
+32/6 and prior 33/7 candidates stay immutable. New inactive Support-v2 is 34/7,
+SHA-256 144d918859db1007cccfbed724d1988a043ca1e5fef42ce694dee6df1a603414.
+
+Local validation: Shop 105/106 (retained frozen-release byte gate), Platform
+320/320, 13 native Support groups plus canonical bootstrap, actual main/router
+login and Support browser regressions, Platform light/dark/mobile visuals, Deno
+checks and actual provider ESZIP bundles. Details: docs/SUPPORT_AUTOMATION.md and
+Support ticket/implementation-evidence/SUPPORT_AUTOMATION_FINAL_HANDOFF.md.
+Owner-reported manual Client 2 success is historical hosted evidence. No hosted
+mutation/deploy/owner reset, promotion, anonymous closure or merge was performed.
+Existing feature branches/Draft PRs target development with CF skip. Fresh
+managed automatic enrollment and genuinely separate-account BYO acceptance remain
+owner-operated after explicit promotion/deployment approval.

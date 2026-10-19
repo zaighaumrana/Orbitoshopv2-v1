@@ -1,5 +1,17 @@
 # Customer Support stabilization validation — 19 October 2026
 
+## Later automation checkpoint — 19 October 2026
+
+The new integration has 105/106 Shop regressions (retained accepted-package byte
+gate only), real main/router refresh and canonical login tests, scoped uncertain
+request reload recovery, source release/BYO planners, all-seven-function Deno
+checks and provider ESZIP bundling. Platform has 320/320 regressions and 13 native
+Support groups. The existing frozen newline baseline remains visible; a separate
+type-only login annotation fix belongs only to the new inactive Support-v2
+candidate. See [Support automation](SUPPORT_AUTOMATION.md) and the local
+`SUPPORT_AUTOMATION_FINAL_HANDOFF.md` evidence report. New hosted managed/BYO
+acceptance and legacy anonymous closure remain separate owner gates.
+
 This ledger supersedes the initial 18 October implementation totals. Both PRs remain Draft/unmerged against development. Platform base: 23a157a5c2aa581eec6e0f02b97318c784296e79; Shop base: f91f02819a9f2909062e36140f1775a870009115. Exact final feature heads are recorded in the PR descriptions and local STABILIZATION_REPORT.md; compare git rev-parse HEAD before manual deployment.
 
 ## Confirmed corrections

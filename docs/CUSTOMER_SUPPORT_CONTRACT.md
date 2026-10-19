@@ -1,5 +1,11 @@
 # Verified customer Support v1
 
+2026-10-19 extension: see [Support automation](SUPPORT_AUTOMATION.md) for the new
+inactive release, customer-local BYO installation, version-2 readiness proof and
+scoped uncertain-request refresh recovery. Unsent drafts remain memory-only;
+the documented live-verified tab recovery supersedes earlier memory-only wording
+for already attempted requests. The ticket wire contract stays v1.
+
 Implementation scope: additive Git source only, paired with Orbitoshopv2-v1's customer Support PR. No hosted changes or provider acceptance are implied. Existing Master Open Shop as Support, financial bridge, POS and onboarding contracts remain separate.
 
 ## Wire contract
