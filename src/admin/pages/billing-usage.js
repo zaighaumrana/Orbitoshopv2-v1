@@ -1,4 +1,5 @@
 import { escapeHTML as esc } from '../../html.js'
+import {paperHistory} from './paper-history.js'
 
 const unavailable = 'Unavailable'
 const amount = (value, currency) => typeof value === 'number' && Number.isFinite(value)
@@ -7,7 +8,7 @@ const amount = (value, currency) => typeof value === 'number' && Number.isFinite
 const count = value => typeof value === 'number' && Number.isFinite(value) ? esc(value.toLocaleString()) : unavailable
 
 export function billingUsagePage(result, busy = false, now = Date.now()) {
-  if (!result?.available) return '<div class="card"><h2>Billing &amp; Usage</h2><p>Unavailable</p><p class="muted">Billing information has not been synced. This does not mean there is no outstanding balance.</p></div>'
+  if (!result?.available) return '<div class="card"><h2>Billing &amp; Usage</h2><p>Unavailable</p><p class="muted">Billing information has not been synced. This does not mean there is no outstanding balance.</p></div>'+paperHistory(result?.paper_requests)
   const p = result.projection
   const synced = Date.parse(result.last_synced_at)
   const published = Date.parse(p.platform_updated_at)
@@ -27,5 +28,5 @@ export function billingUsagePage(result, busy = false, now = Date.now()) {
     <p class="muted">Last synced: ${Number.isFinite(synced) ? esc(new Date(synced).toLocaleString()) : unavailable}</p>
     ${stale ? '<p role="status">Billing information may be out of date.</p>' : ''}
     ${p.paper_resupply_enabled === true ? `<h2>Paper Resupply</h2><button class="primary-button" data-action="paper-resupply" ${busy ? 'disabled' : ''}>${busy ? 'Requesting…' : 'Request Resupply'}</button>` : ''}
-  </div>`
+  </div>${paperHistory(result.paper_requests)}`
 }

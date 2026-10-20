@@ -528,3 +528,51 @@ mutation/deploy/owner reset, promotion, anonymous closure or merge was performed
 Existing feature branches/Draft PRs target development with CF skip. Fresh
 managed automatic enrollment and genuinely separate-account BYO acceptance remain
 owner-operated after explicit promotion/deployment approval.
+
+## 2026-10-20 — Customer-local guided BYO and durable Paper updates
+
+Continued `feature/verified-customer-support-shop` at 5becfae, verified against Draft
+PR1/head. Preserved the owner's sole existing uncommitted CLI correction exactly:
+linked query, explicit project and output-format json. No commit/push/deploy,
+hosted query/write, Auth deletion, credential rotation or production cutover occurred.
+
+Added a guided Node entry reusing the verified installer: native CLI/cache discovery,
+capability/account/pairing/package checks, named-target authorization, private local
+journal/status/lock, atomic exact-source migration recovery, provider write fences,
+observed owner/onboarding waits, automatic public Support target, stable local secret
+and hash handoff. Owner activation and six-step onboarding remain explicit; Completed
+is an identified owner-reported hosted ticket receipt, not fabricated machine proof.
+
+Frozen 34-entry native runs using both actual wrappers initialize correctly.
+An inserted pre-existing Auth identity reproduces the conservative timestamp path,
+but Client3's original trigger is not established without its pre-correction state.
+Added a forward service-only diagnostic and fail-closed pre-secret check; no timestamp
+repair/configuration reset. New separately reviewable Paper SQL/sender/history/UI
+carry customer messages, dates and expectations with source/revision/terminal guards
+and escaped Owner display. Existing additive Support setup preserves base runtime;
+Paper sender rollout for existing Shops requires separate approval.
+
+The owner's active Support-v2 and earlier frozen artifacts remain intact. A new
+inactive, unregistered 36/7 Support-v3 candidate matches source. Future managed
+promotion needs separate compatibility review. Six new native groups and all 13
+existing native Support groups, six guided cases, 52 focused Platform cases, affected
+Deno, explicit builds and actual browser flows pass. Broad Shop 110/111 retains the
+frozen-source equality gate; new candidate parity passes. Platform's initial digest
+stub failure is corrected with real SHA-256 and its SQL subgroup passes 3/3.
+Guides and seven evidence reports record remaining Client4/hosted/Paper/production
+approval gates and exact commands under stabilization-2026-10-20-byo-paper.
+
+## 2026-10-20 — Approved GitHub review checkpoint
+
+The owner explicitly authorized one stabilization commit and push to this existing
+feature branch and its existing Draft PR. This is source-control backup/review only.
+The staged scope is the completed implementation, forward migrations, scripts,
+tests and repository documentation; private settings, pairing files, local journals,
+temporary artifacts and the external evidence directory remain excluded.
+
+No tests, builds, simulations or migrations were rerun for this checkpoint. Earlier
+validation and its recorded limitations remain the evidence of execution. Commit
+messages retain the Cloudflare Pages skip marker. PRs remain Draft/open; no merge,
+hosted Supabase change, Cloudflare deployment, production change or Support-v3
+promotion is authorized. The preceding entry describes the local stabilization
+state before this later source-control authorization.

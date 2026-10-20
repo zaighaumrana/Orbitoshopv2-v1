@@ -40,7 +40,8 @@ test('optional Support package is reproducible, explicit, JWT protected and pres
  assert.ok(future.migrations.some(m=>m.name==='customer_support_actor'));assert.ok(!ordinary.migrations.some(m=>m.name==='customer_support_actor'));
  assert.deepEqual(future,buildRelease(undefined,{support:true}));assert.notEqual(ordinary.sha256,future.sha256);
  for(const fn of future.functions)for(const file of fn.files)assert.equal(file.content,readFileSync(new URL('../supabase/functions/'+file.path,import.meta.url),'utf8').replaceAll('\r\n','\n'));
- assert.deepEqual(JSON.parse(readFileSync(new URL('../../orbito/supabase/releases/shop-release-support-v2.json',import.meta.url),'utf8')),future,'new staged candidate exactly matches current source');
+ assert.deepEqual(JSON.parse(readFileSync(new URL('../../orbito/supabase/releases/shop-release-support-v3.json',import.meta.url),'utf8')),future,'new inactive candidate exactly matches current source');
+ const v2=JSON.parse(readFileSync(new URL('../../orbito/supabase/releases/shop-release-support-v2.json',import.meta.url),'utf8'));assert.equal(v2.sha256,'144d918859db1007cccfbed724d1988a043ca1e5fef42ce694dee6df1a603414');assert.equal(v2.migrations.length,34);
  const v1=JSON.parse(readFileSync(new URL('../../orbito/supabase/releases/shop-release-support-v1.json',import.meta.url),'utf8'));assert.equal(v1.sha256,'0c3298e97a1b9f479170644281499f9e6a0155209eedb9f242b1bcf85c7bcc01');assert.equal(v1.migrations.length,33);
  assert.doesNotMatch(readFileSync(new URL('../src/main.js',import.meta.url),'utf8'),/shop-release-support-v1/);
 });

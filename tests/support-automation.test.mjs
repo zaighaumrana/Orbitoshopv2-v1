@@ -15,8 +15,8 @@ test('release CLI refuses to overwrite the accepted artifact and leaves its exac
 });
 test('customer release planner supports fresh and additive exact histories, and stops gaps, conflicts and untracked schemas',()=>{
  const r=buildRelease(undefined,{support:true}),h=r.migrations.slice(0,32).map(m=>({version:m.version,name:m.name,statements:[m.sql]}));
- assert.equal(planMigrations([],r,'fresh',0).length,34);assert.equal(planMigrations(h,r,'existing',100).length,2);
- assert.equal(planMigrations(h.slice(0,5),r,'fresh',100).length,29,'partial fresh install resumes exact prefix');
+ assert.equal(planMigrations([],r,'fresh',0).length,r.migrations.length);assert.equal(planMigrations(h,r,'existing',100).length,r.migrations.length-32);
+ assert.equal(planMigrations(h.slice(0,5),r,'fresh',100).length,r.migrations.length-5,'partial fresh install resumes exact prefix');
  for(const [history,mode,count] of [[[], 'fresh',1],[h.slice(1),'existing',100],[h.slice(0,4),'existing',100],[[...h,{version:'foreign'}],'existing',100]])assert.throws(()=>planMigrations(history,r,mode,count));
  assert.throws(()=>planMigrations(h.map((m,i)=>i===0?{...m,statements:['conflict']}:m),r,'existing',100));
  assert.match(migrationEnvelope(r.migrations.at(-1)),/pg_advisory_xact_lock\(71390461\)/);assert.match(migrationEnvelope(r.migrations.at(-1)),/schema_migrations/);

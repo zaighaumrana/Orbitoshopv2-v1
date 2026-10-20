@@ -96,9 +96,10 @@ Deno.serve(async req => {
     if (response.resupply_updates != null) {
       if (!Array.isArray(response.resupply_updates) || response.resupply_updates.length > 100) throw new Error('Invalid lifecycle revisions')
       for (const update of response.resupply_updates) {
-        const { error: lifecycleError } = await admin.rpc('bridge_apply_resupply', {
+        const { error: lifecycleError } = await admin.rpc(update.communication == null ? 'bridge_apply_resupply' : 'bridge_apply_resupply_communication', {
           p_source_id: batch.source_id, p_request_id: update.request_id, p_version: update.sync_version,
           p_status: update.status, p_updated_at: update.platform_updated_at,
+          ...(update.communication == null ? {} : { p_communication: update.communication }),
         })
         if (lifecycleError) throw new Error('Lifecycle revision rejected')
       }

@@ -27,7 +27,7 @@ function privatePath(p){
  for(const repo of [root,resolve(root,'../orbito')]){const base=existsSync(repo)?realpathSync(repo):repo;const rel=relative(base,physical);if(!isAbsolute(rel)&&rel!=='..'&&!rel.startsWith('..'+sep))throw Error('Private path resolves inside a repository.');}
  return candidate;
 }
-export async function runSupportSetup(args){
+export async function runSupportSetup(args,deps={}){
  if(args.includes('--help')||!args.length){console.log('Support setup: --config PUBLIC_JSON --action generate|export|prepare|install|verify|status|revoke [--runtime-file PRIVATE_ENV] [--enrollment-file PRIVATE_JSON] [--cli ABSOLUTE_EXE] [--apply]\nConfig: exact platform_ref, project_ref, client_id, source_id, client_binding, public anon shop_public_api_key, stable request_id, pairing_mode, scopes. Master actions read SUPPORT_MASTER_ACCESS_TOKEN and PLATFORM_PUBLIC_API_KEY only from the current process environment. BYO export creates a hash-only enrollment file for a separate Platform operator; the secret and customer Management authority stay local. --apply authorizes remote changes. No SQL or onboarding is replayed.');return;}
  const opt={};for(let i=0;i<args.length;i++){const k=args[i];if(k==='--apply'){opt.apply=true;continue;}if(!['--config','--action','--runtime-file','--enrollment-file','--cli'].includes(k)||!args[i+1]||opt[k])throw Error('Invalid Support setup options.');opt[k]=args[++i];}
  const c=validateConfig(JSON.parse(readFileSync(opt['--config'],'utf8'))),action=opt['--action'];
@@ -49,7 +49,7 @@ export async function runSupportSetup(args){
  if(action==='install'&&c.pairing_mode==='byo'){
   if(!runtime)throw Error('Private runtime file required.');supportEnv(readFileSync(runtime,'utf8'),c);
   const cli=opt['--cli'];if(!cli||!isAbsolute(cli)||!cli.endsWith('.exe'))throw Error('Use an absolute installed Supabase executable.');
-  const invoke=argv=>{const r=spawnSync(cli,argv,{encoding:'utf8',windowsHide:true,timeout:120000});if(r.status!==0)throw Error('CLI operation failed or is uncertain. Retry this same private file and request identity; provider output is suppressed.');return r.stdout;};
+  const invoke=deps.invoke||(argv=>{const r=spawnSync(cli,argv,{encoding:'utf8',windowsHide:true,timeout:120000});if(r.status!==0)throw Error('CLI operation failed or is uncertain. Retry this same private file and request identity; provider output is suppressed.');return r.stdout;});
   if(!invoke(['secrets','set','--help']).includes('--env-file'))throw Error('CLI lacks env-file support.');
   invoke(['secrets','set','--project-ref',c.project_ref,'--env-file',runtime]);console.log('Support settings installed. Master capability verification is still required.');return;
  }
