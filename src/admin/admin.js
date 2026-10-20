@@ -72,6 +72,8 @@ let billingResult = null
 let legalStatus = null
 const customerSupport = createSupportClient(sb)
 let resupplyBusy = false
+let paperObservation = {}
+let paperActor = null
 let _inv = null  // populated via dynamic import only when inventory_module_enabled
 let adminNavigationIsCurrent = () => true
 let adminLoadGeneration = 0
@@ -112,10 +114,11 @@ async function load() {
   }
   if (mod === 'billing-usage' && can(mod, state.role)) {
     let result
-    try { result = await platformBridge.readBilling() }
-    catch { result = { available: false } }
+    try { result = await platformBridge.readBilling(SESSION.authUserId||SESSION.user?.id) }
+    catch { result = null }
     if (!current()) return
-    billingResult = result
+    if(result){billingResult=result;paperObservation={checkedAt:new Date().toISOString(),accepted:paperObservation.accepted&&!result.paper_requests?.some(r=>r.request_id===paperObservation.accepted)?paperObservation.accepted:null}}
+    else paperObservation={...paperObservation,error:true}
   }
   if (mod === 'customer-support' && can(mod, state.role)) {
     try { await customerSupport.list(customerSupport.view.offset) } catch(error) { customerSupport.view.error=error.message }
@@ -259,7 +262,7 @@ function render() {
 
 function pageContent() {
   if (adminState.adminModule === 'customer-support') return adminShell(supportPage(customerSupport.view))
-  if (adminState.adminModule === 'billing-usage') return adminShell(billingUsagePage(billingResult, resupplyBusy))
+  if (adminState.adminModule === 'billing-usage') return adminShell(billingUsagePage(billingResult, resupplyBusy, Date.now(), paperObservation))
   const pages = { dashboard, repairs, inventory, catalog, reports, employees, receipts, settings }
   if (adminState.adminModule === 'ems') {
     return adminShell(adminState._emsHTML || '<div class="empty">Loading EMS…</div>')
@@ -731,17 +734,30 @@ function attachEvents() {
       if (state.modal?.type === 'pinPrompt') { cancelPinPrompt(render); return }
       state.modal = null; render(); return
     }
-    if (el.dataset.action === 'paper-resupply') {
-      if (resupplyBusy || !can('billing-usage', state.role) || billingResult?.projection?.paper_resupply_enabled !== true) return
+    if (['paper-resupply','paper-refresh'].includes(el.dataset.action)) {
+      const submit=el.dataset.action==='paper-resupply'
+      if (resupplyBusy || !can('billing-usage', state.role) || adminState.adminModule!=='billing-usage') return
+      if(submit&&(billingResult?.projection?.paper_resupply_enabled!==true||paperObservation.accepted||billingResult?.paper_requests?.some(r=>['requested','approved','dispatched'].includes(r.status))))return
+      const session=SESSION,path=window.location.pathname
+      const current=()=>SESSION===session&&window.location.pathname===path&&adminNavigationIsCurrent()&&can('billing-usage',state.role)
       resupplyBusy = true; render()
       try {
-        const { data: { user }, error } = await sb.auth.getUser()
-        if (error || !user) throw new Error('Please sign in again.')
-        const result = await platformBridge.requestResupply(user.id)
-        showTransactionSuccess(result.already_active ? 'A resupply request is already pending.' : 'Your resupply request has been received.', 'Paper Resupply')
+        if(submit){
+          const { data: { user }, error } = await sb.auth.getUser()
+          if(!current())return
+          if (error || !user || ((session.authUserId||session.user?.id)&&(session.authUserId||session.user.id)!==user.id)) throw new Error('Please sign in again.')
+          const receipt=await platformBridge.requestResupply(user.id)
+          if(!current())return
+          paperObservation={...paperObservation,accepted:receipt.request_id||true}
+        }
+        try{
+          const result=await platformBridge.readBilling(session.authUserId||session.user?.id)
+          if(!current())return
+          billingResult=result;paperObservation={checkedAt:new Date().toISOString(),accepted:paperObservation.accepted&&!result.paper_requests?.some(r=>r.request_id===paperObservation.accepted)?paperObservation.accepted:null}
+        }catch{if(current())paperObservation={...paperObservation,error:true}}
       } catch (error) {
-        showBlockingError(error.message || 'Could not send your request. Please retry.')
-      } finally { resupplyBusy = false; render() }
+        if(current())showBlockingError('Request outcome is unconfirmed. Retry the original request when connected; its saved identity will be reused.')
+      } finally { if(current()){resupplyBusy = false; render()} }
       return
     }
     if (el.dataset.action === 'print-ticket-slip') {
@@ -1458,7 +1474,11 @@ export async function initAdmin(sess, module, query, isCurrent = () => true) {
   if (!isCurrent()) return
   adminNavigationIsCurrent = isCurrent
   dlog('ADMIN.initAdmin', `ENTRY module=${module} _eventsAttached=${_eventsAttached} caller=[${callerInfo()}]`)
+  const actor=sess.authUserId||sess.user?.id||sess.employee?.auth_user_id||sess.employee?.id||sess.employee?.name
+  const nextActor=JSON.stringify([actor,sess.employee?.role])
+  if(paperActor!==nextActor){billingResult=null;paperObservation={};resupplyBusy=false;paperActor=nextActor}
   SESSION    = sess
+  resupplyBusy=false
   state.role = sess.employee?.role || null
   const requestedModule = module || 'dashboard'
   if (!can(requestedModule, state.role)) {

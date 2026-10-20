@@ -21,7 +21,7 @@ export function planMigrations(history,release,mode,tableCount){
  return release.migrations.slice(rows.length);
 }
 export async function runByoRelease(args,deps={}){
- const opt={};for(let i=0;i<args.length;i++){const k=args[i];if(k==='--apply'){opt.apply=true;continue;}if(!['--phase','--mode','--project-ref','--release-sha','--pairing-file','--runtime-file','--config','--support-file','--enrollment-file','--cli'].includes(k)||!args[i+1]||opt[k])throw Error('Invalid BYO release option.');opt[k]=args[++i];}
+ const opt={};for(let i=0;i<args.length;i++){const k=args[i];if(k==='--apply'){opt.apply=true;continue;}if(!['--phase','--mode','--project-ref','--release-sha','--pairing-file','--runtime-file','--public-config','--config','--support-file','--enrollment-file','--cli'].includes(k)||!args[i+1]||opt[k])throw Error('Invalid BYO release option.');opt[k]=args[++i];}
  const ref=opt['--project-ref'],cli=opt['--cli']||'supabase',root=resolve(import.meta.dirname,'..');
  if(!/^[a-z]{20}$/.test(ref||'')||ref==='kxmovywgshyltwusghhj'||/\.(cmd|bat|ps1)$/i.test(cli))throw Error('Explicit customer project and native Supabase CLI required; Client 1 is protected.');
  const invoke=deps.invoke||((argv)=>{const r=spawnSync(cli,argv,{cwd:root,encoding:'utf8',windowsHide:true,shell:false,timeout:180000,maxBuffer:8*1024*1024});if(r.error||r.status!==0)throw Error('CLI failed or outcome is uncertain. Preserve the same files and operation. Provider output is suppressed.');return r.stdout;});
@@ -42,6 +42,7 @@ export async function runByoRelease(args,deps={}){
   if(!opt['--pairing-file']||!opt['--runtime-file'])throw Error('Separate private pairing and runtime paths required.');
   // Validate local private files and account BEFORE the first migration write.
   const setupArgs=['--project-ref',ref,'--pairing-file',opt['--pairing-file'],'--runtime-file',opt['--runtime-file'],'--cli',cli];
+  if(opt['--public-config'])setupArgs.push('--public-config',opt['--public-config']);
   const setupDeps={invoke:(exe,argv)=>exe==='git'?spawnSync(exe,argv,{cwd:root,encoding:'utf8',windowsHide:true}).stdout:invoke(argv),report,...(deps.fetch?{fetch:deps.fetch}:{})};
   await (deps.setup||runSetup)(setupArgs,setupDeps);
   const ledger=query("select to_regclass('supabase_migrations.schema_migrations') is not null as present");

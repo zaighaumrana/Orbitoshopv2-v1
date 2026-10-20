@@ -7,7 +7,8 @@ import {createHash,randomUUID} from 'node:crypto';
 import {createInterface} from 'node:readline/promises';
 import {fileURLToPath} from 'node:url';
 import {buildRelease} from './build-platform-release.mjs';
-import {parseEnv} from './byo-setup.mjs';
+import {parseEnv,SetupError} from './byo-setup.mjs';
+import {ConfigurationError,validatePublicConfig,validateTurnstileSecret} from './byo-public-config.mjs';
 import {runByoRelease} from './byo-support-release.mjs';
 const root=resolve(import.meta.dirname,'..'),sha=x=>createHash('sha256').update(x).digest('hex');
 export function outsideRepos(path){
@@ -26,6 +27,7 @@ export function nativeCliCandidates(env=process.env,home=homedir()){
  return [...new Set(candidates)].filter(p=>existsSync(p)&&! /\.(cmd|bat|ps1)$/i.test(p));
 }
 export function checkedCli(cli,invoke){
+ if(/\.(cmd|bat|ps1)$/i.test(cli))throw new ConfigurationError('Use the native Supabase executable rather than a shell wrapper.');
  const version=invoke(cli,['--version']).trim();if(!/\b2\.\d+\.\d+\b/.test(version))throw Error('A supported native Supabase CLI v2 is required.');
  for(const [args,flags] of [[['db','query','--help'],['--linked','--project-ref','--file','--output-format']],[['functions','deploy','--help'],['--use-api']],[['secrets','set','--help'],['--env-file']]]){
   const help=invoke(cli,args);if(flags.some(f=>!help.includes(f)))throw Error('CLI lacks required capabilities.');
@@ -46,16 +48,23 @@ export function guardedInvoke(journal,save,invoke,report=()=>{}){
 }
 export async function setupByo(args,deps={}){
  const opt={};for(let i=0;i<args.length;i++){
-  if(['--status','--help','--enroll','--record-acceptance'].includes(args[i])){opt[args[i]]=true;continue;}
-  if(!['--journal','--pairing-file','--runtime-file','--cli','--mode','--config','--confirm-provider-complete'].includes(args[i])||!args[i+1]||opt[args[i]])throw Error('Unknown or duplicate setup option.');opt[args[i]]=args[++i];
+  if(['--status','--help','--login','--enroll','--record-acceptance'].includes(args[i])){opt[args[i]]=true;continue;}
+  if(!['--journal','--pairing-file','--runtime-file','--public-config','--cli','--mode','--config','--confirm-provider-complete'].includes(args[i])||!args[i+1]||opt[args[i]])throw Error('Unknown or duplicate setup option.');opt[args[i]]=args[++i];
  }
  const report=deps.report||console.log;
- if(opt['--help']){report('Run node scripts/setup-byo.mjs from the reviewed Shop checkout. Prompts select private files, verify exact project/package and require named-target authorization. Optional --journal PRIVATE_JSON resumes; --status reads only that local journal. --enroll continues after owner onboarding with a public Support target file. Unknown provider writes require review, then --confirm-provider-complete STEP. Never use a real project for failure tests.');return;}
+ if(opt['--help']){report('Run node scripts/setup-byo.mjs from the reviewed Shop checkout. --login discovers native Supabase CLI and starts customer-account login. Prompts select private files and --public-config PUBLIC_JSON, verify exact project/package and Turnstile separation, and require named-target authorization. Backend preflight is not CAPTCHA proof. Optional --journal PRIVATE_JSON resumes; --status reads only that local journal. --enroll continues after owner onboarding with a public Support target file. Retain original files and request identities. Unknown provider writes require review, then --confirm-provider-complete STEP. Never use a real project for failure tests.');return;}
  const rl=deps.ask?null:createInterface({input:process.stdin,output:process.stdout});
  const ask=deps.ask||(q=>rl.question(q+' '));
  const invoke=deps.invoke||((exe,argv)=>{const r=spawnSync(exe,argv,{cwd:root,encoding:'utf8',shell:false,windowsHide:true,timeout:180000,maxBuffer:8e6});if(r.error||r.status!==0)throw Error('CLI failed; provider output suppressed.');return r.stdout;});
  let lock,ownsLock=false;
  try{
+  if(opt['--login']){
+   let selected=opt['--cli'];if(selected)checkedCli(selected,invoke);else for(const candidate of nativeCliCandidates()){try{checkedCli(candidate,invoke);selected=candidate;break;}catch{}}
+   if(!selected)throw new ConfigurationError('Compatible native Supabase CLI v2 not found. Run npx --yes supabase@2.120.0 --version to install the reviewed tooling, then retry --login.');
+   report('Sign in only with the customer-owned Supabase account. No account token is sent to Platform or saved in the setup journal.');
+   if(deps.invoke)invoke(selected,['login']);else{const result=spawnSync(selected,['login'],{cwd:root,stdio:'inherit',shell:false,windowsHide:true});if(result.error||result.status!==0)throw new ConfigurationError('Customer CLI login did not complete. Retry --login in an interactive terminal.');}
+   return;
+  }
   const journalPath=outsideRepos(opt['--journal']||await ask('Private journal path outside both repositories (reuse this path to resume):'));
   let journal=existsSync(journalPath)?JSON.parse(readFileSync(journalPath,'utf8')):null;
   if(opt['--status']){if(!journal)throw Error('No setup journal exists.');report(JSON.stringify({project:journal.project,client:journal.client,release:journal.release,state:journal.state,steps:journal.steps,acceptance:journal.acceptance},null,2));return journal;}
@@ -74,6 +83,20 @@ export async function setupByo(args,deps={}){
   if(journal?.state==='Completed'){report('Completed (owner-reported hosted acceptance). Use --status to review the local receipt.');return journal;}
   journal||={contract:'retrasell-byo-setup-v1',project,client,release:release.sha256,pairing:pair,runtime,mode:opt['--mode']||await ask('Installation mode: fresh or existing?'),state:'Preflight',steps:{}};
   if(opt['--mode']&&opt['--mode']!==journal.mode)throw Error('Cannot change the saved installation mode.');save();
+  // Older journals may continue owner/Support reconciliation unchanged. Every
+  // base install now requires the explicit public input before any provider write.
+  let publicPath=opt['--public-config']||journal.publicConfig;
+  if(!opt['--enroll']&&!opt['--record-acceptance']&&!['Runtime verified','Waiting for owner','Waiting for onboarding','Support enrollment pending'].includes(journal.state)){
+   publicPath=outsideRepos(publicPath||await ask('Public frontend JSON path (three public fields only; used to compare the Turnstile site key):'));
+   let publicConfig;try{publicConfig=JSON.parse(readFileSync(publicPath,'utf8'))}catch{throw new ConfigurationError('Cannot read the public frontend JSON. Save the three public fields as valid JSON at the supplied path.');}
+   validatePublicConfig(publicConfig,project);
+   const runtimeConfig=parseEnv(readFileSync(runtime,'utf8'),['TURNSTILE_SECRET','PLATFORM_SUPABASE_URL','PLATFORM_SUPABASE_ANON','PLATFORM_AUTH_EMAIL','PLATFORM_SUPPORT_TICKETS_ENDPOINT','PLATFORM_SUPPORT_TICKETS_SECRET']);
+   validateTurnstileSecret(runtimeConfig.values.TURNSTILE_SECRET,publicConfig.VITE_TURNSTILE_SITE_KEY);
+   const publicHash=sha(JSON.stringify(publicConfig));
+   if(journal.publicConfig&&(journal.publicConfig!==publicPath||journal.publicConfigSha256!==publicHash))throw new ConfigurationError('Public configuration changed during this operation. Restore the reviewed file and reconcile the original journal before installing.');
+   journal.publicConfig=publicPath;journal.publicConfigSha256=publicHash;save();
+   report('Static public target and Turnstile separation checked. Real browser CAPTCHA verification remains pending.');
+  }
   let cli=opt['--cli'];if(cli)checkedCli(cli,invoke);else for(const candidate of nativeCliCandidates()){try{checkedCli(candidate,invoke);cli=candidate;break;}catch{}}
   if(!cli)throw Error('Compatible native Supabase CLI not found. Install the official CLI and sign in to the customer account, then resume.');
   const guarded=guardedInvoke(journal,save,argv=>invoke(cli,argv),report);
@@ -114,15 +137,15 @@ export async function setupByo(args,deps={}){
    const supportStep='secrets:'+sha(['secrets','set','--project-ref',project,'--env-file',supportFile].join('\0')).slice(0,16);
    if(journal.steps[supportStep]&&!existsSync(supportFile))throw Error('Original private Support settings are missing. Do not generate a replacement for this operation.');
    common.push('--config',config,'--support-file',supportFile,'--enrollment-file',join(dirname(journalPath),'support-'+project+'-handoff.json'));
-  }else common.push('--pairing-file',pair,'--runtime-file',runtime);
+  }else{common.push('--pairing-file',pair,'--runtime-file',runtime);if(publicPath)common.push('--public-config',publicPath);}
   await core(common,coreDeps);journal.state=opt['--enroll']?'Support enrollment pending':'Ready for installation';save();
   report(`Target: Client #${client} / ${project}. Mode: ${journal.mode}. Exact local release: ${release.sha256}. This checkout may be an unpromoted review candidate; verify its approval before continuing.`);
   if(await ask(`To authorize the displayed package for this named target, type INSTALL ${project}:`)!==`INSTALL ${project}`){report('Stopped after preflight; no installation writes authorized.');return journal;}
   journal.state='Installing';save();await core([...common,'--apply'],coreDeps);
   journal.state=opt['--enroll']?'Support enrollment pending':'Runtime verified';save();
   if(opt['--enroll']){journal.supportInstalled=true;save();report('Hash handoff: '+join(dirname(journalPath),'support-'+project+'-handoff.json')+'. Share only this handoff and the public target, never the private settings.');}
-  report(opt['--enroll']?'Give only the hash handoff and public target to Platform Master for Prepare → verify → enable. Final hosted ticket acceptance is still required.':'Runtime verified. In Platform reserve the owner, create their confirmed Shop Auth account, check activation, then complete the existing six onboarding steps. Resume this journal with --enroll afterward.');
+  report(opt['--enroll']?'Give only the hash handoff and public target to Platform Master for Prepare → verify → enable. Final hosted ticket acceptance is still required.':'Backend runtime preflight verified; CAPTCHA is NOT browser verified. Build and deploy using the same public JSON. In Platform reserve the owner, create their confirmed Shop Auth account, check activation, then complete the existing six onboarding steps using real CAPTCHA. Retain the pairing file securely; resume this journal with --enroll afterward.');
   return journal;
  }catch(e){throw e;}finally{rl?.close();if(ownsLock&&existsSync(lock))unlinkSync(lock);}
 }
-if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))setupByo(process.argv.slice(2)).catch(e=>{console.error(e.message.startsWith('Needs intervention')||e.message.startsWith('Outcome unknown')?e.message:'Setup stopped. Check the exact target, retained files and local journal. Credentials and raw provider output are suppressed.');process.exitCode=1;});
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))setupByo(process.argv.slice(2)).catch(e=>{console.error(e instanceof ConfigurationError||e instanceof SetupError||e.message.startsWith('Needs intervention')||e.message.startsWith('Outcome unknown')?e.message:'Setup stopped. Check the exact target, retained files and local journal. Credentials and raw provider output are suppressed.');process.exitCode=1;});

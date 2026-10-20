@@ -8,7 +8,7 @@ import {runByoRelease} from '../scripts/byo-support-release.mjs';
 import {buildRelease} from '../scripts/build-platform-release.mjs';
 import {paperHistory} from '../src/admin/pages/paper-history.js';
 const ref='abcdefghijklmnopqrst',pairing=`# orbito-project-ref: ${ref}\n# orbito-client-id: 42\nPLATFORM_BRIDGE_CALL_SECRET=${'a'.repeat(64)}\nPLATFORM_BRIDGE_SOURCE_SECRET=${'b'.repeat(64)}\nPLATFORM_BRIDGE_ENDPOINT=https://qrstabcdefghijklmnop.supabase.co/functions/v1/platform-bridge\n`;
-const fixture=()=>{const dir=mkdtempSync(join(tmpdir(),'retrasell-guided-test-')),pair=join(dir,'pair.env'),runtime=join(dir,'runtime.env'),journal=join(dir,'journal.json');writeFileSync(pair,pairing);writeFileSync(runtime,'TURNSTILE_SECRET=synthetic-private\n');return{dir,pair,runtime,journal,args:['--journal',journal,'--pairing-file',pair,'--runtime-file',runtime,'--mode','fresh','--cli',join(dir,'supabase.exe')]};};
+const fixture=()=>{const dir=mkdtempSync(join(tmpdir(),'retrasell-guided-test-')),pair=join(dir,'pair.env'),runtime=join(dir,'runtime.env'),journal=join(dir,'journal.json'),publicFile=join(dir,'public.json');writeFileSync(pair,pairing);writeFileSync(runtime,'TURNSTILE_SECRET=synthetic-private\n');writeFileSync(publicFile,JSON.stringify({VITE_SUPABASE_URL:`https://${ref}.supabase.co`,VITE_SUPABASE_ANON:'x.'+Buffer.from(JSON.stringify({role:'anon',ref,exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')+'.x',VITE_TURNSTILE_SITE_KEY:'synthetic-site'}));return{dir,pair,runtime,journal,publicFile,args:['--journal',journal,'--pairing-file',pair,'--runtime-file',runtime,'--public-config',publicFile,'--mode','fresh','--cli',join(dir,'supabase.exe')]};};
 const cli=(_exe,argv)=>argv[0]==='--version'?'2.120.0':argv.includes('--help')?'--linked --project-ref --file --output-format --use-api --env-file':'[]';
 test('CLI capability discovery includes arbitrary npm cache directories without shell wrappers',()=>{
  const dir=mkdtempSync(join(tmpdir(),'retrasell-cli-test-'));try{const bin=join(dir,'_npx','random-cache-entry','node_modules','@supabase','cli-windows-x64','bin');mkdirSync(bin,{recursive:true});const exe=join(bin,process.platform==='win32'?'supabase.exe':'supabase');writeFileSync(exe,'');assert.ok(nativeCliCandidates({PATH:'',npm_config_cache:dir}).includes(exe));assert.equal(checkedCli(exe,cli),'2.120.0');assert.throws(()=>checkedCli(exe,()=>''));}finally{rmSync(dir,{recursive:true,force:true});}
@@ -55,4 +55,12 @@ test('guided authorized installation advances through observed owner/onboarding 
 });
 test('Shop paper history escapes customer messages, preserves supplied dates and does not invent an ETA',()=>{
  const html=paperHistory([{request_id:'<img src=x>',status:'rejected',requested_at:'2026-10-20',communication:[{status:'rejected',message:'<script>bad()</script>',expectation:'',at:'2026-10-20'}]}]);assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>'));assert.ok(!html.includes('Expected delivery:'));assert.match(html,/Rejected/);assert.match(paperHistory([{status:'fulfilled',communication:[]}]),/earlier update/);
+});
+
+test('guided public/private equality fails before CLI/provider dispatch and preserves a nonsecret journal',async()=>{
+ const f=fixture(),calls=[],reports=[];try{
+  writeFileSync(f.runtime,'TURNSTILE_SECRET=synthetic-site\n');
+  await assert.rejects(()=>setupByo(f.args,{ask:async()=>'',invoke:(...a)=>{calls.push(a);return cli(...a)},report:s=>reports.push(s),run:async()=>{throw Error('must not reach provider')}}),/equals the public/);
+  assert.deepEqual(calls,[]);assert.ok(!reports.join('').includes('synthetic-site'));assert.ok(!readFileSync(f.journal,'utf8').includes('synthetic-site'));
+ }finally{rmSync(f.dir,{recursive:true,force:true});}
 });

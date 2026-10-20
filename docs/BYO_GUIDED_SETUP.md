@@ -1,4 +1,58 @@
-# Customer-operated guided BYO setup — 2026-10-20
+# Customer-operated guided BYO setup — updated 2026-10-21
+
+## Current hardening pass
+
+The Platform's **Complete BYO Setup** screen is the primary twelve-stage operator
+guide: client creation, customer CLI login, pairing, separate public/private files,
+installation, resume, verified build, independent Pages/routing/redirects, confirmed
+owner and six steps, customer Support install, Master verification/ticket acceptance,
+and Paper acceptance. It stays available after business onboarding completes.
+
+Use `npx --yes supabase@2.120.0 --version` to install the reviewed tooling if needed,
+then `node scripts/setup-byo.mjs --login` to discover its native executable and sign
+in with the customer account. The installer does not download tooling itself.
+Account/project visibility is checked again before installation. Platform account
+authority cannot substitute for customer account authority.
+
+Every new base-install wizard operation now requires `--public-config PUBLIC_JSON`
+(or its prompted path). It contains exactly `VITE_SUPABASE_URL`,
+`VITE_SUPABASE_ANON` (the target's unexpired public legacy anon JWT), and
+`VITE_TURNSTILE_SITE_KEY`. Private `TURNSTILE_SECRET` remains in the separate runtime
+file. Equality, public target/role conflicts and common placeholder/testing/unrelated
+credential mistakes stop before provider writes, with fixed errors that omit values.
+The public file path and its configuration digest bind a new operation; secret
+contents/digests are not added to the journal. Older owner/Support reconciliation
+journals keep their original contract, release, UUID and paths.
+
+**Static validation is not CAPTCHA verification.** There is no reliable universal
+private-key format or matching proof from a dummy-token error. No Cloudflare API
+token or external validation request is introduced. Only a real challenge and
+successful login on the allowed hosted hostname verify that flow. The screen and
+installer label backend preflight separately from this acceptance.
+
+Run the existing explicit build with the same public JSON, exact `--project-ref`
+and then `--verify-dist`. Upload only verified dist contents to an independent Pages
+project; preserve `_redirects` and the target receipt. Configure final domain/TLS,
+Turnstile hostname, Supabase Site URL and optional `/invite/accept` redirect. Never
+place private runtime or service-role credentials in VITE/Pages browser inputs.
+
+Retain the original pairing file securely through Support enrollment and unresolved
+recovery. Remove redundant Downloads copies. Cleanup of the final pairing file is
+an explicit retention decision after enrollment, never a prerequisite for it.
+The lower-level `byo-setup.mjs --remove-pairing` is final cleanup only.
+
+Client #4's successful separate-account hosted installation, tickets and paper
+acceptance are now **owner-reported** in the Oct 21 request. The historical pending
+checkpoint below is superseded by that report. This pass performed no hosted
+mutations and does not independently claim that acceptance. Use a fresh client and
+project for the next acceptance; do not reset Client #4.
+
+Support-v3's existing 36/7 package and fingerprints remain unchanged: this pass
+changes scripts/frontend only on the Shop side. The managed pointer remains v2.
+New evidence is isolated under the Oct 20 evidence folder in
+`hardening-2026-10-21`. No deployment, promotion, commit or push is authorized here.
+
+## Historical Oct 20 checkpoint
 
 This is a local, uncommitted implementation awaiting owner review. The active
 Platform package remains Support-v2. Support-v3 is an **inactive 36-migration,

@@ -576,3 +576,33 @@ messages retain the Cloudflare Pages skip marker. PRs remain Draft/open; no merg
 hosted Supabase change, Cloudflare deployment, production change or Support-v3
 promotion is authorized. The preceding entry describes the local stabilization
 state before this later source-control authorization.
+
+## 2026-10-21 — BYO key separation and recoverable Paper status
+
+Branch: feature/verified-customer-support-shop.
+
+Added customer-local static Turnstile checks and an explicit public JSON input
+before new wizard base installations. Wrong project/anon role, public/private
+equality, placeholders/testing/unrelated credentials fail with fixed value-free
+errors. Native CLI login is discoverable without a fixed npm-cache path. Backend
+preflight is explicitly separate from real browser CAPTCHA acceptance. Existing
+release identities, private files, journal reconciliation and Support UUIDs remain
+intact; retain pairing through enrollment/recovery rather than deleting it early.
+
+Paper UI disables new submissions while Requested/Approved/Dispatched, reloads
+after a receipt, offers explicit refresh and shows local pending versus evidenced
+Platform updates. Failed refresh retains same-account observations and acknowledged
+submission blocking; account changes clear cached views and delayed responses are
+discarded. Only an exact authenticated status-read acknowledgement clears a lost
+response's saved request ID. Unknown IDs and other actors' retries remain intact.
+No polling, accounting changes, migrations or packaged Shop function edits.
+
+Validation: Shop broad regression initially 116/117; the inherited test comparing
+an old frozen package to newer source was corrected to assert frozen byte/internal
+integrity and exact separate v3 source parity, then its five-group subset passed.
+Platform 324/324, six native PG17/Auth groups, copied on-screen wizard walkthrough,
+actual paper browser lifecycle/offline/reload/account-change checks and both clean
+public builds/digest/stale-target refusal passed. Evidence: the preserved Oct 20
+folder's new hardening-2026-10-21 subfolder. Client #4 success is owner-reported;
+next fresh hosted acceptance is pending. No commit/push/deploy, hosted change,
+release promotion or stable customer credential/journal mutation occurred.
