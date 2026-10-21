@@ -9,6 +9,7 @@ import {fileURLToPath} from 'node:url';
 import {buildRelease} from './build-platform-release.mjs';
 import {runSetup,parseEnv} from './byo-setup.mjs';
 import {runSupportSetup,validateConfig,supportEnv} from './support-setup.mjs';
+import {validShopProject} from './byo-identity.mjs';
 const sha=s=>createHash('sha256').update(s).digest('hex');
 const literal=s=>"'"+s.replaceAll("'","''")+"'";
 export function migrationEnvelope(m){return `begin;set local statement_timeout='25s';select pg_advisory_xact_lock(71390461);create schema if not exists supabase_migrations;create table if not exists supabase_migrations.schema_migrations(version text primary key,statements text[],name text);do $release$ begin if exists(select 1 from supabase_migrations.schema_migrations where version=${literal(m.version)}) then if not exists(select 1 from supabase_migrations.schema_migrations where version=${literal(m.version)} and name=${literal(m.name)} and encode(extensions.digest(replace(array_to_string(statements,E'\\n'),E'\\r\\n',E'\\n'),'sha256'),'hex')=${literal(m.sha256)}) then raise exception 'Migration source conflict';end if;else execute ${literal(m.sql.replace(/^\s*(begin|commit);\s*$/gmi,''))};insert into supabase_migrations.schema_migrations(version,name,statements) values(${literal(m.version)},${literal(m.name)},array[${literal(m.sql)}]);end if;end $release$;commit;`}
@@ -23,7 +24,7 @@ export function planMigrations(history,release,mode,tableCount){
 export async function runByoRelease(args,deps={}){
  const opt={};for(let i=0;i<args.length;i++){const k=args[i];if(k==='--apply'){opt.apply=true;continue;}if(!['--phase','--mode','--project-ref','--release-sha','--pairing-file','--runtime-file','--public-config','--config','--support-file','--enrollment-file','--cli'].includes(k)||!args[i+1]||opt[k])throw Error('Invalid BYO release option.');opt[k]=args[++i];}
  const ref=opt['--project-ref'],cli=opt['--cli']||'supabase',root=resolve(import.meta.dirname,'..');
- if(!/^[a-z]{20}$/.test(ref||'')||ref==='kxmovywgshyltwusghhj'||/\.(cmd|bat|ps1)$/i.test(cli))throw Error('Explicit customer project and native Supabase CLI required; Client 1 is protected.');
+ if(!validShopProject(ref)||/\.(cmd|bat|ps1)$/i.test(cli))throw Error('Explicit eligible customer project and native Supabase CLI required; historical protected projects are excluded.');
  const invoke=deps.invoke||((argv)=>{const r=spawnSync(cli,argv,{cwd:root,encoding:'utf8',windowsHide:true,shell:false,timeout:180000,maxBuffer:8*1024*1024});if(r.error||r.status!==0)throw Error('CLI failed or outcome is uncertain. Preserve the same files and operation. Provider output is suppressed.');return r.stdout;});
  const report=deps.report||console.log;
  const projects=JSON.parse(invoke(['projects','list','--output','json']));

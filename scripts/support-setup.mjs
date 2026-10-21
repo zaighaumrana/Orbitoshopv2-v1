@@ -5,10 +5,11 @@ import {resolve,relative,isAbsolute,sep} from 'node:path';
 import {randomBytes,createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {validClientId,validShopProject} from './byo-identity.mjs';
 export function validateConfig(c){
  if(!c||Object.keys(c).some(k=>!['platform_ref','project_ref','client_id','source_id','client_binding','shop_public_api_key','request_id','pairing_mode','scopes'].includes(k))
   || ![c.platform_ref,c.project_ref].every(v=>/^[a-z]{20}$/.test(v))||c.platform_ref===c.project_ref
-  || c.project_ref==='kxmovywgshyltwusghhj'||!Number.isSafeInteger(c.client_id)||c.client_id<=1
+  || !validShopProject(c.project_ref)||!Number.isSafeInteger(c.client_id)||!validClientId(c.client_id)
   || ![c.source_id,c.request_id].every(v=>/^[0-9a-f-]{36}$/i.test(v||''))
   || !['managed','byo'].includes(c.pairing_mode)||typeof c.client_binding!=='string'||!c.client_binding||c.client_binding.length>200
   || !Array.isArray(c.scopes)||!c.scopes.length||c.scopes.some(s=>!['ticket:create','ticket:read'].includes(s)))throw Error('Invalid exact Support target configuration.');

@@ -3,6 +3,7 @@ import {resolve,dirname,relative,isAbsolute,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {ConfigurationError,validatePublicConfig,validateTurnstileSecret} from './byo-public-config.mjs';
+import {validClientId,validShopProject} from './byo-identity.mjs';
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const FUNCTIONS=['login','account-admin','verify-pin','password-reset-request','public-track','platform-bridge'];
 const REQUIRED=['migrations','database_privileges','rpc_privileges','sequence_privileges','private_config','storage','database_reachable','bridge_configuration','edge_functions','runtime_configuration','authentication'];
@@ -22,8 +23,8 @@ export function parseEnv(text,allowed){
  return {values,metadata};
 }
 export function validateInputs(ref,pairing,runtime,publicConfig){
- if(!/^[a-z]{20}$/.test(ref)||ref==='kxmovywgshyltwusghhj')fail('Choose a new test/customer project; Client 1 is protected.');
- if(pairing.metadata['project-ref']!==ref || !/^[1-9][0-9]*$/.test(pairing.metadata['client-id']||'') || pairing.metadata['client-id']==='1')fail('Pairing file target metadata does not match this new client/project. Download it again from Platform.');
+ if(!validShopProject(ref))fail('Choose the exact eligible customer project; historical protected projects are excluded.');
+ if(pairing.metadata['project-ref']!==ref || !validClientId(pairing.metadata['client-id']))fail('Pairing file target metadata does not match this customer/project. Compare the original Platform package; do not regenerate it to bypass a mismatch.');
  const p=pairing.values;
  if(!/^[a-f0-9]{64}$/.test(p.PLATFORM_BRIDGE_CALL_SECRET||'')||!/^[a-f0-9]{64}$/.test(p.PLATFORM_BRIDGE_SOURCE_SECRET||'')||p.PLATFORM_BRIDGE_CALL_SECRET===p.PLATFORM_BRIDGE_SOURCE_SECRET)fail('Two valid, distinct bridge credentials are required.');
  let endpoint;try{endpoint=new URL(p.PLATFORM_BRIDGE_ENDPOINT);}catch{fail('Invalid Platform bridge destination.');}

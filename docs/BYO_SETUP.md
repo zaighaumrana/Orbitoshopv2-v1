@@ -1,4 +1,11 @@
-# Brand-new cross-account BYO Shop setup
+# Legacy cross-account BYO Shop setup reference
+
+**Historical procedure:** use [BYO_GUIDED_SETUP.md](BYO_GUIDED_SETUP.md) for new
+coordinated installations and recovery. The older branch/manual deployment and
+pairing-removal sequence below is retained as history, not current instructions.
+Numerical Client 1 is no longer an exclusion; the historical protected project
+remains excluded by exact project identity. Do not follow this legacy sequence
+to install or reset the new Client 1.
 
 **Current staged Support release (2026-10-19):** use
 [SUPPORT_AUTOMATION.md](SUPPORT_AUTOMATION.md) and

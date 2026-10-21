@@ -1,189 +1,181 @@
-# Customer-operated guided BYO setup — updated 2026-10-21
+# Customer-operated BYO setup — authoritative procedure, 2026-10-21
 
-## Current hardening pass
+Use the reviewed Shop checkout and Platform Client Detail → **Resume BYO Setup**.
+The Platform presents the original twelve stages one at a time. Its saved
+acknowledgments are not installation receipts. The customer-side journal remains
+authoritative for local operations; Platform cannot read it. This document replaces
+the older branch/manual deployment sequence in `BYO_SETUP.md`.
 
-The Platform's **Complete BYO Setup** screen is the primary twelve-stage operator
-guide: client creation, customer CLI login, pairing, separate public/private files,
-installation, resume, verified build, independent Pages/routing/redirects, confirmed
-owner and six steps, customer Support install, Master verification/ticket acceptance,
-and Paper acceptance. It stays available after business onboarding completes.
-
-Use `npx --yes supabase@2.120.0 --version` to install the reviewed tooling if needed,
-then `node scripts/setup-byo.mjs --login` to discover its native executable and sign
-in with the customer account. The installer does not download tooling itself.
-Account/project visibility is checked again before installation. Platform account
-authority cannot substitute for customer account authority.
-
-Every new base-install wizard operation now requires `--public-config PUBLIC_JSON`
-(or its prompted path). It contains exactly `VITE_SUPABASE_URL`,
-`VITE_SUPABASE_ANON` (the target's unexpired public legacy anon JWT), and
-`VITE_TURNSTILE_SITE_KEY`. Private `TURNSTILE_SECRET` remains in the separate runtime
-file. Equality, public target/role conflicts and common placeholder/testing/unrelated
-credential mistakes stop before provider writes, with fixed errors that omit values.
-The public file path and its configuration digest bind a new operation; secret
-contents/digests are not added to the journal. Older owner/Support reconciliation
-journals keep their original contract, release, UUID and paths.
-
-**Static validation is not CAPTCHA verification.** There is no reliable universal
-private-key format or matching proof from a dummy-token error. No Cloudflare API
-token or external validation request is introduced. Only a real challenge and
-successful login on the allowed hosted hostname verify that flow. The screen and
-installer label backend preflight separately from this acceptance.
-
-Run the existing explicit build with the same public JSON, exact `--project-ref`
-and then `--verify-dist`. Upload only verified dist contents to an independent Pages
-project; preserve `_redirects` and the target receipt. Configure final domain/TLS,
-Turnstile hostname, Supabase Site URL and optional `/invite/accept` redirect. Never
-place private runtime or service-role credentials in VITE/Pages browser inputs.
-
-Retain the original pairing file securely through Support enrollment and unresolved
-recovery. Remove redundant Downloads copies. Cleanup of the final pairing file is
-an explicit retention decision after enrollment, never a prerequisite for it.
-The lower-level `byo-setup.mjs --remove-pairing` is final cleanup only.
-
-Client #4's successful separate-account hosted installation, tickets and paper
-acceptance are now **owner-reported** in the Oct 21 request. The historical pending
-checkpoint below is superseded by that report. This pass performed no hosted
-mutations and does not independently claim that acceptance. Use a fresh client and
-project for the next acceptance; do not reset Client #4.
-
-Support-v3's existing 36/7 package and fingerprints remain unchanged: this pass
-changes scripts/frontend only on the Shop side. The managed pointer remains v2.
-New evidence is isolated under the Oct 20 evidence folder in
-`hardening-2026-10-21`. No deployment, promotion, commit or push is authorized here.
-
-## Historical Oct 20 checkpoint
-
-This is a local, uncommitted implementation awaiting owner review. The active
-Platform package remains Support-v2. Support-v3 is an **inactive 36-migration,
-7-function candidate**, fingerprint
+This source checkpoint does not authorize customer installation or hosted changes.
+The managed pointer remains Support-v2; the separate unchanged Support-v3 candidate
+contains 36 migrations and 7 functions, fingerprint
 `f3fb64e51f1d07c536c626acd33b0e05b98b4fe5a22c3a7c3ff1a02a6a9e5bfd`.
-Approval of this candidate and the exact hosted target must precede installation.
-No promotion or deployment was performed during this pass.
+Approve the exact package and target separately before installation. Never repin
+an unresolved operation or use a database reset as recovery.
 
-## Customer journey
+## Prepare customer-side files and tooling
 
-1. Use the reviewed Shop checkout, Node.js 22 or newer, and an installed native
-   Supabase CLI v2 signed in to the **customer's** account. CLI 2.120.0 was inspected.
-   Discovery checks PATH and npm's configured cache, including arbitrary `_npx`
-   entries. Nothing is downloaded or installed automatically.
-2. Download the exact client's pairing file from Platform. Keep it outside both
-   repositories, along with a separate private runtime file containing only the
-   supported entries, including `TURNSTILE_SECRET`. Use a folder accessible only
-   to the authorized operator. Windows inherits the folder's ACL; POSIX writes
-   request mode 0600. Never put secrets in command arguments or VITE variables.
-3. From the Shop folder run:
-
-   ```powershell
-   node scripts/setup-byo.mjs
-   ```
-
-   Choose a journal filename in that existing private folder, the pairing and
-   runtime files, and `fresh` or `existing`. The exact Client ID/project comes
-   from pairing metadata. The wizard checks CLI capabilities, account project
-   visibility, package/source fingerprint and exact migration history. It prints
-   the target, mode, release and missing migration count. It does not install
-   anything unless the operator enters the complete named-target authorization
-   shown at the prompt. Declining stops after preflight.
-4. The customer CLI installs migrations, secrets and functions. Migration SQL and
-   its original history source commit atomically under a transaction advisory
-   lock. Existing installations must have at least the exact approved 32-entry
-   prefix and the same client/binding. Existing mode leaves ownership, pairing,
-   base runtime secrets and base functions intact; it installs forward SQL and
-   the optional Support function. The new paper bridge sender needs a separately
-   approved targeted `platform-bridge` update for existing Shops.
-5. In Platform, reserve the owner with the existing Provision Shop action. Create
-   their confirmed Auth account directly in the Shop Dashboard, check activation,
-   and let the owner complete the existing six-step setup. No owner password is
-   collected by Platform or this wizard.
-6. Resume with the same journal after owner setup:
-
-   ```powershell
-   node scripts/setup-byo.mjs --journal "PRIVATE_FOLDER\setup.json" --enroll
-   ```
-
-   Read-only observation distinguishes waiting for owner, waiting for onboarding
-   and Support enrollment pending. The wizard creates the exact **public** Support
-   target automatically from the Shop source/binding and pairing destination. It
-   retains one UUID, one private Support settings file, and one hash-only handoff.
-   An optional existing public target can be supplied with `--config`.
-7. Give only `support-PROJECT-handoff.json` and `support-target-PROJECT.json` to
-   the Platform Master. The Master uses Customer Support → Prepare & verify
-   Support with the hash file and the Shop's public anon JWT. Keep the `.env`
-   settings, customer CLI authority, DB password and service keys customer-side.
-   Master capability proof/enabling stays in the existing authenticated Platform
-   flow; customer Management authority is never sent to Platform.
-8. Perform the real Shop ticket → Platform resolution → Shop refresh acceptance.
-   Optionally record that **owner-reported** result locally:
-
-   ```powershell
-   node scripts/setup-byo.mjs --journal "PRIVATE_FOLDER\setup.json" --record-acceptance
-   ```
-
-   This asks for the public test-ticket UUID and a named-project confirmation.
-   `Completed` is explicitly an owner-reported receipt, not an automated hosted
-   verification claim. Support pending alone never means accepted.
-
-## Status, interruption and recovery
+Use Node.js 22.12+ (or Node.js 24) and a native Supabase CLI v2 with the checked capabilities. The
+reviewed CLI is 2.120.0. These checks contain no credentials:
 
 ```powershell
-node scripts/setup-byo.mjs --journal "PRIVATE_FOLDER\setup.json" --status
+node --version
+npm --version
+npx --yes supabase@2.120.0 --version
+node scripts/setup-byo.mjs --login
 ```
 
-Status reads only the local journal and makes no CLI/network calls. Ordinary
-re-entry repeats preflight, verifies the same target/package/files and retains
-completed provider steps. The journal contains public identifiers, package hash,
-private-file paths, state and step outcomes; no file contents, tokens, credential
-hashes or passwords. Never edit it to bypass a conflict. Keep the original private
-files unchanged while an operation is unresolved.
+The last command starts interactive login to the authorized customer account only.
+The coordinator discovers native executables in PATH/npm cache and checks version,
+db query, API function deployment and env-file capabilities. Project visibility is
+checked before installation; visibility alone does not prove write authority.
+An explicit native executable can be supplied using `--cli`.
 
-Migration interruption is reconciled through the exact source ledger. A timeout
-does not justify a replacement identity or a reset. Replaying the same atomic
-envelope waits for the original transaction lock, then checks the recorded source.
+Create an existing private folder outside both repositories. On Windows, use folder
+Properties → Security → Advanced to restrict inherited access to the authorized
+operator (and required system administrators). Check the resulting ACL before
+saving secrets; POSIX mode 0600 is not a Windows ACL guarantee. Avoid shared/synced
+folders and remove redundant Downloads copies. Keep original files throughout
+recovery and optional Support enrollment; do not delete pairing early.
 
-Function and secret writes are fenced **before** dispatch. A running/unknown step
-blocks automatic replay even after process restart. Review the exact provider
-operation and confirm it has finished with the intended artifact/settings. Only
-then use:
+Download the exact client's pairing file. It contains generated project/client
+metadata and bridge credentials. Match it to the independent intended target in
+Platform; never edit or regenerate it to bypass a mismatch. Positive Client IDs,
+including a legitimate new Client 1 after Platform reset, are supported. The old
+protected project `kxmovywgshyltwusghhj` remains blocked by exact project identity.
+Platform and Shop must be different Supabase projects.
+
+In Notepad, create `runtime.env` in that private folder. Use Save as type **All
+files** so it is not saved as `runtime.env.txt`. Paste the one-line template and
+replace the placeholder locally with the customer's own server-side widget secret:
+
+```env
+TURNSTILE_SECRET=REPLACE_WITH_CUSTOMER_PRIVATE_TURNSTILE_SECRET
+```
+
+Use unquoted `NAME=value`, no prose. Never upload the real file or secret to
+Platform, GitHub or public Cloudflare/Vite configuration. Do not echo values into
+commands. Never use a site key, CLI token, service key or testing secret instead.
+
+Separately create `public-shop.json` with exactly these three public fields:
+
+```json
+{
+  "VITE_SUPABASE_URL": "https://NEW_SHOP_REF.supabase.co",
+  "VITE_SUPABASE_ANON": "REPLACE_WITH_TARGET_PUBLIC_ANON_JWT",
+  "VITE_TURNSTILE_SITE_KEY": "REPLACE_WITH_CUSTOMER_PUBLIC_SITE_KEY"
+}
+```
+
+The anon JWT must be unexpired, role anon and bound to that ref. The installer
+checks target, public/private separation and common credential mistakes. Static
+checks do not prove the widget key pair or successful browser CAPTCHA.
+
+## Install and resume
+
+Replace the example Client ID/ref with the independently reviewed Platform target:
 
 ```powershell
-node scripts/setup-byo.mjs --journal "PRIVATE_FOLDER\setup.json" --confirm-provider-complete "STEP_FROM_STATUS"
+node scripts/setup-byo.mjs --journal "PRIVATE_FOLDER\journal.json" --client-id 1 --project-ref NEW_SHOP_REF --pairing-file "PRIVATE_FOLDER\orbito-shop-pairing.env" --runtime-file "PRIVATE_FOLDER\runtime.env" --public-config "PRIVATE_FOLDER\public-shop.json" --mode fresh
 ```
 
-The wizard requires a named project/step confirmation. This records an operator
-attestation, then retains that step without sending it again. If the provider
-cannot prove completion, keep Needs intervention; do not acknowledge speculatively
-or generate replacement secrets. Runtime verification still follows reconciliation.
-A leftover `.lock` is removed manually only after confirming the earlier process
-has stopped. A second process cannot remove another process's lock.
+Explicitly review **fresh** versus **existing**. Fresh requires an empty eligible
+project or the exact resumable installation prefix. Existing requires original
+pairing/binding and at least the exact approved migration prefix; it preserves
+ownership, base runtime secrets/functions and installs approved forward changes.
+Existing-Shop Paper sender updates require separate targeted rollout approval.
 
-## Fresh initialization uncertainty
+Preflight checks pairing/client/project, manifest fingerprint, CLI/account and
+exact migration provenance. Installation writes require the full named
+`INSTALL <project-ref>` prompt. Declining performs no installation writes. Pairing,
+runtime paths, mode, release and request identities stay bound to the journal.
 
-The frozen 34-entry package produced a neutral pending Shop in native PG17 using
-both actual migration envelopes. A pre-existing Auth identity before onboarding-v2
-reproduces the timestamp/owner-reservation error by deliberately failing the strict
-pristine predicate. There is no retained pre-correction Client #3 snapshot proving
-which predicate failed there. No automatic timestamp reset is implemented.
+```powershell
+node scripts/setup-byo.mjs --journal "PRIVATE_FOLDER\journal.json" --status
+node scripts/setup-byo.mjs --journal "PRIVATE_FOLDER\journal.json"
+```
 
-The new forward migration is a service-only diagnostic guard and does not mutate
-configuration, ownership, users or timestamps. The installer stops before runtime
-credentials if fresh initialization is ambiguous. The managed path now also checks
-the timestamp before preparing pairing/secrets and revalidates source history even
-when an aggregate migration stage was previously passed.
+Status is local-only, value-free and makes no provider call. Resume retains the
+original files and completed steps. Migration SQL/history commit atomically under
+an advisory lock; exact replay observes original provenance rather than adopting
+unrelated schema. Backend runtime success is separate from frontend deployment.
 
-## Client #4 approval checkpoint
+Failures emit `retrasell-byo-diagnostic-v1`: fixed phase/category, completed checks,
+provider writes none/possible/confirmed, journal existence and safe next action.
+Categories distinguish configuration, identity, release, mode, CLI availability/
+authorization, history, provider, unknown writes, interruption, lock and journal.
+No raw provider errors, tokens or private file values are printed.
 
-Target is Client 4, project `mincersddxuaqojczcih`, binding `orbito-client-4`,
-intended UI `https://retrabyo.ahwad.com`. It belongs to a separate customer account.
-No new hosted read/write was performed. Before installation approve the exact
-candidate, preserved package checksums, local changes and this named target.
-The command above is the entry point; a native npm-cache executable path or a
-manually constructed migration command is no longer required.
+Before journal creation, fix the identified input/tooling/path problem and retry
+with the original pairing and exact target. When a journal exists, inspect status
+and resume it. Do not replace a journal, rotate stable credentials or reset a Shop.
+A leftover `.lock` may be removed manually only after confirming the earlier
+process stopped; another running process's lock must remain intact.
 
-Paper rollout is separate: review/apply the additive Shop SQL and compatible
-Shop bridge sender before the Platform SQL/UI begins sending communication.
-New candidate installation includes the sender. Existing-Shop additive Support
-setup deliberately does not redeploy base functions. Promotion into managed jobs
-requires a separate registry/pin/automation compatibility review: this candidate
-is not registered as active and the existing promotion utility must not be used
-to infer authorization for it.
+Unknown function/secret writes are fenced before dispatch and never auto-replayed.
+Review authoritative provider completion for the exact project/artifact/settings.
+Only with confirmed completion, retain a non-secret public receipt identifier and:
+
+```powershell
+node scripts/setup-byo.mjs --journal "PRIVATE_FOLDER\journal.json" --confirm-provider-complete "STEP_FROM_STATUS" --provider-reference PUBLIC_RECEIPT_ID
+```
+
+The ID is 5–100 letters/numbers/hyphens, never a credential, URL or file content.
+Named project/step confirmation records an operator attestation, not automatic
+provider proof. If completion cannot be established, remain Needs intervention.
+Elapsed time is not proof. Do not forge a receipt to unlock a step.
+
+## Independent frontend and core acceptance
+
+Build using the same public JSON, then verify the exact dist receipt/digest:
+
+```powershell
+node scripts/build-verified.mjs --config "PRIVATE_FOLDER\public-shop.json" --project-ref NEW_SHOP_REF
+node scripts/build-verified.mjs --config "PRIVATE_FOLDER\public-shop.json" --project-ref NEW_SHOP_REF --verify-dist
+```
+
+After separately authorized independent Pages deployment, check SPA `_redirects`,
+login/onboarding/optional invite routes, domain/TLS, Supabase Site URL/redirects and
+Turnstile allowed hostname. Never deploy private files as browser assets.
+
+Reserve the exact owner through Platform. Create one confirmed Auth account in
+the customer's Shop Dashboard with that reserved normalized email. Passwords stay
+in Shop Auth. Check existing identities before retrying an uncertain creation.
+Use Check Owner Account, then real CAPTCHA/login and all six onboarding steps.
+Manual owner creation and optional invitation delivery are separate choices.
+
+Core BYO readiness does **not** require Support. After those actual checks:
+
+```powershell
+node scripts/setup-byo.mjs --journal "PRIVATE_FOLDER\journal.json" --record-acceptance --acceptance core
+```
+
+The coordinator checks owner/onboarding/exact binding read-only and asks for
+`CORE ACCEPT <project-ref>`. The receipt is explicitly owner-reported. It leaves
+the journal resumable for optional Support and never claims machine CAPTCHA proof.
+
+## Optional Support and Paper
+
+```powershell
+node scripts/setup-byo.mjs --journal "PRIVATE_FOLDER\journal.json" --enroll
+```
+
+Original owner/onboarding/binding must be ready. Retain the stable public target
+UUID, private customer Support settings and hash-only handoff. Give only the
+public target and hash handoff to Platform Master; never private Support settings.
+Master Prepare → verify → enable remains separately authorized. BYO ticket
+enrollment does not grant managed-only Open Shop as Support permission.
+After real Shop ticket → Platform resolution → Shop refresh acceptance:
+
+```powershell
+node scripts/setup-byo.mjs --journal "PRIVATE_FOLDER\journal.json" --record-acceptance --acceptance support
+```
+
+This requires the public ticket UUID and named acceptance. Completed is an
+owner-reported Support receipt, not automated hosted acceptance. Paper acceptance
+is separate: request, customer-visible decision/expectation, dispatch, delivery and
+refresh; printing/thermal accounting remains independent of Paper enablement.
+
+Historical Oct20–21 evidence remains preserved outside Git. Former Client4 success
+was owner-reported; it does not prove installation in the new Client1 project.
+No customer checkout/private file is modified by this development pass.

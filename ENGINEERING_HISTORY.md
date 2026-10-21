@@ -606,3 +606,38 @@ public builds/digest/stale-target refusal passed. Evidence: the preserved Oct 20
 folder's new hardening-2026-10-21 subfolder. Client #4 success is owner-reported;
 next fresh hosted acceptance is pending. No commit/push/deploy, hosted change,
 release promotion or stable customer credential/journal mutation occurred.
+
+## 2026-10-21 — Customer identity and installer reliability checkpoint
+
+Branch: feature/verified-customer-support-shop; starting HEAD 3ddf5d5f9b3e.
+
+The earlier numeric Client1 exclusions conflated a former protected installation
+with a legitimate first client after Platform reset. Shared validation now accepts
+positive database IDs including 1, retains the exact historical protected project,
+and independently compares intended client/project against pairing and journal.
+The Support target validator had a third numeric exclusion and is corrected too.
+No customer's private files were inspected or modified and no live install ran.
+
+The coordinator emits fixed, value-free phase/category/check/write-state recovery
+diagnostics. Original release, pairing, paths, mode, locks, migration provenance,
+request IDs and uncertain-write fences remain authoritative. Provider completion
+requires explicit review, public receipt ID and named confirmation. Installer
+diagnostics conservatively retain possible writes for interrupted/malformed journals
+even when failure occurs before release validation. Core acceptance
+is separately owner-reported without requiring optional Support, leaving the same
+journal resumable. Help and authoritative BYO guidance cover private runtime
+template, Windows ACLs, tooling, exact target/mode, recovery, verified frontend,
+manual owner and optional Support/ticket/Paper acceptance.
+
+Compatible Vite8.2.4/source-map-js1.2.2 patches remove the two current Shop findings;
+final public audit reports zero vulnerabilities. Complete Shop regression passes
+122/122, replacing the historical 116/117 plus corrected subset limitation. Final
+commit-specific cross-repository native/browser/build evidence is external under
+coordinated-wizards-2026-10-21. Shop source appearance, migrations/functions,
+36/7 candidate fingerprint and managed release pointer remain unchanged. The legacy
+bridge SQL test now checks unavailable state and empty requests while accepting the
+additive Paper response field; its financial authorization assertions remain intact.
+
+Commit/push to existing Draft PR1 against development is authorized; all new
+commits use [CF-Pages-Skip] prefix. Actual Cloudflare skip confirmation remains
+pending provider access. No merge, hosted mutation, deployment or promotion.

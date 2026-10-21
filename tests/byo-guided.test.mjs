@@ -8,7 +8,7 @@ import {runByoRelease} from '../scripts/byo-support-release.mjs';
 import {buildRelease} from '../scripts/build-platform-release.mjs';
 import {paperHistory} from '../src/admin/pages/paper-history.js';
 const ref='abcdefghijklmnopqrst',pairing=`# orbito-project-ref: ${ref}\n# orbito-client-id: 42\nPLATFORM_BRIDGE_CALL_SECRET=${'a'.repeat(64)}\nPLATFORM_BRIDGE_SOURCE_SECRET=${'b'.repeat(64)}\nPLATFORM_BRIDGE_ENDPOINT=https://qrstabcdefghijklmnop.supabase.co/functions/v1/platform-bridge\n`;
-const fixture=()=>{const dir=mkdtempSync(join(tmpdir(),'retrasell-guided-test-')),pair=join(dir,'pair.env'),runtime=join(dir,'runtime.env'),journal=join(dir,'journal.json'),publicFile=join(dir,'public.json');writeFileSync(pair,pairing);writeFileSync(runtime,'TURNSTILE_SECRET=synthetic-private\n');writeFileSync(publicFile,JSON.stringify({VITE_SUPABASE_URL:`https://${ref}.supabase.co`,VITE_SUPABASE_ANON:'x.'+Buffer.from(JSON.stringify({role:'anon',ref,exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')+'.x',VITE_TURNSTILE_SITE_KEY:'synthetic-site'}));return{dir,pair,runtime,journal,publicFile,args:['--journal',journal,'--pairing-file',pair,'--runtime-file',runtime,'--public-config',publicFile,'--mode','fresh','--cli',join(dir,'supabase.exe')]};};
+const fixture=()=>{const dir=mkdtempSync(join(tmpdir(),'retrasell-guided-test-')),pair=join(dir,'pair.env'),runtime=join(dir,'runtime.env'),journal=join(dir,'journal.json'),publicFile=join(dir,'public.json');writeFileSync(pair,pairing);writeFileSync(runtime,'TURNSTILE_SECRET=synthetic-private\n');writeFileSync(publicFile,JSON.stringify({VITE_SUPABASE_URL:`https://${ref}.supabase.co`,VITE_SUPABASE_ANON:'x.'+Buffer.from(JSON.stringify({role:'anon',ref,exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')+'.x',VITE_TURNSTILE_SITE_KEY:'synthetic-site'}));return{dir,pair,runtime,journal,publicFile,args:['--client-id','42','--project-ref',ref,'--journal',journal,'--pairing-file',pair,'--runtime-file',runtime,'--public-config',publicFile,'--mode','fresh','--cli',join(dir,'supabase.exe')]};};
 const cli=(_exe,argv)=>argv[0]==='--version'?'2.120.0':argv.includes('--help')?'--linked --project-ref --file --output-format --use-api --env-file':'[]';
 test('CLI capability discovery includes arbitrary npm cache directories without shell wrappers',()=>{
  const dir=mkdtempSync(join(tmpdir(),'retrasell-cli-test-'));try{const bin=join(dir,'_npx','random-cache-entry','node_modules','@supabase','cli-windows-x64','bin');mkdirSync(bin,{recursive:true});const exe=join(bin,process.platform==='win32'?'supabase.exe':'supabase');writeFileSync(exe,'');assert.ok(nativeCliCandidates({PATH:'',npm_config_cache:dir}).includes(exe));assert.equal(checkedCli(exe,cli),'2.120.0');assert.throws(()=>checkedCli(exe,()=>''));}finally{rmSync(dir,{recursive:true,force:true});}
@@ -25,8 +25,8 @@ test('guided preflight declines without writes, local-only status, exact-target 
   await setupByo(f.args,deps);assert.equal(calls.length,1);assert.ok(!calls[0].includes('--apply'));
   const j=JSON.parse(readFileSync(f.journal));assert.equal(j.state,'Ready for installation');assert.ok(!JSON.stringify(j).includes('synthetic-private'));
   await setupByo(['--journal',f.journal,'--status'],{invoke:()=>{throw Error('must not contact CLI')},report:()=>{},ask:async()=>''});
-  writeFileSync(f.journal+'.lock','other process');await assert.rejects(()=>setupByo(f.args,deps),/EEXIST/);assert.ok(existsSync(f.journal+'.lock'));rmSync(f.journal+'.lock');
-  writeFileSync(f.pair,pairing.replace(ref,'bcdefghijklmnopqrstu'));await assert.rejects(()=>setupByo(f.args,deps),/target, release/);
+  writeFileSync(f.journal+'.lock','other process');await assert.rejects(()=>setupByo(f.args,deps),e=>e.diagnostic.category==='lock');assert.ok(existsSync(f.journal+'.lock'));rmSync(f.journal+'.lock');
+  writeFileSync(f.pair,pairing.replace(ref,'bcdefghijklmnopqrstu'));await assert.rejects(()=>setupByo(f.args,deps),e=>e.diagnostic.category==='identity');
   assert.throws(()=>outsideRepos(new URL('../scripts/byo-release-manifest.json',import.meta.url).pathname.replace(/^\/([A-Z]:)/,'$1')),/outside both/);
  }finally{rmSync(f.dir,{recursive:true,force:true});}
 });
@@ -60,7 +60,7 @@ test('Shop paper history escapes customer messages, preserves supplied dates and
 test('guided public/private equality fails before CLI/provider dispatch and preserves a nonsecret journal',async()=>{
  const f=fixture(),calls=[],reports=[];try{
   writeFileSync(f.runtime,'TURNSTILE_SECRET=synthetic-site\n');
-  await assert.rejects(()=>setupByo(f.args,{ask:async()=>'',invoke:(...a)=>{calls.push(a);return cli(...a)},report:s=>reports.push(s),run:async()=>{throw Error('must not reach provider')}}),/equals the public/);
+  await assert.rejects(()=>setupByo(f.args,{ask:async()=>'',invoke:(...a)=>{calls.push(a);return cli(...a)},report:s=>reports.push(s),run:async()=>{throw Error('must not reach provider')}}),e=>e.diagnostic.category==='configuration');
   assert.deepEqual(calls,[]);assert.ok(!reports.join('').includes('synthetic-site'));assert.ok(!readFileSync(f.journal,'utf8').includes('synthetic-site'));
  }finally{rmSync(f.dir,{recursive:true,force:true});}
 });

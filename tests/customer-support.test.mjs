@@ -66,7 +66,7 @@ test('split-operator BYO export shares only a hash and exact target metadata, wi
 test('a customer with only a Shop checkout can generate private BYO settings without a sibling Platform checkout',async()=>{
  const dir=mkdtempSync(join(tmpdir(),'support-export-'));
  try{
-  const scripts=join(dir,'shop','scripts');mkdirSync(scripts,{recursive:true});const copied=join(scripts,'support-setup.mjs');writeFileSync(copied,readFileSync(new URL('../scripts/support-setup.mjs',import.meta.url),'utf8'));
+  const scripts=join(dir,'shop','scripts');mkdirSync(scripts,{recursive:true});const copied=join(scripts,'support-setup.mjs');writeFileSync(copied,readFileSync(new URL('../scripts/support-setup.mjs',import.meta.url),'utf8'));writeFileSync(join(scripts,'byo-identity.mjs'),readFileSync(new URL('../scripts/byo-identity.mjs',import.meta.url),'utf8'));
   const standalone=await import(pathToFileURL(copied).href),config=join(dir,'target.json'),runtime=join(dir,'private.env');
   writeFileSync(config,JSON.stringify({platform_ref:'ukbhyerxshteyetwomqy',project_ref:'tufvoxxlgfydoknxczoy',client_id:42,source_id:id,request_id:sid,client_binding:'fixture',pairing_mode:'byo',scopes:['ticket:create','ticket:read']}));
   await standalone.runSupportSetup(['--config',config,'--action','generate','--runtime-file',runtime]);assert.match(readFileSync(runtime,'utf8'),/^PLATFORM_SUPPORT_TICKETS_SECRET=[a-f0-9]{64}\n/);
