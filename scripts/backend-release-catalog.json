@@ -10,5 +10,9 @@
   "f3fb64e51f1d07c536c626acd33b0e05b98b4fe5a22c3a7c3ff1a02a6a9e5bfd": {
     "release_id": "support-v3",
     "migrations": 36
+  },
+  "f5295937f06e45177190bedebf19a54c86fd067d03785365a393e3de269e062f": {
+    "release_id": "support-v4",
+    "migrations": 37
   }
 }

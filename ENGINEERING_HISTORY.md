@@ -681,3 +681,19 @@ require another immutable version. Preserve older packages and original job pins
 Owner-authorized migrations/functions/frontend deployment, effective hosted hook
 verification, two fresh customer acceptances and final security review remain.
 Legacy anonymous Platform intake stays a compatibility-gated release blocker.
+
+## 2026-10-22 — Final immutable shared backend release metadata
+Branch: feature/verified-customer-support-shop
+
+After backend implementation commit 089fd7870f9f0665e35674bf7b8db9fd190f1509,
+built NEW support-v4: 37 migrations/7 functions, SHA-256
+`f5295937f06e45177190bedebf19a54c86fd067d03785365a393e3de269e062f`. Both provisioning selectors now reference
+that exact package; previous packages/fingerprints and original pins remain.
+Manifest approved-shared records the completed backend commit. Final parity
+verification compares every embedded migration/source hash against committed
+backend Git blobs; existing v2 additive preservation and trusted consent checks
+passed locally. See coordinated Platform docs/Release-parity.md and
+docs/Release-parity-acceptance.md. No packaged backend changed after this build.
+No deployment/merge/customer acceptance occurred. Effective hosted hook checks,
+fresh Managed/BYO acceptance, historical sender compatibility before anonymous
+closure, and final security review remain gates.
