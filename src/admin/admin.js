@@ -89,7 +89,8 @@ async function load() {
   const generation = ++adminLoadGeneration
   const loadSession = SESSION
   const loadPath = window.location.pathname
-  const current = () => generation === adminLoadGeneration && adminNavigationIsCurrent() && SESSION === loadSession && state.role === loadSession.employee?.role && window.location.pathname === loadPath
+  const navigationIsCurrent=adminNavigationIsCurrent
+  const current = () => generation === adminLoadGeneration && navigationIsCurrent() && SESSION === loadSession && state.role === loadSession.employee?.role && window.location.pathname === loadPath
   dlog('ADMIN.load', `ENTRY adminModule=${adminState.adminModule}`)
   await loadConfig()
   if (!current() || !window.location.pathname.startsWith('/admin')) return
@@ -123,6 +124,10 @@ async function load() {
   if (mod === 'customer-support' && can(mod, state.role)) {
     try { await customerSupport.list(customerSupport.view.offset) } catch(error) { customerSupport.view.error=error.message }
     if (!current()) return
+    if(SESSION.employee?.role==='Business Owner'){
+      try{await customerSupport.consents()}catch(error){if(current())customerSupport.view.error=error.message}
+      if(!current())return
+    }
   }
   const needs = {
     tickets: CFG.repair_module_enabled && ['dashboard','repairs','reports','receipts'].includes(mod),
@@ -261,7 +266,7 @@ function render() {
 }
 
 function pageContent() {
-  if (adminState.adminModule === 'customer-support') return adminShell(supportPage(customerSupport.view))
+  if (adminState.adminModule === 'customer-support') return adminShell(supportPage(customerSupport.view,SESSION.employee?.role==='Business Owner'))
   if (adminState.adminModule === 'billing-usage') return adminShell(billingUsagePage(billingResult, resupplyBusy, Date.now(), paperObservation))
   const pages = { dashboard, repairs, inventory, catalog, reports, employees, receipts, settings }
   if (adminState.adminModule === 'ems') {
@@ -715,6 +720,12 @@ function attachEvents() {
       '[data-mark-not-needed],[data-subinv-comp-remove],[data-add-draft-comp-name],[data-tag-select]'
     )
     if (!el) return
+    if(el.dataset.action==='support-consent-revoke'){
+      if(SESSION.employee?.role!=='Business Owner'||customerSupport.view.busy)return
+      const nav=adminNavigationIsCurrent;customerSupport.view.busy=true
+      try{await customerSupport.consents('revoke',{p_consent:el.dataset.consentId})}catch(error){if(nav())customerSupport.view.error=error.message}
+      finally{if(nav()){customerSupport.view.busy=false;render()}}return
+    }
     if (el.dataset.action?.startsWith('customer-support-')) {
       if (!can('customer-support',state.role)||customerSupport.view.busy)return
       const session=SESSION,path=window.location.pathname,v=customerSupport.view
@@ -738,8 +749,8 @@ function attachEvents() {
       const submit=el.dataset.action==='paper-resupply'
       if (resupplyBusy || !can('billing-usage', state.role) || adminState.adminModule!=='billing-usage') return
       if(submit&&(billingResult?.projection?.paper_resupply_enabled!==true||paperObservation.accepted||billingResult?.paper_requests?.some(r=>['requested','approved','dispatched'].includes(r.status))))return
-      const session=SESSION,path=window.location.pathname
-      const current=()=>SESSION===session&&window.location.pathname===path&&adminNavigationIsCurrent()&&can('billing-usage',state.role)
+      const session=SESSION,path=window.location.pathname,navigationIsCurrent=adminNavigationIsCurrent
+      const current=()=>SESSION===session&&window.location.pathname===path&&navigationIsCurrent()&&can('billing-usage',state.role)
       resupplyBusy = true; render()
       try {
         if(submit){
@@ -1342,6 +1353,13 @@ function attachEvents() {
     const type = form.dataset.form
     dlog('ADMIN.submit', `ENTRY form.dataset.form=${type}`)
 
+    if(type==='support-consent'){
+      if(SESSION.employee?.role!=='Business Owner'||customerSupport.view.busy)return
+      const nav=adminNavigationIsCurrent;customerSupport.view.busy=true;render()
+      try{await customerSupport.consents('approve',{p_case:data.ticket_id,p_purpose:data.purpose,p_confirmation:data.confirmation})}
+      catch(error){if(nav())customerSupport.view.error=error.message}
+      finally{if(nav()){customerSupport.view.busy=false;render()}}return
+    }
     if (type === 'customer-support') {
       if(!can('customer-support',state.role)||customerSupport.view.busy)return
       const session=SESSION,path=window.location.pathname,v=customerSupport.view

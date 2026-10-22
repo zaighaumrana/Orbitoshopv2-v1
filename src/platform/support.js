@@ -7,8 +7,8 @@ export function createSupportClient(sb, options={}) {
  const recoverable=!!storage&&!!sb.auth.getUser&&!!sb.rpc;
  const recovery=recoveryStore(storage,options.now);
  const identityOf=s=>{try{const c=JSON.parse(atob(s.access_token.split('.')[1].replaceAll('-','+').replaceAll('_','/')));return s.user.id+':'+c.session_id;}catch{return null;}};
- const view={tickets:[],offset:0,has_more:false,detail:null,error:'',busy:false,pending:null,draft:{subject:'',category:'technical',message:''},receipt:null};
- function reset(clear=true){epoch++;scope=null;if(clear)recovery.clear();Object.assign(view,{tickets:[],offset:0,has_more:false,detail:null,error:'',busy:false,pending:null,draft:{subject:'',category:'technical',message:''},receipt:null});}
+ const view={tickets:[],offset:0,has_more:false,detail:null,error:'',busy:false,pending:null,draft:{subject:'',category:'technical',message:''},receipt:null,access:null,accessPending:null};
+ function reset(clear=true){epoch++;scope=null;if(clear)recovery.clear();Object.assign(view,{tickets:[],offset:0,has_more:false,detail:null,error:'',busy:false,pending:null,draft:{subject:'',category:'technical',message:''},receipt:null,access:null,accessPending:null});}
  async function session(){const {data}=await sb.auth.getSession();const s=data?.session;
   // Refreshes preserve session_id; no JWT is retained as application state.
   const identity=identityOf(s);
@@ -42,6 +42,7 @@ export function createSupportClient(sb, options={}) {
   return data;
  }
  return {view,reset,
+  async consents(action='list',args={}){await session();if(action==='approve'){if(!view.accessPending&&(typeof args.p_purpose!=='string'||args.p_purpose.trim().length<20||args.p_purpose.trim().length>400||/[\x00-\x1f\x7f]/.test(args.p_purpose)||args.p_confirmation!=='AUTHORIZE SUPPORT'))throw Error('Describe the purpose in 20–400 characters and type AUTHORIZE SUPPORT.');view.accessPending||={...args,p_request:crypto.randomUUID()};args=view.accessPending}const identity=owner,generation=epoch;const {data,error}=await sb.rpc('support_consent',{p_action:action,...args});if(error)throw Error('Owner approval could not be confirmed. Check the case and sign-in, then refresh access history.');await session();if(identity!==owner||generation!==epoch)return;view.access=data;if(action==='approve')view.accessPending=null;},
   async list(offset=0){await session();const result=await call({action:'list',offset});Object.assign(view,{tickets:result.tickets,offset,has_more:result.has_more,detail:null});},
   async get(ticket_id){view.detail=(await call({action:'get',ticket_id})).ticket;},
   async create(){await session();if(!view.pending)view.pending={action:'create',request_id:crypto.randomUUID(),subject:view.draft.subject.trim(),category:view.draft.category,message:view.draft.message.trim()};

@@ -119,6 +119,11 @@ z-index:100
   turnstileVerified = false
 
   if (btn) btn.disabled = true
+  const siteKey=import.meta.env.VITE_TURNSTILE_SITE_KEY
+  if(typeof siteKey!=='string'||!/^[A-Za-z0-9_-]{10,200}$/.test(siteKey)||/^(?:[123]x0+|replace|your|example)/i.test(siteKey)){
+    if(wrap)wrap.textContent='Shop verification is not configured. Ask the Shop administrator to set the public Turnstile site key and rebuild this website.'
+    return
+  }
 
   _turnstileWidgetId = null
   _turnstileContainer = wrap
@@ -128,9 +133,7 @@ z-index:100
     if (generation !== _turnstileGeneration || !wrap?.isConnected) return
     if (window.turnstile) {
       _turnstileWidgetId = window.turnstile.render(wrap, {
-        sitekey:
-          import.meta.env.VITE_TURNSTILE_SITE_KEY ||
-          '0x4AAAAAADl87EDGnxcg5eJZ',
+        sitekey: siteKey,
 
         theme: 'dark',
 

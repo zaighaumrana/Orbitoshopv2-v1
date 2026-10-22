@@ -36,9 +36,13 @@ export function diagnosticFor(error,context={}){
   else if(/^(Customer CLI account cannot access|Current Supabase CLI account cannot access)/.test(error?.message||''))category='cli_authorization';
   else if(/^(Compatible native|A supported native|CLI lacks|Installed Supabase CLI lacks)/.test(error?.message||''))category='cli_unavailable';
   else if(['ConfigurationError','SetupError'].includes(error?.constructor?.name))category='configuration';
+  else if(/^(CLI failed or outcome is uncertain|Unrecognized CLI query output)/.test(error?.message||''))category=context.writes==='possible'?'unknown_write':'provider';
+  else if(/^(Original private Support settings are missing|Private journal path|Separate private pairing)/.test(error?.message||''))category='configuration';
+  else if(/^Existing Shop requires the dedicated additive upgrade/.test(error?.message||''))category='prerequisites';
   else category='internal';
  }
- const [message,next_action]=catalog[category];
+ const [message,recovery]=catalog[category];
+ const next_action=/^Existing Shop requires the dedicated additive upgrade/.test(error?.message||'')?'Use docs/Existing-shop-upgrade.md to review the exact source/target with the original customer authorization. Keep setup and enrollment journals unchanged.':recovery;
  return {contract:'retrasell-byo-diagnostic-v1',phase:context.phase||'arguments',category,message,
   completed_checks:(context.checks||[]).filter(x=>['journal','pairing_identity','release','public_configuration','cli','preflight','installation','owner_onboarding'].includes(x)),
   provider_writes:context.writes||'none',journal_exists:context.journalExists===true,next_action};

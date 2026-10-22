@@ -1,0 +1,14 @@
+{
+  "7f8e4cd5614a4b19e155f5114d49517dddb6c9c2ef7d62a2bc71e3927d97c940": {
+    "release_id": "accepted-v1",
+    "migrations": 32
+  },
+  "144d918859db1007cccfbed724d1988a043ca1e5fef42ce694dee6df1a603414": {
+    "release_id": "support-v2",
+    "migrations": 34
+  },
+  "f3fb64e51f1d07c536c626acd33b0e05b98b4fe5a22c3a7c3ff1a02a6a9e5bfd": {
+    "release_id": "support-v3",
+    "migrations": 36
+  }
+}

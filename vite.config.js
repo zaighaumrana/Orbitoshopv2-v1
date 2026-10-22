@@ -1,3 +1,4 @@
+import {validatePublicConfig} from './scripts/byo-public-config.mjs'
 import { defineConfig, loadEnv } from 'vite'
 import { readFileSync } from 'node:fs'
 import { PRODUCT_NAME, SHORT_BRAND_NAME } from './src/config/brand.js'
@@ -17,6 +18,10 @@ export default defineConfig(({mode}) => {
     buildStart() {
       const missing=['VITE_SUPABASE_URL','VITE_SUPABASE_ANON','VITE_TURNSTILE_SITE_KEY'].filter(k=>!(process.env[k]||env[k])?.trim());
       if(missing.length)throw new Error('Shop browser configuration missing: '+missing.join(', '));
+      const config=Object.fromEntries(['VITE_SUPABASE_URL','VITE_SUPABASE_ANON','VITE_TURNSTILE_SITE_KEY'].map(k=>[k,process.env[k]||env[k]]));
+      const ref=/^https:\/\/([a-z]{20})\.supabase\.co$/.exec(config.VITE_SUPABASE_URL)?.[1];
+      if(!ref)throw Error('Exact customer Supabase URL required');
+      validatePublicConfig(config,ref);
     },
     transformIndexHtml: { order: 'pre', handler: html => html.replaceAll('%PRODUCT_NAME%', escapeHTML(PRODUCT_NAME)) },
     configureServer(server) {

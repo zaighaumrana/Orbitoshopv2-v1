@@ -40,6 +40,7 @@ export async function runByoRelease(args,deps={}){
   const observed=query("select sc.onboarding_completed_at is not null as onboarded,sc.platform_client_id,bc.client_binding,bc.source_id,(public.bridge_runtime_preflight()->>'owner_account') as owner_account from public.shop_config sc cross join app_private.bridge_config bc where sc.id=1 and bc.singleton")?.[0];
   return observed;
  }else if(opt['--phase']==='install'){
+  if(opt['--mode']==='existing')throw Error('Existing Shop requires the dedicated additive upgrade workflow; original setup/enrollment journals remain unchanged.');
   if(!opt['--pairing-file']||!opt['--runtime-file'])throw Error('Separate private pairing and runtime paths required.');
   // Validate local private files and account BEFORE the first migration write.
   const setupArgs=['--project-ref',ref,'--pairing-file',opt['--pairing-file'],'--runtime-file',opt['--runtime-file'],'--cli',cli];

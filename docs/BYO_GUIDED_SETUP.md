@@ -1,4 +1,12 @@
-# Customer-operated BYO setup — authoritative procedure, 2026-10-21
+# Customer-operated BYO setup — authoritative procedure, 2026-10-22
+
+Current milestone: both fresh provisioning paths select the final shared release
+recorded in `scripts/byo-release-manifest.json` (approved-shared). Earlier v2/v3
+references below describe their checkpoints. Existing Shops must use
+[the dedicated additive upgrade](Existing-shop-upgrade.md), which updates all
+required functions before optional enrollment. Existing-mode installation now
+stops rather than applying SQL without the matching functions. Preserve interrupted
+jobs' original release checkout and journals; never repin them to this release.
 
 Use the reviewed Shop checkout and Platform Client Detail → **Resume BYO Setup**.
 The Platform presents the original twelve stages one at a time. Its saved

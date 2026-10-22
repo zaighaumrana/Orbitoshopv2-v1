@@ -1,3 +1,4 @@
+import {supportSessionAllowed} from '../_shared/support-consent.ts'
 import { runtimeProbe } from '../_shared/runtime-preflight.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.108.2'
 
@@ -60,6 +61,7 @@ async function context(req: Request) {
     .eq('auth_user_id', userData.user.id)
     .single()
   if (callerError || !caller || caller.status !== 'Active') return null
+  if(!await supportSessionAllowed(admin,token,userData.user.id,caller.role))return null
   const { data: shop, error: shopError } = await admin.from('shop_config').select('suspended').eq('id', 1).single()
   if (shopError || !shop) return null
   if (shop.suspended && caller.role !== 'Orbito Support') return null

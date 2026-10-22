@@ -641,3 +641,43 @@ additive Paper response field; its financial authorization assertions remain int
 Commit/push to existing Draft PR1 against development is authorized; all new
 commits use [CF-Pages-Skip] prefix. Actual Cloudflare skip confirmation remains
 pending provider access. No merge, hosted mutation, deployment or promotion.
+
+## 2026-10-22 — Coordinated final stabilization and owner support consent
+Branch: feature/verified-customer-support-shop
+
+### Purpose / changed
+Complete S-01/02/03 and the Shop side of shared backend parity before independent
+fresh Managed/BYO acceptance. Removed the hard-coded Turnstile fallback, aligned
+build validators, completed fixed/redacted diagnostics and captured immutable
+Paper navigation ownership. Added a dedicated additive v1/v2 backend upgrader with
+separate customer-CLI/Managed Master authorization, exact provenance, immutable
+journals, all-function deployment and uncertain-provider fencing. Existing-mode
+setup stops instead of claiming SQL-only upgrade completion.
+
+### Security / decisions
+A forward migration introduces explicit owner approval for a verified Support case,
+purpose/scope/actor/time, a 30-minute single-session authorization, append-only
+history and revocation. Ticket creation does not authorize access. The login binds
+consent before returning tokens; Data API pre-request enforcement, restrictive RLS
+and privileged Edge checks reject revoked/expired/unbound Support sessions.
+Existing custom hooks fail closed for manual composition. BYO managed handoff
+remains prohibited; canonical Master and one-time capability boundaries remain.
+
+### Validation / impact
+Four focused Shop tests passed (Turnstile, diagnostics, stale Paper response and
+upgrade uncertainty/provenance). Targeted Docker PostgreSQL checks passed for the
+forward chain, existing-v2 owner/reservation/data/PIN/Vault preservation, owner vs
+Manager authority, case attestation, idempotent approval, one-session binding,
+replay denial, expiry and revocation. Changed Edge entrypoints type-check with Deno;
+explicit synthetic-public production build passed. These are local checks, not
+hosted Auth/provider/customer acceptance. No hosted changes or production deployment.
+
+### Release / deferred
+All packaged backend changes are complete in this implementation commit. Build a
+NEW immutable shared release from this committed source afterward; do not reuse or
+rewrite v3. Final selectors/fingerprint are recorded in the following metadata
+commit and coordinated Platform release documentation. Future packaged changes
+require another immutable version. Preserve older packages and original job pins.
+Owner-authorized migrations/functions/frontend deployment, effective hosted hook
+verification, two fresh customer acceptances and final security review remain.
+Legacy anonymous Platform intake stays a compatibility-gated release blocker.

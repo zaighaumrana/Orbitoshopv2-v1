@@ -2,6 +2,8 @@ export const RUNTIME_CONTRACT = 'orbito-onboarding-runtime-v1'
 export const REQUIRED_FUNCTIONS = ['login','account-admin','verify-pin','password-reset-request','public-track']
 
 export async function runtimeProbe(req: Request, name: string, required: string[]) {
+  // Public version attestation only; no configuration or operation authority.
+  if(req.method==='POST'&&req.headers.get('x-retrasell-support-policy')==='v1')return Response.json({contract:'retrasell-owner-consent-v1',function:name},{headers:{'Cache-Control':'no-store'}})
   if (!req.headers.has('x-orbito-preflight')) return null
   const supplied = req.headers.get('x-orbito-preflight') || ''
   const expected = Deno.env.get('PLATFORM_BRIDGE_CALL_SECRET') || ''

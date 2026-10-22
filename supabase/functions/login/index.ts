@@ -277,6 +277,7 @@ async function bootstrapSupportSession(
   platformUserId: string,
   platformEmail: string,
   userAgent: string | null,
+  consentId: string,
 ) {
   const supportEmail = clientSupportEmail()
   let profile = await findSupportProfile(admin)
@@ -349,6 +350,13 @@ async function bootstrapSupportSession(
     return { ok: false, error: 'Support session could not be created.' }
   }
 
+  // Binding happens before any token is returned to the browser. Old/unbound
+  // Support sessions cannot pass the request hook or privileged Edge checks.
+  let sessionId:string;
+  try{sessionId=JSON.parse(atob(verified.session.access_token.split('.')[1].replaceAll('-','+').replaceAll('_','/'))).session_id}
+  catch{return {ok:false,error:'Support session identity unavailable.'}}
+  const bound=await admin.rpc('support_consent_bind',{p_consent:consentId,p_actor:profile.auth_user_id,p_session:sessionId,p_platform_actor:platformUserId})
+  if(bound.error)return {ok:false,error:'Owner support approval expired, revoked or already used. Ask the owner for a new approval.'}
   const { error: auditError } = await admin.from('support_access_log').insert({
     platform_user_id: platformUserId,
     platform_email: platformEmail,
@@ -380,7 +388,7 @@ Deno.serve(async (req: Request) => {
       const {admin,auth}=clients()
       const identity=await exchangeSupportHandoff(admin,body.token || '')
       if(!identity)return json({ok:false,error:'Support authorization invalid, expired or already used. Open a new support session from Platform.'},401)
-      const result=await bootstrapSupportSession(admin,auth,identity.userId,identity.email,req.headers.get('user-agent'))
+      const result=await bootstrapSupportSession(admin,auth,identity.userId,identity.email,req.headers.get('user-agent'),identity.consentId)
       return json(result,result.ok?200:401)
     } catch {return json({ok:false,error:'Secure support session unavailable. Open a new support session from Platform.'},503)}
   }
