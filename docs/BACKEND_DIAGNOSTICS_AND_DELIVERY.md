@@ -84,3 +84,10 @@ older release packages, owner/binding, original request/job pins and journals.
 
 Platform companion documentation: docs/RELEASE_INVENTORY_CONTINUITY.md in orbito.
 Full joint hosted/manual acceptance remains a separate testing session.
+
+The new client opts into pending receipts using the existing CORS-allowed
+`x-client-info: retrasell-support-journal-v1` header. A saved but unacknowledged
+submission returns 202 only to opted-in clients; legacy clients receive 503 and
+retain their original retry identity. A verified received ticket retains the
+existing successful receipt shape. Final support-v6 contains this correction;
+the uninstalled local v5 candidate remains immutable and superseded.

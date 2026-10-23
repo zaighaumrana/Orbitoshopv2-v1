@@ -780,3 +780,25 @@ it was not deployed or installed and is superseded for fresh selection. The corr
 backend requires NEW support-v6, generated only after this source correction is
 committed. Old-v4 remains supported; no existing Shop was upgraded or repinned.
 The focused compatibility fixture covers both old and opted-in pending responses.
+
+
+## 2026-10-23 — Final corrected support-v6 release metadata
+Branch: feature/verified-customer-support-shop
+
+Final backend source 95448d75b7c78fbe5e7cf0e9a02f87e7d919650d includes the legacy/modern receipt compatibility
+correction. Built NEW support-v6 only afterward: 38 migrations / 7 functions,
+canonical SHA-256 64fcec36fa7a5e2565db2a6d3aa6ddbd8e6c1170eefd4a07a57ae6ba0c066a31. Both fresh source selectors/manifests now reference
+this exact package; v5 remains unchanged as an uninstalled superseded candidate,
+and v4/older approved artifacts and original pins remain unchanged. The final
+committed-source parity gate is the approval check; no packaged byte changes
+after this build. Hosted migration/function rollout and joint acceptance remain
+pending; no automatic customer upgrade or production promotion.
+
+Final checks: canonical v6 parity, nine focused source/contract cases, four bounded
+Managed engine cases, isolated native PostgreSQL continuity/catalog checks, changed
+Edge typechecks, explicit synthetic-public builds and syntax/diff checks passed.
+Read-only hosting inspection found retrasellshop/retrabyo use this feature branch
+as their production branch. The final metadata checkpoint therefore uses the
+established [CF-Pages-Skip] prefix to suppress its automatic Pages deployment;
+hosting settings are unchanged. Actual remote skip/CI results are recorded in the
+external release-parity-fleet-continuity-2026-10-23 evidence.

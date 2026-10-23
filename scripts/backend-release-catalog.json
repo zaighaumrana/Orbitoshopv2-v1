@@ -1,18 +1,1453 @@
 {
   "7f8e4cd5614a4b19e155f5114d49517dddb6c9c2ef7d62a2bc71e3927d97c940": {
     "release_id": "accepted-v1",
-    "migrations": 32
+    "migrations": 32,
+    "functions": 6,
+    "approved_for_new": false,
+    "supported": true,
+    "successor": "support-v6",
+    "upgrade_policy": "optional",
+    "compatibility": {
+      "bridge": 1,
+      "billing": 1,
+      "support": 0,
+      "config": 1
+    },
+    "required_evidence": [
+      "migration-provenance",
+      "deployed-source",
+      "gateway",
+      "current-database-capabilities"
+    ],
+    "migration_manifest": [
+      {
+        "version": "00000000000000",
+        "name": "baseline_schema",
+        "sha256": "7c7535b814e62523b27948155d592ccd460d1ff0a3f253e50da41c3321c287c9"
+      },
+      {
+        "version": "20260712000000",
+        "name": "invoice_numbering",
+        "sha256": "b8afc5a9c58860857e8e4722b7f6e909debdf4dfa1155e7b488bcfb018816785"
+      },
+      {
+        "version": "20260903020000",
+        "name": "support_access_log",
+        "sha256": "ff7b6bb1d300cf98f5598d7a92514c67d8e2aa3218763965f573a2d129761306"
+      },
+      {
+        "version": "20260903165753",
+        "name": "phase2_auth_foundation",
+        "sha256": "cae1c8dd30513c304c3b21567ba7c32984edffeba47d7a4dfd0ed060a0185659"
+      },
+      {
+        "version": "20260903170222",
+        "name": "phase2_auth_bridge_helpers",
+        "sha256": "0ad43008d064eab8f75a15eb5bab1a52eac1387e4c53df39aa78addb78537c45"
+      },
+      {
+        "version": "20260903171448",
+        "name": "phase2_security_helpers",
+        "sha256": "269386e1963e2c2c7e791b2bf085b0ca6e1de90db6a03596f9e1fc9b4135cca1"
+      },
+      {
+        "version": "20260903175518",
+        "name": "phase2_legacy_credential_vault",
+        "sha256": "13913ad6a1ced76e349e89bb174ba8ade654923696646a3516e78c6ad63addbd"
+      },
+      {
+        "version": "20260903180703",
+        "name": "phase2_neutralize_unused_employee_pin",
+        "sha256": "1d5a4dba7e69350589d6e5e30322d3116a1e547fa2797bd6ffbc85194f4e7cbf"
+      },
+      {
+        "version": "20260903181153",
+        "name": "phase2_authenticated_rls",
+        "sha256": "0a1e617f7257ffc582c845be6a0707902c7e59906ac93cfe4ba47ba1b7640b03"
+      },
+      {
+        "version": "20260904001510",
+        "name": "phase2_reseal_legacy_plaintext_credentials",
+        "sha256": "9cf54fb7a1354db3ee6cf6ad01a1ebe9b32d46a61f7b7378d8dcb17948b83ae8"
+      },
+      {
+        "version": "20260904200000",
+        "name": "phase3_ledger_foundation",
+        "sha256": "d4b594bc1c6355f007ceb508e10a785d15da90036d30d5f237e1c66155677e0a"
+      },
+      {
+        "version": "20260904203000",
+        "name": "phase3_deterministic_backfill",
+        "sha256": "315b7c5e40910e61a054c2dfaecfc75585acbb8192d38932081e4375315bb3ce"
+      },
+      {
+        "version": "20260904210000",
+        "name": "phase3_atomic_retail_checkout",
+        "sha256": "446b00d7281a5cef1edfa8b1add1b35d03a0695bec606a5100a85d9b988ee0b4"
+      },
+      {
+        "version": "20260904220000",
+        "name": "phase3_atomic_repair_transactions",
+        "sha256": "6d83781811ccb86f8793aaa9e8ca9060f81dd8ac3d68dce2acce508fb401f821"
+      },
+      {
+        "version": "20260904230000",
+        "name": "phase3_additional_work_and_adjustments",
+        "sha256": "11bd640f993c8ef30ebdde0d68cc7b84ea6b7db7893b32cf8c1068bb68353f9c"
+      },
+      {
+        "version": "20260905000000",
+        "name": "phase3_repair_cancellation_and_delivery",
+        "sha256": "9c7f49bd93c0ed43d3b3077b4765f6c29ad536f5d6a364fd89abc07dd3b539d2"
+      },
+      {
+        "version": "20260905010000",
+        "name": "phase3_retail_returns_and_inventory_adjustments",
+        "sha256": "6e243c4bfaac02dd8f4aa1af1ff5005f6f88780b543111b342e334630d63b224"
+      },
+      {
+        "version": "20260905011000",
+        "name": "phase3_return_line_invariant",
+        "sha256": "8dad9eae243264a1bddce5a48f2cfd1de59f94443db41008f15b2a3ce5a75343"
+      },
+      {
+        "version": "20260905020000",
+        "name": "phase3_unified_udhar_and_reporting",
+        "sha256": "ea4026c200dc454b2aa3b9fa31b5be34f53c7a98a45a18148790896f3cbeda8f"
+      },
+      {
+        "version": "20260905030000",
+        "name": "phase3_repair_family_summary",
+        "sha256": "3919d87bbdfc0ab39c2655b347b9f95cb785e9dfc654b28ea519d5065ae78d4a"
+      },
+      {
+        "version": "20260905031000",
+        "name": "phase3_repair_component_change_guard",
+        "sha256": "ab5e8f53d3639b92d7082016bba0ca6ff750dd9e73a151abee85a82460485f2d"
+      },
+      {
+        "version": "20260917015216",
+        "name": "phase4_pin_request_security",
+        "sha256": "ad23b94d145fd7dc0898d1a973d12788d574d6540d776937843c51fbb279a4f0"
+      },
+      {
+        "version": "20260917174024",
+        "name": "phase4_platform_bridge",
+        "sha256": "a239ffc772f61a089a893ef1e3cef127db3b62b8240235403ddfe4df7111de5d"
+      },
+      {
+        "version": "20260919043803",
+        "name": "phase4_invoice_creation_bill_semantics",
+        "sha256": "5abf5083a62711363e6294ea2f0a299c0d8aaf55104a3a54be0bb1aae9e92678"
+      },
+      {
+        "version": "20260920195256",
+        "name": "remove_legacy_workshop_config_alias",
+        "sha256": "d96dac8db0261263573b1e3d6e2943ec70e94c686863a203957b7ed1e047c6ae"
+      },
+      {
+        "version": "20260929090000",
+        "name": "onboarding_v2",
+        "sha256": "2a7c8d0ef19e54ac3057cb8f3824ec08fdb3383dd5d4e17a53c7090677158786"
+      },
+      {
+        "version": "20261001090000",
+        "name": "manual_owner_activation",
+        "sha256": "50fdaade67e7b71db56c7c623cb20bdc4f0d8b3c975e7d24da6a48e614b7abc1"
+      },
+      {
+        "version": "20261001110000",
+        "name": "shop_config_service_role_read",
+        "sha256": "b2e8f19847af856df419b830f2a673f58172e4b4cb18637eac8c4e17b876a94f"
+      },
+      {
+        "version": "20261001120000",
+        "name": "onboarding_runtime_preflight",
+        "sha256": "bb9628fce78a444d39dbcaa79f35c857506e5838f383ab38313931f67e159aec"
+      },
+      {
+        "version": "20261002015159",
+        "name": "legal_acceptance",
+        "sha256": "69ab3528142d4b7191202c8a0db75dd7791674abfe67b34914eaefa5851e8eaa"
+      },
+      {
+        "version": "20261002071259",
+        "name": "legal_policy_metadata",
+        "sha256": "495947de90f76f4b3c39b75a0ad453bcac9614b2a4860cebafd1de2152b27a51"
+      },
+      {
+        "version": "20261003121000",
+        "name": "config_request_journal",
+        "sha256": "2040399a420d2f9f32c5180867449e066872939e200357e11d3e502845f24f52"
+      }
+    ],
+    "function_manifest": [
+      {
+        "name": "account-admin",
+        "verify_jwt": true,
+        "sha256": "08b76f679115e9622a44993e3baa6ebd560968b75c560520de31f6cefc4ceea2"
+      },
+      {
+        "name": "login",
+        "verify_jwt": true,
+        "sha256": "72f823e8194db105042a0350034a8323829327c28289af8cbe31ecc217b6c866"
+      },
+      {
+        "name": "password-reset-request",
+        "verify_jwt": true,
+        "sha256": "44b4a7c9f452bdda9b493c437d9fbf01d227dcb80e75b33bb5701caf63fe8cbb"
+      },
+      {
+        "name": "public-track",
+        "verify_jwt": true,
+        "sha256": "5909915586d897487aa0c233d4dbfa20c306eef5b3c01484d3cdf4a330a9667b"
+      },
+      {
+        "name": "verify-pin",
+        "verify_jwt": true,
+        "sha256": "6e39ac7df2e77989bd327e5c757db91f94ce649e90053eec79caee3ae01b50f7"
+      },
+      {
+        "name": "platform-bridge",
+        "verify_jwt": false,
+        "sha256": "e28d3f0d64812901fedd2599379072d3fc7f43a0ff65ec06c2ea65516b584568"
+      }
+    ]
   },
   "144d918859db1007cccfbed724d1988a043ca1e5fef42ce694dee6df1a603414": {
     "release_id": "support-v2",
-    "migrations": 34
+    "migrations": 34,
+    "functions": 7,
+    "approved_for_new": false,
+    "supported": true,
+    "successor": "support-v6",
+    "upgrade_policy": "optional",
+    "compatibility": {
+      "bridge": 1,
+      "billing": 1,
+      "support": 1,
+      "config": 1
+    },
+    "required_evidence": [
+      "migration-provenance",
+      "deployed-source",
+      "gateway",
+      "current-database-capabilities"
+    ],
+    "migration_manifest": [
+      {
+        "version": "00000000000000",
+        "name": "baseline_schema",
+        "sha256": "7c7535b814e62523b27948155d592ccd460d1ff0a3f253e50da41c3321c287c9"
+      },
+      {
+        "version": "20260712000000",
+        "name": "invoice_numbering",
+        "sha256": "b8afc5a9c58860857e8e4722b7f6e909debdf4dfa1155e7b488bcfb018816785"
+      },
+      {
+        "version": "20260903020000",
+        "name": "support_access_log",
+        "sha256": "ff7b6bb1d300cf98f5598d7a92514c67d8e2aa3218763965f573a2d129761306"
+      },
+      {
+        "version": "20260903165753",
+        "name": "phase2_auth_foundation",
+        "sha256": "cae1c8dd30513c304c3b21567ba7c32984edffeba47d7a4dfd0ed060a0185659"
+      },
+      {
+        "version": "20260903170222",
+        "name": "phase2_auth_bridge_helpers",
+        "sha256": "0ad43008d064eab8f75a15eb5bab1a52eac1387e4c53df39aa78addb78537c45"
+      },
+      {
+        "version": "20260903171448",
+        "name": "phase2_security_helpers",
+        "sha256": "269386e1963e2c2c7e791b2bf085b0ca6e1de90db6a03596f9e1fc9b4135cca1"
+      },
+      {
+        "version": "20260903175518",
+        "name": "phase2_legacy_credential_vault",
+        "sha256": "13913ad6a1ced76e349e89bb174ba8ade654923696646a3516e78c6ad63addbd"
+      },
+      {
+        "version": "20260903180703",
+        "name": "phase2_neutralize_unused_employee_pin",
+        "sha256": "1d5a4dba7e69350589d6e5e30322d3116a1e547fa2797bd6ffbc85194f4e7cbf"
+      },
+      {
+        "version": "20260903181153",
+        "name": "phase2_authenticated_rls",
+        "sha256": "0a1e617f7257ffc582c845be6a0707902c7e59906ac93cfe4ba47ba1b7640b03"
+      },
+      {
+        "version": "20260904001510",
+        "name": "phase2_reseal_legacy_plaintext_credentials",
+        "sha256": "9cf54fb7a1354db3ee6cf6ad01a1ebe9b32d46a61f7b7378d8dcb17948b83ae8"
+      },
+      {
+        "version": "20260904200000",
+        "name": "phase3_ledger_foundation",
+        "sha256": "d4b594bc1c6355f007ceb508e10a785d15da90036d30d5f237e1c66155677e0a"
+      },
+      {
+        "version": "20260904203000",
+        "name": "phase3_deterministic_backfill",
+        "sha256": "315b7c5e40910e61a054c2dfaecfc75585acbb8192d38932081e4375315bb3ce"
+      },
+      {
+        "version": "20260904210000",
+        "name": "phase3_atomic_retail_checkout",
+        "sha256": "446b00d7281a5cef1edfa8b1add1b35d03a0695bec606a5100a85d9b988ee0b4"
+      },
+      {
+        "version": "20260904220000",
+        "name": "phase3_atomic_repair_transactions",
+        "sha256": "6d83781811ccb86f8793aaa9e8ca9060f81dd8ac3d68dce2acce508fb401f821"
+      },
+      {
+        "version": "20260904230000",
+        "name": "phase3_additional_work_and_adjustments",
+        "sha256": "11bd640f993c8ef30ebdde0d68cc7b84ea6b7db7893b32cf8c1068bb68353f9c"
+      },
+      {
+        "version": "20260905000000",
+        "name": "phase3_repair_cancellation_and_delivery",
+        "sha256": "9c7f49bd93c0ed43d3b3077b4765f6c29ad536f5d6a364fd89abc07dd3b539d2"
+      },
+      {
+        "version": "20260905010000",
+        "name": "phase3_retail_returns_and_inventory_adjustments",
+        "sha256": "6e243c4bfaac02dd8f4aa1af1ff5005f6f88780b543111b342e334630d63b224"
+      },
+      {
+        "version": "20260905011000",
+        "name": "phase3_return_line_invariant",
+        "sha256": "8dad9eae243264a1bddce5a48f2cfd1de59f94443db41008f15b2a3ce5a75343"
+      },
+      {
+        "version": "20260905020000",
+        "name": "phase3_unified_udhar_and_reporting",
+        "sha256": "ea4026c200dc454b2aa3b9fa31b5be34f53c7a98a45a18148790896f3cbeda8f"
+      },
+      {
+        "version": "20260905030000",
+        "name": "phase3_repair_family_summary",
+        "sha256": "3919d87bbdfc0ab39c2655b347b9f95cb785e9dfc654b28ea519d5065ae78d4a"
+      },
+      {
+        "version": "20260905031000",
+        "name": "phase3_repair_component_change_guard",
+        "sha256": "ab5e8f53d3639b92d7082016bba0ca6ff750dd9e73a151abee85a82460485f2d"
+      },
+      {
+        "version": "20260917015216",
+        "name": "phase4_pin_request_security",
+        "sha256": "ad23b94d145fd7dc0898d1a973d12788d574d6540d776937843c51fbb279a4f0"
+      },
+      {
+        "version": "20260917174024",
+        "name": "phase4_platform_bridge",
+        "sha256": "a239ffc772f61a089a893ef1e3cef127db3b62b8240235403ddfe4df7111de5d"
+      },
+      {
+        "version": "20260919043803",
+        "name": "phase4_invoice_creation_bill_semantics",
+        "sha256": "5abf5083a62711363e6294ea2f0a299c0d8aaf55104a3a54be0bb1aae9e92678"
+      },
+      {
+        "version": "20260920195256",
+        "name": "remove_legacy_workshop_config_alias",
+        "sha256": "d96dac8db0261263573b1e3d6e2943ec70e94c686863a203957b7ed1e047c6ae"
+      },
+      {
+        "version": "20260929090000",
+        "name": "onboarding_v2",
+        "sha256": "2a7c8d0ef19e54ac3057cb8f3824ec08fdb3383dd5d4e17a53c7090677158786"
+      },
+      {
+        "version": "20261001090000",
+        "name": "manual_owner_activation",
+        "sha256": "50fdaade67e7b71db56c7c623cb20bdc4f0d8b3c975e7d24da6a48e614b7abc1"
+      },
+      {
+        "version": "20261001110000",
+        "name": "shop_config_service_role_read",
+        "sha256": "b2e8f19847af856df419b830f2a673f58172e4b4cb18637eac8c4e17b876a94f"
+      },
+      {
+        "version": "20261001120000",
+        "name": "onboarding_runtime_preflight",
+        "sha256": "bb9628fce78a444d39dbcaa79f35c857506e5838f383ab38313931f67e159aec"
+      },
+      {
+        "version": "20261002015159",
+        "name": "legal_acceptance",
+        "sha256": "69ab3528142d4b7191202c8a0db75dd7791674abfe67b34914eaefa5851e8eaa"
+      },
+      {
+        "version": "20261002071259",
+        "name": "legal_policy_metadata",
+        "sha256": "495947de90f76f4b3c39b75a0ad453bcac9614b2a4860cebafd1de2152b27a51"
+      },
+      {
+        "version": "20261003121000",
+        "name": "config_request_journal",
+        "sha256": "2040399a420d2f9f32c5180867449e066872939e200357e11d3e502845f24f52"
+      },
+      {
+        "version": "20261018000617",
+        "name": "customer_support_actor",
+        "sha256": "1b1431a0053e0be5f3a1d1727ea7760af2edb4e411010c04273da3596190ea29"
+      },
+      {
+        "version": "20261019000028",
+        "name": "support_installation_readiness",
+        "sha256": "4b088fcbcab033924fe60f091fa6ddb02e4a5c8809e071c3cef5b095ac973410"
+      }
+    ],
+    "function_manifest": [
+      {
+        "name": "account-admin",
+        "verify_jwt": true,
+        "sha256": "7afbcd84913268735afe17f0437998df4320e7a38dd94be38e887d419d49043b"
+      },
+      {
+        "name": "login",
+        "verify_jwt": true,
+        "sha256": "865095405c0903af022afa16e7497f186004641e631a769471f0dbe4798a9925"
+      },
+      {
+        "name": "password-reset-request",
+        "verify_jwt": true,
+        "sha256": "26f559e47a81e06792320babdbe46a128f9ebdcdc5d3f632214ebc0f038fca6c"
+      },
+      {
+        "name": "public-track",
+        "verify_jwt": true,
+        "sha256": "7cb3f89ca99f8ace4ab22f1d58296a78cdc7753386b48861cf20851dcd12e244"
+      },
+      {
+        "name": "verify-pin",
+        "verify_jwt": true,
+        "sha256": "4da13eb83b489f2dd4668247a1e562d8983c16ab6ccd6dc07b60a27346e15bae"
+      },
+      {
+        "name": "platform-bridge",
+        "verify_jwt": false,
+        "sha256": "dcc6de067a42f67f308fc103f69c192d963144c75cdccad5650e0ad12c456b15"
+      },
+      {
+        "name": "support-tickets",
+        "verify_jwt": true,
+        "sha256": "24a11b9100fcd523323114d6f9dedc00575eabfbfbd6aa4a7a6bd9b57e4fd9dc"
+      }
+    ]
   },
   "f3fb64e51f1d07c536c626acd33b0e05b98b4fe5a22c3a7c3ff1a02a6a9e5bfd": {
     "release_id": "support-v3",
-    "migrations": 36
+    "migrations": 36,
+    "functions": 7,
+    "approved_for_new": false,
+    "supported": true,
+    "successor": "support-v6",
+    "upgrade_policy": "optional",
+    "compatibility": {
+      "bridge": 1,
+      "billing": 1,
+      "support": 1,
+      "config": 1
+    },
+    "required_evidence": [
+      "migration-provenance",
+      "deployed-source",
+      "gateway",
+      "current-database-capabilities"
+    ],
+    "migration_manifest": [
+      {
+        "version": "00000000000000",
+        "name": "baseline_schema",
+        "sha256": "7c7535b814e62523b27948155d592ccd460d1ff0a3f253e50da41c3321c287c9"
+      },
+      {
+        "version": "20260712000000",
+        "name": "invoice_numbering",
+        "sha256": "b8afc5a9c58860857e8e4722b7f6e909debdf4dfa1155e7b488bcfb018816785"
+      },
+      {
+        "version": "20260903020000",
+        "name": "support_access_log",
+        "sha256": "ff7b6bb1d300cf98f5598d7a92514c67d8e2aa3218763965f573a2d129761306"
+      },
+      {
+        "version": "20260903165753",
+        "name": "phase2_auth_foundation",
+        "sha256": "cae1c8dd30513c304c3b21567ba7c32984edffeba47d7a4dfd0ed060a0185659"
+      },
+      {
+        "version": "20260903170222",
+        "name": "phase2_auth_bridge_helpers",
+        "sha256": "0ad43008d064eab8f75a15eb5bab1a52eac1387e4c53df39aa78addb78537c45"
+      },
+      {
+        "version": "20260903171448",
+        "name": "phase2_security_helpers",
+        "sha256": "269386e1963e2c2c7e791b2bf085b0ca6e1de90db6a03596f9e1fc9b4135cca1"
+      },
+      {
+        "version": "20260903175518",
+        "name": "phase2_legacy_credential_vault",
+        "sha256": "13913ad6a1ced76e349e89bb174ba8ade654923696646a3516e78c6ad63addbd"
+      },
+      {
+        "version": "20260903180703",
+        "name": "phase2_neutralize_unused_employee_pin",
+        "sha256": "1d5a4dba7e69350589d6e5e30322d3116a1e547fa2797bd6ffbc85194f4e7cbf"
+      },
+      {
+        "version": "20260903181153",
+        "name": "phase2_authenticated_rls",
+        "sha256": "0a1e617f7257ffc582c845be6a0707902c7e59906ac93cfe4ba47ba1b7640b03"
+      },
+      {
+        "version": "20260904001510",
+        "name": "phase2_reseal_legacy_plaintext_credentials",
+        "sha256": "9cf54fb7a1354db3ee6cf6ad01a1ebe9b32d46a61f7b7378d8dcb17948b83ae8"
+      },
+      {
+        "version": "20260904200000",
+        "name": "phase3_ledger_foundation",
+        "sha256": "d4b594bc1c6355f007ceb508e10a785d15da90036d30d5f237e1c66155677e0a"
+      },
+      {
+        "version": "20260904203000",
+        "name": "phase3_deterministic_backfill",
+        "sha256": "315b7c5e40910e61a054c2dfaecfc75585acbb8192d38932081e4375315bb3ce"
+      },
+      {
+        "version": "20260904210000",
+        "name": "phase3_atomic_retail_checkout",
+        "sha256": "446b00d7281a5cef1edfa8b1add1b35d03a0695bec606a5100a85d9b988ee0b4"
+      },
+      {
+        "version": "20260904220000",
+        "name": "phase3_atomic_repair_transactions",
+        "sha256": "6d83781811ccb86f8793aaa9e8ca9060f81dd8ac3d68dce2acce508fb401f821"
+      },
+      {
+        "version": "20260904230000",
+        "name": "phase3_additional_work_and_adjustments",
+        "sha256": "11bd640f993c8ef30ebdde0d68cc7b84ea6b7db7893b32cf8c1068bb68353f9c"
+      },
+      {
+        "version": "20260905000000",
+        "name": "phase3_repair_cancellation_and_delivery",
+        "sha256": "9c7f49bd93c0ed43d3b3077b4765f6c29ad536f5d6a364fd89abc07dd3b539d2"
+      },
+      {
+        "version": "20260905010000",
+        "name": "phase3_retail_returns_and_inventory_adjustments",
+        "sha256": "6e243c4bfaac02dd8f4aa1af1ff5005f6f88780b543111b342e334630d63b224"
+      },
+      {
+        "version": "20260905011000",
+        "name": "phase3_return_line_invariant",
+        "sha256": "8dad9eae243264a1bddce5a48f2cfd1de59f94443db41008f15b2a3ce5a75343"
+      },
+      {
+        "version": "20260905020000",
+        "name": "phase3_unified_udhar_and_reporting",
+        "sha256": "ea4026c200dc454b2aa3b9fa31b5be34f53c7a98a45a18148790896f3cbeda8f"
+      },
+      {
+        "version": "20260905030000",
+        "name": "phase3_repair_family_summary",
+        "sha256": "3919d87bbdfc0ab39c2655b347b9f95cb785e9dfc654b28ea519d5065ae78d4a"
+      },
+      {
+        "version": "20260905031000",
+        "name": "phase3_repair_component_change_guard",
+        "sha256": "ab5e8f53d3639b92d7082016bba0ca6ff750dd9e73a151abee85a82460485f2d"
+      },
+      {
+        "version": "20260917015216",
+        "name": "phase4_pin_request_security",
+        "sha256": "ad23b94d145fd7dc0898d1a973d12788d574d6540d776937843c51fbb279a4f0"
+      },
+      {
+        "version": "20260917174024",
+        "name": "phase4_platform_bridge",
+        "sha256": "a239ffc772f61a089a893ef1e3cef127db3b62b8240235403ddfe4df7111de5d"
+      },
+      {
+        "version": "20260919043803",
+        "name": "phase4_invoice_creation_bill_semantics",
+        "sha256": "5abf5083a62711363e6294ea2f0a299c0d8aaf55104a3a54be0bb1aae9e92678"
+      },
+      {
+        "version": "20260920195256",
+        "name": "remove_legacy_workshop_config_alias",
+        "sha256": "d96dac8db0261263573b1e3d6e2943ec70e94c686863a203957b7ed1e047c6ae"
+      },
+      {
+        "version": "20260929090000",
+        "name": "onboarding_v2",
+        "sha256": "2a7c8d0ef19e54ac3057cb8f3824ec08fdb3383dd5d4e17a53c7090677158786"
+      },
+      {
+        "version": "20261001090000",
+        "name": "manual_owner_activation",
+        "sha256": "50fdaade67e7b71db56c7c623cb20bdc4f0d8b3c975e7d24da6a48e614b7abc1"
+      },
+      {
+        "version": "20261001110000",
+        "name": "shop_config_service_role_read",
+        "sha256": "b2e8f19847af856df419b830f2a673f58172e4b4cb18637eac8c4e17b876a94f"
+      },
+      {
+        "version": "20261001120000",
+        "name": "onboarding_runtime_preflight",
+        "sha256": "bb9628fce78a444d39dbcaa79f35c857506e5838f383ab38313931f67e159aec"
+      },
+      {
+        "version": "20261002015159",
+        "name": "legal_acceptance",
+        "sha256": "69ab3528142d4b7191202c8a0db75dd7791674abfe67b34914eaefa5851e8eaa"
+      },
+      {
+        "version": "20261002071259",
+        "name": "legal_policy_metadata",
+        "sha256": "495947de90f76f4b3c39b75a0ad453bcac9614b2a4860cebafd1de2152b27a51"
+      },
+      {
+        "version": "20261003121000",
+        "name": "config_request_journal",
+        "sha256": "2040399a420d2f9f32c5180867449e066872939e200357e11d3e502845f24f52"
+      },
+      {
+        "version": "20261018000617",
+        "name": "customer_support_actor",
+        "sha256": "1b1431a0053e0be5f3a1d1727ea7760af2edb4e411010c04273da3596190ea29"
+      },
+      {
+        "version": "20261019000028",
+        "name": "support_installation_readiness",
+        "sha256": "4b088fcbcab033924fe60f091fa6ddb02e4a5c8809e071c3cef5b095ac973410"
+      },
+      {
+        "version": "20261020135016",
+        "name": "fresh_initialization_guard",
+        "sha256": "a6c1b3a9032cbd6b0d64a71606a23fc9a158b86834f3cfbf0e5ceac5a192e054"
+      },
+      {
+        "version": "20261020135251",
+        "name": "paper_customer_communication",
+        "sha256": "e12ba42a09d402140bd6cb0399f5f8618f3ca58da885153107daf1c397f950e8"
+      }
+    ],
+    "function_manifest": [
+      {
+        "name": "account-admin",
+        "verify_jwt": true,
+        "sha256": "7afbcd84913268735afe17f0437998df4320e7a38dd94be38e887d419d49043b"
+      },
+      {
+        "name": "login",
+        "verify_jwt": true,
+        "sha256": "865095405c0903af022afa16e7497f186004641e631a769471f0dbe4798a9925"
+      },
+      {
+        "name": "password-reset-request",
+        "verify_jwt": true,
+        "sha256": "26f559e47a81e06792320babdbe46a128f9ebdcdc5d3f632214ebc0f038fca6c"
+      },
+      {
+        "name": "public-track",
+        "verify_jwt": true,
+        "sha256": "7cb3f89ca99f8ace4ab22f1d58296a78cdc7753386b48861cf20851dcd12e244"
+      },
+      {
+        "name": "verify-pin",
+        "verify_jwt": true,
+        "sha256": "4da13eb83b489f2dd4668247a1e562d8983c16ab6ccd6dc07b60a27346e15bae"
+      },
+      {
+        "name": "platform-bridge",
+        "verify_jwt": false,
+        "sha256": "4c48a0ec11dcdd355919a544b92562656ed261c09e6e951eb5482ca6e818322c"
+      },
+      {
+        "name": "support-tickets",
+        "verify_jwt": true,
+        "sha256": "24a11b9100fcd523323114d6f9dedc00575eabfbfbd6aa4a7a6bd9b57e4fd9dc"
+      }
+    ]
   },
   "f5295937f06e45177190bedebf19a54c86fd067d03785365a393e3de269e062f": {
     "release_id": "support-v4",
-    "migrations": 37
+    "migrations": 37,
+    "functions": 7,
+    "approved_for_new": false,
+    "supported": true,
+    "successor": "support-v6",
+    "upgrade_policy": "optional",
+    "compatibility": {
+      "bridge": 1,
+      "billing": 1,
+      "support": 1,
+      "config": 1
+    },
+    "required_evidence": [
+      "migration-provenance",
+      "deployed-source",
+      "gateway",
+      "current-database-capabilities"
+    ],
+    "migration_manifest": [
+      {
+        "version": "00000000000000",
+        "name": "baseline_schema",
+        "sha256": "7c7535b814e62523b27948155d592ccd460d1ff0a3f253e50da41c3321c287c9"
+      },
+      {
+        "version": "20260712000000",
+        "name": "invoice_numbering",
+        "sha256": "b8afc5a9c58860857e8e4722b7f6e909debdf4dfa1155e7b488bcfb018816785"
+      },
+      {
+        "version": "20260903020000",
+        "name": "support_access_log",
+        "sha256": "ff7b6bb1d300cf98f5598d7a92514c67d8e2aa3218763965f573a2d129761306"
+      },
+      {
+        "version": "20260903165753",
+        "name": "phase2_auth_foundation",
+        "sha256": "cae1c8dd30513c304c3b21567ba7c32984edffeba47d7a4dfd0ed060a0185659"
+      },
+      {
+        "version": "20260903170222",
+        "name": "phase2_auth_bridge_helpers",
+        "sha256": "0ad43008d064eab8f75a15eb5bab1a52eac1387e4c53df39aa78addb78537c45"
+      },
+      {
+        "version": "20260903171448",
+        "name": "phase2_security_helpers",
+        "sha256": "269386e1963e2c2c7e791b2bf085b0ca6e1de90db6a03596f9e1fc9b4135cca1"
+      },
+      {
+        "version": "20260903175518",
+        "name": "phase2_legacy_credential_vault",
+        "sha256": "13913ad6a1ced76e349e89bb174ba8ade654923696646a3516e78c6ad63addbd"
+      },
+      {
+        "version": "20260903180703",
+        "name": "phase2_neutralize_unused_employee_pin",
+        "sha256": "1d5a4dba7e69350589d6e5e30322d3116a1e547fa2797bd6ffbc85194f4e7cbf"
+      },
+      {
+        "version": "20260903181153",
+        "name": "phase2_authenticated_rls",
+        "sha256": "0a1e617f7257ffc582c845be6a0707902c7e59906ac93cfe4ba47ba1b7640b03"
+      },
+      {
+        "version": "20260904001510",
+        "name": "phase2_reseal_legacy_plaintext_credentials",
+        "sha256": "9cf54fb7a1354db3ee6cf6ad01a1ebe9b32d46a61f7b7378d8dcb17948b83ae8"
+      },
+      {
+        "version": "20260904200000",
+        "name": "phase3_ledger_foundation",
+        "sha256": "d4b594bc1c6355f007ceb508e10a785d15da90036d30d5f237e1c66155677e0a"
+      },
+      {
+        "version": "20260904203000",
+        "name": "phase3_deterministic_backfill",
+        "sha256": "315b7c5e40910e61a054c2dfaecfc75585acbb8192d38932081e4375315bb3ce"
+      },
+      {
+        "version": "20260904210000",
+        "name": "phase3_atomic_retail_checkout",
+        "sha256": "446b00d7281a5cef1edfa8b1add1b35d03a0695bec606a5100a85d9b988ee0b4"
+      },
+      {
+        "version": "20260904220000",
+        "name": "phase3_atomic_repair_transactions",
+        "sha256": "6d83781811ccb86f8793aaa9e8ca9060f81dd8ac3d68dce2acce508fb401f821"
+      },
+      {
+        "version": "20260904230000",
+        "name": "phase3_additional_work_and_adjustments",
+        "sha256": "11bd640f993c8ef30ebdde0d68cc7b84ea6b7db7893b32cf8c1068bb68353f9c"
+      },
+      {
+        "version": "20260905000000",
+        "name": "phase3_repair_cancellation_and_delivery",
+        "sha256": "9c7f49bd93c0ed43d3b3077b4765f6c29ad536f5d6a364fd89abc07dd3b539d2"
+      },
+      {
+        "version": "20260905010000",
+        "name": "phase3_retail_returns_and_inventory_adjustments",
+        "sha256": "6e243c4bfaac02dd8f4aa1af1ff5005f6f88780b543111b342e334630d63b224"
+      },
+      {
+        "version": "20260905011000",
+        "name": "phase3_return_line_invariant",
+        "sha256": "8dad9eae243264a1bddce5a48f2cfd1de59f94443db41008f15b2a3ce5a75343"
+      },
+      {
+        "version": "20260905020000",
+        "name": "phase3_unified_udhar_and_reporting",
+        "sha256": "ea4026c200dc454b2aa3b9fa31b5be34f53c7a98a45a18148790896f3cbeda8f"
+      },
+      {
+        "version": "20260905030000",
+        "name": "phase3_repair_family_summary",
+        "sha256": "3919d87bbdfc0ab39c2655b347b9f95cb785e9dfc654b28ea519d5065ae78d4a"
+      },
+      {
+        "version": "20260905031000",
+        "name": "phase3_repair_component_change_guard",
+        "sha256": "ab5e8f53d3639b92d7082016bba0ca6ff750dd9e73a151abee85a82460485f2d"
+      },
+      {
+        "version": "20260917015216",
+        "name": "phase4_pin_request_security",
+        "sha256": "ad23b94d145fd7dc0898d1a973d12788d574d6540d776937843c51fbb279a4f0"
+      },
+      {
+        "version": "20260917174024",
+        "name": "phase4_platform_bridge",
+        "sha256": "a239ffc772f61a089a893ef1e3cef127db3b62b8240235403ddfe4df7111de5d"
+      },
+      {
+        "version": "20260919043803",
+        "name": "phase4_invoice_creation_bill_semantics",
+        "sha256": "5abf5083a62711363e6294ea2f0a299c0d8aaf55104a3a54be0bb1aae9e92678"
+      },
+      {
+        "version": "20260920195256",
+        "name": "remove_legacy_workshop_config_alias",
+        "sha256": "d96dac8db0261263573b1e3d6e2943ec70e94c686863a203957b7ed1e047c6ae"
+      },
+      {
+        "version": "20260929090000",
+        "name": "onboarding_v2",
+        "sha256": "2a7c8d0ef19e54ac3057cb8f3824ec08fdb3383dd5d4e17a53c7090677158786"
+      },
+      {
+        "version": "20261001090000",
+        "name": "manual_owner_activation",
+        "sha256": "50fdaade67e7b71db56c7c623cb20bdc4f0d8b3c975e7d24da6a48e614b7abc1"
+      },
+      {
+        "version": "20261001110000",
+        "name": "shop_config_service_role_read",
+        "sha256": "b2e8f19847af856df419b830f2a673f58172e4b4cb18637eac8c4e17b876a94f"
+      },
+      {
+        "version": "20261001120000",
+        "name": "onboarding_runtime_preflight",
+        "sha256": "bb9628fce78a444d39dbcaa79f35c857506e5838f383ab38313931f67e159aec"
+      },
+      {
+        "version": "20261002015159",
+        "name": "legal_acceptance",
+        "sha256": "69ab3528142d4b7191202c8a0db75dd7791674abfe67b34914eaefa5851e8eaa"
+      },
+      {
+        "version": "20261002071259",
+        "name": "legal_policy_metadata",
+        "sha256": "495947de90f76f4b3c39b75a0ad453bcac9614b2a4860cebafd1de2152b27a51"
+      },
+      {
+        "version": "20261003121000",
+        "name": "config_request_journal",
+        "sha256": "2040399a420d2f9f32c5180867449e066872939e200357e11d3e502845f24f52"
+      },
+      {
+        "version": "20261018000617",
+        "name": "customer_support_actor",
+        "sha256": "1b1431a0053e0be5f3a1d1727ea7760af2edb4e411010c04273da3596190ea29"
+      },
+      {
+        "version": "20261019000028",
+        "name": "support_installation_readiness",
+        "sha256": "4b088fcbcab033924fe60f091fa6ddb02e4a5c8809e071c3cef5b095ac973410"
+      },
+      {
+        "version": "20261020135016",
+        "name": "fresh_initialization_guard",
+        "sha256": "a6c1b3a9032cbd6b0d64a71606a23fc9a158b86834f3cfbf0e5ceac5a192e054"
+      },
+      {
+        "version": "20261020135251",
+        "name": "paper_customer_communication",
+        "sha256": "e12ba42a09d402140bd6cb0399f5f8618f3ca58da885153107daf1c397f950e8"
+      },
+      {
+        "version": "20261022155952",
+        "name": "support_session_consent",
+        "sha256": "39bb0ebb6da2289691623c247e43c2ca58fe95e990517356759fba0daf3c569c"
+      }
+    ],
+    "function_manifest": [
+      {
+        "name": "account-admin",
+        "verify_jwt": true,
+        "sha256": "5de3ec25640842b6e0c3199d8c11aa696fbb84f8b46ce4d33851f9e7650c2c78"
+      },
+      {
+        "name": "login",
+        "verify_jwt": true,
+        "sha256": "0780ab45754510c98421273539b9a28323421dc866246ddf10d878fe864593c7"
+      },
+      {
+        "name": "password-reset-request",
+        "verify_jwt": true,
+        "sha256": "bd30100eed308b1c56224132a089a295e3e5ea7b97ae7ae1755023f20efc3c1e"
+      },
+      {
+        "name": "public-track",
+        "verify_jwt": true,
+        "sha256": "830536e83c5678810773c0357d9c505e9bbaf3d8dd99a4344e59d68fede9005a"
+      },
+      {
+        "name": "verify-pin",
+        "verify_jwt": true,
+        "sha256": "475afb3a59deb45684407cedb3fa779ca7a039e7e54e650cbcca007409ac6905"
+      },
+      {
+        "name": "platform-bridge",
+        "verify_jwt": false,
+        "sha256": "2e11da247c5f7bbfe79c523e0c948fb3bd44324ba1975ec908f4decd6b8ae3a8"
+      },
+      {
+        "name": "support-tickets",
+        "verify_jwt": true,
+        "sha256": "225168b5fe9cbde8498bc549f9cd0551c7a95d16639ec316dbe81bb8d9ed45c8"
+      }
+    ]
+  },
+  "7953927660473aeaafcc62b3b8d45e382f5189d1536f7e0100b890d938ff5fdd": {
+    "release_id": "support-v5",
+    "migrations": 38,
+    "functions": 7,
+    "supported": false,
+    "approved_for_new": false,
+    "successor": "support-v6",
+    "upgrade_policy": "optional",
+    "compatibility": {
+      "bridge": 1,
+      "billing": 1,
+      "support": 1,
+      "config": 1
+    },
+    "requirements": [
+      "core-runtime",
+      "usage-outbox",
+      "billing-projection",
+      "config-journal",
+      "support-identity",
+      "support-consent",
+      "owner-bootstrap",
+      "support-durable-submissions"
+    ],
+    "required_evidence": [
+      "migration-provenance",
+      "deployed-source",
+      "gateway",
+      "current-database-capabilities"
+    ],
+    "migration_manifest": [
+      {
+        "version": "00000000000000",
+        "name": "baseline_schema",
+        "sha256": "7c7535b814e62523b27948155d592ccd460d1ff0a3f253e50da41c3321c287c9"
+      },
+      {
+        "version": "20260712000000",
+        "name": "invoice_numbering",
+        "sha256": "b8afc5a9c58860857e8e4722b7f6e909debdf4dfa1155e7b488bcfb018816785"
+      },
+      {
+        "version": "20260903020000",
+        "name": "support_access_log",
+        "sha256": "ff7b6bb1d300cf98f5598d7a92514c67d8e2aa3218763965f573a2d129761306"
+      },
+      {
+        "version": "20260903165753",
+        "name": "phase2_auth_foundation",
+        "sha256": "cae1c8dd30513c304c3b21567ba7c32984edffeba47d7a4dfd0ed060a0185659"
+      },
+      {
+        "version": "20260903170222",
+        "name": "phase2_auth_bridge_helpers",
+        "sha256": "0ad43008d064eab8f75a15eb5bab1a52eac1387e4c53df39aa78addb78537c45"
+      },
+      {
+        "version": "20260903171448",
+        "name": "phase2_security_helpers",
+        "sha256": "269386e1963e2c2c7e791b2bf085b0ca6e1de90db6a03596f9e1fc9b4135cca1"
+      },
+      {
+        "version": "20260903175518",
+        "name": "phase2_legacy_credential_vault",
+        "sha256": "13913ad6a1ced76e349e89bb174ba8ade654923696646a3516e78c6ad63addbd"
+      },
+      {
+        "version": "20260903180703",
+        "name": "phase2_neutralize_unused_employee_pin",
+        "sha256": "1d5a4dba7e69350589d6e5e30322d3116a1e547fa2797bd6ffbc85194f4e7cbf"
+      },
+      {
+        "version": "20260903181153",
+        "name": "phase2_authenticated_rls",
+        "sha256": "0a1e617f7257ffc582c845be6a0707902c7e59906ac93cfe4ba47ba1b7640b03"
+      },
+      {
+        "version": "20260904001510",
+        "name": "phase2_reseal_legacy_plaintext_credentials",
+        "sha256": "9cf54fb7a1354db3ee6cf6ad01a1ebe9b32d46a61f7b7378d8dcb17948b83ae8"
+      },
+      {
+        "version": "20260904200000",
+        "name": "phase3_ledger_foundation",
+        "sha256": "d4b594bc1c6355f007ceb508e10a785d15da90036d30d5f237e1c66155677e0a"
+      },
+      {
+        "version": "20260904203000",
+        "name": "phase3_deterministic_backfill",
+        "sha256": "315b7c5e40910e61a054c2dfaecfc75585acbb8192d38932081e4375315bb3ce"
+      },
+      {
+        "version": "20260904210000",
+        "name": "phase3_atomic_retail_checkout",
+        "sha256": "446b00d7281a5cef1edfa8b1add1b35d03a0695bec606a5100a85d9b988ee0b4"
+      },
+      {
+        "version": "20260904220000",
+        "name": "phase3_atomic_repair_transactions",
+        "sha256": "6d83781811ccb86f8793aaa9e8ca9060f81dd8ac3d68dce2acce508fb401f821"
+      },
+      {
+        "version": "20260904230000",
+        "name": "phase3_additional_work_and_adjustments",
+        "sha256": "11bd640f993c8ef30ebdde0d68cc7b84ea6b7db7893b32cf8c1068bb68353f9c"
+      },
+      {
+        "version": "20260905000000",
+        "name": "phase3_repair_cancellation_and_delivery",
+        "sha256": "9c7f49bd93c0ed43d3b3077b4765f6c29ad536f5d6a364fd89abc07dd3b539d2"
+      },
+      {
+        "version": "20260905010000",
+        "name": "phase3_retail_returns_and_inventory_adjustments",
+        "sha256": "6e243c4bfaac02dd8f4aa1af1ff5005f6f88780b543111b342e334630d63b224"
+      },
+      {
+        "version": "20260905011000",
+        "name": "phase3_return_line_invariant",
+        "sha256": "8dad9eae243264a1bddce5a48f2cfd1de59f94443db41008f15b2a3ce5a75343"
+      },
+      {
+        "version": "20260905020000",
+        "name": "phase3_unified_udhar_and_reporting",
+        "sha256": "ea4026c200dc454b2aa3b9fa31b5be34f53c7a98a45a18148790896f3cbeda8f"
+      },
+      {
+        "version": "20260905030000",
+        "name": "phase3_repair_family_summary",
+        "sha256": "3919d87bbdfc0ab39c2655b347b9f95cb785e9dfc654b28ea519d5065ae78d4a"
+      },
+      {
+        "version": "20260905031000",
+        "name": "phase3_repair_component_change_guard",
+        "sha256": "ab5e8f53d3639b92d7082016bba0ca6ff750dd9e73a151abee85a82460485f2d"
+      },
+      {
+        "version": "20260917015216",
+        "name": "phase4_pin_request_security",
+        "sha256": "ad23b94d145fd7dc0898d1a973d12788d574d6540d776937843c51fbb279a4f0"
+      },
+      {
+        "version": "20260917174024",
+        "name": "phase4_platform_bridge",
+        "sha256": "a239ffc772f61a089a893ef1e3cef127db3b62b8240235403ddfe4df7111de5d"
+      },
+      {
+        "version": "20260919043803",
+        "name": "phase4_invoice_creation_bill_semantics",
+        "sha256": "5abf5083a62711363e6294ea2f0a299c0d8aaf55104a3a54be0bb1aae9e92678"
+      },
+      {
+        "version": "20260920195256",
+        "name": "remove_legacy_workshop_config_alias",
+        "sha256": "d96dac8db0261263573b1e3d6e2943ec70e94c686863a203957b7ed1e047c6ae"
+      },
+      {
+        "version": "20260929090000",
+        "name": "onboarding_v2",
+        "sha256": "2a7c8d0ef19e54ac3057cb8f3824ec08fdb3383dd5d4e17a53c7090677158786"
+      },
+      {
+        "version": "20261001090000",
+        "name": "manual_owner_activation",
+        "sha256": "50fdaade67e7b71db56c7c623cb20bdc4f0d8b3c975e7d24da6a48e614b7abc1"
+      },
+      {
+        "version": "20261001110000",
+        "name": "shop_config_service_role_read",
+        "sha256": "b2e8f19847af856df419b830f2a673f58172e4b4cb18637eac8c4e17b876a94f"
+      },
+      {
+        "version": "20261001120000",
+        "name": "onboarding_runtime_preflight",
+        "sha256": "bb9628fce78a444d39dbcaa79f35c857506e5838f383ab38313931f67e159aec"
+      },
+      {
+        "version": "20261002015159",
+        "name": "legal_acceptance",
+        "sha256": "69ab3528142d4b7191202c8a0db75dd7791674abfe67b34914eaefa5851e8eaa"
+      },
+      {
+        "version": "20261002071259",
+        "name": "legal_policy_metadata",
+        "sha256": "495947de90f76f4b3c39b75a0ad453bcac9614b2a4860cebafd1de2152b27a51"
+      },
+      {
+        "version": "20261003121000",
+        "name": "config_request_journal",
+        "sha256": "2040399a420d2f9f32c5180867449e066872939e200357e11d3e502845f24f52"
+      },
+      {
+        "version": "20261018000617",
+        "name": "customer_support_actor",
+        "sha256": "1b1431a0053e0be5f3a1d1727ea7760af2edb4e411010c04273da3596190ea29"
+      },
+      {
+        "version": "20261019000028",
+        "name": "support_installation_readiness",
+        "sha256": "4b088fcbcab033924fe60f091fa6ddb02e4a5c8809e071c3cef5b095ac973410"
+      },
+      {
+        "version": "20261020135016",
+        "name": "fresh_initialization_guard",
+        "sha256": "a6c1b3a9032cbd6b0d64a71606a23fc9a158b86834f3cfbf0e5ceac5a192e054"
+      },
+      {
+        "version": "20261020135251",
+        "name": "paper_customer_communication",
+        "sha256": "e12ba42a09d402140bd6cb0399f5f8618f3ca58da885153107daf1c397f950e8"
+      },
+      {
+        "version": "20261022155952",
+        "name": "support_session_consent",
+        "sha256": "39bb0ebb6da2289691623c247e43c2ca58fe95e990517356759fba0daf3c569c"
+      },
+      {
+        "version": "20261023012311",
+        "name": "durable_support_and_backend_capabilities",
+        "sha256": "1172021d24bb7de58976d20fdfc8de36050bc7dfdf2b6e80582ce01cc96d91db"
+      }
+    ],
+    "function_manifest": [
+      {
+        "name": "account-admin",
+        "verify_jwt": true,
+        "sha256": "5de3ec25640842b6e0c3199d8c11aa696fbb84f8b46ce4d33851f9e7650c2c78"
+      },
+      {
+        "name": "login",
+        "verify_jwt": true,
+        "sha256": "0780ab45754510c98421273539b9a28323421dc866246ddf10d878fe864593c7"
+      },
+      {
+        "name": "password-reset-request",
+        "verify_jwt": true,
+        "sha256": "bd30100eed308b1c56224132a089a295e3e5ea7b97ae7ae1755023f20efc3c1e"
+      },
+      {
+        "name": "public-track",
+        "verify_jwt": true,
+        "sha256": "830536e83c5678810773c0357d9c505e9bbaf3d8dd99a4344e59d68fede9005a"
+      },
+      {
+        "name": "verify-pin",
+        "verify_jwt": true,
+        "sha256": "475afb3a59deb45684407cedb3fa779ca7a039e7e54e650cbcca007409ac6905"
+      },
+      {
+        "name": "platform-bridge",
+        "verify_jwt": false,
+        "sha256": "9afcfaaab5cf372c58bff86ca1e01cbff0991e69da7645bac2cef3d19dbf1aef"
+      },
+      {
+        "name": "support-tickets",
+        "verify_jwt": true,
+        "sha256": "e55102c0385f9c2674e6fac7e8c063ccf7b227026ae78b7f3efe8dae7d0648d7"
+      }
+    ],
+    "review_status": "superseded-local-candidate"
+  },
+  "64fcec36fa7a5e2565db2a6d3aa6ddbd8e6c1170eefd4a07a57ae6ba0c066a31": {
+    "release_id": "support-v6",
+    "migrations": 38,
+    "functions": 7,
+    "supported": true,
+    "approved_for_new": true,
+    "successor": null,
+    "upgrade_policy": "optional",
+    "compatibility": {
+      "bridge": 1,
+      "billing": 1,
+      "support": 1,
+      "config": 1
+    },
+    "requirements": [
+      "core-runtime",
+      "usage-outbox",
+      "billing-projection",
+      "config-journal",
+      "support-identity",
+      "support-consent",
+      "owner-bootstrap",
+      "support-durable-submissions"
+    ],
+    "required_evidence": [
+      "migration-provenance",
+      "deployed-source",
+      "gateway",
+      "current-database-capabilities"
+    ],
+    "migration_manifest": [
+      {
+        "version": "00000000000000",
+        "name": "baseline_schema",
+        "sha256": "7c7535b814e62523b27948155d592ccd460d1ff0a3f253e50da41c3321c287c9"
+      },
+      {
+        "version": "20260712000000",
+        "name": "invoice_numbering",
+        "sha256": "b8afc5a9c58860857e8e4722b7f6e909debdf4dfa1155e7b488bcfb018816785"
+      },
+      {
+        "version": "20260903020000",
+        "name": "support_access_log",
+        "sha256": "ff7b6bb1d300cf98f5598d7a92514c67d8e2aa3218763965f573a2d129761306"
+      },
+      {
+        "version": "20260903165753",
+        "name": "phase2_auth_foundation",
+        "sha256": "cae1c8dd30513c304c3b21567ba7c32984edffeba47d7a4dfd0ed060a0185659"
+      },
+      {
+        "version": "20260903170222",
+        "name": "phase2_auth_bridge_helpers",
+        "sha256": "0ad43008d064eab8f75a15eb5bab1a52eac1387e4c53df39aa78addb78537c45"
+      },
+      {
+        "version": "20260903171448",
+        "name": "phase2_security_helpers",
+        "sha256": "269386e1963e2c2c7e791b2bf085b0ca6e1de90db6a03596f9e1fc9b4135cca1"
+      },
+      {
+        "version": "20260903175518",
+        "name": "phase2_legacy_credential_vault",
+        "sha256": "13913ad6a1ced76e349e89bb174ba8ade654923696646a3516e78c6ad63addbd"
+      },
+      {
+        "version": "20260903180703",
+        "name": "phase2_neutralize_unused_employee_pin",
+        "sha256": "1d5a4dba7e69350589d6e5e30322d3116a1e547fa2797bd6ffbc85194f4e7cbf"
+      },
+      {
+        "version": "20260903181153",
+        "name": "phase2_authenticated_rls",
+        "sha256": "0a1e617f7257ffc582c845be6a0707902c7e59906ac93cfe4ba47ba1b7640b03"
+      },
+      {
+        "version": "20260904001510",
+        "name": "phase2_reseal_legacy_plaintext_credentials",
+        "sha256": "9cf54fb7a1354db3ee6cf6ad01a1ebe9b32d46a61f7b7378d8dcb17948b83ae8"
+      },
+      {
+        "version": "20260904200000",
+        "name": "phase3_ledger_foundation",
+        "sha256": "d4b594bc1c6355f007ceb508e10a785d15da90036d30d5f237e1c66155677e0a"
+      },
+      {
+        "version": "20260904203000",
+        "name": "phase3_deterministic_backfill",
+        "sha256": "315b7c5e40910e61a054c2dfaecfc75585acbb8192d38932081e4375315bb3ce"
+      },
+      {
+        "version": "20260904210000",
+        "name": "phase3_atomic_retail_checkout",
+        "sha256": "446b00d7281a5cef1edfa8b1add1b35d03a0695bec606a5100a85d9b988ee0b4"
+      },
+      {
+        "version": "20260904220000",
+        "name": "phase3_atomic_repair_transactions",
+        "sha256": "6d83781811ccb86f8793aaa9e8ca9060f81dd8ac3d68dce2acce508fb401f821"
+      },
+      {
+        "version": "20260904230000",
+        "name": "phase3_additional_work_and_adjustments",
+        "sha256": "11bd640f993c8ef30ebdde0d68cc7b84ea6b7db7893b32cf8c1068bb68353f9c"
+      },
+      {
+        "version": "20260905000000",
+        "name": "phase3_repair_cancellation_and_delivery",
+        "sha256": "9c7f49bd93c0ed43d3b3077b4765f6c29ad536f5d6a364fd89abc07dd3b539d2"
+      },
+      {
+        "version": "20260905010000",
+        "name": "phase3_retail_returns_and_inventory_adjustments",
+        "sha256": "6e243c4bfaac02dd8f4aa1af1ff5005f6f88780b543111b342e334630d63b224"
+      },
+      {
+        "version": "20260905011000",
+        "name": "phase3_return_line_invariant",
+        "sha256": "8dad9eae243264a1bddce5a48f2cfd1de59f94443db41008f15b2a3ce5a75343"
+      },
+      {
+        "version": "20260905020000",
+        "name": "phase3_unified_udhar_and_reporting",
+        "sha256": "ea4026c200dc454b2aa3b9fa31b5be34f53c7a98a45a18148790896f3cbeda8f"
+      },
+      {
+        "version": "20260905030000",
+        "name": "phase3_repair_family_summary",
+        "sha256": "3919d87bbdfc0ab39c2655b347b9f95cb785e9dfc654b28ea519d5065ae78d4a"
+      },
+      {
+        "version": "20260905031000",
+        "name": "phase3_repair_component_change_guard",
+        "sha256": "ab5e8f53d3639b92d7082016bba0ca6ff750dd9e73a151abee85a82460485f2d"
+      },
+      {
+        "version": "20260917015216",
+        "name": "phase4_pin_request_security",
+        "sha256": "ad23b94d145fd7dc0898d1a973d12788d574d6540d776937843c51fbb279a4f0"
+      },
+      {
+        "version": "20260917174024",
+        "name": "phase4_platform_bridge",
+        "sha256": "a239ffc772f61a089a893ef1e3cef127db3b62b8240235403ddfe4df7111de5d"
+      },
+      {
+        "version": "20260919043803",
+        "name": "phase4_invoice_creation_bill_semantics",
+        "sha256": "5abf5083a62711363e6294ea2f0a299c0d8aaf55104a3a54be0bb1aae9e92678"
+      },
+      {
+        "version": "20260920195256",
+        "name": "remove_legacy_workshop_config_alias",
+        "sha256": "d96dac8db0261263573b1e3d6e2943ec70e94c686863a203957b7ed1e047c6ae"
+      },
+      {
+        "version": "20260929090000",
+        "name": "onboarding_v2",
+        "sha256": "2a7c8d0ef19e54ac3057cb8f3824ec08fdb3383dd5d4e17a53c7090677158786"
+      },
+      {
+        "version": "20261001090000",
+        "name": "manual_owner_activation",
+        "sha256": "50fdaade67e7b71db56c7c623cb20bdc4f0d8b3c975e7d24da6a48e614b7abc1"
+      },
+      {
+        "version": "20261001110000",
+        "name": "shop_config_service_role_read",
+        "sha256": "b2e8f19847af856df419b830f2a673f58172e4b4cb18637eac8c4e17b876a94f"
+      },
+      {
+        "version": "20261001120000",
+        "name": "onboarding_runtime_preflight",
+        "sha256": "bb9628fce78a444d39dbcaa79f35c857506e5838f383ab38313931f67e159aec"
+      },
+      {
+        "version": "20261002015159",
+        "name": "legal_acceptance",
+        "sha256": "69ab3528142d4b7191202c8a0db75dd7791674abfe67b34914eaefa5851e8eaa"
+      },
+      {
+        "version": "20261002071259",
+        "name": "legal_policy_metadata",
+        "sha256": "495947de90f76f4b3c39b75a0ad453bcac9614b2a4860cebafd1de2152b27a51"
+      },
+      {
+        "version": "20261003121000",
+        "name": "config_request_journal",
+        "sha256": "2040399a420d2f9f32c5180867449e066872939e200357e11d3e502845f24f52"
+      },
+      {
+        "version": "20261018000617",
+        "name": "customer_support_actor",
+        "sha256": "1b1431a0053e0be5f3a1d1727ea7760af2edb4e411010c04273da3596190ea29"
+      },
+      {
+        "version": "20261019000028",
+        "name": "support_installation_readiness",
+        "sha256": "4b088fcbcab033924fe60f091fa6ddb02e4a5c8809e071c3cef5b095ac973410"
+      },
+      {
+        "version": "20261020135016",
+        "name": "fresh_initialization_guard",
+        "sha256": "a6c1b3a9032cbd6b0d64a71606a23fc9a158b86834f3cfbf0e5ceac5a192e054"
+      },
+      {
+        "version": "20261020135251",
+        "name": "paper_customer_communication",
+        "sha256": "e12ba42a09d402140bd6cb0399f5f8618f3ca58da885153107daf1c397f950e8"
+      },
+      {
+        "version": "20261022155952",
+        "name": "support_session_consent",
+        "sha256": "39bb0ebb6da2289691623c247e43c2ca58fe95e990517356759fba0daf3c569c"
+      },
+      {
+        "version": "20261023012311",
+        "name": "durable_support_and_backend_capabilities",
+        "sha256": "1172021d24bb7de58976d20fdfc8de36050bc7dfdf2b6e80582ce01cc96d91db"
+      }
+    ],
+    "function_manifest": [
+      {
+        "name": "account-admin",
+        "verify_jwt": true,
+        "sha256": "5de3ec25640842b6e0c3199d8c11aa696fbb84f8b46ce4d33851f9e7650c2c78"
+      },
+      {
+        "name": "login",
+        "verify_jwt": true,
+        "sha256": "0780ab45754510c98421273539b9a28323421dc866246ddf10d878fe864593c7"
+      },
+      {
+        "name": "password-reset-request",
+        "verify_jwt": true,
+        "sha256": "bd30100eed308b1c56224132a089a295e3e5ea7b97ae7ae1755023f20efc3c1e"
+      },
+      {
+        "name": "public-track",
+        "verify_jwt": true,
+        "sha256": "830536e83c5678810773c0357d9c505e9bbaf3d8dd99a4344e59d68fede9005a"
+      },
+      {
+        "name": "verify-pin",
+        "verify_jwt": true,
+        "sha256": "475afb3a59deb45684407cedb3fa779ca7a039e7e54e650cbcca007409ac6905"
+      },
+      {
+        "name": "platform-bridge",
+        "verify_jwt": false,
+        "sha256": "9afcfaaab5cf372c58bff86ca1e01cbff0991e69da7645bac2cef3d19dbf1aef"
+      },
+      {
+        "name": "support-tickets",
+        "verify_jwt": true,
+        "sha256": "95b8709291be8f109d5e58b0c27831932e89270eaa8284d0711e86c0942eef5f"
+      }
+    ]
   }
 }
