@@ -802,3 +802,44 @@ as their production branch. The final metadata checkpoint therefore uses the
 established [CF-Pages-Skip] prefix to suppress its automatic Pages deployment;
 hosting settings are unchanged. Actual remote skip/CI results are recorded in the
 external release-parity-fleet-continuity-2026-10-23 evidence.
+
+## 2026-10-23 — Customer-owned controlled upgrades and current release guidance
+Branch: feature/verified-customer-support-shop
+
+Replaced ungated terminal upgrade execution with the customer-owned BYO path backed
+by the Platform's exact approved plan/request and pending-operation fence. Managed
+terminal mode now refuses and directs the operator to the live Master workflow.
+The CLI verifies approved source/target, exact project/client/source/binding, native
+CLI capabilities and actual SQL progress; requires separate customer confirmation,
+an expiring private clearance and original private journal; and shares the bounded
+planner/engine with Managed. No customer PAT/service key/password reaches Platform
+or browser. A blocked claim causes no provider write; missing/unknown outcomes retain
+the original UUID for authoritative review. Only missing SQL and changed functions
+are installed, preserving owner, pairing, configuration receipts and customer data.
+
+Customer assessment and checkpoints are explicitly customer-reported evidence.
+SQL/gateway/runtime checks do not become full deployed-source compliance; final
+state requires source/component review and separate hosted acceptance. The owner
+Support screen has restrained read-only upgrade guidance that also works on older
+supported backends without assuming new RPCs. Historical upgrade instructions are
+labelled superseded; current instructions identify immutable support-v6 and distinguish
+fresh source, historical pins, observed ledger and independent installed proof.
+
+Five focused contract/source/CLI/UI cases and three directly affected Support,
+financial and legacy compatibility cases pass. Real owned PG17 checks verify shared
+approval/ACL/concurrent/session/recovery rules, preserve an actual old pin, and apply
+v4→v6 SQL idempotently while retaining Shop configuration/journal data. The customer
+CLI fixture covers blocked clearance and successful serial original-ID execution.
+Changed Edge typecheck, both explicit-public builds, syntax/diff and canonical parity
+pass. Windows sandbox atomic-rename denial was isolated; the unchanged safe journal
+path passes in an ordinary Windows private temp directory. No unsafe fallback.
+
+No packaged Shop migration/function/dependency changed, so v6 remains unchanged at
+64fcec36fa7a5e2565db2a6d3aa6ddbd8e6c1170eefd4a07a57ae6ba0c066a31;
+no v7 or new fingerprint was needed. Historical releases/pins are preserved. New
+Platform SQL then platform-upgrade/UI rollout remains pending; deployed provisionv26
+is not reinstalled. Owner kept independent fresh hosted acceptance pending and BYO
+admin is unavailable. No hosted install/upgrade/reset, secrets/Auth/Vault change,
+production promotion or merge. Checkpoint uses [CF-Pages-Skip]; actual remote results
+are external in controlled-upgrades-stabilization-2026-10-23. Both existing PRs stay
+Draft/Open/unmerged against development.

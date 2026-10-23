@@ -1,4 +1,5 @@
 import {escapeHTML as esc} from '../../html.js';
+import {backendUpgradeGuidance} from '../backend-upgrade-guidance.js';
 export function supportPage(v,owner=false) {
  const detail=t=>`<div class="card" style="display:grid;gap:10px"><h3>${esc(t.subject)}</h3>
   <div>${esc(t.category)} Â· ${esc(t.status)} Â· ${esc(new Date(t.created_at).toLocaleString())}</div>
@@ -17,6 +18,7 @@ export function supportPage(v,owner=false) {
   ${v.pending?`<p role="status">${v.deliveryState==='review'?'This saved request needs review before another delivery attempt. Keep its original reference and contact your administrator.':v.deliveryState?'Saved in this Shop. Platform acknowledgment is pending; a signed-in retry uses the original request.':'The outcome is uncertain. Retry the same request after reconnecting; delivery is not confirmed.'}</p>`:''}
   <button type="submit" class="primary-button" ${v.busy?'disabled':''}>${v.busy?'Please waitâ€¦':v.pending?'Retry original request':'Submit request'}</button>
  </form>
+ ${owner?backendUpgradeGuidance():''}
  <div class="toolbar"><h3>Support history</h3><button data-action="customer-support-refresh" ${v.busy?'disabled':''}>Refresh</button></div>
  ${v.detail?detail(v.detail):''}
  ${owner?`<section class="card"><h3>Privileged support access Â· separate owner approval</h3><p>Submitting a ticket grants no Shop access. Approve only a reviewed case. This allows the canonical Support role to view and manage Shop application operations for up to 30 minutes; it does not share database credentials. Revoking blocks subsequent server operations. Already displayed data is not erased and existing browser sessions are not claimed signed out.</p>

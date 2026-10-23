@@ -1,3 +1,5 @@
+> Historical procedure: its terminal Managed path and ungated apply are superseded. Use [controlled upgrade procedure](CONTROLLED_BACKEND_UPGRADES.md). Current fresh source is support-v6; historical pins remain unchanged.
+
 # Existing Shop: additive backend upgrade
 
 This is a reviewed procedure, not deployment authorization. Fresh installations use
