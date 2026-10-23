@@ -746,3 +746,37 @@ metadata checkpoint. New SQL must precede changed Shop functions/UI. No hosted S
 Edge deployment, reset, credential rotation, customer suspension or production
 promotion. Live BYO administration remains unavailable and hosted acceptance remains
 separate. See docs/BACKEND_DIAGNOSTICS_AND_DELIVERY.md and new external milestone evidence.
+
+
+## 2026-10-23 — Final immutable support-v5 metadata
+Branch: feature/verified-customer-support-shop
+
+Completed backend source f9df8eb0ac4055378a77fdfc11503cc9007882ca was packaged only after the Support/diagnostic
+implementation and focused SQL/source checks. NEW immutable support-v5 contains 38
+migrations / 7 functions; canonical SHA-256 7953927660473aeaafcc62b3b8d45e382f5189d1536f7e0100b890d938ff5fdd.
+Both source selectors/manifests/catalogs reference that exact package. Catalogs
+retain all older hashes and describe optional upgrades, supported releases and
+evidence limitations. No existing job pin or customer backend is changed. Packaged
+source did not change after this build; the following commit is release metadata
+only. The canonical final committed-source gate and actual CI/provider outcomes
+are recorded in the external milestone report. Hosted rollout/acceptance remains
+separate; production promotion and PR merges remain unauthorized.
+
+
+## 2026-10-23 — Legacy receipt compatibility before final release
+Branch: feature/verified-customer-support-shop
+
+Final old/new client review found that an older Shop page treats any2xx as a reason
+to clear its original request. The sender now returns503 for uncertain delivery to
+legacy clients, preserving their UUID, and returns an explicit persisted/pending202
+only to a client opting in through the already CORS-allowed x-client-info header.
+The new client works with the older handler, which ignores that header. Verified
+Platform receipts keep their existing accepted shape. No authentication, ticket
+wire contract, queue authority or consent is weakened.
+
+The locally fingerprinted support-v5 candidate remains immutable at
+7953927660473aeaafcc62b3b8d45e382f5189d1536f7e0100b890d938ff5fdd;
+it was not deployed or installed and is superseded for fresh selection. The corrected
+backend requires NEW support-v6, generated only after this source correction is
+committed. Old-v4 remains supported; no existing Shop was upgraded or repinned.
+The focused compatibility fixture covers both old and opted-in pending responses.

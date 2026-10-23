@@ -31,7 +31,7 @@ export function createSupportClient(sb, options={}) {
  }
  sb.auth.onAuthStateChange?.((_event,s)=>{const identity=identityOf(s);if(identity!==owner){reset(owner!==null||!identity);owner=identity;}});
  async function call(body){const identity=await session(),generation=epoch;
-  const {data,error}=await sb.functions.invoke('support-tickets',{body});
+  const {data,error}=await sb.functions.invoke('support-tickets',{body,headers:{'x-client-info':'retrasell-support-journal-v1'}});
   let failure;
   if(error||data?.error){let message=data?.error;try{message=(await error?.context?.json())?.error||message;}catch{}
    failure=Error(message||'Support is unavailable or not enabled. Retry the same request when access is restored.');failure.status=error?.context?.status;}

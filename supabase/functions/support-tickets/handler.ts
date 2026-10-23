@@ -21,7 +21,13 @@ export function ticketHandler(env: (key:string)=>string|undefined,fetcher: typeo
     return Response.json({contract:CONTRACT,challenge:raw.challenge,project_ref:ref,...c,endpoint:target,proof:await proof(await sha(secret),signed)},{headers:cors});
    }
    const body=fields(raw),token=bearer(req),context=await actor(fetcher,url,key,token);
-   if(body.action==='create')return Response.json(await deliverSubmission(fetcher,url,key,env('SUPABASE_SERVICE_ROLE_KEY')||'',token,target,secret,body,context),{status:202,headers:cors});
+   if(body.action==='create'){
+    const result=await deliverSubmission(fetcher,url,key,env('SUPABASE_SERVICE_ROLE_KEY')||'',token,target,secret,body,context);
+    // Existing clients clear an intent on any 2xx. They must retain its UUID on
+    // uncertainty; modern clients explicitly opt into the durable pending receipt.
+    if(result.accepted!==true&&req.headers.get('x-client-info')!=='retrasell-support-journal-v1')return Response.json({error:'Support acknowledgment is pending. Keep and retry the original request after reconnecting.'},{status:503,headers:cors});
+    return Response.json(result,{status:202,headers:cors});
+   }
    const forwarded={...body,contract:CONTRACT,project_ref:ref,source_id:context.source_id,client_binding:context.client_binding};
    const response=await http(fetcher,target,{Authorization:'Bearer '+secret,'X-Shop-User-Authorization':'Bearer '+token},forwarded);
    if(!response.ok)throw new SupportError([400,401,403,404,409,413,429,503].includes(response.status)?response.status:503);

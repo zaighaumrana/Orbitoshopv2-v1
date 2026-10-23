@@ -5,9 +5,10 @@ export function assessBackend(catalog:any[],packages:Record<string,any>,observat
  let migrationRelease:any=null,conflict=false;
  const history=observation.migrations;
  if(Array.isArray(history)){
-  const match=catalog.find(c=>{const r=packages[c.release_id];return r&&history.length===r.migrations.length&&history.every((m:any,i:number)=>m.version===r.migrations[i].version&&m.name===r.migrations[i].name&&m.sha256===r.migrations[i].sha256)});
-  if(match)migrationRelease=match;
-  else if(target&&history.some((m:any,i:number)=>!target.migrations[i]||m.version!==target.migrations[i].version||m.name!==target.migrations[i].name||m.sha256!==target.migrations[i].sha256)){conflict=true;missing.push('migration-provenance-conflict');}
+  const matches=catalog.filter(c=>{const r=packages[c.release_id];return r&&history.length===r.migrations.length&&history.every((m:any,i:number)=>m.version===r.migrations[i].version&&m.name===r.migrations[i].name&&m.sha256===r.migrations[i].sha256)});
+  const exactSources=matches.filter(c=>observation.database_source_match===true&&packages[c.release_id].functions.every((f:any)=>observation.functions?.some((v:any)=>v.name===f.name&&v.present===true&&v.verify_jwt===f.verify_jwt&&v.source_sha256===f.sha256)));
+  if(matches.length===1)migrationRelease=matches[0];else if(exactSources.length===1)migrationRelease=exactSources[0];else if(matches.length>1)limitations.push('Migration history matches multiple release packages; deployed source evidence is required');
+  else if(matches.length===0&&target&&history.some((m:any,i:number)=>!target.migrations[i]||m.version!==target.migrations[i].version||m.name!==target.migrations[i].name||m.sha256!==target.migrations[i].sha256)){conflict=true;missing.push('migration-provenance-conflict');}
   else limitations.push('migration history is incomplete; no installed release inferred');
  }else limitations.push('migration provenance unavailable');
  const base=migrationRelease&&packages[migrationRelease.release_id],functions=observation.functions;

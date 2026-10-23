@@ -374,6 +374,10 @@
       "invoice/payment commit",
       "new Support acceptance before Shop persistence"
     ],
-    "automatic_upgrade": false
+    "automatic_upgrade": false,
+    "shop_receipts": {
+      "legacy": "503 preserves original browser intent for uncertain delivery",
+      "durable": "explicit opt-in with existing CORS-allowed x-client-info; 202 distinguishes Shop persistence from Platform acknowledgment"
+    }
   }
 }
