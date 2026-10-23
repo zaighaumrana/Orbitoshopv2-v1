@@ -1,3 +1,5 @@
+import {installationPlan} from './backend-plan.mjs';
+import {buildRelease} from './build-platform-release.mjs';
 import {readFileSync,unlinkSync,realpathSync,statSync} from 'node:fs';
 import {resolve,dirname,relative,isAbsolute,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -5,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {ConfigurationError,validatePublicConfig,validateTurnstileSecret} from './byo-public-config.mjs';
 import {validClientId,validShopProject} from './byo-identity.mjs';
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
-const FUNCTIONS=['login','account-admin','verify-pin','password-reset-request','public-track','platform-bridge'];
+
 const REQUIRED=['migrations','database_privileges','rpc_privileges','sequence_privileges','private_config','storage','database_reachable','bridge_configuration','edge_functions','runtime_configuration','authentication'];
 const TICKETS=['PLATFORM_SUPPORT_TICKETS_ENDPOINT','PLATFORM_SUPPORT_TICKETS_SECRET'];
 const SUPPORT=['PLATFORM_SUPABASE_URL','PLATFORM_SUPABASE_ANON','PLATFORM_AUTH_EMAIL'];
@@ -79,11 +81,14 @@ export async function runSetup(args,deps={}){
  if(!Array.isArray(projects)||!projects.some(p=>p.id===opt['project-ref']))fail('Current Supabase CLI account cannot access the selected Shop project. Obtain temporary authorised project access or use screen sharing.');
  report('PASS: branch, target, separate secret files and project visibility in the current CLI account.');
  if(!opt.apply){report('VALIDATION ONLY: no hosted changes made. After approved full migration release, rerun with --apply.');return;}
+ const backend=buildRelease(ROOT,{support:true}),plan=installationPlan(backend,'byo');
+ const manifest=JSON.parse(readFileSync(resolve(ROOT,'scripts/byo-release-manifest.json'),'utf8'));
+ if(manifest.sha256!==backend.sha256)fail('Approved release manifest differs from this checkout.');
  // Only the authorised local Supabase CLI sees these private files. Never send them to Platform.
  for(const [label,path] of [['application runtime',runtimePath],['bridge pairing',pairPath]]) {
   report('Installing '+label+' settings.');invoke(cli,['secrets','set','--project-ref',opt['project-ref'],'--env-file',path]);
  }
- for(const name of [...FUNCTIONS,...(runtime.values.PLATFORM_SUPPORT_TICKETS_SECRET?['support-tickets']:[])]) { report('Deploying '+name+'.');invoke(cli,['functions','deploy',name,'--project-ref',opt['project-ref'],'--use-api']); }
+ for(const fn of [...plan.coreFunctions,...(runtime.values.PLATFORM_SUPPORT_TICKETS_SECRET?plan.deferredFunctions:[])]) { report('Deploying '+fn.name+'.');invoke(cli,['functions','deploy',fn.name,'--project-ref',opt['project-ref'],'--use-api',...(fn.verify_jwt?[]:['--no-verify-jwt'])]); }
  report('PASS: required secrets installed and '+(runtime.values.PLATFORM_SUPPORT_TICKETS_SECRET?'seven functions (including customer Support)':'six functions')+' deployed.');
  const fetcher=deps.fetch||fetch;
  const response=await fetcher('https://'+opt['project-ref']+'.supabase.co/functions/v1/platform-bridge',{

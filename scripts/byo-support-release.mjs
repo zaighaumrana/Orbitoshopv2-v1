@@ -1,3 +1,4 @@
+import {installationPlan} from './backend-plan.mjs';
 // Customer-operated, single-account CLI workflow. No customer PAT, database
 // password or service key is accepted by or forwarded to Platform.
 import {readFileSync,writeFileSync,mkdtempSync,unlinkSync,rmdirSync,existsSync} from 'node:fs';
@@ -29,7 +30,7 @@ export async function runByoRelease(args,deps={}){
  const report=deps.report||console.log;
  const projects=JSON.parse(invoke(['projects','list','--output','json']));
  if(!projects.some(p=>p.id===ref))throw Error('Customer CLI account cannot access this exact project.');
- const release=deps.release||buildRelease(root,{support:true});
+ const release=deps.release||buildRelease(root,{support:true});const plan=installationPlan(release,'byo');
  if(opt['--release-sha']!==release.sha256)throw Error('Customer checkout differs from the owner-approved release fingerprint.');
  const query=sql=>{
   const dir=mkdtempSync(join(tmpdir(),'retrasell-byo-sql-')),file=join(dir,'query.sql');
@@ -50,7 +51,7 @@ export async function runByoRelease(args,deps={}){
   const ledger=query("select to_regclass('supabase_migrations.schema_migrations') is not null as present");
   const history=ledger?.[0]?.present?query('select version,name,statements from supabase_migrations.schema_migrations order by version'):[];
   const count=query("select count(*)::integer as count from pg_tables where schemaname='public'")?.[0]?.count;
-  const missing=planMigrations(history,release,opt['--mode'],count);
+  const missing=planMigrations(history,{...release,migrations:plan.migrations},opt['--mode'],count);
   const pairing=parseEnv(readFileSync(opt['--pairing-file'],'utf8'),['PLATFORM_BRIDGE_CALL_SECRET','PLATFORM_BRIDGE_SOURCE_SECRET','PLATFORM_BRIDGE_ENDPOINT']);
   if(opt['--mode']==='existing'){
    const bound=query('select sc.onboarding_version,sc.platform_client_id,bc.client_binding from public.shop_config sc cross join app_private.bridge_config bc where sc.id=1 and bc.singleton')?.[0];
@@ -69,7 +70,7 @@ export async function runByoRelease(args,deps={}){
    if(state?.onboarding_version!==0||state.onboarding_completed_at!==null||state.platform_client_id!==null)throw Error('Fresh initialization is not proven. No runtime secrets replaced; owner review is required.');
    await (deps.setup||runSetup)([...setupArgs,'--apply'],setupDeps);
   }
-  invoke(['functions','deploy','support-tickets','--project-ref',ref,'--use-api']);
+  for(const fn of plan.deferredFunctions)invoke(['functions','deploy',fn.name,'--project-ref',ref,'--use-api',...(fn.verify_jwt?[]:['--no-verify-jwt'])]);
   report('Installed the approved release. In Platform reserve the existing owner, confirm their Shop Auth account, then let the owner complete onboarding. No owner or Shop was reset.');
  }else if(opt['--phase']==='enroll'){
   if(!opt['--config']||!opt['--support-file']||!opt['--enrollment-file'])throw Error('Reviewed public target, private Support settings and separate hash handoff paths required.');

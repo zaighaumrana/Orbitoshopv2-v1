@@ -1,4 +1,5 @@
 import {CONTRACT,UUID,fields,jsonBody,bearer,project,endpoint,actor,rpc,http,proof,sha,SupportError,fail} from './protocol.ts';
+import {deliverSubmission} from './delivery.ts';
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization,apikey,content-type,x-client-info','Access-Control-Allow-Methods':'POST,OPTIONS','Cache-Control':'no-store','Referrer-Policy':'no-referrer'};
 export function ticketHandler(env: (key:string)=>string|undefined,fetcher: typeof fetch=fetch) {
  return async(req: Request)=>{
@@ -20,14 +21,14 @@ export function ticketHandler(env: (key:string)=>string|undefined,fetcher: typeo
     return Response.json({contract:CONTRACT,challenge:raw.challenge,project_ref:ref,...c,endpoint:target,proof:await proof(await sha(secret),signed)},{headers:cors});
    }
    const body=fields(raw),token=bearer(req),context=await actor(fetcher,url,key,token);
+   if(body.action==='create')return Response.json(await deliverSubmission(fetcher,url,key,env('SUPABASE_SERVICE_ROLE_KEY')||'',token,target,secret,body,context),{status:202,headers:cors});
    const forwarded={...body,contract:CONTRACT,project_ref:ref,source_id:context.source_id,client_binding:context.client_binding};
    const response=await http(fetcher,target,{Authorization:'Bearer '+secret,'X-Shop-User-Authorization':'Bearer '+token},forwarded);
    if(!response.ok)throw new SupportError([400,401,403,404,409,413,429,503].includes(response.status)?response.status:503);
    // Only fixed customer fields may reach the browser, even if upstream expands.
    const ticket=(t:any)=>{if(!t||!UUID.test(t.ticket_id||''))throw new SupportError(503);return Object.fromEntries(['ticket_id','subject','category','message','status','created_at','resolved_at','revision','resolution'].map(k=>[k,t[k]]));};
    let result:any;
-   if(body.action==='create'){if(response.data?.accepted!==true||!UUID.test(response.data.ticket_id||''))throw new SupportError(503);result={accepted:true,ticket_id:response.data.ticket_id,status:response.data.status};}
-   else if(body.action==='get'){
+   if(body.action==='get'){
     result={ticket:ticket(response.data?.ticket)};
     const service=env('SUPABASE_SERVICE_ROLE_KEY')||'';
     await rpc(fetcher,url,service,service,'support_case_observe',{p_ticket:result.ticket.ticket_id,p_client:context.platform_client_id,p_source:context.source_id,p_binding:context.client_binding});

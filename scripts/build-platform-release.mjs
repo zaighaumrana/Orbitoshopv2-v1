@@ -32,6 +32,7 @@ const migrationsSha=sha(JSON.stringify(migrations));
 const functionsSha=sha(JSON.stringify(functions.map(f=>({name:f.name,sha256:f.sha256}))));
 const sameFunctions=functions.length===legacy.functions.length && functions.every(f=>legacy.functions.some(old=>old.name===f.name && old.source_sha256===f.sha256));
 const artifact={contract:'orbito-managed-release-v1',migrations,functions,stage_checksums:{migrations:migrationsSha===legacy.migrations_sha256?legacy.release_sha256:migrationsSha,functions:sameFunctions?legacy.release_sha256:functionsSha}};
+if(support)artifact.requirements=JSON.parse(readFileSync(resolve(sourceRoot,'scripts/backend-requirements.json'),'utf8'));
 artifact.sha256=sha(JSON.stringify(artifact));
 return artifact;
 }

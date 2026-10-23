@@ -1,6 +1,13 @@
 import { checkRuntime } from '../_shared/runtime-preflight.ts'
 // Called only after the bridge's opaque call credential has been authenticated.
 export async function onboardingOperation(admin: any, body: any) {
+  if(body.operation==='backend-capabilities'){
+    if(Object.keys(body).some(k=>!['operation','challenge'].includes(k))||!/^[-a-f0-9]{36}$/i.test(body.challenge||''))throw new Error('Invalid diagnostic request');
+    const {data,error}=await admin.rpc('shop_backend_capabilities');
+    if(error)throw new Error('Backend capability inspection unavailable');
+    const runtime=await checkRuntime(admin,{});
+    return {...data,runtime:runtime.checks,challenge:body.challenge};
+  }
   const rpc = async (action: string, payload: any = {}) => {
     const { data, error } = await admin.rpc('bridge_onboarding', { p_action: action, p_payload: payload })
     if (error) throw new Error('Shop identity, readiness or operation conflict. Retry the same request; reconcile an existing Shop instead of resetting it.')

@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "byo:setup": "node scripts/byo-setup.mjs",
     "test:support": "node --test tests/customer-support.test.mjs",
-    "release:support": "node scripts/build-platform-release.mjs --support"
+    "release:support": "node scripts/build-platform-release.mjs --support",
+    "release:check": "node scripts/check-release-parity.mjs"
   },
   "devDependencies": {
     "vite": "8.2.4"

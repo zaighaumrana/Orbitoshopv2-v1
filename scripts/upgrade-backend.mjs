@@ -1,3 +1,4 @@
+import {installationPlan} from './backend-plan.mjs';
 // Explicit operator/customer upgrade tool. Never reads .env, rotates credentials,
 // bootstraps an owner, or contacts a provider unless invoked with exact inputs.
 import {readFileSync,writeFileSync,renameSync,existsSync,unlinkSync,mkdtempSync,rmdirSync} from 'node:fs';
@@ -27,7 +28,7 @@ export async function upgradeBackend(argv){
  const o={};for(let i=0;i<argv.length;i++){const k=argv[i];if(['--apply','--review'].includes(k)){o[k]=true;continue}if(!['--mode','--project-ref','--client-id','--from-sha','--journal','--cli','--confirm-provider-complete','--provider-reference'].includes(k)||o[k]||!argv[i+1])throw new UpgradeError('Invalid upgrade arguments');o[k]=argv[++i]}
  const ref=o['--project-ref'],client=Number(o['--client-id']);
  if(!['managed','byo'].includes(o['--mode'])||!validShopProject(ref)||!validClientId(String(client))||!o['--journal']||!o['--from-sha'])throw new UpgradeError('Specify mode, exact customer project/client, approved source fingerprint and original private journal.');
- const manifest=JSON.parse(readFileSync(join(root,'scripts/byo-release-manifest.json'),'utf8')),release=buildRelease(root,{support:true});
+ const manifest=JSON.parse(readFileSync(join(root,'scripts/byo-release-manifest.json'),'utf8')),release=buildRelease(root,{support:true}),plan=installationPlan(release,o['--mode']);
  if(manifest.sha256!==release.sha256||manifest.review_status!=='approved-shared')throw new UpgradeError('Completed source differs from the approved shared release. No upgrade allowed.');
  const catalog=JSON.parse(readFileSync(join(root,'scripts/backend-release-catalog.json'),'utf8')),source=catalog[o['--from-sha']];
  if(!source)throw new UpgradeError('Unapproved source release; manual provenance review required.');
@@ -78,7 +79,7 @@ export async function upgradeBackend(argv){
   // Missing SQL runs with atomic ledger verification; a lost commit acknowledgment
   // is reconciled by the next exact history read, never guessed from elapsed time.
   for(const m of missing){await query(migrationEnvelope(m));j.steps['migration:'+m.version]='passed';save()}
-  for(const fn of release.functions)await upgradeStep(j,save,'function:'+fn.name,()=>deploy(fn));
+  for(const fn of [...plan.coreFunctions,...plan.deferredFunctions])await upgradeStep(j,save,'function:'+fn.name,()=>deploy(fn));
   if(JSON.stringify(await inspect())!==JSON.stringify(before))throw new UpgradeError('Owner/source snapshot changed; investigate before acceptance.');
   const gateways=await listFunctions();if(release.functions.some(f=>!gateways.some(g=>(g.slug||g.name)===f.name&&g.verify_jwt===f.verify_jwt)))throw new UpgradeError('Required function/gateway verification incomplete.');
   j.state='Backend upgraded; hosted acceptance pending';save();console.log('PASS: additive backend upgrade recorded. No secrets or owner bootstrap were changed. Real browser/ticket/POS acceptance remains pending.');

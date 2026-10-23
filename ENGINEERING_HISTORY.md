@@ -697,3 +697,52 @@ docs/Release-parity-acceptance.md. No packaged backend changed after this build.
 No deployment/merge/customer acceptance occurred. Effective hosted hook checks,
 fresh Managed/BYO acceptance, historical sender compatibility before anonymous
 closure, and final security review remain gates.
+
+
+## 2026-10-23 — Release requirements, restricted diagnostics and durable Support
+Branch: feature/verified-customer-support-shop
+
+### Changed / purpose
+Appended the complete mandatory Managed/BYO parity rule to AGENTS.md without
+rewriting existing instructions. Added a canonical backend requirement inventory
+and executable installation planner consumed by customer CLI and Platform paths.
+The small release-check wrapper/CI gate compares final committed source, exact
+migration/function/dependency/gateway hashes, coverage and selectors; deliberate
+negative fixtures prove drift/omission rejection. No pull, branch restructuring,
+customer upgrade or automatic repinning occurred.
+
+Forward SQL introduces a private RLS Support submission journal and append delivery
+events. Valid live actors persist sealed fields/original UUID before network work.
+Leases, backoff, review and server-only receipt acknowledgment preserve uncertainty;
+stale workers cannot acknowledge another lease. The receiver's existing atomic
+source/request dedupe and actor/payload conflict checks remain. Support UI restores
+own pending work after tab loss without relying on storage; accepted-at-Shop and
+received-by-Platform states are explicit. Live authorization is required on each
+retry, including a new session of the original user. No JWT/secret is journaled,
+no service worker impersonates a revoked actor and ticket creation still grants no
+privileged consent. Existing consent/history/revision/privacy/abuse rules remain.
+
+A restricted paired Bridge challenge exposes nonsecret structural/runtime capability
+evidence; an owner-only RPC and customer-authorized read-only CLI provide supported
+BYO diagnostics. Reports separate historical migration identity, full-source unknowns,
+optional successor policy and runtime health. Provider function presence/version is
+not accepted as approved-source proof. Detection never writes customer state or
+executes upgrades. Existing usage outbox, billing revisions and config journals are
+reused. Platform adds financial receipt read-back before original-ID retries.
+
+### Validation / impact
+Seven focused cross-repository source tests pass, including actual Support sender,
+browser pending recovery without storage, financial reconciliation, independent
+health/compliance and deliberate gate failures. Owned PG17 forward chains verify
+Support persistence, actor/conflict/ACL/lease recovery, receiver dedupe and actual
+invoice/payment idempotency; fixtures enforce existing owner/cutover guards. Changed
+Shop Edge entrypoints typecheck. Final build/gate and fingerprint evidence follow
+once this completed backend is committed. No broad acceptance campaign was repeated.
+
+All packaged backend changes are complete in this implementation commit. Build NEW
+immutable support-v5 from this committed source afterward; never rewrite v4 or older
+packages. Both final selectors/manifests and exact SHA are recorded in the following
+metadata checkpoint. New SQL must precede changed Shop functions/UI. No hosted SQL,
+Edge deployment, reset, credential rotation, customer suspension or production
+promotion. Live BYO administration remains unavailable and hosted acceptance remains
+separate. See docs/BACKEND_DIAGNOSTICS_AND_DELIVERY.md and new external milestone evidence.
