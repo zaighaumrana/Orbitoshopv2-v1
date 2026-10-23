@@ -1,4 +1,18 @@
-# Brand-new cross-account BYO Shop setup
+# Legacy cross-account BYO Shop setup reference
+
+**Historical procedure:** use [BYO_GUIDED_SETUP.md](BYO_GUIDED_SETUP.md) for new
+coordinated installations and recovery. The older branch/manual deployment and
+pairing-removal sequence below is retained as history, not current instructions.
+Numerical Client 1 is no longer an exclusion; the historical protected project
+remains excluded by exact project identity. Do not follow this legacy sequence
+to install or reset the new Client 1.
+
+**Current staged Support release (2026-10-19):** use
+[SUPPORT_AUTOMATION.md](SUPPORT_AUTOMATION.md) and
+`scripts/byo-support-release.mjs` for full/additive migrations plus functions and
+the customer-local enrollment/hash handoff. The original `byo-setup.mjs` below
+installs only the base runtime and does not apply migrations. Preserve this
+historical checkpoint; current feature PRs target `development`.
 
 > Repository status update — 2026-10-04: BYO/runtime stabilization was later committed (c4b4776), integrated into developmentv2 (1794ac2) and pushed. The optional password-support configuration is superseded by the managed one-time handoff; it remains compatibility-only, and BYO handoff is not currently enabled. Local HEAD and the live GitHub `feature/platform-overhaul-v1` head match at `68885d4`. Current integration target is `developmentv2`. Preserve the original validation/deployment evidence below as a point-in-time record; Git does not prove hosted deployment. See [engineering history](../ENGINEERING_HISTORY.md) for the owner-reported hosted checkpoint and pending smoke gate.
 

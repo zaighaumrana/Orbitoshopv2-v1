@@ -1,3 +1,6 @@
+import { createSupportClient } from '../platform/support.js'
+import { supportPage } from './pages/support.js'
+import {readAdminView,saveAdminView,safeAdminState} from './navigation-state.js'
 import { settingsUpdates } from '../settings-data.js'
 import { managedFeatures } from '../onboarding-state.js'
 import { escapeHTML, safeImageURL } from "../html.js"
@@ -47,6 +50,7 @@ const ADMIN_MODULES = [
   ['ems',       '⏱', 'EMS'],
   ['settings',  '◐', 'Settings'],
   ['billing-usage', '▧', 'Billing & Usage'],
+  ['customer-support', '◈', 'Help & Support'],
 ]
 
 const adminState = {
@@ -66,16 +70,30 @@ let SESSION = {}
 const platformBridge = createPlatformBridge(sb)
 let billingResult = null
 let legalStatus = null
+const customerSupport = createSupportClient(sb)
 let resupplyBusy = false
+let paperObservation = {}
+let paperActor = null
 let _inv = null  // populated via dynamic import only when inventory_module_enabled
+let adminNavigationIsCurrent = () => true
+let adminLoadGeneration = 0
+let restoreScroll = null
+const saveNavigation = () => {
+  if(adminNavigationIsCurrent() && state.role===SESSION.employee?.role)saveAdminView(history,location,SESSION,adminState,window.scrollY)
+}
+window.addEventListener('pagehide',saveNavigation)
+window.addEventListener('scroll',saveNavigation,{passive:true})
 
 /* ── Load ── */
 async function load() {
+  const generation = ++adminLoadGeneration
   const loadSession = SESSION
   const loadPath = window.location.pathname
+  const navigationIsCurrent=adminNavigationIsCurrent
+  const current = () => generation === adminLoadGeneration && navigationIsCurrent() && SESSION === loadSession && state.role === loadSession.employee?.role && window.location.pathname === loadPath
   dlog('ADMIN.load', `ENTRY adminModule=${adminState.adminModule}`)
   await loadConfig()
-  if (!window.location.pathname.startsWith('/admin') || state.role !== SESSION.employee?.role) return
+  if (!current() || !window.location.pathname.startsWith('/admin')) return
   if (!can(adminState.adminModule, state.role)) {
     state.modal = null
     adminState.adminModule = 'dashboard'
@@ -85,16 +103,31 @@ async function load() {
   }
   if (CFG.inventory_module_enabled && !_inv) {
     _inv = await import('../features/admin/inventory/index.js')
+    if (!current()) return
   }
   const mod = adminState.adminModule
   legalStatus = null
   if (mod === 'settings' && SESSION.employee?.role === 'Business Owner') {
-    try { legalStatus = await readLegalStatus(sb) } catch {}
-    if (SESSION !== loadSession || window.location.pathname !== loadPath) return
+    let result = null
+    try { result = await readLegalStatus(sb) } catch {}
+    if (!current()) return
+    legalStatus = result
   }
   if (mod === 'billing-usage' && can(mod, state.role)) {
-    try { billingResult = await platformBridge.readBilling() }
-    catch { billingResult = { available: false } }
+    let result
+    try { result = await platformBridge.readBilling(SESSION.authUserId||SESSION.user?.id) }
+    catch { result = null }
+    if (!current()) return
+    if(result){billingResult=result;paperObservation={checkedAt:new Date().toISOString(),accepted:paperObservation.accepted&&!result.paper_requests?.some(r=>r.request_id===paperObservation.accepted)?paperObservation.accepted:null}}
+    else paperObservation={...paperObservation,error:true}
+  }
+  if (mod === 'customer-support' && can(mod, state.role)) {
+    try { await customerSupport.list(customerSupport.view.offset) } catch(error) { customerSupport.view.error=error.message }
+    if (!current()) return
+    if(SESSION.employee?.role==='Business Owner'){
+      try{await customerSupport.consents()}catch(error){if(current())customerSupport.view.error=error.message}
+      if(!current())return
+    }
   }
   const needs = {
     tickets: CFG.repair_module_enabled && ['dashboard','repairs','reports','receipts'].includes(mod),
@@ -126,7 +159,7 @@ async function load() {
     needs.quickItems ? sb.from('quick_items').select('*').order('sort_order') : skip,
     needs.repairComponents ? sb.from('repair_components').select('*').order('sort_order') : skip,
   ])
-  if (SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== loadPath) return
+  if (!current()) return
   state.data = {
     tickets:          tickets.data          || [],
     sales:            sales.data            || [],
@@ -144,15 +177,17 @@ async function load() {
 
   if (adminState.adminModule === 'ems' && can('ems', state.role)) {
     const { loadEMSData, emsView, attachEMSEvents } = await import('../features/admin/ems/index.js')
-    if (!can('ems', state.role) || window.location.pathname !== '/admin/ems') return
+    if (!current() || !can('ems', state.role) || window.location.pathname !== '/admin/ems') return
     const emsData = await loadEMSData()
+    if (!current()) return
     adminState._emsData = emsData
     adminState._emsHTML = emsView(emsData, SESSION)
     render()
     const app = document.getElementById('app')
     attachEMSEvents(app, () => adminState._emsData, async () => {
-      if (!can('ems', state.role) || window.location.pathname !== '/admin/ems') return
+      if (!current() || !can('ems', state.role) || window.location.pathname !== '/admin/ems') return
       const fresh = await loadEMSData()
+      if (!current()) return
       adminState._emsData = fresh
       adminState._emsHTML = emsView(fresh, SESSION)
       render()
@@ -167,7 +202,7 @@ async function load() {
 let _eventsAttached = false
 
 function render() {
-  if (!window.location.pathname.startsWith('/admin') || state.role !== SESSION.employee?.role) return
+  if (!adminNavigationIsCurrent() || !window.location.pathname.startsWith('/admin') || state.role !== SESSION.employee?.role) return
   dstack('ADMIN.render', `*** #app REWRITE *** adminModule=${adminState.adminModule}`)
   const tenant = currentTenant()
   if (!can(adminState.adminModule, state.role)) adminState.adminModule = 'dashboard'
@@ -226,10 +261,13 @@ function render() {
     const m = document.querySelector('.modal')
     if (m) m.scrollTop = _modalScroll
   }
+  if(restoreScroll!==null){const scroll=restoreScroll;restoreScroll=null;requestAnimationFrame(()=>{if(adminNavigationIsCurrent())window.scrollTo(0,scroll)})}
+  saveNavigation()
 }
 
 function pageContent() {
-  if (adminState.adminModule === 'billing-usage') return adminShell(billingUsagePage(billingResult, resupplyBusy))
+  if (adminState.adminModule === 'customer-support') return adminShell(supportPage(customerSupport.view,SESSION.employee?.role==='Business Owner'))
+  if (adminState.adminModule === 'billing-usage') return adminShell(billingUsagePage(billingResult, resupplyBusy, Date.now(), paperObservation))
   const pages = { dashboard, repairs, inventory, catalog, reports, employees, receipts, settings }
   if (adminState.adminModule === 'ems') {
     return adminShell(adminState._emsHTML || '<div class="empty">Loading EMS…</div>')
@@ -658,6 +696,10 @@ function attachEvents() {
 
   dlog('ADMIN.attachEvents', 'listeners attached to #app (click + submit)')
 
+  app.addEventListener('input',e=>{
+    const field=e.target.dataset.supportField
+    if(window.location.pathname==='/admin/customer-support' && ['subject','category','message'].includes(field) && !customerSupport.view.pending)customerSupport.view.draft[field]=e.target.value
+  })
   // Click delegation
   app.addEventListener('click', async e => {
     if (!can(adminState.adminModule, state.role) || !modalEntitled(state.modal?.type)) return
@@ -678,6 +720,23 @@ function attachEvents() {
       '[data-mark-not-needed],[data-subinv-comp-remove],[data-add-draft-comp-name],[data-tag-select]'
     )
     if (!el) return
+    if(el.dataset.action==='support-consent-revoke'){
+      if(SESSION.employee?.role!=='Business Owner'||customerSupport.view.busy)return
+      const nav=adminNavigationIsCurrent;customerSupport.view.busy=true
+      try{await customerSupport.consents('revoke',{p_consent:el.dataset.consentId})}catch(error){if(nav())customerSupport.view.error=error.message}
+      finally{if(nav()){customerSupport.view.busy=false;render()}}return
+    }
+    if (el.dataset.action?.startsWith('customer-support-')) {
+      if (!can('customer-support',state.role)||customerSupport.view.busy)return
+      const session=SESSION,path=window.location.pathname,v=customerSupport.view
+      v.busy=true;v.error='';render()
+      try {
+        if(el.dataset.action==='customer-support-detail')await customerSupport.get(el.dataset.ticketId)
+        else await customerSupport.list(el.dataset.action==='customer-support-next'?v.offset+50:el.dataset.action==='customer-support-previous'?Math.max(0,v.offset-50):v.offset)
+      }catch(error){if(SESSION===session)v.error=error.message}
+      finally{v.busy=false;if(SESSION===session&&window.location.pathname===path)render()}
+      return
+    }
     dlog('ADMIN.click', `el MATCHED selector -- action=${el.dataset.action} close=${el.dataset.close} tag=${el.tagName}`)
 
     if (el.dataset.ppKey !== undefined) { handlePpKey(el.dataset.ppKey); return }
@@ -686,17 +745,30 @@ function attachEvents() {
       if (state.modal?.type === 'pinPrompt') { cancelPinPrompt(render); return }
       state.modal = null; render(); return
     }
-    if (el.dataset.action === 'paper-resupply') {
-      if (resupplyBusy || !can('billing-usage', state.role) || billingResult?.projection?.paper_resupply_enabled !== true) return
+    if (['paper-resupply','paper-refresh'].includes(el.dataset.action)) {
+      const submit=el.dataset.action==='paper-resupply'
+      if (resupplyBusy || !can('billing-usage', state.role) || adminState.adminModule!=='billing-usage') return
+      if(submit&&(billingResult?.projection?.paper_resupply_enabled!==true||paperObservation.accepted||billingResult?.paper_requests?.some(r=>['requested','approved','dispatched'].includes(r.status))))return
+      const session=SESSION,path=window.location.pathname,navigationIsCurrent=adminNavigationIsCurrent
+      const current=()=>SESSION===session&&window.location.pathname===path&&navigationIsCurrent()&&can('billing-usage',state.role)
       resupplyBusy = true; render()
       try {
-        const { data: { user }, error } = await sb.auth.getUser()
-        if (error || !user) throw new Error('Please sign in again.')
-        const result = await platformBridge.requestResupply(user.id)
-        showTransactionSuccess(result.already_active ? 'A resupply request is already pending.' : 'Your resupply request has been received.', 'Paper Resupply')
+        if(submit){
+          const { data: { user }, error } = await sb.auth.getUser()
+          if(!current())return
+          if (error || !user || ((session.authUserId||session.user?.id)&&(session.authUserId||session.user.id)!==user.id)) throw new Error('Please sign in again.')
+          const receipt=await platformBridge.requestResupply(user.id)
+          if(!current())return
+          paperObservation={...paperObservation,accepted:receipt.request_id||true}
+        }
+        try{
+          const result=await platformBridge.readBilling(session.authUserId||session.user?.id)
+          if(!current())return
+          billingResult=result;paperObservation={checkedAt:new Date().toISOString(),accepted:paperObservation.accepted&&!result.paper_requests?.some(r=>r.request_id===paperObservation.accepted)?paperObservation.accepted:null}
+        }catch{if(current())paperObservation={...paperObservation,error:true}}
       } catch (error) {
-        showBlockingError(error.message || 'Could not send your request. Please retry.')
-      } finally { resupplyBusy = false; render() }
+        if(current())showBlockingError('Request outcome is unconfirmed. Retry the original request when connected; its saved identity will be reused.')
+      } finally { if(current()){resupplyBusy = false; render()} }
       return
     }
     if (el.dataset.action === 'print-ticket-slip') {
@@ -728,13 +800,13 @@ function attachEvents() {
 
     if (el.dataset.settingsTab) {
       const { navigate } = await import('../router.js')
-      navigate(`/admin/settings?tab=${el.dataset.settingsTab}`, { replace: true, force: true })
+      navigate(`/admin/settings?tab=${el.dataset.settingsTab}`)
       return
     }
     if (el.dataset.catalogTab) {
       if (el.dataset.catalogTab === 'components' && !CFG.repair_module_enabled) return
       const { navigate } = await import('../router.js')
-      navigate(`/admin/catalog?tab=${el.dataset.catalogTab}`, { replace: true, force: true })
+      navigate(`/admin/catalog?tab=${el.dataset.catalogTab}`)
       return
     }
     if (el.dataset.modal) {
@@ -1281,6 +1353,22 @@ function attachEvents() {
     const type = form.dataset.form
     dlog('ADMIN.submit', `ENTRY form.dataset.form=${type}`)
 
+    if(type==='support-consent'){
+      if(SESSION.employee?.role!=='Business Owner'||customerSupport.view.busy)return
+      const nav=adminNavigationIsCurrent;customerSupport.view.busy=true;render()
+      try{await customerSupport.consents('approve',{p_case:data.ticket_id,p_purpose:data.purpose,p_confirmation:data.confirmation})}
+      catch(error){if(nav())customerSupport.view.error=error.message}
+      finally{if(nav()){customerSupport.view.busy=false;render()}}return
+    }
+    if (type === 'customer-support') {
+      if(!can('customer-support',state.role)||customerSupport.view.busy)return
+      const session=SESSION,path=window.location.pathname,v=customerSupport.view
+      if(!v.pending)v.draft={subject:data.subject,category:data.category,message:data.message}
+      v.busy=true;v.error='';render()
+      try {await customerSupport.create();await customerSupport.list(0)}catch(error){if(SESSION===session)v.error=error.message}
+      finally{v.busy=false;if(SESSION===session&&window.location.pathname===path)render()}
+      return
+    }
     if (type === 'add-quick-item') {
       const itemName = data.itemName?.trim()
       if (!itemName) { showBlockingError('Item name is required.'); return }
@@ -1400,9 +1488,15 @@ function _addComponentToDraft(name, tag, customText) {
 }
 
 /* ── Public ── */
-export async function initAdmin(sess, module, query) {
+export async function initAdmin(sess, module, query, isCurrent = () => true) {
+  if (!isCurrent()) return
+  adminNavigationIsCurrent = isCurrent
   dlog('ADMIN.initAdmin', `ENTRY module=${module} _eventsAttached=${_eventsAttached} caller=[${callerInfo()}]`)
+  const actor=sess.authUserId||sess.user?.id||sess.employee?.auth_user_id||sess.employee?.id||sess.employee?.name
+  const nextActor=JSON.stringify([actor,sess.employee?.role])
+  if(paperActor!==nextActor){billingResult=null;paperObservation={};resupplyBusy=false;paperActor=nextActor}
   SESSION    = sess
+  resupplyBusy=false
   state.role = sess.employee?.role || null
   const requestedModule = module || 'dashboard'
   if (!can(requestedModule, state.role)) {
@@ -1411,7 +1505,9 @@ export async function initAdmin(sess, module, query) {
     return
   }
   if (module) adminState.adminModule = module
-  if (module === 'settings' && query?.tab) adminState.settingsTab = query.tab
-  if (module === 'catalog'  && query?.tab) adminState.catalogTab  = query.tab
+  const saved=readAdminView(history,location,sess)
+  if(saved){Object.assign(adminState,saved.values);restoreScroll=saved.scroll}
+  if (module === 'settings') adminState.settingsTab = safeAdminState({settingsTab:query?.tab}).settingsTab || saved?.values.settingsTab || 'branding'
+  if (module === 'catalog') adminState.catalogTab = safeAdminState({catalogTab:query?.tab}).catalogTab || saved?.values.catalogTab || 'quickitems'
   await load()
 }

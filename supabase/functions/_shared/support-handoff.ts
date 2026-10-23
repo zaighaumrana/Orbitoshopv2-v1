@@ -14,6 +14,7 @@ export async function exchangeSupportHandoff(admin: any,token: string) {
   const result=await response.json()
   if(result?.ok!==true || result.contract!=='orbito-support-handoff-v1' || result.client_id!==client || result.project_ref!==project || result.client_binding!==binding || result.source_id!==source
    || typeof result.platform_user_id!=='string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(result.platform_user_id) || typeof result.platform_email!=='string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result.platform_email))return null
-  return {userId:result.platform_user_id,email:result.platform_email.trim().toLowerCase()}
+  if(typeof result.consent_id!=='string'||!/^[0-9a-f-]{36}$/i.test(result.consent_id))return null
+  return {userId:result.platform_user_id,email:result.platform_email.trim().toLowerCase(),consentId:result.consent_id}
  } catch {return null}
 }

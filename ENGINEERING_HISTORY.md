@@ -355,3 +355,491 @@ hosted smoke attribution comes from the user-supplied durable-memory task checkp
 dated 2026-10-04; no independent per-case hosted evidence artifact was supplied.
 This documentation remains uncommitted; suggested message:
 `docs: add durable engineering memory and agent rules`.
+
+
+## 2026-10-18 — Verified customer Support v1 source implementation
+
+Branch: feature/verified-customer-support-shop; base development
+f91f02819a9f2909062e36140f1775a870009115. Coordinated Platform branch:
+feature/verified-customer-support-platform, base 23a157a5c2aa581eec6e0f02b97318c784296e79.
+
+### Purpose and changed
+
+Add Help & Support to the existing Owner/Manager admin navigation: create, list,
+detail/status/customer resolution, safe same-UUID retry, private session cleanup and
+escaped rendering. The Shop migration adds live-session actor context with active
+canonical app/employee/email/role/lifecycle/pairing checks; support-tickets verifies
+Auth, derives identity locally and calls the exact central endpoint with transient
+access JWT plus its independent credential. Extend optional BYO allowlists and a
+separate release builder mode; support-setup provides managed and split-operator
+BYO enrollment without collecting customer Management authority.
+
+The coordinated Platform extends its existing Support administration. New forward migration adds private credentials,
+immutable requester provenance/events, atomic budgets, opaque ticket IDs, audited
+revision-based resolution and the legacy integer resolver wrapper. Dedicated
+platform-support-tickets revalidates a real Shop Auth token and actor-context RPC
+against the registered project on every call. platform-support-enrollment requires
+canonical live Master authority; managed preparation uses protected Vault recovery,
+BYO accepts a locally generated credential hash, installation dispatch/acknowledgment
+is audited and only an exact capability proof enables a key. Rotation/revocation
+and permanent re-pair invalidation are separate from bridge/handoff credentials.
+The existing page gains verified/legacy labels, category/history, customer-visible
+resolution and pagination, with session/view stale-response fencing. Resolution
+still refreshes existing dashboard data. No global redesign or existing Edge
+Function modification was needed.
+
+### Decisions and compatibility
+
+Anonymous closure is prepared under supabase/staged-migrations, outside automatic
+discovery, because all deployed historical senders are not inventoried. It is not
+claimed deployed or closed. The accepted _shared/shop-release.json remains
+unchanged; a separately generated, reproducible seven-function Support candidate
+is staged under supabase/releases and requires explicit future promotion. Completed
+Shop upgrades must not replay onboarding. Support capability is optional for
+existing POS/bridge readiness. The privileged Master handoff, financial bridge,
+canonical staff identity, existing migrations and unrelated worktrees are preserved.
+
+### Validation
+
+Final unit/handler/simulation set: 309/310 Platform and 99/100 Shop, retaining the
+two independently recorded baseline failures (config-recovery fixture and accepted
+release/runtime-preflight byte drift). New actual handler groups 8/8; Shop Support
+client/renderer/package/installer groups 7/7; actual native PG17/GoTrue-schema/Vault
+Support matrix across three databases 7/7, including concurrent duplicates, ACLs,
+quotas, atomic audit rollback, scope/tenant/role/session boundaries, rotation,
+managed recovery and staged closure. Existing PR4 security native groups 8/8.
+Actual Support browser integrations for both products pass at 320/768/1440px;
+existing login/Add Client six light/dark browser groups pass. Both builds pass;
+built JS scan finds no privileged JWT/Support secret variable. All browser network
+transports are synthetic/loopback, not hosted provider proof.
+
+The broad native team runner timed out; an old handoff native fixture fails its
+Master-approved-destination prerequisite identically on an archive of the unchanged
+development base. Neither is relabeled passed. Full evidence, baseline distinctions
+and pending provider/Deno/device gates are in docs/CUSTOMER_SUPPORT_VALIDATION.md.
+
+### Deployment / Git
+
+No hosted Supabase schema, secrets, functions, Auth, Shop pairing/provisioning,
+customer data or Cloudflare resources changed. Owner CLI-2.120.0 runbook is in
+docs/CUSTOMER_SUPPORT_DEPLOYMENT.md. Git delivery is authorized as a feature-only
+CF-Pages-Skip commit/push and coordinated Draft PRs targeting development, unmerged.
+Final SHAs and PR links are recorded by the delivery response/PR descriptions.
+Real hosted cross-project/different-account BYO acceptance, release promotion and
+legacy-sender compatibility remain before-use gates; no production-ready claim.
+
+
+## 2026-10-18 — Standalone customer BYO installation portability
+
+Final review found support-setup's physical-path check assumed the Platform sibling
+checkout exists. Customer installations can have only the Shop repository. Use the
+real path when an excluded repository exists, otherwise retain its absolute lexical
+exclusion; keep private-file/symlink protections. A regression copies the actual
+installer into an isolated customer-only checkout and executes private generation
+without a sibling Platform. BYO deployment messages now report the optional seventh
+function accurately. Final Shop suite: 100/101, retaining only the same preexisting
+accepted artifact/runtime-preflight byte gate; new Support groups 8/8. No frontend,
+SQL, release candidate bytes or hosted systems changed in this follow-up. Existing
+Draft Shop PR #1 and Platform PR #5 remain unmerged against development. Earlier
+feature pushes were independently confirmed skipped by Cloudflare for commit_message;
+this follow-up also uses CF-Pages-Skip. Updated the shared validation ledger.
+
+
+## 2026-10-19 — Verified customer Support stabilization and independent regression review
+
+Branch: feature/verified-customer-support-shop
+
+### Purpose and changes
+
+Correct confirmed Support compatibility/state defects and independently close the
+previous local validation gaps, updating the existing Draft PRs only. Both shared
+protocols remove the unsupported 3660-second remaining JWT ceiling, add exact
+issuer/authenticated-audience/UUID checks, and retain real Auth plus live canonical
+actor verification. Shop's final identity/generation check now follows asynchronous
+error parsing, preventing a late old HTTP 400 from erasing another account's retry.
+The new unshipped Platform read RPC uses client-first shared locks; all writer
+ordering, post-wait authorization and actor freshness checks remain.
+
+Corrected stale recovery/handoff fixtures through verified read-back and canonical
+Master protected-destination approval, preserving historical migration-cutoff
+contracts. Production recovery/handoff/POS/billing/provisioning sources and all old
+migrations remain unchanged. Bounded native subgroup runners stream progress,
+retain both output streams and avoid hidden test grandchildren. The accepted
+release remains frozen; only the separate Support candidate was regenerated.
+
+### Validation and decisions
+
+Platform broad suite 312/312; Shop 101/102, retaining the preexisting accepted
+artifact raw-byte equality gate. Exact drift is newline-only across three unchanged
+Git blobs; promotion/fingerprint changes need a separate owner decision. New
+handlers 10/10; Shop Support groups 9/9; native Support 10/10, including independent
+read/create/revoke/re-pair/rotation/config/pricing/provisioning/resolution backends,
+closure retention and real two-hour GoTrue/Auth/PostgREST verification. Existing
+native groups total 32 passes across bounded historical/current runs; focused
+privileged handoff passes. Both builds and actual Support browser integrations
+pass at 320/768/1440px with synthetic loopback SDK transport. A local restart
+interrupted some runs; only completed checks and targeted recoveries count.
+
+### Deployment and remaining gates
+
+No hosted Supabase/Cloudflare mutation or deployment. Same feature branches and
+Draft PRs target development, unmerged, with CF-Pages-Skip delivery. Both contracts,
+owner CLI-2.120.0 runbooks and validation ledgers describe runtime privilege trust,
+precise snapshot/network freshness, protected hash material, optional capability,
+manual baseline/pairing gates and staged anonymous closure. Local report:
+Support ticket/implementation-evidence/STABILIZATION_REPORT.md. Conditional GO for
+owner-controlled additive development deployment after exact dry-run/prerequisites;
+customer use and production remain blocked on real hosted managed/BYO/Auth/gateway,
+deployed-sender inventory and explicit release/closure/acceptance decisions.
+
+## 2026-10-19 — Refresh, semantic login and staged Support integration
+
+Integrated the owner's uncommitted /admin/customer-support route correction.
+The actual entry/router preserves authorized URL/query only after live identity,
+configuration, suspension, onboarding, legal and clock-in gates. Query Back/Forward
+and async navigation/authorization generations prevent stale imports/loads from
+replacing a newer view. Safe scoped history retains whitelisted tabs, receipt
+filters and bounded scroll; transaction drafts/actions are excluded. Login now
+uses one semantic form submission, independent in-flight and Turnstile verified/
+expiry/error guards; auxiliary actions and existing visuals/PWA remain intact.
+
+Attempted uncertain Support requests can recover the same UUID/canonical payload
+from tab storage only after live Auth and actor/source/binding proof. Recovery is
+scoped, expires after six hours and clears on account/role/binding/authorization
+changes, logout or receipt; no JWT/server credential is persisted. Unsent drafts
+remain memory-only. Added a forward-only service readiness RPC requiring a
+confirmed active owner and complete onboarding; old deployed actor SQL is fixed.
+A concrete public-schema SDK type annotation resolves Deno inference errors in
+login without runtime auth changes.
+
+Added customer-authorized full/additive BYO migration/function installation,
+private dedicated Support secret recovery and hash-only operator handoff. Added
+explicit public-input builds and compiled target/digest verification. Accepted
+32/6 and prior 33/7 candidates stay immutable. New inactive Support-v2 is 34/7,
+SHA-256 144d918859db1007cccfbed724d1988a043ca1e5fef42ce694dee6df1a603414.
+
+Local validation: Shop 105/106 (retained frozen-release byte gate), Platform
+320/320, 13 native Support groups plus canonical bootstrap, actual main/router
+login and Support browser regressions, Platform light/dark/mobile visuals, Deno
+checks and actual provider ESZIP bundles. Details: docs/SUPPORT_AUTOMATION.md and
+Support ticket/implementation-evidence/SUPPORT_AUTOMATION_FINAL_HANDOFF.md.
+Owner-reported manual Client 2 success is historical hosted evidence. No hosted
+mutation/deploy/owner reset, promotion, anonymous closure or merge was performed.
+Existing feature branches/Draft PRs target development with CF skip. Fresh
+managed automatic enrollment and genuinely separate-account BYO acceptance remain
+owner-operated after explicit promotion/deployment approval.
+
+## 2026-10-20 — Customer-local guided BYO and durable Paper updates
+
+Continued `feature/verified-customer-support-shop` at 5becfae, verified against Draft
+PR1/head. Preserved the owner's sole existing uncommitted CLI correction exactly:
+linked query, explicit project and output-format json. No commit/push/deploy,
+hosted query/write, Auth deletion, credential rotation or production cutover occurred.
+
+Added a guided Node entry reusing the verified installer: native CLI/cache discovery,
+capability/account/pairing/package checks, named-target authorization, private local
+journal/status/lock, atomic exact-source migration recovery, provider write fences,
+observed owner/onboarding waits, automatic public Support target, stable local secret
+and hash handoff. Owner activation and six-step onboarding remain explicit; Completed
+is an identified owner-reported hosted ticket receipt, not fabricated machine proof.
+
+Frozen 34-entry native runs using both actual wrappers initialize correctly.
+An inserted pre-existing Auth identity reproduces the conservative timestamp path,
+but Client3's original trigger is not established without its pre-correction state.
+Added a forward service-only diagnostic and fail-closed pre-secret check; no timestamp
+repair/configuration reset. New separately reviewable Paper SQL/sender/history/UI
+carry customer messages, dates and expectations with source/revision/terminal guards
+and escaped Owner display. Existing additive Support setup preserves base runtime;
+Paper sender rollout for existing Shops requires separate approval.
+
+The owner's active Support-v2 and earlier frozen artifacts remain intact. A new
+inactive, unregistered 36/7 Support-v3 candidate matches source. Future managed
+promotion needs separate compatibility review. Six new native groups and all 13
+existing native Support groups, six guided cases, 52 focused Platform cases, affected
+Deno, explicit builds and actual browser flows pass. Broad Shop 110/111 retains the
+frozen-source equality gate; new candidate parity passes. Platform's initial digest
+stub failure is corrected with real SHA-256 and its SQL subgroup passes 3/3.
+Guides and seven evidence reports record remaining Client4/hosted/Paper/production
+approval gates and exact commands under stabilization-2026-10-20-byo-paper.
+
+## 2026-10-20 — Approved GitHub review checkpoint
+
+The owner explicitly authorized one stabilization commit and push to this existing
+feature branch and its existing Draft PR. This is source-control backup/review only.
+The staged scope is the completed implementation, forward migrations, scripts,
+tests and repository documentation; private settings, pairing files, local journals,
+temporary artifacts and the external evidence directory remain excluded.
+
+No tests, builds, simulations or migrations were rerun for this checkpoint. Earlier
+validation and its recorded limitations remain the evidence of execution. Commit
+messages retain the Cloudflare Pages skip marker. PRs remain Draft/open; no merge,
+hosted Supabase change, Cloudflare deployment, production change or Support-v3
+promotion is authorized. The preceding entry describes the local stabilization
+state before this later source-control authorization.
+
+## 2026-10-21 — BYO key separation and recoverable Paper status
+
+Branch: feature/verified-customer-support-shop.
+
+Added customer-local static Turnstile checks and an explicit public JSON input
+before new wizard base installations. Wrong project/anon role, public/private
+equality, placeholders/testing/unrelated credentials fail with fixed value-free
+errors. Native CLI login is discoverable without a fixed npm-cache path. Backend
+preflight is explicitly separate from real browser CAPTCHA acceptance. Existing
+release identities, private files, journal reconciliation and Support UUIDs remain
+intact; retain pairing through enrollment/recovery rather than deleting it early.
+
+Paper UI disables new submissions while Requested/Approved/Dispatched, reloads
+after a receipt, offers explicit refresh and shows local pending versus evidenced
+Platform updates. Failed refresh retains same-account observations and acknowledged
+submission blocking; account changes clear cached views and delayed responses are
+discarded. Only an exact authenticated status-read acknowledgement clears a lost
+response's saved request ID. Unknown IDs and other actors' retries remain intact.
+No polling, accounting changes, migrations or packaged Shop function edits.
+
+Validation: Shop broad regression initially 116/117; the inherited test comparing
+an old frozen package to newer source was corrected to assert frozen byte/internal
+integrity and exact separate v3 source parity, then its five-group subset passed.
+Platform 324/324, six native PG17/Auth groups, copied on-screen wizard walkthrough,
+actual paper browser lifecycle/offline/reload/account-change checks and both clean
+public builds/digest/stale-target refusal passed. Evidence: the preserved Oct 20
+folder's new hardening-2026-10-21 subfolder. Client #4 success is owner-reported;
+next fresh hosted acceptance is pending. No commit/push/deploy, hosted change,
+release promotion or stable customer credential/journal mutation occurred.
+
+## 2026-10-21 — Customer identity and installer reliability checkpoint
+
+Branch: feature/verified-customer-support-shop; starting HEAD 3ddf5d5f9b3e.
+
+The earlier numeric Client1 exclusions conflated a former protected installation
+with a legitimate first client after Platform reset. Shared validation now accepts
+positive database IDs including 1, retains the exact historical protected project,
+and independently compares intended client/project against pairing and journal.
+The Support target validator had a third numeric exclusion and is corrected too.
+No customer's private files were inspected or modified and no live install ran.
+
+The coordinator emits fixed, value-free phase/category/check/write-state recovery
+diagnostics. Original release, pairing, paths, mode, locks, migration provenance,
+request IDs and uncertain-write fences remain authoritative. Provider completion
+requires explicit review, public receipt ID and named confirmation. Installer
+diagnostics conservatively retain possible writes for interrupted/malformed journals
+even when failure occurs before release validation. Core acceptance
+is separately owner-reported without requiring optional Support, leaving the same
+journal resumable. Help and authoritative BYO guidance cover private runtime
+template, Windows ACLs, tooling, exact target/mode, recovery, verified frontend,
+manual owner and optional Support/ticket/Paper acceptance.
+
+Compatible Vite8.2.4/source-map-js1.2.2 patches remove the two current Shop findings;
+final public audit reports zero vulnerabilities. Complete Shop regression passes
+122/122, replacing the historical 116/117 plus corrected subset limitation. Final
+commit-specific cross-repository native/browser/build evidence is external under
+coordinated-wizards-2026-10-21. Shop source appearance, migrations/functions,
+36/7 candidate fingerprint and managed release pointer remain unchanged. The legacy
+bridge SQL test now checks unavailable state and empty requests while accepting the
+additive Paper response field; its financial authorization assertions remain intact.
+
+Commit/push to existing Draft PR1 against development is authorized; all new
+commits use [CF-Pages-Skip] prefix. Actual Cloudflare skip confirmation remains
+pending provider access. No merge, hosted mutation, deployment or promotion.
+
+## 2026-10-22 — Coordinated final stabilization and owner support consent
+Branch: feature/verified-customer-support-shop
+
+### Purpose / changed
+Complete S-01/02/03 and the Shop side of shared backend parity before independent
+fresh Managed/BYO acceptance. Removed the hard-coded Turnstile fallback, aligned
+build validators, completed fixed/redacted diagnostics and captured immutable
+Paper navigation ownership. Added a dedicated additive v1/v2 backend upgrader with
+separate customer-CLI/Managed Master authorization, exact provenance, immutable
+journals, all-function deployment and uncertain-provider fencing. Existing-mode
+setup stops instead of claiming SQL-only upgrade completion.
+
+### Security / decisions
+A forward migration introduces explicit owner approval for a verified Support case,
+purpose/scope/actor/time, a 30-minute single-session authorization, append-only
+history and revocation. Ticket creation does not authorize access. The login binds
+consent before returning tokens; Data API pre-request enforcement, restrictive RLS
+and privileged Edge checks reject revoked/expired/unbound Support sessions.
+Existing custom hooks fail closed for manual composition. BYO managed handoff
+remains prohibited; canonical Master and one-time capability boundaries remain.
+
+### Validation / impact
+Four focused Shop tests passed (Turnstile, diagnostics, stale Paper response and
+upgrade uncertainty/provenance). Targeted Docker PostgreSQL checks passed for the
+forward chain, existing-v2 owner/reservation/data/PIN/Vault preservation, owner vs
+Manager authority, case attestation, idempotent approval, one-session binding,
+replay denial, expiry and revocation. Changed Edge entrypoints type-check with Deno;
+explicit synthetic-public production build passed. These are local checks, not
+hosted Auth/provider/customer acceptance. No hosted changes or production deployment.
+
+### Release / deferred
+All packaged backend changes are complete in this implementation commit. Build a
+NEW immutable shared release from this committed source afterward; do not reuse or
+rewrite v3. Final selectors/fingerprint are recorded in the following metadata
+commit and coordinated Platform release documentation. Future packaged changes
+require another immutable version. Preserve older packages and original job pins.
+Owner-authorized migrations/functions/frontend deployment, effective hosted hook
+verification, two fresh customer acceptances and final security review remain.
+Legacy anonymous Platform intake stays a compatibility-gated release blocker.
+
+## 2026-10-22 — Final immutable shared backend release metadata
+Branch: feature/verified-customer-support-shop
+
+After backend implementation commit 089fd7870f9f0665e35674bf7b8db9fd190f1509,
+built NEW support-v4: 37 migrations/7 functions, SHA-256
+`f5295937f06e45177190bedebf19a54c86fd067d03785365a393e3de269e062f`. Both provisioning selectors now reference
+that exact package; previous packages/fingerprints and original pins remain.
+Manifest approved-shared records the completed backend commit. Final parity
+verification compares every embedded migration/source hash against committed
+backend Git blobs; existing v2 additive preservation and trusted consent checks
+passed locally. See coordinated Platform docs/Release-parity.md and
+docs/Release-parity-acceptance.md. No packaged backend changed after this build.
+No deployment/merge/customer acceptance occurred. Effective hosted hook checks,
+fresh Managed/BYO acceptance, historical sender compatibility before anonymous
+closure, and final security review remain gates.
+
+
+## 2026-10-23 — Release requirements, restricted diagnostics and durable Support
+Branch: feature/verified-customer-support-shop
+
+### Changed / purpose
+Appended the complete mandatory Managed/BYO parity rule to AGENTS.md without
+rewriting existing instructions. Added a canonical backend requirement inventory
+and executable installation planner consumed by customer CLI and Platform paths.
+The small release-check wrapper/CI gate compares final committed source, exact
+migration/function/dependency/gateway hashes, coverage and selectors; deliberate
+negative fixtures prove drift/omission rejection. No pull, branch restructuring,
+customer upgrade or automatic repinning occurred.
+
+Forward SQL introduces a private RLS Support submission journal and append delivery
+events. Valid live actors persist sealed fields/original UUID before network work.
+Leases, backoff, review and server-only receipt acknowledgment preserve uncertainty;
+stale workers cannot acknowledge another lease. The receiver's existing atomic
+source/request dedupe and actor/payload conflict checks remain. Support UI restores
+own pending work after tab loss without relying on storage; accepted-at-Shop and
+received-by-Platform states are explicit. Live authorization is required on each
+retry, including a new session of the original user. No JWT/secret is journaled,
+no service worker impersonates a revoked actor and ticket creation still grants no
+privileged consent. Existing consent/history/revision/privacy/abuse rules remain.
+
+A restricted paired Bridge challenge exposes nonsecret structural/runtime capability
+evidence; an owner-only RPC and customer-authorized read-only CLI provide supported
+BYO diagnostics. Reports separate historical migration identity, full-source unknowns,
+optional successor policy and runtime health. Provider function presence/version is
+not accepted as approved-source proof. Detection never writes customer state or
+executes upgrades. Existing usage outbox, billing revisions and config journals are
+reused. Platform adds financial receipt read-back before original-ID retries.
+
+### Validation / impact
+Seven focused cross-repository source tests pass, including actual Support sender,
+browser pending recovery without storage, financial reconciliation, independent
+health/compliance and deliberate gate failures. Owned PG17 forward chains verify
+Support persistence, actor/conflict/ACL/lease recovery, receiver dedupe and actual
+invoice/payment idempotency; fixtures enforce existing owner/cutover guards. Changed
+Shop Edge entrypoints typecheck. Final build/gate and fingerprint evidence follow
+once this completed backend is committed. No broad acceptance campaign was repeated.
+
+All packaged backend changes are complete in this implementation commit. Build NEW
+immutable support-v5 from this committed source afterward; never rewrite v4 or older
+packages. Both final selectors/manifests and exact SHA are recorded in the following
+metadata checkpoint. New SQL must precede changed Shop functions/UI. No hosted SQL,
+Edge deployment, reset, credential rotation, customer suspension or production
+promotion. Live BYO administration remains unavailable and hosted acceptance remains
+separate. See docs/BACKEND_DIAGNOSTICS_AND_DELIVERY.md and new external milestone evidence.
+
+
+## 2026-10-23 — Final immutable support-v5 metadata
+Branch: feature/verified-customer-support-shop
+
+Completed backend source f9df8eb0ac4055378a77fdfc11503cc9007882ca was packaged only after the Support/diagnostic
+implementation and focused SQL/source checks. NEW immutable support-v5 contains 38
+migrations / 7 functions; canonical SHA-256 7953927660473aeaafcc62b3b8d45e382f5189d1536f7e0100b890d938ff5fdd.
+Both source selectors/manifests/catalogs reference that exact package. Catalogs
+retain all older hashes and describe optional upgrades, supported releases and
+evidence limitations. No existing job pin or customer backend is changed. Packaged
+source did not change after this build; the following commit is release metadata
+only. The canonical final committed-source gate and actual CI/provider outcomes
+are recorded in the external milestone report. Hosted rollout/acceptance remains
+separate; production promotion and PR merges remain unauthorized.
+
+
+## 2026-10-23 — Legacy receipt compatibility before final release
+Branch: feature/verified-customer-support-shop
+
+Final old/new client review found that an older Shop page treats any2xx as a reason
+to clear its original request. The sender now returns503 for uncertain delivery to
+legacy clients, preserving their UUID, and returns an explicit persisted/pending202
+only to a client opting in through the already CORS-allowed x-client-info header.
+The new client works with the older handler, which ignores that header. Verified
+Platform receipts keep their existing accepted shape. No authentication, ticket
+wire contract, queue authority or consent is weakened.
+
+The locally fingerprinted support-v5 candidate remains immutable at
+7953927660473aeaafcc62b3b8d45e382f5189d1536f7e0100b890d938ff5fdd;
+it was not deployed or installed and is superseded for fresh selection. The corrected
+backend requires NEW support-v6, generated only after this source correction is
+committed. Old-v4 remains supported; no existing Shop was upgraded or repinned.
+The focused compatibility fixture covers both old and opted-in pending responses.
+
+
+## 2026-10-23 — Final corrected support-v6 release metadata
+Branch: feature/verified-customer-support-shop
+
+Final backend source 95448d75b7c78fbe5e7cf0e9a02f87e7d919650d includes the legacy/modern receipt compatibility
+correction. Built NEW support-v6 only afterward: 38 migrations / 7 functions,
+canonical SHA-256 64fcec36fa7a5e2565db2a6d3aa6ddbd8e6c1170eefd4a07a57ae6ba0c066a31. Both fresh source selectors/manifests now reference
+this exact package; v5 remains unchanged as an uninstalled superseded candidate,
+and v4/older approved artifacts and original pins remain unchanged. The final
+committed-source parity gate is the approval check; no packaged byte changes
+after this build. Hosted migration/function rollout and joint acceptance remain
+pending; no automatic customer upgrade or production promotion.
+
+Final checks: canonical v6 parity, nine focused source/contract cases, four bounded
+Managed engine cases, isolated native PostgreSQL continuity/catalog checks, changed
+Edge typechecks, explicit synthetic-public builds and syntax/diff checks passed.
+Read-only hosting inspection found retrasellshop/retrabyo use this feature branch
+as their production branch. The final metadata checkpoint therefore uses the
+established [CF-Pages-Skip] prefix to suppress its automatic Pages deployment;
+hosting settings are unchanged. Actual remote skip/CI results are recorded in the
+external release-parity-fleet-continuity-2026-10-23 evidence.
+
+## 2026-10-23 — Customer-owned controlled upgrades and current release guidance
+Branch: feature/verified-customer-support-shop
+
+Replaced ungated terminal upgrade execution with the customer-owned BYO path backed
+by the Platform's exact approved plan/request and pending-operation fence. Managed
+terminal mode now refuses and directs the operator to the live Master workflow.
+The CLI verifies approved source/target, exact project/client/source/binding, native
+CLI capabilities and actual SQL progress; requires separate customer confirmation,
+an expiring private clearance and original private journal; and shares the bounded
+planner/engine with Managed. No customer PAT/service key/password reaches Platform
+or browser. A blocked claim causes no provider write; missing/unknown outcomes retain
+the original UUID for authoritative review. Only missing SQL and changed functions
+are installed, preserving owner, pairing, configuration receipts and customer data.
+
+Customer assessment and checkpoints are explicitly customer-reported evidence.
+SQL/gateway/runtime checks do not become full deployed-source compliance; final
+state requires source/component review and separate hosted acceptance. The owner
+Support screen has restrained read-only upgrade guidance that also works on older
+supported backends without assuming new RPCs. Historical upgrade instructions are
+labelled superseded; current instructions identify immutable support-v6 and distinguish
+fresh source, historical pins, observed ledger and independent installed proof.
+
+Five focused contract/source/CLI/UI cases and three directly affected Support,
+financial and legacy compatibility cases pass. Real owned PG17 checks verify shared
+approval/ACL/concurrent/session/recovery rules, preserve an actual old pin, and apply
+v4→v6 SQL idempotently while retaining Shop configuration/journal data. The customer
+CLI fixture covers blocked clearance and successful serial original-ID execution.
+Changed Edge typecheck, both explicit-public builds, syntax/diff and canonical parity
+pass. Windows sandbox atomic-rename denial was isolated; the unchanged safe journal
+path passes in an ordinary Windows private temp directory. No unsafe fallback.
+
+No packaged Shop migration/function/dependency changed, so v6 remains unchanged at
+64fcec36fa7a5e2565db2a6d3aa6ddbd8e6c1170eefd4a07a57ae6ba0c066a31;
+no v7 or new fingerprint was needed. Historical releases/pins are preserved. New
+Platform SQL then platform-upgrade/UI rollout remains pending; deployed provisionv26
+is not reinstalled. Owner kept independent fresh hosted acceptance pending and BYO
+admin is unavailable. No hosted install/upgrade/reset, secrets/Auth/Vault change,
+production promotion or merge. Checkpoint uses [CF-Pages-Skip]; actual remote results
+are external in controlled-upgrades-stabilization-2026-10-23. Both existing PRs stay
+Draft/Open/unmerged against development.

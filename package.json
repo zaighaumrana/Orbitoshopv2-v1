@@ -7,10 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "byo:setup": "node scripts/byo-setup.mjs"
+    "byo:setup": "node scripts/byo-setup.mjs",
+    "test:support": "node --test tests/customer-support.test.mjs",
+    "release:support": "node scripts/build-platform-release.mjs --support",
+    "release:check": "node scripts/check-release-parity.mjs"
   },
   "devDependencies": {
-    "vite": "^8.1.0"
+    "vite": "8.2.4"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2"

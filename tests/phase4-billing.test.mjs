@@ -44,8 +44,19 @@ test('resupply double click coalesces and timeout/reload retries same identity',
   const bridge = createPlatformBridge(client, storage)
   const first = bridge.requestResupply('owner'); const second = bridge.requestResupply('owner')
   assert.equal(first, second)
+  await assert.rejects(bridge.requestResupply('other-owner'),/previous session/)
   await assert.rejects(first, /timeout/)
   fail = false
   await createPlatformBridge(client, storage).requestResupply('owner')
   assert.equal(ids.length, 2); assert.equal(ids[0], ids[1]); assert.equal(values.size, 0)
 })
+
+test('authoritative status read acknowledges only the exact saved actor request, preserving unresolved and other-account retries',async()=>{
+ const values=new Map([['orbito-resupply-request:owner','original'],['orbito-resupply-request:other','other-request']]);
+ const storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+ let rows=[],offline=false;
+ const bridge=createPlatformBridge({rpc:async()=>offline?{error:Error('offline')}:{data:{paper_requests:rows}}},storage);
+ await bridge.readBilling('owner');assert.equal(values.get('orbito-resupply-request:owner'),'original');
+ rows=[{request_id:'original',status:'fulfilled'}];offline=true;await assert.rejects(()=>bridge.readBilling('owner'));assert.equal(values.size,2);
+ offline=false;await bridge.readBilling('owner');assert.equal(values.has('orbito-resupply-request:owner'),false);assert.equal(values.get('orbito-resupply-request:other'),'other-request');
+});

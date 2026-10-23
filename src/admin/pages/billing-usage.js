@@ -1,4 +1,5 @@
 import { escapeHTML as esc } from '../../html.js'
+import {paperHistory,activePaperRequest} from './paper-history.js'
 
 const unavailable = 'Unavailable'
 const amount = (value, currency) => typeof value === 'number' && Number.isFinite(value)
@@ -6,8 +7,11 @@ const amount = (value, currency) => typeof value === 'number' && Number.isFinite
   : unavailable
 const count = value => typeof value === 'number' && Number.isFinite(value) ? esc(value.toLocaleString()) : unavailable
 
-export function billingUsagePage(result, busy = false, now = Date.now()) {
-  if (!result?.available) return '<div class="card"><h2>Billing &amp; Usage</h2><p>Unavailable</p><p class="muted">Billing information has not been synced. This does not mean there is no outstanding balance.</p></div>'
+export function billingUsagePage(result, busy = false, now = Date.now(), observation = {}) {
+  const active=activePaperRequest(result?.paper_requests);
+  const pending=active||observation.accepted;
+  const refresh=`<div class="card"><button class="secondary-button" data-action="paper-refresh" ${busy?'disabled':''}>Refresh paper status</button>${observation.error?'<p role="status">Could not refresh. Showing the last known status; retry when connected. Platform updates may take time to arrive.</p>':''}${observation.accepted&&!active?'<p role="status">Submission acknowledged locally. Refresh to read the current request status; do not submit another request yet.</p>':''}${observation.checkedAt?`<p class="muted">Last successful Shop status read: ${esc(new Date(observation.checkedAt).toLocaleString())}. This does not prove a new Platform synchronization.</p>`:''}</div>`;
+  if (!result?.available) return '<div class="card"><h2>Billing &amp; Usage</h2><p>Unavailable</p><p class="muted">Billing information has not been synced. This does not mean there is no outstanding balance.</p></div>'+refresh+paperHistory(result?.paper_requests)
   const p = result.projection
   const synced = Date.parse(result.last_synced_at)
   const published = Date.parse(p.platform_updated_at)
@@ -24,8 +28,8 @@ export function billingUsagePage(result, busy = false, now = Date.now()) {
     <p>${amount(p.estimated_current_charges, p.currency)}</p>
     <p class="muted">Un-invoiced usage estimate, separate from issued invoices.</p>
     <h2>Recent Billing</h2><p>${invoices.length?'Showing up to the latest 25 issued invoices. Outstanding total includes all issued invoices.':'No issued invoices yet.'}</p>
-    <p class="muted">Last synced: ${Number.isFinite(synced) ? esc(new Date(synced).toLocaleString()) : unavailable}</p>
+    <p class="muted">Billing last synced: ${Number.isFinite(synced) ? esc(new Date(synced).toLocaleString()) : unavailable}</p>
     ${stale ? '<p role="status">Billing information may be out of date.</p>' : ''}
-    ${p.paper_resupply_enabled === true ? `<h2>Paper Resupply</h2><button class="primary-button" data-action="paper-resupply" ${busy ? 'disabled' : ''}>${busy ? 'Requesting…' : 'Request Resupply'}</button>` : ''}
-  </div>`
+    ${p.paper_resupply_enabled === true ? `<h2>Paper Resupply</h2>${active?`<p role="status">An active request already exists: ${esc({requested:'Requested',approved:'Approved',dispatched:'Dispatched'}[active.status])}.</p>`:''}<button class="primary-button" data-action="paper-resupply" ${busy||pending ? 'disabled' : ''}>${busy ? 'Please wait…' : pending?'Request in progress':'Request Resupply'}</button>` : ''}
+  </div>${refresh}${paperHistory(result.paper_requests)}`
 }

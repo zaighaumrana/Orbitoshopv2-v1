@@ -1,0 +1,8 @@
+{
+  "release_id": "support-v6",
+  "review_status": "approved-shared",
+  "sha256": "64fcec36fa7a5e2565db2a6d3aa6ddbd8e6c1170eefd4a07a57ae6ba0c066a31",
+  "migrations": 38,
+  "functions": 7,
+  "backend_source_commit": "95448d75b7c78fbe5e7cf0e9a02f87e7d919650d"
+}

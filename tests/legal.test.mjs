@@ -259,7 +259,7 @@ test('current enterApplication completes Onboarding V2 before legal and keeps no
   let finishOnboarding, allowLegal = true
   const CFG = {onboarding_version:2,onboarding_completed_at:null,ems_enabled:false}
   const ctx = vm.createContext({
-    CFG,state:{role:null},sb:{},applicationGeneration:0,canonicalRole:s=>s.employee.role,needsOnboarding,
+    CFG,state:{role:null},sb:{},window:{location:{pathname:'/onboarding',search:''}},applicationGeneration:0,canonicalRole:s=>s.employee.role,needsOnboarding,
     clearRoutes(){calls.push('clear');routes.clear()},registerRoute:(path,fn)=>routes.set(path,fn),registerNotFound(){},
     navigate:path=>calls.push(path),startRouter:()=>calls.push('router'),
     setupRoutes:()=>calls.push('routes'),routeForRole:()=>calls.push('normal'),_clearSession(){},showLogin(){},
@@ -286,5 +286,6 @@ test('current enterApplication completes Onboarding V2 before legal and keeps no
   assert.deepEqual(calls,['clear','legal'],'unavailable legal status cannot install application routes')
   assert.match(main,/activate|loadCurrentSession/)
   assert.match(main,/location.pathname === '\/invite\/accept'/)
-  assert.match(main,/if \(!await loadConfig\(false\)\)/)
+  assert.match(main,/const configReady = await loadConfig\(false\)/)
+  assert.match(main,/if \(!configReady\)/)
 })

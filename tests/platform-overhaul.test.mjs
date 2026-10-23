@@ -14,8 +14,9 @@ test('billing issued-invoice copy follows actual projection rows, including zero
  result.projection.invoices=[{reference:'INV-42',period:'Test',status:'Unpaid',outstanding:10}];
  assert.match(billingUsagePage(result),/Showing up to the latest 25 issued invoices\. Outstanding total includes all issued invoices\./);
 });
-test('approved server release exactly matches current migrations and all six function gateway settings',()=>{
- const release=JSON.parse(read('../orbito/supabase/functions/_shared/shop-release.json'));
+test('frozen server release retains exact integrity while the separate BYO candidate matches current source and gateway settings',()=>{
+ const frozen=read('../orbito/supabase/functions/_shared/shop-release.json'),release=JSON.parse(frozen);
+ assert.equal(sha(frozen),'812c13f102abd83d583eccea4876e68736e4686e3c593af43f1cb10d4d2ef61a');
  for(const m of release.migrations){const src=read('supabase/migrations/'+m.version+'_'+m.name+'.sql').replaceAll('\r\n','\n');assert.equal(m.sql,src);assert.equal(m.sha256,createHash('sha256').update(src).digest('hex'));}
  assert.equal(release.functions.length,6);
  for(const f of release.functions){
@@ -23,12 +24,17 @@ test('approved server release exactly matches current migrations and all six fun
   assert.ok(f.files.length>1);const paths=f.files.map(file=>file.path);
   assert.deepEqual(paths,[...paths].sort());assert.equal(new Set(paths).size,paths.length);
   assert.ok(paths.includes(f.entrypoint));
-  for(const file of f.files){assert.ok(!file.path.includes('\\') && !file.path.includes('..') && file.path.endsWith('.ts'));assert.equal(file.content,read('supabase/functions/'+file.path));assert.equal(file.sha256,sha(file.content));}
+  for(const file of f.files){assert.ok(!file.path.includes('\\') && !file.path.includes('..') && file.path.endsWith('.ts'));assert.equal(file.sha256,sha(file.content));}
   assert.equal(f.sha256,sha(JSON.stringify({name:f.name,entrypoint:f.entrypoint,verify_jwt:f.verify_jwt,files:f.files})));
  }
  assert.deepEqual(release.functions.find(f=>f.name==='account-admin').files.map(f=>f.path),['_shared/runtime-preflight.ts','_shared/support-handoff.ts','account-admin/index.ts']);
  const {sha256,...contents}=release;assert.equal(sha256,sha(JSON.stringify(contents)));
- assert.deepEqual(release,buildRelease());assert.deepEqual(buildRelease(),buildRelease());
+ // Frozen releases are historical snapshots. New source belongs to a separately
+ // fingerprinted candidate, never to an in-place rewrite of the accepted package.
+ const candidate=JSON.parse(read('../orbito/supabase/releases/shop-release-support-v3.json'));
+ assert.deepEqual(candidate,buildRelease(undefined,{support:true}));
+ assert.equal(candidate.sha256,JSON.parse(read('scripts/byo-release-manifest.json')).sha256);
+ assert.equal(candidate.migrations.length,36);assert.equal(candidate.functions.length,7);
  assert.doesNotMatch(read('src/main.js'),/shop-release\.json/);
 });
 
