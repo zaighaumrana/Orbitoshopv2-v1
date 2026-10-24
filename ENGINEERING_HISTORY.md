@@ -869,3 +869,30 @@ retrasellshop/retrabyo, without skip markers or settings changes. Platform's sep
 fixture/history commit retains its skip marker. Actual deployment/CI outcomes are
 saved in new external clearance-compatibility evidence. PRs stay Open/Draft/unmerged
 against development; hosted owner acceptance and final merging remain separate.
+
+## 2026-10-25 — Final Help & Support presentation correction
+Branch: feature/verified-customer-support-shop
+
+The Support renderer contained already-corrupted punctuation despite the document's
+correct UTF-8 declaration. Replaced static punctuation with HTML entities; customer
+subjects/messages and stored records are unchanged. Generic card buttons and flat
+metadata lacked compact list styling and shared control classes. Support now uses
+scoped token-based fields, buttons, badges, aligned history metadata, pagination,
+notices, disclosure and owner approval/history. Long subject previews use two lines
+with full accessible/title/detail text; long identities wrap. Responsive Refresh
+alignment and dark-theme contrast were checked visually. Other screens retain their
+existing CSS defaults.
+
+The existing isolated Support browser regression passes form/retry/one receipt,
+escaped detail, Owner/Manager access and fifty-row pagination. Synthetic presentation
+checks pass four widths/both themes, six message states, disclosure and unrelated
+component CSS comparisons. Two focused renderer/role cases, JS syntax, production
+build (118 modules) and diff checks pass. Initial captures are preserved separately
+from final screenshots. No broad suites, backend tests or customer tickets were run.
+
+Owner reports hosted Support acceptance already passed in Managed/BYO; only final
+visual review remains. No Support handlers, consent/retry/query contracts, backend,
+immutable v6, Platform or excluded BYO checkout changed. Normal Shop commit/push has
+no skip marker; existing Git-connected production builds are authorized. Actual
+deployment results are in external shop-support-ui evidence. PR1 stays Open/Draft/
+unmerged to development; no Cloudflare settings or Platform deployment changes.
