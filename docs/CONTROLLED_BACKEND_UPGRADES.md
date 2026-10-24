@@ -43,12 +43,23 @@ node scripts/upgrade-backend.mjs --mode byo --project-ref EXACT_SHOP_REF --clien
 
 Type the exact UPGRADE project/target confirmation. The tool requires that separate
 customer approval and actual customer CLI project access. It validates the clearance
-contract/digest/public anon key and exact Platform/customer identities, then claims
+contract/digest/public key and exact Platform/customer identities, then claims
 the SAME durable Platform request. It cannot begin with only a self-reported local
 "operations cleared" flag. Any unresolved Platform provisioning/configuration,
 owner/bootstrap or unknown provider write blocks execution. A private original
 journal/local exclusive process lock complements Platform's concurrent executor
 fence. Each provider write is preceded by live clearance and exact Shop checks.
+
+The customer CLI accepts both Supabase publishable keys and legacy anon JWTs in
+the original clearance; no JSON editing or key substitution is needed. It rejects
+privileged/malformed keys and checks the key against the exact explicitly supplied
+Platform project's read-only Auth settings endpoint before sending any clearance
+token. Publishable keys are opaque, not decoded JWTs. Redirects, network failures,
+invalid keys and unexpected responses stop conservatively and preserve the original
+clearance/journal. Successful key verification does not authorize an upgrade: the
+original live claim must still pass expiry, revocation, session and pending-operation
+gates and return the exact request/client/project/source/target/binding/plan digest.
+No backend redeployment, new release or repeat of a completed upgrade is required.
 
 SQL uses approved atomic migration envelopes and exact ledger read-back; functions
 deploy only changed approved sources with original JWT settings. Unchanged packages,

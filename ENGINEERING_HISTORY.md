@@ -843,3 +843,29 @@ admin is unavailable. No hosted install/upgrade/reset, secrets/Auth/Vault change
 production promotion or merge. Checkpoint uses [CF-Pages-Skip]; actual remote results
 are external in controlled-upgrades-stabilization-2026-10-23. Both existing PRs stay
 Draft/Open/unmerged against development.
+
+## 2026-10-25 — Permanent customer clearance public-key compatibility
+Branch: feature/verified-customer-support-shop
+
+The upgrade CLI assumed every Platform public key was a legacy anon JWT, rejecting
+valid publishable-key clearances before execution. It now recognizes both public
+formats and rejects privileged/malformed credentials. A fixed-project, read-only
+Auth settings request verifies the key before sending clearance authority; decoded
+JWT claims or a publishable prefix alone are not authentication. Redirects, failed
+network/HTTP and malformed responses fail closed. The authoritative original claim
+also must match its exact mode, state, invocation, client/project/source/target,
+binding, request and recomputed plan digest before any customer write.
+
+Five synthetic compatibility/security groups and the existing Platform customer CLI
+regression pass, including both formats through three mocked operations, altered
+identities, expired/revoked/unauthorized clearance and original-journal recovery.
+Changed-JS syntax passes. Canonical cross-repository parity verifies unchanged
+immutable support-v6; no packaged backend source or fingerprint is regenerated.
+
+Only CLI, focused tests and guidance/history change. Both completed hosted upgrades,
+their source limitations, checkpoints, pins and audit history remain untouched.
+Owner authorized this Shop commit's normal Git-connected production builds for
+retrasellshop/retrabyo, without skip markers or settings changes. Platform's separate
+fixture/history commit retains its skip marker. Actual deployment/CI outcomes are
+saved in new external clearance-compatibility evidence. PRs stay Open/Draft/unmerged
+against development; hosted owner acceptance and final merging remain separate.

@@ -16,6 +16,26 @@ import {outsideRepos,nativeCliCandidates,checkedCli} from './setup-byo.mjs';
 import {validShopProject,validClientId} from './byo-identity.mjs';
 export class UpgradeError extends Error {}
 const root=resolve(import.meta.dirname,'..'),literal=s=>"'"+String(s).replaceAll("'","''")+"'";
+const uuid=s=>typeof s==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(s);
+export async function verifyPlatformPublicKey(ref,key,fetcher=fetch){
+ const invalid=()=>new UpgradeError('Public Platform publishable or legacy anon key required; privileged or wrong-project keys are forbidden.');
+ if(!/^[a-z]{20}$/.test(ref||'')||typeof key!=='string'||key.length>4096)throw invalid();
+ if(!/^sb_publishable_[A-Za-z0-9_-]{1,256}$/.test(key)){
+  try{
+   if(!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(key))throw invalid();
+   const [header,claims]=key.split('.').slice(0,2).map(s=>JSON.parse(Buffer.from(s,'base64url').toString()));
+   if(header?.alg!=='HS256'||claims?.role!=='anon'||claims?.ref!==ref)throw invalid();
+  }catch{throw invalid();}
+ }
+ // Neither a prefix nor decoded claims authenticate a key. The exact project's
+ // API gateway must accept it before any clearance token is sent. No redirects.
+ try{
+  const r=await fetcher(`https://${ref}.supabase.co/auth/v1/settings`,{method:'GET',redirect:'error',signal:AbortSignal.timeout(25000),headers:{apikey:key,Accept:'application/json'}});
+  if(r.status!==200||r.redirected){await r.body?.cancel();throw Error();}
+  const settings=await r.json();
+  if(!settings||!settings.external||typeof settings.external!=='object'||Array.isArray(settings.external))throw Error();
+ }catch{throw new UpgradeError('Public Platform key could not be verified for the exact Platform project. Keep the original clearance and journal; no customer write was started.');}
+}
 export function upgradePlan(history,release,source,count,resuming=false){
  if(!source||!Number.isInteger(source.migrations)||(!resuming&&history.length!==source.migrations))throw new UpgradeError('Declared source package does not match history; manual provenance review required.');
  return planMigrations(history,release,'existing',count);
@@ -43,10 +63,9 @@ export async function upgradeBackend(argv,deps={}){
   if(!o['--approval-file']||!/^[a-z]{20}$/.test(o['--platform-project-ref']||'')||o['--platform-project-ref']===ref)throw new UpgradeError('A separate private Master clearance file and exact Platform project are required before any customer write.');
   const approvalPath=outsideRepos(o['--approval-file']);if(approvalPath===path)throw new UpgradeError('Clearance and journal must be different files.');
   approval=JSON.parse(readFileSync(approvalPath,'utf8'));
-  if(approval.contract!=='retrasell-byo-upgrade-clearance-v1'||approval.platform_url!==`https://${o['--platform-project-ref']}.supabase.co`||!/^[a-f0-9]{64}$/.test(approval.token||'')||approval.plan_sha256!==await digest(approval.plan)||approval.plan.source_sha256!==identity.source||approval.plan.target_sha256!==identity.target||approval.plan.client_id!==client||approval.plan.project_ref!==ref)throw new UpgradeError('Exact original source/target clearance required.');
-  let claims;try{claims=JSON.parse(Buffer.from(approval.platform_public_key.split('.')[1],'base64url').toString());}catch{throw new UpgradeError('Public Platform anon key required.');}
-  if(claims.role!=='anon'||claims.ref!==o['--platform-project-ref'])throw new UpgradeError('Privileged or wrong-project Platform key is forbidden.');
+  if(approval.contract!=='retrasell-byo-upgrade-clearance-v1'||approval.platform_url!==`https://${o['--platform-project-ref']}.supabase.co`||!uuid(approval.request_id)||!/^[a-f0-9]{64}$/.test(approval.token||'')||approval.plan_sha256!==await digest(approval.plan)||approval.plan.source_sha256!==identity.source||approval.plan.target_sha256!==identity.target||approval.plan.client_id!==client||approval.plan.project_ref!==ref)throw new UpgradeError('Exact original source/target clearance required.');
   if(old&&(old.request_id!==approval.request_id||old.plan_sha256!==approval.plan_sha256))throw new UpgradeError('The original journal cannot be replaced by a different request or plan.');
+  await verifyPlatformPublicKey(o['--platform-project-ref'],approval.platform_public_key,deps.fetch||fetch);
  }
  const j=old||{contract:'retrasell-backend-upgrade-v2',...identity,request_id:approval?.request_id||randomUUID(),plan_sha256:approval?.plan_sha256,steps:{}};
  const lock=path+'.lock';let locked=false;const terminal=createInterface({input:process.stdin,output:process.stdout});
@@ -76,13 +95,13 @@ export async function upgradeBackend(argv,deps={}){
    (deps.report||console.log)(JSON.stringify(assessment,null,2));return assessment;
   }
   if(Object.keys(binding).some(k=>approval.plan[k]!==binding[k]))throw new UpgradeError('Exact original source binding changed.');
-  const platform=deps.platform||(async(action,fields={})=>{const r=await fetch(approval.platform_url+'/functions/v1/platform-upgrade',{method:'POST',redirect:'error',signal:AbortSignal.timeout(25000),headers:{apikey:approval.platform_public_key,'Content-Type':'application/json','x-retrasell-upgrade-token':approval.token},body:JSON.stringify({action,request_id:j.request_id,...fields})});if(!r.ok){await r.body?.cancel();throw new UpgradeError('Original Platform clearance or pending-operation gate refused this action.');}return (await r.json()).job;});
+  const platform=deps.platform||(async(action,fields={})=>{const r=await (deps.fetch||fetch)(approval.platform_url+'/functions/v1/platform-upgrade',{method:'POST',redirect:'error',signal:AbortSignal.timeout(25000),headers:{apikey:approval.platform_public_key,'Content-Type':'application/json','x-retrasell-upgrade-token':approval.token},body:JSON.stringify({action,request_id:j.request_id,...fields})});if(!r.ok){await r.body?.cancel();throw new UpgradeError('Original Platform clearance or pending-operation gate refused this action.');}return (await r.json()).job;});
   const answer=deps.confirm?await deps.confirm():await terminal.question(`Type UPGRADE ${ref} ${release.sha256} to authorize only this approved package: `);
   if(answer!==`UPGRADE ${ref} ${release.sha256}`)throw new UpgradeError('Customer did not approve the exact upgrade.');
   save();
   for(;;){
    j.state='claiming';save();const job=await platform('customer-claim');
-   if(job.request_id!==j.request_id||job.project_ref!==ref||job.target_sha256!==release.sha256||job.plan_sha256!==approval.plan_sha256)throw new UpgradeError('Original Platform plan changed.');
+   if(!job||job.mode!=='byo'||job.state!=='running'||!uuid(job.invocation)||job.request_id!==j.request_id||job.client_id!==client||job.project_ref!==ref||job.source_sha256!==identity.source||job.target_sha256!==release.sha256||job.source_id!==binding.source_id||job.client_binding!==binding.client_binding||job.plan_sha256!==approval.plan_sha256||await digest(job.plan)!==approval.plan_sha256)throw new UpgradeError('Original Platform plan or binding changed. Retain the original journal.');
    j.state='running';save();
    const command=async(kind,args={})=>{const result=await platform('customer-command',{invocation:job.invocation,kind,args});if(result?.state){j.state=result.state;j.steps=result.steps;j.unknown_step=result.unknown_step;save();}return result;};
    const inspect=async()=>{await command('check');if(buildRelease(root,{support:true}).sha256!==release.sha256)throw new UpgradeError('Local source changed after approval.');requireShopReady({shop:(await query(shopUpgradeQuery))?.[0]},binding);requireUpgradeProgress(release,job.plan,await query(migrationEvidenceQuery),job.steps);};
