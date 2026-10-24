@@ -20,3 +20,7 @@ verify_jwt = true
 
 [functions.platform-bridge]
 verify_jwt = false
+
+[functions.support-tickets]
+# User JWT is checked again with Auth and the live actor-context RPC.
+verify_jwt = true

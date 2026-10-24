@@ -9,7 +9,8 @@ do $$
 declare source uuid; eid uuid; again uuid; payload jsonb; batch jsonb; req jsonb; r text;
 begin
   select source_id into source from app_private.bridge_config;
-  assert public.get_platform_billing()='{"available":false}'::jsonb,'Missing treated as available';
+  assert public.get_platform_billing()->'available'='false'::jsonb,'Missing treated as available';
+  assert coalesce(public.get_platform_billing()->'paper_requests','[]'::jsonb)='[]'::jsonb,'Missing projection exposed requests';
   assert (public.bridge_claim_outbox()->>'enabled')::boolean=false,'Delivery enabled by default';
   eid:=app_private.append_bridge_event('usage','fixture','22222222-2222-4222-8222-222222222222','{"metric":"BILL","quantity":1}',now());
   again:=app_private.append_bridge_event('usage','fixture','22222222-2222-4222-8222-222222222222','{"metric":"BILL","quantity":1}',now());

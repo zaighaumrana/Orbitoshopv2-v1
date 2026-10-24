@@ -1,0 +1,383 @@
+{
+  "contract": "retrasell-backend-requirements-v1",
+  "requirements": [
+    {
+      "id": "core-runtime",
+      "purpose": "Core application schema, Auth/role isolation, private data and storage",
+      "migrations": [
+        "00000000000000",
+        "20260712000000",
+        "20260903020000",
+        "20260903165753",
+        "20260903170222",
+        "20260903171448",
+        "20260903175518",
+        "20260903180703",
+        "20260903181153",
+        "20260904001510",
+        "20260904200000",
+        "20260904203000",
+        "20260904210000",
+        "20260904220000",
+        "20260904230000",
+        "20260905000000",
+        "20260905010000",
+        "20260905011000",
+        "20260905020000",
+        "20260905030000",
+        "20260905031000",
+        "20260917015216",
+        "20260919043803",
+        "20260920195256",
+        "20261001090000",
+        "20261001110000",
+        "20261001120000",
+        "20261002015159",
+        "20261002071259",
+        "20261020135016",
+        "20261020135251"
+      ],
+      "functions": [
+        "account-admin",
+        "login",
+        "password-reset-request",
+        "public-track",
+        "verify-pin",
+        "platform-bridge"
+      ],
+      "managed": "approved migrations + pinned function packages; canonical runtime checks",
+      "byo": "same approved migrations + native CLI packages; customer-controlled runtime checks",
+      "verification": "exact source/hash/order/gateway gate; restricted structural capability probe where available"
+    },
+    {
+      "id": "usage-outbox",
+      "purpose": "Atomic financial events, immutable source identities and leased delivery",
+      "migrations": [
+        "20260917174024"
+      ],
+      "functions": [
+        "platform-bridge"
+      ],
+      "managed": "approved migrations + pinned function packages; canonical runtime checks",
+      "byo": "same approved migrations + native CLI packages; customer-controlled runtime checks",
+      "verification": "exact source/hash/order/gateway gate; restricted structural capability probe where available"
+    },
+    {
+      "id": "billing-projection",
+      "purpose": "Ordered complete billing projections with same-revision conflict denial",
+      "migrations": [
+        "20260917174024"
+      ],
+      "functions": [
+        "platform-bridge"
+      ],
+      "managed": "approved migrations + pinned function packages; canonical runtime checks",
+      "byo": "same approved migrations + native CLI packages; customer-controlled runtime checks",
+      "verification": "exact source/hash/order/gateway gate; restricted structural capability probe where available"
+    },
+    {
+      "id": "config-journal",
+      "purpose": "Original-ID configuration replay and conflict protection",
+      "migrations": [
+        "20261003121000"
+      ],
+      "functions": [
+        "platform-bridge"
+      ],
+      "managed": "approved migrations + pinned function packages; canonical runtime checks",
+      "byo": "same approved migrations + native CLI packages; customer-controlled runtime checks",
+      "verification": "exact source/hash/order/gateway gate; restricted structural capability probe where available"
+    },
+    {
+      "id": "support-identity",
+      "purpose": "Current Auth/session/role/source verification for ticket intake",
+      "migrations": [
+        "20261018000617",
+        "20261019000028"
+      ],
+      "functions": [
+        "support-tickets"
+      ],
+      "managed": "approved migrations + pinned function packages; canonical runtime checks",
+      "byo": "same approved migrations + native CLI packages; customer-controlled runtime checks",
+      "verification": "exact source/hash/order/gateway gate; restricted structural capability probe where available"
+    },
+    {
+      "id": "support-consent",
+      "purpose": "Separate owner case/purpose consent, expiry, revoke and request enforcement",
+      "migrations": [
+        "20261022155952"
+      ],
+      "functions": [
+        "login",
+        "support-tickets"
+      ],
+      "managed": "approved migrations + pinned function packages; canonical runtime checks",
+      "byo": "same approved migrations + native CLI packages; customer-controlled runtime checks",
+      "verification": "exact source/hash/order/gateway gate; restricted structural capability probe where available"
+    },
+    {
+      "id": "owner-bootstrap",
+      "purpose": "Immutable owner reservation and pairing before installation use",
+      "migrations": [
+        "20260929090000"
+      ],
+      "functions": [
+        "platform-bridge"
+      ],
+      "managed": "approved migrations + pinned function packages; canonical runtime checks",
+      "byo": "same approved migrations + native CLI packages; customer-controlled runtime checks",
+      "verification": "exact source/hash/order/gateway gate; restricted structural capability probe where available"
+    },
+    {
+      "id": "support-durable-submissions",
+      "purpose": "Shop acceptance survives tab loss; authorized original-ID acknowledgment recovery",
+      "migrations": [
+        "20261023012311"
+      ],
+      "functions": [
+        "support-tickets",
+        "platform-bridge"
+      ],
+      "managed": "approved migrations + pinned function packages; canonical runtime checks",
+      "byo": "same approved migrations + native CLI packages; customer-controlled runtime checks",
+      "verification": "exact source/hash/order/gateway gate; restricted structural capability probe where available"
+    }
+  ],
+  "runtime": {
+    "external_dependencies": [
+      "https://esm.sh/@supabase/supabase-js@2.108.2"
+    ],
+    "configuration": [
+      "SUPABASE_URL",
+      "SUPABASE_ANON_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "TURNSTILE_SECRET",
+      "PLATFORM_BRIDGE_CALL_SECRET",
+      "PLATFORM_BRIDGE_SOURCE_SECRET",
+      "PLATFORM_BRIDGE_ENDPOINT"
+    ],
+    "optional_support_configuration": [
+      "PLATFORM_SUPPORT_TICKETS_SECRET",
+      "PLATFORM_SUPPORT_TICKETS_ENDPOINT"
+    ],
+    "storage": {
+      "required_buckets": [],
+      "reason": "No storage bucket is required by the current core POS installation contract; source migrations/security policies remain hash-gated."
+    },
+    "database": {
+      "functions": [
+        "public.bridge_claim_outbox(integer)",
+        "public.bridge_finish_delivery(uuid,uuid,boolean)",
+        "public.bridge_apply_billing(uuid,bigint,jsonb)",
+        "public.bridge_onboarding(text,jsonb)",
+        "public.support_ticket_actor_context()",
+        "public.support_consent(text,uuid,uuid,text,text,uuid)",
+        "public.support_delivery_claim(uuid)",
+        "public.support_delivery_finish(uuid,uuid,text,uuid,text)"
+      ],
+      "tables": [
+        "app_private.bridge_events",
+        "app_private.bridge_outbox",
+        "app_private.config_requests",
+        "app_private.support_consents",
+        "app_private.support_submissions"
+      ],
+      "triggers": [
+        "bridge_events_immutable"
+      ],
+      "security": [
+        "canonical live actor",
+        "private RLS",
+        "service-only receipt acknowledgment",
+        "owner-only consent",
+        "separate source/call/ticket credentials"
+      ]
+    },
+    "managed_support_handoff_configuration": [
+      "PLATFORM_SUPABASE_URL",
+      "PLATFORM_SUPABASE_ANON",
+      "PLATFORM_AUTH_EMAIL"
+    ]
+  },
+  "installers": {
+    "managed": {
+      "migrations": [
+        "00000000000000",
+        "20260712000000",
+        "20260903020000",
+        "20260903165753",
+        "20260903170222",
+        "20260903171448",
+        "20260903175518",
+        "20260903180703",
+        "20260903181153",
+        "20260904001510",
+        "20260904200000",
+        "20260904203000",
+        "20260904210000",
+        "20260904220000",
+        "20260904230000",
+        "20260905000000",
+        "20260905010000",
+        "20260905011000",
+        "20260905020000",
+        "20260905030000",
+        "20260905031000",
+        "20260917015216",
+        "20260917174024",
+        "20260919043803",
+        "20260920195256",
+        "20260929090000",
+        "20261001090000",
+        "20261001110000",
+        "20261001120000",
+        "20261002015159",
+        "20261002071259",
+        "20261003121000",
+        "20261018000617",
+        "20261019000028",
+        "20261020135016",
+        "20261020135251",
+        "20261022155952",
+        "20261023012311"
+      ],
+      "core_functions": [
+        "account-admin",
+        "login",
+        "password-reset-request",
+        "public-track",
+        "verify-pin",
+        "platform-bridge"
+      ],
+      "deferred_functions": [
+        "support-tickets"
+      ],
+      "requirements": [
+        "core-runtime",
+        "usage-outbox",
+        "billing-projection",
+        "config-journal",
+        "support-identity",
+        "support-consent",
+        "owner-bootstrap",
+        "support-durable-submissions"
+      ],
+      "configuration": [
+        "runtime",
+        "pairing",
+        "turnstile",
+        "optional-support"
+      ],
+      "support_phase": "after-owner-readiness"
+    },
+    "byo": {
+      "migrations": [
+        "00000000000000",
+        "20260712000000",
+        "20260903020000",
+        "20260903165753",
+        "20260903170222",
+        "20260903171448",
+        "20260903175518",
+        "20260903180703",
+        "20260903181153",
+        "20260904001510",
+        "20260904200000",
+        "20260904203000",
+        "20260904210000",
+        "20260904220000",
+        "20260904230000",
+        "20260905000000",
+        "20260905010000",
+        "20260905011000",
+        "20260905020000",
+        "20260905030000",
+        "20260905031000",
+        "20260917015216",
+        "20260917174024",
+        "20260919043803",
+        "20260920195256",
+        "20260929090000",
+        "20261001090000",
+        "20261001110000",
+        "20261001120000",
+        "20261002015159",
+        "20261002071259",
+        "20261003121000",
+        "20261018000617",
+        "20261019000028",
+        "20261020135016",
+        "20261020135251",
+        "20261022155952",
+        "20261023012311"
+      ],
+      "core_functions": [
+        "account-admin",
+        "login",
+        "password-reset-request",
+        "public-track",
+        "verify-pin",
+        "platform-bridge"
+      ],
+      "deferred_functions": [
+        "support-tickets"
+      ],
+      "requirements": [
+        "core-runtime",
+        "usage-outbox",
+        "billing-projection",
+        "config-journal",
+        "support-identity",
+        "support-consent",
+        "owner-bootstrap",
+        "support-durable-submissions"
+      ],
+      "configuration": [
+        "runtime",
+        "pairing",
+        "turnstile",
+        "optional-support"
+      ],
+      "support_phase": "after-core-install"
+    }
+  },
+  "mode_exceptions": [
+    {
+      "id": "platform-invocation-ownership",
+      "mode": "managed",
+      "purpose": "Bound Platform Edge execution; BYO uses customer-local serial journals and has no Platform Edge execution limit"
+    },
+    {
+      "id": "managed-privileged-support-handoff",
+      "mode": "managed",
+      "purpose": "Existing privileged Open Shop as Support is Managed-only. BYO retains customer ticket delivery and consent records without granting Platform handoff."
+    }
+  ],
+  "compatibility": {
+    "bridge": 1,
+    "billing": 1,
+    "support": 1,
+    "config": 1,
+    "migration_strategy": "additive",
+    "drain_before_upgrade": [
+      "running Managed provider write",
+      "unknown installer provider write",
+      "unresolved config command"
+    ],
+    "queueable": [
+      "Shop usage events",
+      "persisted Support submissions with live original actor on retry"
+    ],
+    "live_required": [
+      "POS database commit",
+      "invoice/payment commit",
+      "new Support acceptance before Shop persistence"
+    ],
+    "automatic_upgrade": false,
+    "shop_receipts": {
+      "legacy": "503 preserves original browser intent for uncertain delivery",
+      "durable": "explicit opt-in with existing CORS-allowed x-client-info; 202 distinguishes Shop persistence from Platform acknowledgment"
+    }
+  }
+}

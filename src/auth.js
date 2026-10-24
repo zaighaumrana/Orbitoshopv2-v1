@@ -16,6 +16,8 @@ let _turnstileWidgetId = null
 let _turnstileContainer = null
 let _turnstileMountTimer = null
 let _turnstileGeneration = 0
+let loginInFlight = false
+let turnstileVerified = false
 
 export function renderLogin(onSuccess) {
   cleanupLoginBackground()
@@ -54,7 +56,7 @@ export function renderLogin(onSuccess) {
            Sign in to continue
           </p>
         </div>
-        <div style="display:grid;gap:10px">
+        <form id="login-form" aria-labelledby="login-title" style="display:grid;gap:10px">
           <label class="field"><span>Email</span>
             <input id="login-email" type="email" autocomplete="email"
               placeholder="your@email.com" style="font-size:15px" autofocus>
@@ -75,11 +77,11 @@ export function renderLogin(onSuccess) {
           </button>
           <div id="cf-turnstile-wrap"
             style="display:flex;justify-content:center;margin:4px 0"></div>
-          <button id="login-btn" class="primary-button"
+          <button type="submit" id="login-btn" class="primary-button"
             style="width:100%;font-size:15px;padding:12px">
             Login
           </button>
-        </div>
+        </form>
                 <p class="muted" style="text-align:center;font-size:12px;margin:0">
           ${escapeHTML(CFG.shop_address || '')}
         </p>
@@ -114,8 +116,14 @@ z-index:100
   const wrap = document.getElementById('cf-turnstile-wrap')
   const btn  = document.getElementById('login-btn')
   const generation = ++_turnstileGeneration
+  turnstileVerified = false
 
   if (btn) btn.disabled = true
+  const siteKey=import.meta.env.VITE_TURNSTILE_SITE_KEY
+  if(typeof siteKey!=='string'||!/^[A-Za-z0-9_-]{10,200}$/.test(siteKey)||/^(?:[123]x0+|replace|your|example)/i.test(siteKey)){
+    if(wrap)wrap.textContent='Shop verification is not configured. Ask the Shop administrator to set the public Turnstile site key and rebuild this website.'
+    return
+  }
 
   _turnstileWidgetId = null
   _turnstileContainer = wrap
@@ -125,21 +133,22 @@ z-index:100
     if (generation !== _turnstileGeneration || !wrap?.isConnected) return
     if (window.turnstile) {
       _turnstileWidgetId = window.turnstile.render(wrap, {
-        sitekey:
-          import.meta.env.VITE_TURNSTILE_SITE_KEY ||
-          '0x4AAAAAADl87EDGnxcg5eJZ',
+        sitekey: siteKey,
 
         theme: 'dark',
 
         callback: () => {
-          if (generation === _turnstileGeneration && btn?.isConnected) btn.disabled = false
+          if (generation === _turnstileGeneration) turnstileVerified = true
+          if (generation === _turnstileGeneration && btn?.isConnected) btn.disabled = loginInFlight
         },
 
         'expired-callback': () => {
+          if (generation === _turnstileGeneration) turnstileVerified = false
           if (generation === _turnstileGeneration && btn?.isConnected) btn.disabled = true
         },
 
         'error-callback': () => {
+          if (generation === _turnstileGeneration) turnstileVerified = false
           if (generation === _turnstileGeneration && btn?.isConnected) btn.disabled = true
         },
       })
@@ -156,20 +165,21 @@ z-index:100
 
   mountTurnstile()
 
-  document.getElementById('login-btn').addEventListener('click', submitLogin)
+  document.getElementById('login-form').addEventListener('submit', event => {
+    event.preventDefault()
+    void submitLogin()
+  })
   document.getElementById('forgot-btn').addEventListener('click', forgotPassword)
   document
   .getElementById('support-access-btn')
   .addEventListener('click', () => {
     showBlockingError('Open this Shop from Platform using Open Shop as Support. No Platform password is entered here.')
   })
-  document.getElementById('login-password').addEventListener('keydown', e => {
-    if (e.key === 'Enter') submitLogin()
-  })
   cleanupLoginBackground = startLoginBackground(app.querySelector('.orbito-login'))
 }
 
 function resetTurnstile() {
+  turnstileVerified = false
   const btn = document.getElementById('login-btn')
 
   if (btn) btn.disabled = true
@@ -203,7 +213,7 @@ function cleanupTurnstile() {
 
 async function submitLogin() {
   const btn = document.getElementById('login-btn')
-  if (btn?.disabled) return  // Turnstile not verified yet, or a submit is already in flight
+  if (loginInFlight || btn?.disabled) return
   const emailEl = document.getElementById('login-email')
   const passEl  = document.getElementById('login-password')
   const errEl   = document.getElementById('login-error')
@@ -215,6 +225,9 @@ async function submitLogin() {
     return
   }
 
+  loginInFlight = true
+  const generation = _turnstileGeneration
+  try {
   if (btn) { btn.disabled = true; btn.textContent = 'Logging in…' }
   if (errEl) errEl.classList.add('hidden')
 
@@ -226,8 +239,10 @@ async function submitLogin() {
    turnstileToken,
    'shop'
   )
+  if (generation !== _turnstileGeneration || !btn?.isConnected) return
   if (res.ok) {
     const established = await establishLoginSession(res)
+    if (generation !== _turnstileGeneration || !btn?.isConnected) return
     if (!established.ok) {
       await _clearSession()
       res.ok = false
@@ -263,6 +278,18 @@ async function submitLogin() {
 }
 
 resetTurnstile()
+  }
+  } catch {
+    if (generation === _turnstileGeneration && btn?.isConnected) {
+      btn.textContent = 'Login'
+      if (errEl) { errEl.textContent = 'Sign in is unavailable. Please retry.'; errEl.classList.remove('hidden') }
+      if (passEl) passEl.value = ''
+      resetTurnstile()
+    }
+  } finally {
+    loginInFlight = false
+    const current = document.getElementById('login-btn')
+    if (current) current.disabled = !turnstileVerified
   }
 }
 

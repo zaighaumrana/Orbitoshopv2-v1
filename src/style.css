@@ -920,6 +920,50 @@ body .app-dialog { width: min(480px, 100%); border-radius: 8px; max-height: 92vh
   }
 }
 
+/* Help & Support only; shared tokens/components retain their existing defaults. */
+.support-page { display: grid; align-content: start; align-self: start; gap: var(--space-4); width: 100%; max-width: 1100px; min-width: 0; line-height: 1.5; overflow-wrap: anywhere; }
+.support-page .support-heading, .support-page .support-section { display: grid; align-content: start; gap: var(--space-3); min-width: 0; }
+.support-page .support-heading { gap: var(--space-1); }
+.support-page h4, .support-page p { margin: 0; }
+.support-page .support-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(160px, 1fr); gap: var(--space-3); }
+.support-page .field { min-width: 0; }
+.support-page .field > span { font-size: 13px; font-weight: 600; color: var(--muted); }
+.support-page .field :is(input, select, textarea) { min-width: 0; }
+.support-page .support-actions, .support-page .support-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.support-page .support-meta, .support-page .support-ticket time { font-size: 13px; color: var(--muted); }
+.support-page .support-message { white-space: pre-wrap; }
+.support-page .support-history { display: grid; align-content: start; gap: var(--space-2); }
+.support-page .toolbar { flex-direction: row; align-items: center; }
+.support-page .toolbar button { flex: 0 0 auto; width: auto; }
+.support-page .support-ticket { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; text-align: left; color: var(--text); width: 100%; min-width: 0; padding: var(--space-3); box-shadow: none; }
+.support-page .support-ticket-main, .support-page .support-ticket-meta { display: grid; gap: var(--space-1); min-width: 0; }
+.support-page .support-ticket-meta { justify-items: end; }
+.support-page .support-ticket-main > strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.support-page .support-ticket-action { font-size: 12px; color: color-mix(in srgb, var(--primary) 50%, var(--text)); }
+.support-page .badge.good { color: color-mix(in srgb, var(--success) 55%, var(--text)); }
+.support-page .badge.warn { color: color-mix(in srgb, var(--warning) 55%, var(--text)); }
+.support-page .support-ticket[aria-pressed="true"] { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 6%, var(--surface)); }
+.support-page .support-ticket:hover:not(:disabled) { border-color: var(--primary); background: var(--surface-2); }
+.support-page .support-pagination { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: var(--space-3); font-size: 13px; }
+.support-page .support-notice { padding: var(--space-3); border: 1px solid var(--border); border-left: 3px solid var(--primary); border-radius: 8px; background: var(--surface-2); }
+.support-page .support-notice-error { border-left-color: var(--danger); }
+.support-page .support-notice-success { border-left-color: var(--success); }
+.support-page .support-notice-pending { border-left-color: var(--warning); }
+.support-page details > summary { cursor: pointer; font-weight: 600; }
+.support-page details > :not(summary) { margin-top: var(--space-3); }
+.support-page details > a { display: inline-block; color: color-mix(in srgb, var(--primary) 50%, var(--text)); font-weight: 600; }
+.support-page .support-approval { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.support-page .support-approval-details { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: var(--space-1) var(--space-2); margin: 0; font-size: 13px; }
+.support-page .support-approval-details dt { color: var(--muted); }
+.support-page .support-approval-details dd { margin: 0; min-width: 0; }
+.support-page :is(button, input, select, textarea, summary):focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.support-page button:disabled { opacity: 0.6; cursor: default; }
+@media (max-width: 600px) {
+  .support-page .support-fields { grid-template-columns: minmax(0, 1fr); }
+  .support-page .support-pagination { justify-content: space-between; gap: var(--space-2); }
+  .support-page .support-ticket { gap: var(--space-2); }
+}
+
 /* Remove number input spinners everywhere */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {

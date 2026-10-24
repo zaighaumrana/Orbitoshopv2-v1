@@ -1,3 +1,4 @@
+import {supportSessionAllowed} from '../_shared/support-consent.ts'
 import { runtimeProbe } from '../_shared/runtime-preflight.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.108.2'
 
@@ -45,6 +46,7 @@ Deno.serve(async (req: Request) => {
     if (profileError || !profile || profile.status !== 'Active') {
       return json({ ok: false, error: 'Authorization failed.' }, 403)
     }
+    if(!await supportSessionAllowed(admin,token,userData.user.id,profile.role))return json({ok:false,error:'Current owner support approval required.'},403)
     const { data: shop } = await admin.from('shop_config').select('suspended').eq('id', 1).single()
     if (shop?.suspended && profile.role !== 'Orbito Support') {
       return json({ ok: false, error: 'Authorization failed.' }, 403)
