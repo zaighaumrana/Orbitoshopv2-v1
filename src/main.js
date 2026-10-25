@@ -181,7 +181,7 @@ async function enterApplication(session) {
     if (!CFG.ems_enabled) { proceed(); return }
     const { checkClockIn } = await import('./features/ems/index.js')
     if (generation !== applicationGeneration || state.role !== role) return
-    checkClockIn(session, CFG, proceed)
+    await checkClockIn(session, CFG, proceed,()=>generation===applicationGeneration&&state.role===role)
   }
   // Onboarding remains first. No previously registered route bypasses this gate.
   clearRoutes()

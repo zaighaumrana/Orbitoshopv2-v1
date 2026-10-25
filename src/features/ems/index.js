@@ -25,13 +25,18 @@ import {
   _clearSession, confirmAction, showBlockingError, showToast,
 } from '../../shared.js'
 import { dlog, dstack } from '../../debuglog.js'
-import {onPrivateReset} from '../../ui-authority.js'
+import {onPrivateReset,captureAuthority} from '../../ui-authority.js'
+import {captureView} from '../../ui-lifecycle.js'
 
 let SESSION         = {}
 let _onProceed      = null   // callback after clock-in
-onPrivateReset(()=>{SESSION={};_onProceed=null})
+let gateGeneration=0,gateIsCurrent=()=>false
+onPrivateReset(()=>{gateGeneration++;gateIsCurrent=()=>false;SESSION={};_onProceed=null})
 
-export async function checkClockIn(sess, cfg, onProceed) {
+export async function checkClockIn(sess, cfg, onProceed, isCurrent=()=>true) {
+  const generation=++gateGeneration,authority=captureAuthority()
+  const current=()=>generation===gateGeneration&&authority()&&isCurrent()
+  gateIsCurrent=current
   dlog('EMS.checkClockIn', `ENTRY isAdmin=${sess.isAdmin} role=${sess.employee?.role} ems_enabled=${cfg.ems_enabled}`)
   SESSION    = sess
   _onProceed = onProceed
@@ -50,12 +55,18 @@ export async function checkClockIn(sess, cfg, onProceed) {
 
   // Check if employee has an open attendance record today
   const today = new Date().toISOString().slice(0, 10)
-  const { data } = await sb.from('attendance')
+  const { data,error } = await sb.from('attendance')
     .select('id, clock_in, clock_out')
     .eq('employee_id', sess.employee.id)
     .eq('date', today)
     .order('id', { ascending: false })
     .limit(1)
+  if(!current())return
+  if(error||!Array.isArray(data)){
+    document.getElementById('app').innerHTML='<main class="card" role="alert"><h1>Clock-in status unavailable</h1><p>Attendance could not be verified. Retry this read before continuing.</p><button id="clockin-retry">Retry status</button></main>'
+    document.getElementById('clockin-retry').onclick=()=>{if(current())void checkClockIn(sess,cfg,onProceed,isCurrent)}
+    return
+  }
 
   const record = data?.[0] || null
   if (!CFG.ems_enabled || state.role !== sess.employee?.role) return
@@ -92,6 +103,8 @@ export async function checkClockIn(sess, cfg, onProceed) {
 
 /* ── Clock-in screen ── */
 function renderClockInScreen(sess, isReturn) {
+  const current=gateIsCurrent,proceed=_onProceed
+  if(!current())return
   dstack('EMS.renderClockInScreen', `*** #app REWRITE *** isReturn=${isReturn}`)
   const now  = new Date()
   const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -138,11 +151,12 @@ function renderClockInScreen(sess, isReturn) {
   // Tick the live clock
   const clockEl = document.getElementById('live-clock')
   const ticker  = setInterval(() => {
-    if (!clockEl || !document.body.contains(clockEl)) { clearInterval(ticker); return }
+    if (!current() || !clockEl || !document.body.contains(clockEl)) { clearInterval(ticker); return }
     clockEl.textContent = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })
   }, 60000)
 
   document.getElementById('clockin-btn').addEventListener('click', async () => {
+    if(!current())return
     const btn = document.getElementById('clockin-btn')
     btn.disabled = true; btn.textContent = 'Clocking in…'
     const today = new Date().toISOString().slice(0, 10)
@@ -151,14 +165,17 @@ function renderClockInScreen(sess, isReturn) {
       clock_in:    new Date().toISOString(),
       date:        today,
     })
+    if(!current())return
     if (error) { showBlockingError('Clock-in failed: ' + error.message); btn.disabled = false; btn.textContent = '⏱ Clock In'; return }
     clearInterval(ticker)
-    _onProceed && _onProceed()
+    proceed && proceed()
   })
 }
 
 /* ── Break gate (ems_track_breaks = true, already clocked in) ── */
 function renderBreakGate(sess, record) {
+  const current=gateIsCurrent,proceed=_onProceed
+  if(!current())return
   dstack('EMS.renderBreakGate', '*** #app REWRITE ***')
   const clockedInAt  = new Date(record.clock_in)
   const elapsed      = Math.floor((Date.now() - clockedInAt) / 60000) // minutes
@@ -197,17 +214,20 @@ function renderBreakGate(sess, record) {
     </div>`
 
   document.getElementById('proceed-btn').addEventListener('click', () => {
-    _onProceed && _onProceed()
+    if(current())proceed && proceed()
   })
 
   document.getElementById('breakout-btn').addEventListener('click', async () => {
+    if(!current())return
     const btn = document.getElementById('breakout-btn')
     btn.disabled = true; btn.textContent = 'Clocking out…'
     await _clockOut(sess, record.id)
+    if(!current())return
     renderClockInScreen(sess, true)
   })
 
   document.getElementById('shiftend-btn').addEventListener('click', async () => {
+    if(!current())return
     await confirmAction({
       title: 'End shift and log out?',
       message: 'Your shift will be clocked out before this session ends.',
@@ -215,6 +235,7 @@ function renderBreakGate(sess, record) {
       tone: 'danger',
       action: async () => {
         await _clockOut(sess, record.id)
+        if(!current())return false
         await _clearSession()
         return true
       },
@@ -308,6 +329,7 @@ export function clockOutButtonHTML() {
 }
 
 export async function handleClockOut(sess, onComplete) {
+  const current=captureView()
   if (!CFG.ems_enabled) return
   dlog('EMS.handleClockOut', `ENTRY employee=${sess.employee?.name}`)
   const outcome = await confirmAction({
@@ -315,18 +337,22 @@ export async function handleClockOut(sess, onComplete) {
     message: 'Clock out and end your current shift?',
     confirmLabel: 'Clock out',
     action: async () => {
+      if(!current())return false
       if (!CFG.ems_enabled || state.role !== sess.employee?.role) return false
       const today = new Date().toISOString().slice(0, 10)
-      const { data } = await sb.from('attendance')
+      const { data,error:readError } = await sb.from('attendance')
         .select('id')
         .eq('employee_id', sess.employee.id)
         .eq('date', today)
         .is('clock_out', null)
         .limit(1)
+      if(!current())return false
+      if(readError||!Array.isArray(data)){showBlockingError('Attendance is unavailable. Retry the status read before clocking out.');return false}
       if (data?.[0]) {
         const { error } = await sb.from('attendance')
           .update({ clock_out: new Date().toISOString() })
           .eq('id', data[0].id)
+        if(!current())return false
         if (error) {
           showBlockingError('Clock-out failed: ' + error.message)
           return false
@@ -335,7 +361,7 @@ export async function handleClockOut(sess, onComplete) {
       return true
     },
   })
-  if (!outcome?.confirmed) { dlog('EMS.handleClockOut', 'user cancelled clock-out dialog'); return }
+  if (!current() || !outcome?.confirmed) { dlog('EMS.handleClockOut', 'user cancelled clock-out dialog'); return }
   dlog('EMS.handleClockOut', 'DONE -- calling onComplete()')
   onComplete && onComplete()
 }

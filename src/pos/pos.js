@@ -1043,12 +1043,18 @@ async function _finalizeCheckoutOnce() {
     taxRate: Number(CFG.tax_rate||0),
   }
   const operation=cartOperations.get(inputs.requestId)||{actor,kind:'checkout',inputs,status:'pending'}
+  if(JSON.stringify(operation.inputs)!==JSON.stringify(inputs)){
+    operation.detached=true
+    showBlockingError('The original checkout '+inputs.requestId+' has different intended inputs. Review its original outcome before creating another sale.');return
+  }
   cartOperations.set(inputs.requestId,operation)
   let res
   try {res=await finalizeCheckout(operation.inputs)}
   catch {res={ok:false,error:'Outcome unavailable. Reconcile the original request before retrying.'}}
   operation.status=res.ok?'succeeded':res.code==='incomplete-cash-payment'?'rejected':'uncertain'
   operation.result=res
+  if(operation.status==='rejected')cartOperations.delete(inputs.requestId)
+  if(operation.status==='uncertain')operation.detached=true
   if (!current() || posState!==ownerState) {operation.detached=true;return}
   if (!res.ok) {
     dlog('POS._finalizeCheckout', `FAILED: ${res.error}`)

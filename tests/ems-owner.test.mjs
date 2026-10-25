@@ -4,6 +4,16 @@ import vm from 'node:vm'
 import {readFileSync} from 'node:fs'
 import {parseAst} from 'rolldown/parseAst'
 const tick=()=>new Promise(r=>setImmediate(r))
+test('actual clock-in gate rejects a departed same-role session response',async()=>{
+ const source=readFileSync(new URL('../src/features/ems/index.js',import.meta.url),'utf8'),node=parseAst(source).body.find(n=>n.declaration?.id?.name==='checkClockIn').declaration
+ const pending=[],shown=[];let epoch=1
+ const q={select:()=>q,eq:()=>q,order:()=>q,limit:()=>new Promise(resolve=>pending.push(resolve))}
+ const ctx=vm.createContext({captureAuthority:()=>{const e=epoch;return ()=>e===epoch},sb:{from:()=>q},CFG:{ems_enabled:true},state:{role:'Cashier'},dlog(){},renderClockInScreen:s=>shown.push(s.authUserId),Date})
+ vm.runInContext('let SESSION={},_onProceed=null,gateGeneration=0,gateIsCurrent=()=>false;'+source.slice(node.start,node.end)+';globalThis.check=checkClockIn',ctx)
+ const a=ctx.check({authUserId:'A',employee:{id:1,role:'Cashier'}},{ems_enabled:true},()=>assert.fail('old gate proceeded'));epoch=2
+ const b=ctx.check({authUserId:'B',employee:{id:2,role:'Cashier'}},{ems_enabled:true},()=>assert.fail('missing attendance cannot proceed'))
+ pending[1]({data:[]});await b;pending[0]({data:[]});await a;assert.deepEqual(shown,['B'])
+})
 test('actual EMS binder uses current callbacks after revisit, refreshes actions once and blocks duplicate payroll',async()=>{
  const source=readFileSync(new URL('../src/features/admin/ems/index.js',import.meta.url),'utf8')
  const node=parseAst(source).body.find(n=>n.type==='ExportNamedDeclaration'&&n.declaration?.id?.name==='attachEMSEvents').declaration

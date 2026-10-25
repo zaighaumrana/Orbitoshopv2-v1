@@ -9,7 +9,7 @@ export function observeCommand(name,args,send){
  if(record&&record.payload!==payload)throw Error('Original request UUID has a different intended payload. Reconcile it before continuing.')
  record||={actor,session:identity,requestId:args.p_request_id,name,args:structuredClone(args),payload,status:'pending'}
  records.set(key,record)
- let sent;try{sent=send(identity)}catch(error){record.status='uncertain';throw error}
+ let sent;try{sent=send(identity,structuredClone(record.args))}catch(error){record.status='uncertain';throw error}
  return Promise.resolve(sent).then(result=>{record.status=result?.error?'uncertain':'acknowledged';record.result=structuredClone(result);return result},error=>{record.status='uncertain';throw error})
 }
 export function originalCommandRecords(){

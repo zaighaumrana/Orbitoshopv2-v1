@@ -1083,3 +1083,24 @@ the current intake selector; corrected to the actual intake/tag controls. Integr
 candidate verification additionally checks input/change/Enter/PIN. Prior failed
 runs remain. No backend/release/DB/Platform/provider changes or deployment. Independent
 review NOT REVIEWED; this is implementation-author validation only.
+
+## 2026-10-25 — M1 integrated ownership closure
+Branch: feature/shop-modernization-m1
+
+Final source review found that shared EMS clock-in/out gate continuations also need
+native/session ownership, beyond Admin EMS. They now capture the gate owner and
+recheck after reads/ACKs before rendering, proceeding, clocking out or signing out.
+Failed attendance reads remain unavailable rather than becoming a missing shift.
+A focused actual-gate test proves a departed same-role response cannot open/proceed
+under the new account. Existing payroll/business-day policy is unchanged.
+
+The financial RPC observer sends a detached copy of original arguments after live
+session verification. Conflicting changes to a pending checkout cannot silently
+replace/reuse the original UUID; local pre-send insufficient-cash validation remains
+correctable. Original uncertain outcomes are offered for read-only review, never
+automatic replay. Existing Paper race fixture is adapted only for the new async
+wrapper dependency; its original successor-data/busy assertions remain.
+
+This is a small M1-006/011 closure, no new backend/release/DB/provider/Platform source
+scope. Final candidate commands/results,13-case ledger and audit handoff are in the
+permanent archive. No independent audit or owner acceptance is claimed.

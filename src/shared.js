@@ -29,10 +29,10 @@ initializeSupportConsole(sb)
 const nativeRPC=sb.rpc.bind(sb)
 const recordedCommands=new Set(['create_retail_sale','create_repair_ticket','record_repair_payment','approve_additional_work','save_additional_work_proposal','decide_additional_work','create_repair_adjustment','cancel_repair','deliver_repair','mark_repair_component_not_needed','settle_udhar','create_retail_return','create_inventory_item','adjust_inventory_stock'])
 sb.rpc=(name,args,options)=>recordedCommands.has(name)&&args?.p_request_id
-  ? observeCommand(name,args,async identity=>{
+  ? observeCommand(name,args,async (identity,originalArgs)=>{
       const session=(await sb.auth.getSession()).data?.session
       if(nativeIdentity(session)!==identity)throw Error('Session changed before command submission. Original request retained; outcome unconfirmed.')
-      const request=nativeRPC(name,args,options)
+      const request=nativeRPC(name,originalArgs,options)
       // Keep an initiated operation on its original bearer. Never journal it.
       return request.setHeader?request.setHeader('Authorization','Bearer '+session.access_token):request
     })
