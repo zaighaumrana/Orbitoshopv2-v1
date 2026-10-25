@@ -1114,3 +1114,20 @@ input. Managed-style Vite builds and explicit customer builds therefore share di
 execution evidence for the tracker correction. This adds no public configuration
 field, backend component, provider operation or release. Integrated final-candidate
 logs are retained in the permanent M1 evidence run.
+
+## 2026-10-25 — M1 final validation fixture repair
+Branch: feature/shop-modernization-m1
+
+Integrated candidate validation executed70 focused tests:68 passed and two inherited
+account-admin onboarding fixture cases failed. Both the test and production handler
+were unchanged since development; the VM omitted the handler's current imported
+supportSessionAllowed helper. The fixture now executes that real helper, supplies a
+synthetic native-session token and models the trusted binding response. Owner-only
+completion and revoked-Support denial assertions remain; no handler is weakened.
+The focused onboarding group passes8/8 after repair. Earlier68/70 evidence is retained.
+
+Application/browser/build sources are byte-identical to the passing2643b8f1 candidate:
+actual entry/100-navigation/PIN, two-target builds, explicit BYO verify-dist and
+canonical support-v6 parity all passed. Final unit rerun and source-equivalence proof
+are archived at the next exact commit; no historical test is promoted without that
+proof. No hosted operation, backend/release, Platform or provider change occurred.
