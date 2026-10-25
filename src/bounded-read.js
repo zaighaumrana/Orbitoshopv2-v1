@@ -9,8 +9,9 @@ export async function readPage(query,{offset=0,size=25,current=()=>true}={}) {
   const {data,count}=result
   if(!Array.isArray(data)||!Number.isSafeInteger(count)||count<0||data.length>size)
     throw Error('Page completeness could not be verified. Retry reads.')
-  if(offset<count&&!data.length)throw Error('Matching records were not returned. Retry reads.')
-  return {data,count,offset,size,hasMore:offset+data.length<count,nextOffset:offset+data.length}
+  if(offset>count||count<data.length||(offset<count&&!data.length))throw Error('Matching records were not returned. Retry reads.')
+  const hasMore=offset+data.length<count
+  return {data,count,offset,size:hasMore?Math.min(size,data.length):size,hasMore,nextOffset:offset+data.length}
 }
 
 // For a selected family/payroll period, never for all history on screen entry.
@@ -30,6 +31,22 @@ export async function readComplete(query,{current=()=>true,size=100,maxRows=1000
   } while(offset<total)
   if(rows.length!==total)throw Error('Selected data is incomplete. Retry reads.')
   return {data:rows,count:total,error:null}
+}
+
+// A recent preview is bounded independently of total history and API row cap.
+// Keep reading at most `limit` records; a short nonempty page is not EOF.
+export async function readPreview(query,limit,current=()=>true) {
+  const rows=[],seen=new Set()
+  while(rows.length<limit){
+    if(!current())throw Error('Read owner expired.')
+    const result=await query().range(rows.length,limit-1)
+    if(!current())throw Error('Read owner expired.')
+    if(result.error||!Array.isArray(result.data))throw result.error||Error('Recent records unavailable.')
+    if(!result.data.length)break
+    for(const row of result.data){if(seen.has(String(row.id)))throw Error('Recent records changed. Retry reads.');seen.add(String(row.id));rows.push(row)}
+    if(rows.length>limit)throw Error('Recent response exceeded its bound.')
+  }
+  return {data:rows,error:null}
 }
 
 export function searchPattern(value) {

@@ -29,6 +29,8 @@ import {
 import { findRepairFamilies, groupRepairFamilies, matchedRepairChild } from '../features/repairs/family.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
 import {onPrivateReset} from '../ui-authority.js'
+import {pageControls,readComplete,readPreview} from '../bounded-read.js'
+import {adminPage,flatResource,verifiedLegacyMembers} from '../features/admin/resources.js'
 import { reportsPage } from './pages/reports.js'
 import { billingUsagePage } from './pages/billing-usage.js'
 import { createPlatformBridge } from '../platform/bridge.js'
@@ -82,6 +84,7 @@ let adminNavigationIsCurrent = () => true
 let adminLoadGeneration = 0
 const ownsAdmin=()=>adminNavigationIsCurrent()&&window.location.pathname==='/admin/'+adminState.adminModule&&state.role===SESSION.employee?.role&&can(adminState.adminModule,state.role)
 let restoreScroll = null
+let flatGeneration=0,flatTimer=null
 const initialAdminState={...adminState}
 onPrivateReset(() => {
   adminLoadGeneration++;adminNavigationIsCurrent=()=>false;SESSION={}
@@ -89,6 +92,7 @@ onPrivateReset(() => {
   Object.assign(adminState,initialAdminState)
   billingResult=null;legalStatus=null;paperObservation={};paperActor=null;resupplyBusy=false;restoreScroll=null
   customerSupport.reset()
+  flatGeneration++;clearTimeout(flatTimer)
 })
 const saveNavigation = () => {
   if(adminNavigationIsCurrent() && state.role===SESSION.employee?.role)saveAdminView(history,location,SESSION,adminState,window.scrollY)
@@ -97,15 +101,16 @@ window.addEventListener('pagehide',saveNavigation)
 window.addEventListener('scroll',saveNavigation,{passive:true})
 
 /* ── Load ── */
-async function load() {
+async function load(verifiedConfig) {
   const view=captureView()
   const generation = ++adminLoadGeneration
+  flatGeneration++;clearTimeout(flatTimer);adminState._page=null
   const loadSession = SESSION
   const loadPath = window.location.pathname
   const navigationIsCurrent=adminNavigationIsCurrent
   const current = () => view() && generation === adminLoadGeneration && navigationIsCurrent() && SESSION === loadSession && state.role === loadSession.employee?.role && window.location.pathname === loadPath
   dlog('ADMIN.load', `ENTRY adminModule=${adminState.adminModule}`)
-  const configReady=await loadConfig()
+  const configReady=await loadConfig(false,verifiedConfig)
   if (!current() || !window.location.pathname.startsWith('/admin')) return
   if(!configReady){state.resources={config:{status:'unavailable'}};render();return}
   if (!can(adminState.adminModule, state.role)) {
@@ -115,13 +120,13 @@ async function load() {
     navigate('/admin/dashboard', { replace:true })
     return
   }
-  if (CFG.inventory_module_enabled && !_inv) {
+  if (adminState.adminModule==='inventory' && CFG.inventory_module_enabled && !_inv) {
     _inv = await import('../features/admin/inventory/index.js')
     if (!current()) return
   }
   const mod = adminState.adminModule
   legalStatus = null
-  if (mod === 'settings' && SESSION.employee?.role === 'Business Owner') {
+  if (mod === 'settings' && adminState.settingsTab==='legal' && SESSION.employee?.role === 'Business Owner') {
     let result = null
     try { result = await readLegalStatus(sb) } catch {}
     if (!current()) return
@@ -144,39 +149,52 @@ async function load() {
     }
   }
   const needs = {
-    tickets: CFG.repair_module_enabled && ['dashboard','repairs','reports','receipts'].includes(mod),
+    tickets: CFG.repair_module_enabled && ['repairs','receipts'].includes(mod),
     sales: ['dashboard','reports','receipts'].includes(mod),
-    employees: ['dashboard','employees'].includes(mod),
-    udhar: ['dashboard','reports','receipts'].includes(mod),
+    employees: mod==='employees',
+    udhar: false,
     financial: ['dashboard','reports'].includes(mod),
-    returns: ['reports','receipts'].includes(mod),
+    returns: false,
     inventory: mod === 'inventory' && CFG.inventory_module_enabled,
-    quickItems: mod === 'catalog',
-    repairComponents: CFG.repair_module_enabled && (mod === 'catalog' || mod === 'repairs'),
+    quickItems: mod === 'catalog'&&adminState.catalogTab==='quickitems',
+    repairComponents: CFG.repair_module_enabled && mod === 'catalog' && adminState.catalogTab==='components',
   }
   const skip = { data: [] }
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
   const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
   state.resources=Object.fromEntries(Object.entries(needs).filter(([,needed])=>needed).map(([k])=>[k,{status:'loading'}]));render()
+  const dashboardCounts=mod==='dashboard'?Promise.all([
+    CFG.repair_module_enabled?sb.from('tickets').select('id',{count:'exact',head:true}).is('parent_ticket_id',null).not('status','in','("Delivered","Declined","Cancelled")'):{count:0},
+    sb.from('employees').select('id',{count:'exact',head:true}),
+    sb.from('employees').select('id',{count:'exact',head:true}).eq('status','Active'),
+  ].map(settleRead)):null
   const [tickets, sales, employees, udharAccounts, financial, financialToday, returns_, inv, quickItems, repairComponents] = await Promise.all([
-    needs.tickets ? sb.from('tickets').select('*').order('id', { ascending: false }) : skip,
-    needs.sales ? sb.from('sales').select('*').order('id', { ascending: false }) : skip,
-    needs.employees ? sb.from('employees').select('id, name, role, status, email').order('name') : skip,
+    needs.tickets ? verifiedLegacyMembers('tickets',current) : skip,
+    needs.sales ? mod==='receipts'?verifiedLegacyMembers('sales',current):readPreview(()=>sb.from('sales').select(mod==='dashboard'?'id,invoice_number,customer_name,payment_method,total_bill,created_at':'id,invoice_number,customer_name,payment_method,total_bill,created_at,items_sold').order('created_at',{ascending:false}).order('id',{ascending:false}),mod==='dashboard'?8:15,current) : skip,
+    needs.employees ? adminPage(mod,adminState.catalogTab,adminState.filter,0,current) : skip,
     needs.udhar ? sb.rpc('get_unified_udhar_accounts') : skip,
     needs.financial ? sb.rpc('get_financial_report', {
       p_from: null, p_to: null, p_actor_only: false,
     }) : { data: {} },
-    needs.financial ? sb.rpc('get_financial_report', {
+    mod==='dashboard' ? sb.rpc('get_financial_report', {
       p_from: todayStart.toISOString(), p_to: todayEnd.toISOString(), p_actor_only: false,
     }) : { data: {} },
     needs.returns ? sb.from('returns').select('*').order('id', { ascending: false }) : skip,
-    needs.inventory ? sb.from('inventory').select('*').order('name') : skip,
-    needs.quickItems ? sb.from('quick_items').select('*').order('sort_order') : skip,
-    needs.repairComponents ? sb.from('repair_components').select('*').order('sort_order') : skip,
+    needs.inventory ? adminPage(mod,adminState.catalogTab,adminState.filter,0,current) : skip,
+    needs.quickItems ? adminPage(mod,adminState.catalogTab,adminState.filter,0,current) : skip,
+    needs.repairComponents ? adminPage(mod,adminState.catalogTab,adminState.filter,0,current) : skip,
   ].map(settleRead))
   if (!current()) return
   const reads=readStates({tickets,sales,employees,udharAccounts,financial,financialToday,returns:returns_,inventory:inv,quickItems,repairComponents},['financial','financialToday'])
   state.data=reads.values;state.resources=reads.resources
+  const resource=flatResource(mod,adminState.catalogTab)
+  if(resource)adminState._page={inventory:inv,employees,quickItems,repairComponents}[resource]
+  if(mod==='dashboard'){
+    const counts=await dashboardCounts
+    if(!current())return
+    const value=r=>!r.error&&Number.isSafeInteger(r.count)?r.count:null
+    state.data.dashboardCounts={openTickets:value(counts[0]),employees:value(counts[1]),activeEmployees:value(counts[2])}
+  }
   applyBranding()
   dlog('ADMIN.load', `DATA READY (queries resolved) adminModule=${adminState.adminModule}`)
 
@@ -190,19 +208,49 @@ async function load() {
     render()
     const app = document.getElementById('app')
     let emsReloadGeneration=0
-    attachEMSEvents(app, () => adminState._emsData, async () => {
+    attachEMSEvents(app, () => adminState._emsData, async (options={}) => {
       const reload=++emsReloadGeneration
       if (!current() || !can('ems', state.role) || window.location.pathname !== '/admin/ems') return
-      const fresh = await loadEMSData()
+      const fresh = await loadEMSData({...options,previous:adminState._emsData})
       if (!current()||reload!==emsReloadGeneration) return
       adminState._emsData = fresh
       adminState._emsHTML = emsView(fresh, SESSION)
       render()
-    }, SESSION,current)
+    }, SESSION,current,()=>{if(current()){adminState._emsHTML=emsView(adminState._emsData,SESSION);render()}})
     return
   }
 
   render()
+}
+
+async function loadFlatPage(offset=0,revision=++flatGeneration) {
+  const view=captureView(),mod=adminState.adminModule,tab=adminState.catalogTab,query=adminState.filter
+  const key=flatResource(mod,tab),current=()=>view()&&ownsAdmin()&&revision===flatGeneration&&adminState.filter===query&&adminState.catalogTab===tab
+  if(!key||!current())return
+  state.resources[key]={status:'loading'}
+  document.querySelector('.content')?.setAttribute('aria-busy','true')
+  const result=await settleRead(adminPage(mod,tab,query,offset,current,offset?adminState._page?.size||25:25))
+  if(!current())return
+  state.data[key]=result.error?null:result.data
+  state.resources[key]={status:result.error?'unavailable':'ready'}
+  adminState._page=result.error?null:result
+  render()
+}
+
+async function openAdminUdhar() {
+  const view=captureView(),modal={type:'udharList',readStatus:'loading'},current=()=>view()&&ownsAdmin()&&state.modal===modal
+  state.modal=modal;render()
+  const result=await settleRead(sb.rpc('get_unified_udhar_accounts'))
+  if(!current())return
+  if(result.error||!Array.isArray(result.data))modal.readStatus='unavailable'
+  else {state.data.udharAccounts=result.data;modal.readStatus='ready'}
+  render()
+}
+
+async function loadEditorComponents(current) {
+  if(!CFG.repair_module_enabled)throw Error('Repair intake is unavailable.')
+  const result=await readComplete(()=>sb.from('repair_components').select('id,name,sort_order',{count:'exact'}).order('sort_order').order('id'),{current})
+  if(current())state.data.repairComponents=result.data
 }
 
 /* ── Render ── */
@@ -281,7 +329,7 @@ function pageContent() {
   if (adminState.adminModule === 'ems') {
     return adminShell(adminState._emsHTML || '<div class="empty">Loading EMS…</div>')
   }
-  return adminShell((pages[adminState.adminModule] || dashboard)())
+  return adminShell((pages[adminState.adminModule] || dashboard)()+pageControls(adminState._page,'data-admin-page'))
 }
 
 function adminShell(content) {
@@ -305,14 +353,14 @@ function dashboard() {
   const tickets  = state.data.tickets  || []
   const financial = state.data.financial || {}
   const todayFinancial = state.data.financialToday || {}
-  const pending  = groupRepairFamilies(tickets).filter(({ root }) => !['Delivered','Declined','Cancelled'].includes(root.status)).length
+  const counts=state.data.dashboardCounts||{},pending=counts.openTickets??'Unavailable'
   const kpis = [
     ["Today's Invoiced", Number(todayFinancial.invoiced || 0),  'reports'],
     ["Today's Collected", Number(todayFinancial.paymentsCollected || 0), 'reports'],
     ['Net Payments', Number(financial.netPayments || 0), 'reports'],
     ['Open Tickets',    pending,   'repairs'],
     ['Udhar Balance',   Number(financial.udharOutstanding || 0),  'udharList'],
-    ['Employees',       (state.data.employees||[]).length, 'employees'],
+    ['Employees',       counts.employees??'Unavailable', 'employees'],
   ]
   return `
     ${tit('Dashboard','Live overview of sales, tickets, and operations.',
@@ -344,9 +392,9 @@ function dashboard() {
         <h2>Operational Alerts</h2>
         <div class="list">
           ${CFG.repair_module_enabled ? `<div class="list-row"><span>Pending Repairs</span><strong>${pending}</strong></div>` : ''}
-          <div class="list-row"><span>Outstanding Udhar</span><strong>${(state.data.udharAccounts||[]).length}</strong></div>
+          <div class="list-row"><span>Outstanding Udhar accounts</span><button class="secondary-button" data-kpi-target="udharList">View complete detail</button></div>
           <div class="list-row"><span>Today's Payment Events</span><strong>${Number(todayFinancial.paymentCount || 0)}</strong></div>
-          <div class="list-row"><span>Active Employees</span><strong>${(state.data.employees||[]).filter(e=>e.status==='Active').length}</strong></div>
+          <div class="list-row"><span>Active Employees</span><strong>${counts.activeEmployees??'Unavailable'}</strong></div>
         </div>
       </div>
     </div>`
@@ -422,6 +470,7 @@ function employees() {
     ${tit('Employees','Staff roster, roles, and access control.',
       `<button class="secondary-button" data-action="open-password-resets">🔑 Password Resets</button>
        <button class="primary-button" data-modal="employee">Add Employee</button>`)}
+    ${tlb('Search employee name, email or role…')}
     <div class="card">
       ${emps.length ? `
         <div class="table-wrap"><table>
@@ -472,7 +521,7 @@ function settings() {
 
 function catalog() {
   const isAllowed = state.role === 'Business Owner' || SESSION.isAdmin || state.role === 'Manager'
-  return catalogPage({ tit, adminState, isAllowed })
+  return catalogPage({ tit, adminState, isAllowed })+tlb('Search this catalog…')
 }
 
 function settingsTabContent() {
@@ -669,7 +718,7 @@ function renderModal() {
   }
 
 
-  if (type === 'udharList') return udharListModalHTML()
+  if (type === 'udharList') return state.modal.readStatus&&state.modal.readStatus!=='ready'?`<div class="modal-backdrop"><div class="modal">${resourceNotice('Outstanding credits',state.modal.readStatus==='loading'?'loading':'unavailable')}<button class="secondary-button" data-action="retry-admin-udhar">Retry detail</button><button class="secondary-button" data-close>Close</button></div></div>`:udharListModalHTML()
 
   if (type === 'receipt-detail') return receiptDetailModalHTML(adminState)
 
@@ -716,6 +765,7 @@ function attachEvents() {
   })
   // Click delegation
   listenOwned(app,'click',ownsAdmin,async (e,eventCurrent)=>{
+    if(e.target.closest('[data-action="retry-admin-udhar"]')||(state.modal?.type==='udharList'&&state.modal.readStatus&&e.target.closest('[data-action="retry-resources"]'))){await openAdminUdhar();return}
     if(e.target.closest('[data-action="retry-resources"]')){await load();return}
     if (!can(adminState.adminModule, state.role) || !modalEntitled(state.modal?.type)) return
     // Route guard: this listener is permanently attached to #app for the
@@ -735,6 +785,9 @@ function attachEvents() {
       '[data-mark-not-needed],[data-subinv-comp-remove],[data-add-draft-comp-name],[data-tag-select]'
     )
     if (!el) return
+    if(el.dataset.adminPage){const page=adminState._page;if(page)await loadFlatPage(el.dataset.adminPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
+    const activeFlat=flatResource(adminState.adminModule,adminState.catalogTab)
+    if(activeFlat&&!resourceReady(state.resources,activeFlat)&&(el.dataset.invEdit||el.dataset.invAdjust||el.dataset.invDelete||el.dataset.empId||el.dataset.removeQitem!==undefined||el.dataset.addQprice!==undefined||el.dataset.removeQprice!==undefined||el.dataset.removeQuick!==undefined))return
     if(el.dataset.action==='support-consent-revoke'){
       if(SESSION.employee?.role!=='Business Owner'||customerSupport.view.busy)return
       const nav=adminNavigationIsCurrent;customerSupport.view.busy=true
@@ -803,7 +856,7 @@ function attachEvents() {
 
     if (el.dataset.kpiTarget) {
       const target = el.dataset.kpiTarget
-      if (target === 'udharList') { state.modal = { type:'udharList' }; render(); return }
+      if (target === 'udharList') { await openAdminUdhar();return }
       if (ADMIN_MODULES.find(([k]) => k === target)) {
         adminState.filter = ''
         const { navigate } = await viewAwait(eventCurrent,()=>(import('../router.js')),()=>state.modal)
@@ -881,6 +934,7 @@ function attachEvents() {
 
     /* Open sub-invoice creation form */
     if (el.dataset.action === 'open-create-sub-invoice') {
+      await viewAwait(eventCurrent,()=>loadEditorComponents(eventCurrent),()=>state.modal)
       state.modal = { type: 'create-sub-invoice', parentId: el.dataset.ticketId, draftComponents: [], draftLabour: 0 }
       render(); return
     }
@@ -1077,9 +1131,12 @@ function attachEvents() {
     }
 
     if (el.dataset.action === 'edit-employee') {
+      const selected=await viewAwait(eventCurrent,()=>sb.from('employees').select('id,name,role,status,email').eq('id',el.dataset.empId).single(),()=>state.modal)
+      if(selected.error||!selected.data){showBlockingError('Selected employee is unavailable. Retry reads.');return}
+      const employee=selected.data
       state.modal = { type:'employee', editMode:true,
-        id:el.dataset.empId, name:el.dataset.empName,
-        role:el.dataset.empRole, status:el.dataset.empStatus, email:el.dataset.empEmail }
+        id:employee.id, name:employee.name,
+        role:employee.role, status:employee.status, email:employee.email }
       render(); return
     }
 
@@ -1137,8 +1194,9 @@ function attachEvents() {
 
     if (el.dataset.action === 'reprint-receipt') {
       const saleId = Number(el.dataset.saleId)
-      const sale   = state.data.sales.find(s => s.id === saleId)
-      if (!sale) { showBlockingError('Sale not found.'); return }
+      const selected=await viewAwait(eventCurrent,()=>sb.from('sales').select('*').eq('id',saleId).single(),()=>state.modal)
+      const sale=selected.data
+      if (selected.error||!sale) { showBlockingError('Complete sale detail unavailable. Retry reads before reprinting.'); return }
       const { buildReceiptSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
       const reprSale = {
         receiptNo: sale.invoice_number||`INV-${sale.id}`, date: sale.created_at,
@@ -1267,8 +1325,14 @@ function attachEvents() {
       await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
 
-    if (el.dataset.invEdit && _inv) { _inv.handleInvEdit(el); render(); return }
-    if (el.dataset.invAdjust && _inv) { _inv.handleInvAdjust(el); render(); return }
+    if ((el.dataset.invEdit||el.dataset.invAdjust) && _inv) {
+      const id=el.dataset.invEdit||el.dataset.invAdjust
+      const selected=await viewAwait(eventCurrent,()=>sb.from('inventory').select('*').eq('id',id).single(),()=>state.modal)
+      if(selected.error||!selected.data){showBlockingError('Complete selected item unavailable. Retry reads.');return}
+      state.data.inventory=state.data.inventory.map(item=>String(item.id)===String(id)?selected.data:item)
+      if(el.dataset.invEdit)_inv.handleInvEdit(el);else _inv.handleInvAdjust(el)
+      render();return
+    }
     if (el.dataset.invDelete && _inv) {
       const { deleted } = await viewAwait(eventCurrent,()=>(_inv.handleInvDelete(el)),()=>state.modal)
       if (deleted) await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
@@ -1304,7 +1368,14 @@ function attachEvents() {
 
     const t = e.target
     rememberAdditionalWorkInput(t, state.modal)
-    if (t.dataset.filter !== undefined) { adminState.filter = t.value; render() }
+    if (t.dataset.filter !== undefined) {
+      adminState.filter=t.value
+      if(flatResource(adminState.adminModule,adminState.catalogTab)){
+        const revision=++flatGeneration;clearTimeout(flatTimer)
+        document.querySelectorAll('[data-inv-edit],[data-inv-adjust],[data-inv-delete],[data-emp-id],[data-remove-qitem],[data-add-qprice],[data-remove-qprice],[data-remove-quick]').forEach(button=>button.disabled=true)
+        flatTimer=setTimeout(()=>{if(ownsAdmin())void loadFlatPage(0,revision)},180)
+      }else render()
+    }
     if (t.dataset.receiptSearch !== undefined) { adminState.receiptSearch = t.value; render() }
     if (t.dataset.receiptFrom !== undefined) { adminState.receiptDateFrom = t.value; render() }
     if (t.dataset.receiptTo   !== undefined) { adminState.receiptDateTo   = t.value; render() }
@@ -1510,7 +1581,7 @@ function _addComponentToDraft(name, tag, customText) {
 }
 
 /* ── Public ── */
-export async function initAdmin(sess, module, query, isCurrent = () => true) {
+export async function initAdmin(sess, module, query, isCurrent = () => true,verifiedConfig) {
   if (!isCurrent()) return
   adminNavigationIsCurrent = isCurrent
   dlog('ADMIN.initAdmin', `ENTRY module=${module} _eventsAttached=${_eventsAttached} caller=[${callerInfo()}]`)
@@ -1531,5 +1602,5 @@ export async function initAdmin(sess, module, query, isCurrent = () => true) {
   if(saved){Object.assign(adminState,saved.values);restoreScroll=saved.scroll}
   if (module === 'settings') adminState.settingsTab = safeAdminState({settingsTab:query?.tab}).settingsTab || saved?.values.settingsTab || 'branding'
   if (module === 'catalog') adminState.catalogTab = safeAdminState({catalogTab:query?.tab}).catalogTab || saved?.values.catalogTab || 'quickitems'
-  await load()
+  await load(verifiedConfig)
 }

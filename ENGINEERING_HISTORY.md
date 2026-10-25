@@ -1205,3 +1205,28 @@ Focused checkout/draft/paging/day-actor cases pass9/9. Large repair collection i
 explicitly unavailable when the existing member array is incomplete; Track B family
 and receipt completeness remain blocked rather than silently showing a partial
 archive. No backend/release/hosted write/Platform/provider change or deployment.
+
+## 2026-10-26 — M2 scoped Admin resources and complete flat pages
+Branch: feature/shop-modernization-m2
+
+Dashboard uses eight projected recent sales, canonical global/day financial reports
+and independent exact root/employee counts. Reports uses its canonical global scope
+and fifteen projected recent summaries, with complete selected sale fetched before
+reprint. Unused ticket/return/Udhar/today reads are removed; complete Udhar detail is
+owned on demand. Inventory imports only for its consumer; Catalog loads only its
+active entitled tab; owner Legal status loads only in Legal settings.
+
+Projected Inventory/Employees/Catalog search runs on the authorized server scope
+with deterministic primary/id order and finite pages, adaptive smaller API caps,
+owned query responses and exact selected editor records. Matching count is distinct
+from page rows; low-stock alerts explicitly describe their page. Recent previews
+reach their finite8/15 bound even below a small cap. POS search keeps its input
+usable while old results are disabled and rejects a late prior query. Incomplete
+legacy family/receipt histories now show unavailable rather than false completeness;
+the approved replacement read contracts remain a separate authorization gate.
+
+Actual application browser with a seven-row synthetic API cap reaches stock and
+employees beyond1,000 records, verifies canonical report scope, complete reprint
+selection, tab scoping and stale search protection. Focused paging and ownership
+tests pass. Final exact-source distribution/audit remain pending. No packaged
+backend, hosted write, Platform source, provider setting or deployment change.

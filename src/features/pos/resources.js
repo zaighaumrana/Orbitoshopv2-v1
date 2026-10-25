@@ -2,13 +2,13 @@ import {sb,CFG} from '../../shared.js'
 import {readPage,readComplete,searchColumns} from '../../bounded-read.js'
 
 export const inventoryColumns='id,name,sku,category,qty,price'
-export function stockPage(search,offset,current) {
+export function stockPage(search,offset,current,size=24) {
   return readPage(()=>searchColumns(sb.from('inventory').select(inventoryColumns,{count:'exact'})
-    .gt('qty',0),['name','sku','category'],search).order('name').order('id'),{offset,size:24,current})
+    .gt('qty',0),['name','sku','category'],search).order('name').order('id'),{offset,size,current})
 }
-export function quickPage(search,offset,current) {
+export function quickPage(search,offset,current,size=25) {
   return readPage(()=>searchColumns(sb.from('quick_items').select('id,name,prices,sort_order',{count:'exact'}),['name'],search)
-    .order('sort_order').order('id'),{offset,size:25,current})
+    .order('sort_order').order('id'),{offset,size,current})
 }
 export function intakeComponents(current) {
   if(!CFG.repair_module_enabled)throw Error('Repair intake is unavailable.')
@@ -34,6 +34,6 @@ export async function legacyCompleteCollection(current) {
   const result=await sb.from('tickets').select('*',{count:'exact'}).order('id',{ascending:false}).range(0,999)
   if(!current())throw Error('Read owner expired.')
   if(result.error||!Array.isArray(result.data)||result.count!==result.data.length)
-    throw Error('Complete repair search is unavailable for this history size. The family-page backend contract is required; no partial results are implied.')
+    throw Error('Complete repair search could not be verified for this history size. No partial search results are shown.')
   return result
 }

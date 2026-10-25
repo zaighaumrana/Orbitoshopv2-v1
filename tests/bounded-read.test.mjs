@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readPage,readComplete,searchColumns} from '../src/bounded-read.js';
+import {readPage,readComplete,readPreview,searchColumns} from '../src/bounded-read.js';
 
 function fixture(length,cap=1000){
  const rows=Array.from({length},(_,id)=>({id,name:'same timestamp/name'}));const calls=[];
@@ -24,4 +24,8 @@ test('count drift, duplicate pages, failed pages and departed owners never yield
 test('remote search covers authorized columns and quotes filter punctuation literally',()=>{
  let filter;searchColumns({or:value=>{filter=value}},['name','sku'],'older,item%_"');
  assert.equal(filter,'name.ilike."%older,item\\%\\_\\"%",sku.ilike."%older,item\\%\\_\\"%"');
+});
+test('recent previews remain exactly bounded even below the configured page cap',async()=>{
+ const f=fixture(10001,7);const result=await readPreview(f.query,15);assert.equal(result.data.length,15);assert.deepEqual(f.calls,[[0,14],[7,14],[14,14]]);
+ assert.equal((await readPreview(fixture(3,2).query,8)).data.length,3);
 });

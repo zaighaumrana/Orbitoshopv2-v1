@@ -18,7 +18,7 @@ export function adminInventoryPage({ filter, tit }) {
     ${tit('Inventory','Stock levels, pricing, and alerts.',
       `<button class="primary-button" data-modal="inv-add">+ Add Item</button>`)}
     ${lowStock.length ? `<div style="background:color-mix(in srgb,var(--warning) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--warning) 30%,var(--border));border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px">
-      ⚠ ${lowStock.length} item${lowStock.length>1?'s':''} low: ${lowStock.map(i=>`<strong>${escapeHTML(i.name)}</strong> (${i.qty} left)`).join(', ')}
+      ⚠ On this page: ${lowStock.length} item${lowStock.length>1?'s':''} low: ${lowStock.map(i=>`<strong>${escapeHTML(i.name)}</strong> (${i.qty} left)`).join(', ')}
     </div>` : ''}
     <div class="card">
       <input class="search" placeholder="Search inventory…" data-filter

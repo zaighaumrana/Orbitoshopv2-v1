@@ -139,8 +139,9 @@ let selectorGeneration=0,quickGeneration=0,selectorTimer=null
 async function refreshStock(offset=0,revision=++selectorGeneration) {
   const view=captureView(),generation=posLoadGeneration,query=posState.invSearch,current=()=>view()&&ownsPOS()&&generation===posLoadGeneration&&revision===selectorGeneration&&query===posState.invSearch
   if(!current())return
-  state.resources.inventory={status:'loading'};render()
-  const result=await settleRead(stockPage(query,offset,current))
+  state.resources.inventory={status:'loading'}
+  const status=document.querySelector('[data-stock-search-status]');if(status)status.textContent='Searching current stock…'
+  const result=await settleRead(stockPage(query,offset,current,offset?posState.inventoryPage?.size||24:24))
   if(!current())return
   state.resources.inventory={status:result.error?'unavailable':'ready'}
   state.data.inventory=result.error?null:result.data;posState.inventoryPage=result.error?null:result
@@ -287,7 +288,7 @@ function posView() {
     <div class="grid pos-layout">
       <div class="grid" style="align-content:start;gap:12px">
         ${quickItemsPanel()}
-        ${CFG.inventory_module_enabled && _inv ? resourceReady(state.resources,'inventory')?_inv.inventoryPanel(posState):resourceNotice('Inventory',state.resources.inventory.status) : ''}
+        ${CFG.inventory_module_enabled && _inv ? (resourceReady(state.resources,'inventory')||(state.resources.inventory?.status==='loading'&&posState.inventoryPage))?_inv.inventoryPanel(posState):resourceNotice('Inventory',state.resources.inventory.status) : ''}
         ${recentRepairPanel()}
       </div>
       <aside class="card cart">
@@ -1219,6 +1220,8 @@ function attachEvents() {
         return
       }
       replaceDraft(ticketItem.draftData)
+      const choices=await viewAwait(eventCurrent,()=>intakeComponents(eventCurrent),()=>state.modal)
+      state.data.repairComponents=choices.data
       state.modal = {
         type: 'repair',
         _editingCartProductId: ticketItem.productId,
