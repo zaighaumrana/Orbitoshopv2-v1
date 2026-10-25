@@ -1277,3 +1277,28 @@ expected pay and no write after incomplete attendance. Existing EMS callback/rev
 duplicate payroll and departed-result tests remain, with the local-filter oracle
 updated to require zero resource reloads. No SQL/function/release, Platform, hosted
 write, provider change, deployment or merge is performed by this frontend slice.
+
+## 2026-10-26 — M2 browser continuity and expanded SQL investigation scope
+Branch: feature/shop-modernization-m2
+
+Added an extension of the existing native-entry fixture for projected/search/count/
+range/detail query behavior. Actual browser acceptance passes old inventory/staff/
+attendance discovery beyond1,000 rows with a seven-row API cap, exact report/reprint
+detail, deferred POS actions, active Catalog/Legal/EMS resources, zero Workshop money
+at0/10/100 roots, all100 roots paged without duplicates, selected-only summaries and
+stale/revoked/denied cases. The existing M1 entry suite also passes privacy, routing,
+read failures, route recovery,100 transitions/listener stability, Enter and PIN.
+Its held-config test now releases the equivalent shared in-flight read before
+awaiting its successor; the old route still cannot publish. Failed prior fixtures
+and browser attempts remain in the permanent archive.
+
+Owner additionally authorized Docker/local Shop SQL development and a read-only
+study of both development release/provisioning/upgrade implementations. A new
+network-isolated, no-port disposable Supabase PostgreSQL17 container is used; no
+existing container or provider is changed. Real Managed/BYO SQL envelopes install
+all38 immutable v6 migrations in isolated fixtures after supplying synthetic Auth
+prerequisites. This is local SQL evidence, not hosted provisioning/Auth acceptance.
+Current v4→v6 controlled upgrade is supported; v5 is explicitly superseded, and
+protocol/source/gateway gates still govern every transition. New Shop SQL remains
+local; Platform source/selectors/manifests/database require explicit owner approval.
+No final new release fingerprint, Platform edit, push, PR, merge or deployment.
