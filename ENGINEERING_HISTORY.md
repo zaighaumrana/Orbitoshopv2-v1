@@ -1179,3 +1179,29 @@ backend scope memo is proposed only; no SQL/function/release/Platform edit is ma
 Disposable Shop identity was verified read-only; available SQL settings did not
 expose its API cap, so the fixture cap is explicitly synthetic. No hosted write,
 provider setting change, agent deployment, push, merge or Platform operation.
+
+## 2026-10-26 — M2 POS critical path and demonstrated shift scope
+Branch: feature/shop-modernization-m2
+
+POS now waits only for bounded projected stock and quick-item selectors after live
+configuration. Intake components, complete collection compatibility read, canonical
+Udhar and shift report are owned on-demand modal reads with local retry/error.
+Return search projects matching invoice identities server-side, verifies complete
+matching pages and then uses the existing canonical return context; no entrance
+sales/return history. Remote stock typing is debounced and generation-owned; cart
+and financial commands remain immediate with original UUID/PIN/ACK ownership.
+Stock refresh after retail ACK is limited to affected visible stock; repair payment
+re-reads its canonical family summary rather than refreshing unrelated histories.
+
+D02 is reproduced against the actual M1 renderer: UTC-prefix/display-name matching
+includes the wrong local day and same-name/unmapped actors. Shift operational rows
+now use the same existing local-midnight half-open report period and canonical
+Auth UUID; legacy unmapped rows are explicitly identified, never guessed by name.
+EMS day policy is unchanged. Complete selected-period reads reject cap/count drift.
+
+First real-browser loopback smoke has six cold/three warm data-service reads
+including config versus twelve/nine at M1; final paired distribution is pending.
+Focused checkout/draft/paging/day-actor cases pass9/9. Large repair collection is
+explicitly unavailable when the existing member array is incomplete; Track B family
+and receipt completeness remain blocked rather than silently showing a partial
+archive. No backend/release/hosted write/Platform/provider change or deployment.
