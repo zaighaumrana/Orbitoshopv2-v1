@@ -5,6 +5,7 @@ import {mkdtempSync,readFileSync,readdirSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {execFileSync} from 'node:child_process';
 const {chromium}=await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE_PATH).href);
 const root=process.cwd(),out=process.env.M1_BUILD_EVIDENCE||mkdtempSync(join(tmpdir(),'m1-target-'));
 const original={...process.env},records=[];
@@ -41,6 +42,11 @@ try{
    assert.deepEqual(escaped,[]);assert.deepEqual(errors,[]);records.push({ref,main:true,tracker:true,calls,escaped,errors});
   }finally{await context.close();await new Promise(r=>server.httpServer.close(r));}
  }
+ const ref='bbbbbbbbbbbbbbbbbbbb',publicInput=Object.fromEntries(['VITE_SUPABASE_URL','VITE_SUPABASE_ANON','VITE_TURNSTILE_SITE_KEY'].map(k=>[k,process.env[k]]));
+ const input=join(out,'explicit-byo-public.json');writeFileSync(input,JSON.stringify(publicInput));
+ const command=['scripts/build-verified.mjs','--config',input,'--project-ref',ref];
+ writeFileSync(join(out,'explicit-byo-build.txt'),execFileSync(process.execPath,command,{cwd:root,encoding:'utf8'}));
+ writeFileSync(join(out,'explicit-byo-verify.txt'),execFileSync(process.execPath,[...command,'--verify-dist'],{cwd:root,encoding:'utf8'}));
  writeFileSync(join(out,'target-results.json'),JSON.stringify(records,null,2));
  console.log('PASS two independent compiled builds: real main/tracker SDK exact public targets, ticket/phone lookup, hostile URL target ignored, all foreign transport blocked. Evidence: '+out);
 }finally{await browser.close();for(const k of Object.keys(process.env))if(!(k in original))delete process.env[k];Object.assign(process.env,original);}

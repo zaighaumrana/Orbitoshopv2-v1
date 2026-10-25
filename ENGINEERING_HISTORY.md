@@ -1104,3 +1104,13 @@ wrapper dependency; its original successor-data/busy assertions remain.
 This is a small M1-006/011 closure, no new backend/release/DB/provider/Platform source
 scope. Final candidate commands/results,13-case ledger and audit handoff are in the
 permanent archive. No independent audit or owner acceptance is claimed.
+
+## 2026-10-25 — M1 explicit public build validation coverage
+Branch: feature/shop-modernization-m1
+
+The two-target synthetic browser regression now also executes the actual explicit
+BYO build CLI and its verify-dist digest/target check using only synthetic public
+input. Managed-style Vite builds and explicit customer builds therefore share direct
+execution evidence for the tracker correction. This adds no public configuration
+field, backend component, provider operation or release. Integrated final-candidate
+logs are retained in the permanent M1 evidence run.
