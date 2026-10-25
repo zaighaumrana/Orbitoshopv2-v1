@@ -74,3 +74,15 @@ test('actual repair/payment ACK followed by a delayed reload cannot publish into
   assert.equal(ctx.state.modal,null);assert.equal(notices,0);assert.equal(operations.get('original-repair').actor,'A');assert.equal(operations.get('original-repair').detached,true)
  }
 })
+
+test('actual router contains current failures and ignores departed asynchronous errors',async()=>{
+ const source=readFileSync(new URL('../src/router.js',import.meta.url),'utf8').replace(/^import .*$/gm,'').replace(/export /g,'')
+ const ctx=vm.createContext({URL,URLSearchParams,Event,console,dlog(){},dstack(){},callerInfo:()=>'',window:{location:{origin:'https://fixture.test',pathname:'/',search:''}},history:{pushState(){},replaceState(){}}})
+ vm.runInContext(source+';globalThis.router={registerRoute,registerRouteError,navigate}',ctx)
+ const gate=deferred(),recovery=[];let reads=0
+ ctx.router.registerRouteError((_error,nav)=>{assert.equal(nav.isCurrent(),true);recovery.push('current')})
+ ctx.router.registerRoute('/old',async()=>{await gate.promise;throw Error('departed failure')});ctx.router.registerRoute('/new',async()=>{reads++})
+ const old=ctx.router.navigate('/old');await ctx.router.navigate('/new');gate.resolve();await old;assert.equal(recovery.length,0)
+ ctx.router.registerRoute('/broken',async()=>{throw Error('current initializer failure')});await ctx.router.navigate('/broken');assert.equal(recovery.length,1)
+ ctx.router.registerRoute('/broken',async()=>{reads++});await ctx.router.navigate('/broken');assert.equal(reads,2);assert.equal(recovery.length,1)
+})

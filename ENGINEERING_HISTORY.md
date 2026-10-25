@@ -1148,3 +1148,14 @@ replacement and proves no replacement-account modal/notice while the original
 actor/outcome remains retained. Final current-source validation is recorded in a
 new run; earlier successful runs remain associated with their exact prior source.
 No backend/release/DB/Platform/provider change or deployment.
+
+## 2026-10-25 — M1 final acceptance boundary coverage
+Branch: feature/shop-modernization-m1
+
+Extended existing acceptance fixtures to explicitly cover private customer/tender
+reset, Cashier/Technician denied operational bundles/data, /admin alias and unknown
+route fallback, and actual-router suppression of a departed async failure. These
+close named M1 acceptance oracles rather than adding duplicate test permutations.
+Application source is unchanged by this coverage commit. Final exact-candidate
+results and source archive follow in the permanent evidence register; no independent
+review, owner acceptance, merge, deployment or backend operation is implied.
