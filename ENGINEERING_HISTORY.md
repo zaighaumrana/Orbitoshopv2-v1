@@ -1255,3 +1255,25 @@ departed response suppression and Support revocation/Technician/Manager negative
 Config tests include concurrent reads, native replacement, failure, one-use proof,
 mutation and a max-size embedded payload. Hosted ACLs are not inferred from mocks.
 No Platform source, packaged backend, hosted write, deployment or merge.
+
+## 2026-10-26 — M2 active EMS resources and complete selected payroll period
+Branch: feature/shop-modernization-m2
+
+EMS reads only its active attendance/leave/salary/slip dependencies and a separately
+verified current-attendance banner. Directory/history/slip pages have deterministic
+ordering and explicit matching counts; server history search reaches older data.
+Presentation filters rerender the current bounded page without Supabase reloads.
+Salary config is complete for its selected employee page; salary generation uses
+its own complete approved employee/month attendance and overlapping approved leaves,
+never directory or attendance-page rows. The overlap restriction is equivalent to
+the prior period-clamped calculation; unrelated leaves contribute zero. Existing
+UTC EMS day, Sundays/pay formula, account authority and pending-action fence remain.
+Selected salary reprint reads the complete persisted slip. Failed live attendance
+is unavailable independently; incomplete payroll reads prevent a salary write.
+
+Actual-browser tab/search tests pass with a seven-row cap and older history beyond
+1,000 rows. Actual generator tests verify complete selected-period pages, independent
+expected pay and no write after incomplete attendance. Existing EMS callback/revisit,
+duplicate payroll and departed-result tests remain, with the local-filter oracle
+updated to require zero resource reloads. No SQL/function/release, Platform, hosted
+write, provider change, deployment or merge is performed by this frontend slice.
