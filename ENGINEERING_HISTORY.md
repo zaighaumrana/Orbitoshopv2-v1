@@ -1230,3 +1230,28 @@ employees beyond1,000 records, verifies canonical report scope, complete reprint
 selection, tab scoping and stale search protection. Focused paging and ownership
 tests pass. Final exact-source distribution/audit remain pending. No packaged
 backend, hosted write, Platform source, provider setting or deployment change.
+
+## 2026-10-26 — M2 Workshop expansion and config equivalence
+Branch: feature/shop-modernization-m2
+
+D03 removes every per-root monetary startup RPC. Workshop pages active roots with
+stable timestamp/id ordering and completely retrieves their required children;
+status queries/page totals are distinct from explicitly page-scoped presentation
+filters. Components and exact editor data load on edit. Owner/eligible Support
+financial expansion calls only the existing selected canonical summary, with local
+loading/error/retry and route/selection/authority fences. Technician receives no
+summary action; Manager remains denied Workshop. Canonical summary shape is checked
+before displaying amounts. No batch financial API or backend change.
+
+Configuration shares concurrent equivalent requests only inside its public/app and
+native authority scope. A private one-use proof passes the just-verified initial
+app config into the first screen; later navigation reads fresh config. Reset and
+config mutation invalidate pending work/proofs. No TTL/completed permission cache,
+public/auth conflation, logo Storage migration or changed saved merchant data.
+
+Actual-loader and browser fixtures prove zero startup monetary calls for0/10/100
+roots, all100 roots reachable under a seven-row API cap, selected-only expansion,
+departed response suppression and Support revocation/Technician/Manager negatives.
+Config tests include concurrent reads, native replacement, failure, one-use proof,
+mutation and a max-size embedded payload. Hosted ACLs are not inferred from mocks.
+No Platform source, packaged backend, hosted write, deployment or merge.

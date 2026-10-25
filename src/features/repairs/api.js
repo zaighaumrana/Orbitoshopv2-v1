@@ -17,6 +17,8 @@
 ═══════════════════════════════════════════════════════════════════ */
 import { sb, logBillEvent } from '../../shared.js'
 import { dlog, dstack } from '../../debuglog.js'
+import {readComplete} from '../../bounded-read.js'
+import {captureView} from '../../ui-lifecycle.js'
 
 const pendingAdditionalWorkRequests = new Map()
 const pendingDeliveryRequests = new Map()
@@ -68,8 +70,8 @@ export async function updateTicket(id, updates) {
 /** All sub-invoices that already exist under a parent ticket, oldest first.
  *  Called by pos.js, admin.js, AND workshop.js -- genuinely shared. */
 export async function getSubInvoices(parentId) {
-  const { data, error } = await sb.from('tickets')
-    .select('*').eq('parent_ticket_id', parentId).order('created_at', { ascending: true })
+  const { data, error } = await readComplete(()=>sb.from('tickets')
+    .select('*',{count:'exact'}).eq('parent_ticket_id', parentId).order('created_at', { ascending: true }).order('id'),{current:captureView()})
   if (error) throw Error('Repair family is incomplete because child work is unavailable. Retry reads.')
   return data || []
 }
@@ -105,6 +107,7 @@ export async function createSubInvoice(parentTicket, components, labourCost, not
 export async function getRepairFamilySummary(ticketId) {
   const { data, error } = await sb.rpc('get_repair_family_summary', { p_ticket_id: ticketId })
   if (error) return { ok:false, error:error.message }
+  if(!data||Array.isArray(data)||!data.root||!Array.isArray(data.invoices)||['effectiveObligation','netPayments','outstanding'].some(key=>data[key]===null||data[key]===undefined||!Number.isFinite(Number(data[key]))))return {ok:false,error:'Complete canonical repair totals could not be verified.'}
   return { ok:true, data }
 }
 

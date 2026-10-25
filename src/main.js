@@ -1,4 +1,4 @@
-import { sb, loadConfig, applyBranding, loadCurrentSession, _clearSession, resetClientEntitlements, state, CFG, can } from './shared.js'
+import { sb, loadConfig, createConfigHandoff, applyBranding, loadCurrentSession, _clearSession, resetClientEntitlements, state, CFG, can } from './shared.js'
 import { renderLogin } from './auth.js'
 import { registerRoute, registerNotFound, registerRouteError, startRouter, navigate, clearRoutes } from './router.js'
 import { dlog } from './debuglog.js'
@@ -78,7 +78,8 @@ function showLogin() {
   startRouter()
 }
 
-function setupRoutes(session) {
+function setupRoutes(session,initialConfig) {
+  const takeInitialConfig=()=>{const proof=initialConfig;initialConfig=null;return proof}
   clearRoutes()
   const generation = applicationGeneration
   const role = canonicalRole(session)
@@ -101,7 +102,7 @@ function setupRoutes(session) {
     document.getElementById('app').textContent = 'Loading…'
     const { initPOS } = await loadPOS()
     if (!navigation.isCurrent() || generation !== applicationGeneration || state.role !== role || window.location.pathname !== '/pos') return
-    await initPOS(session,navigation.isCurrent)
+    await initPOS(session,navigation.isCurrent,takeInitialConfig())
   })
 
   registerRoute('/workshop', async (_params, _query, navigation) => {
@@ -111,7 +112,7 @@ function setupRoutes(session) {
     document.getElementById('app').textContent = 'Loading…'
     const { initWorkshop } = await loadWorkshop()
     if (!navigation.isCurrent() || generation !== applicationGeneration || state.role !== role || window.location.pathname !== '/workshop') return
-    await initWorkshop(session,navigation.isCurrent)
+    await initWorkshop(session,navigation.isCurrent,takeInitialConfig())
   })
 
   const adminModules = ['dashboard','repairs','inventory','reports','employees','receipts','ems','settings','catalog','billing-usage','customer-support']
@@ -125,7 +126,7 @@ function setupRoutes(session) {
       document.getElementById('app').textContent = 'Loading…'
       const { initAdmin } = await loadAdmin()
       if (!navigation.isCurrent() || generation !== applicationGeneration || state.role !== role || window.location.pathname !== `/admin/${mod}`) return
-      await initAdmin(session, mod, query, navigation.isCurrent)
+      await initAdmin(session, mod, query, navigation.isCurrent,takeInitialConfig())
     })
   })
 
@@ -154,7 +155,7 @@ function routeForRole(role, replace = false) {
   }
 }
 
-async function enterApplication(session) {
+async function enterApplication(session,initialConfig) {
   const generation = ++applicationGeneration
   const role = canonicalRole(session)
   state.role = role
@@ -169,7 +170,7 @@ async function enterApplication(session) {
   }
   const proceed = () => {
     if (generation !== applicationGeneration || state.role !== role) return
-    setupRoutes(session)
+    setupRoutes(session,initialConfig)
     // Only resolve the live URL after all gates passed. Registered routes still
     // enforce current role and module access before importing operational code.
     if (['/', '/login', '/onboarding'].includes(window.location.pathname)) routeForRole(role, true)
@@ -217,7 +218,7 @@ async function onLoginSuccess(session) {
     return
   }
   applyBranding()
-  await enterApplication(session)
+  await enterApplication(session,createConfigHandoff())
 }
 
 sb.auth.onAuthStateChange((event, authSession) => {

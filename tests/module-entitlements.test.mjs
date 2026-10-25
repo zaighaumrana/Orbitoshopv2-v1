@@ -7,8 +7,10 @@ const source = readFileSync(new URL('../src/shared.js', import.meta.url), 'utf8'
 function harness(rpc) {
   const config = source.slice(source.indexOf('export let CFG'), source.indexOf('export async function loadQuickItems'))
   const access = source.slice(source.indexOf('export const ACCESS'), source.indexOf('/* ── Auth ── */'))
-  const ctx = vm.createContext({ sb:{rpc}, state:{modal:null}, dlog(){}, console:{warn(){}}, sessionStorage:{removeItem(){}} })
-  vm.runInContext(`${config}\n${access}`.replace(/export /g, '') + '\nglobalThis.api = {CFG,can,modalEntitled,loadConfig,resetClientEntitlements}', ctx)
+  let epoch=0,identity='test-actor:test-session'
+  const ctx = vm.createContext({ sb:{rpc}, state:{modal:null}, captureAuthority:()=>{const captured=epoch;return ()=>captured===epoch},authorityIdentity:()=>identity,dlog(){}, console:{warn(){}}, sessionStorage:{removeItem(){}} })
+  vm.runInContext(`${config}\n${access}`.replace(/export /g, '') + '\nglobalThis.api = {CFG,can,modalEntitled,loadConfig,resetClientEntitlements,createConfigHandoff,invalidateConfigReads}', ctx)
+  ctx.api.replaceIdentity=next=>{identity=next;epoch++;ctx.api.resetClientEntitlements()}
   return ctx.api
 }
 
@@ -25,6 +27,19 @@ test('optional modules fail closed for every role; Workshop uses technician flag
   assert.equal(api.modalEntitled('repair'),false)
   assert.equal(api.modalEntitled('inv-add'),false)
   assert.equal(api.modalEntitled('leave-request'),false)
+})
+
+test('config shares only equivalent inflight work, isolates public/native scopes and consumes initial handoff once',async()=>{
+ const calls=[],pending=[];const api=harness(name=>{calls.push(name);return new Promise(resolve=>pending.push(resolve))})
+ const first=api.loadConfig(),same=api.loadConfig();assert.deepEqual(calls,['get_app_config'])
+ pending[0]({data:{repair_module_enabled:true,shop_logo:'data:image/png;base64,'+'A'.repeat(699052)}});assert.deepEqual(await Promise.all([first,same]),[true,true])
+ const handoff=api.createConfigHandoff();assert.equal(await api.loadConfig(false,handoff),true);assert.equal(calls.length,1)
+ const fresh=api.loadConfig(false,handoff);assert.equal(calls.length,2,'completed/handoff work cannot become a permission cache')
+ pending[1]({data:{repair_module_enabled:false}});await fresh;assert.equal(api.CFG.repair_module_enabled,false)
+ const old=api.loadConfig();api.replaceIdentity('B:session-B');const replacement=api.loadConfig();pending[2]({data:{repair_module_enabled:true}});assert.equal(await old,false);pending[3]({data:{repair_module_enabled:false}});await replacement;assert.equal(api.CFG.repair_module_enabled,false)
+ const publicRead=api.loadConfig(true),appRead=api.loadConfig(false);assert.deepEqual(calls.slice(-2),['get_public_shop_config','get_app_config'])
+ pending[4]({data:{repair_module_enabled:true}});assert.equal(await publicRead,false);pending[5]({data:{repair_module_enabled:false}});await appRead
+ const proof=api.createConfigHandoff();api.invalidateConfigReads();const afterSave=api.loadConfig(false,proof);pending[6]({error:Error('unavailable')});assert.equal(await afterSave,false);assert.equal(api.CFG.repair_module_enabled,false)
 })
 
 test('failed reload clears enabled flags; logout invalidates pending config', async () => {

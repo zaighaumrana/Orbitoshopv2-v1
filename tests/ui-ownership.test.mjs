@@ -6,6 +6,7 @@ import {parseAst} from 'rolldown/parseAst'
 import {setUIAuthority,invalidateUIAuthority} from '../src/ui-authority.js'
 import {observeCommand,originalCommandRecords} from '../src/ui-command-records.js'
 import {settleRead,readStates,resourceReady} from '../src/read-state.js'
+import {readPage,readComplete} from '../src/bounded-read.js'
 const tick=()=>new Promise(r=>setImmediate(r))
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve}}
 function loaderFixture(module){
@@ -13,33 +14,40 @@ function loaderFixture(module){
  const pending=[],summaries=[],renders=[];let epoch=0
  const state={role:'Business Owner',data:{},modal:null},CFG={repair_module_enabled:true,inventory_module_enabled:false}
  const query=table=>{
-  const q={select:()=>q,is:()=>q,not:()=>q,in:()=>{q.child=true;return q},order:()=>q,
-   then:fn=>{if(table==='tickets'&&!q.child){const g=deferred();pending.push(g);return g.promise.then(fn)}return Promise.resolve(q.child&&ctx.failChildren?{data:null,error:Error('denied child read')}:{data:[]}).then(fn)}};return q
+  const result=()=>{if(table==='tickets'&&!q.child){const g=deferred();pending.push(g);return g.promise}return Promise.resolve(q.child&&ctx.failChildren?{data:null,error:Error('denied child read')}:{data:[],count:0})}
+  const q={select:()=>q,is:()=>q,eq:()=>q,not:()=>q,in:()=>{q.child=true;return q},order:()=>q,range:result,then:fn=>result().then(fn)};return q
  }
  const ctx=vm.createContext({SESSION:{employee:{role:state.role}},state,CFG,_inv:{},
   sb:{from:query,rpc:async name=>({data:name==='get_financial_report'?{}:[]})},loadConfig:async()=>true,can:()=>true,
-  settleRead,readStates,resourceReady,
+  settleRead,readStates,resourceReady,readPage,readComplete,clearTimeout(){},
+  quickPage:()=>{const g=deferred();pending.push(g);return g.promise},stockPage:async()=>({data:[],count:0}),
   captureView:()=>{const e=epoch;return ()=>e===epoch},posNavigationIsCurrent:()=>true,workshopNavigationIsCurrent:()=>true,
-  posState:{cart:[]},wsState:{familySummaries:new Map()},groupRepairFamilies:rows=>rows.map(root=>({root})),
+  posState:{cart:[]},wsState:{familySummaries:new Map(),statusFilter:'all',financeRequest:0},groupRepairFamilies:rows=>rows.map(root=>({root})),ownsWorkshop:()=>true,
   getRepairFamilySummary:async id=>{const g=deferred();summaries.push({id,...g});return g.promise},
   applyBranding(){},render(){renders.push(structuredClone(state.data))},dlog(){},showBlockingError(){},
   window:{location:{pathname:module.includes('workshop')?'/workshop':'/pos'}},sessionStorage:{getItem(){return null}},console})
- vm.runInContext('let posLoadGeneration=0,workshopLoadGeneration=0;'+source.slice(node.start,node.end)+';globalThis.load=load',ctx)
+ const expand=parseAst(source).body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='expandFamilyMoney')
+ vm.runInContext('let selectorGeneration=0,quickGeneration=0,selectorTimer=null,posLoadGeneration=0,workshopLoadGeneration=0;'+source.slice(node.start,node.end)+(expand?source.slice(expand.start,expand.end):'')+';globalThis.load=load;'+(expand?'globalThis.expand=expandFamilyMoney;':''),ctx)
  return {ctx,state,pending,summaries,renders,leave:()=>epoch++}
 }
 test('actual POS and Workshop loaders reject reversed older results and departed follow-up reads',async()=>{
  for(const path of ['pos/pos.js','pos/workshop.js']){
   const f=loaderFixture(path),a=f.ctx.load();await tick();const b=f.ctx.load();await tick()
-  f.pending[1].resolve({data:[]});await b;const published=f.renders.length;f.pending[0].resolve({data:[{id:1,customer_name:'OLD'}]});await a
-  assert.deepEqual(JSON.parse(JSON.stringify(f.state.data.tickets)),[]);assert.equal(f.renders.length,published);assert.equal(f.summaries.length,0)
+  f.pending[1].resolve({data:[],count:0});await b;const published=f.renders.length;f.pending[0].resolve({data:[{id:1,customer_name:'OLD'}],count:1});await a
+  assert.deepEqual(JSON.parse(JSON.stringify(f.state.data[path.includes('workshop')?'tickets':'quickItems'])),[]);assert.equal(f.renders.length,published);assert.equal(f.summaries.length,0)
   const departed=f.ctx.load();await tick();const loading=f.renders.length;f.leave();f.pending[2].resolve({data:[{id:2}]});await departed;assert.equal(f.summaries.length,0);assert.equal(f.renders.length,loading)
  }
 })
-test('actual Workshop summary continuation cannot overwrite successor map after leave/return',async()=>{
- const f=loaderFixture('pos/workshop.js'),old=f.ctx.load();await tick();f.pending[0].resolve({data:[{id:1}]});await tick();assert.equal(f.summaries[0].id,1)
- f.leave();const fresh=f.ctx.load();await tick();f.pending[1].resolve({data:[{id:2}]});await tick();f.summaries[1].resolve({ok:true,data:{root:{id:2}}});await fresh
+test('actual Workshop has zero monetary startup calls for 0/10/100 roots and stale expansion cannot overwrite its successor',async()=>{
+ for(const count of [0,10,100]){
+  const f=loaderFixture('pos/workshop.js'),load=f.ctx.load();await tick();f.pending[0].resolve({data:Array.from({length:Math.min(25,count)},(_,i)=>({id:i+1})),count});await load;assert.equal(f.summaries.length,0)
+ }
+ const f=loaderFixture('pos/workshop.js'),load=f.ctx.load();await tick();f.pending[0].resolve({data:[{id:1}],count:1});await load
+ const old=f.ctx.expand('1');await tick();assert.equal(f.summaries[0].id,'1')
+ f.leave();const fresh=f.ctx.load();await tick();f.pending[1].resolve({data:[{id:2}],count:1});await fresh
+ const expansion=f.ctx.expand('2');await tick();f.summaries[1].resolve({ok:true,data:{root:{id:2}}});await expansion
  f.summaries[0].resolve({ok:true,data:{root:{id:1}}});await old
- assert.deepEqual([...f.ctx.wsState.familySummaries.keys()],['2']);assert.equal(f.renders.length,1)
+ assert.deepEqual([...f.ctx.wsState.familySummaries.keys()],['2']);assert.equal(f.ctx.wsState.familySummaries.get('2').data.root.id,2)
 })
 test('financial journal preserves original actor/native-session UUID and exact args without replay',async()=>{
  setUIAuthority('journal-A:session-1');const gate=deferred(),args={p_request_id:'journal-original',p_lines:[{quantity:1,unitPrice:100}]};let calls=0
@@ -57,20 +65,20 @@ test('read failures retain unknown truth and a partial Workshop family never bec
  const reads=readStates({financial:{data:null,error:Error('denied')},history:thrown,catalog:{data:[]}},['financial'])
  assert.equal(reads.values.financial,null);assert.equal(reads.values.history,null);assert.equal(reads.resources.financial.status,'unavailable');assert.equal(reads.resources.catalog.status,'ready')
  assert.equal(resourceReady(reads.resources,'financial'),false);assert.equal(resourceReady(reads.resources,'catalog'),true)
- const f=loaderFixture('pos/workshop.js');f.ctx.failChildren=true;const pending=f.ctx.load();await tick();f.pending[0].resolve({data:[{id:7}]});await pending
+ const f=loaderFixture('pos/workshop.js');f.ctx.failChildren=true;const pending=f.ctx.load();await tick();f.pending[0].resolve({data:[{id:7}],count:1});await pending
  assert.equal(f.state.data.tickets,null);assert.equal(f.state.resources.tickets.status,'incomplete');assert.equal(f.summaries.length,0)
 })
 
-test('actual repair/payment ACK followed by a delayed reload cannot publish into a replacement account',async()=>{
+test('actual late repair ACK and payment ACK followed by delayed summary remain original-account owned',async()=>{
  const source=readFileSync(new URL('../src/pos/pos.js',import.meta.url),'utf8'),node=parseAst(source).body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='placeOrderOnce')
  for(const isNewTicket of [true,false]){
   let epoch=1,notices=0;const reload=deferred(),operations=new Map()
   const ticket={isTicket:true,isNewTicket,requestId:'original-repair',ticketId:7,topupAmount:10,topupMethod:'Cash'}
   const ctx=vm.createContext({SESSION:{authUserId:'A'},posState:{cart:[ticket]},state:{modal:null,data:{tickets:[{id:7}]}},cartOperations:operations,
-   captureView:()=>{const e=epoch;return ()=>e===epoch},structuredClone,dlog(){},insertNewTicketFromCart:async()=>({ok:true,data:{id:7}}),collectTicketPayment:async()=>({ok:true,data:{}}),
-   load:()=>reload.promise,render(){notices++},showTransactionSuccess(){notices++},showBlockingError(){notices++},resourceReady,combinedBalance:()=>({total:0}),money:String})
+   captureView:()=>{const e=epoch;return ()=>e===epoch},structuredClone,dlog(){},insertNewTicketFromCart:()=>reload.promise,collectTicketPayment:async()=>({ok:true,data:{}}),getRepairFamilySummary:()=>reload.promise,
+   load:()=>assert.fail('repair payment must not refresh unrelated selectors'),render(){notices++},showTransactionSuccess(){notices++},showBlockingError(){notices++},resourceReady,combinedBalance:()=>({total:0}),money:String})
   vm.runInContext(source.slice(node.start,node.end)+';globalThis.place=placeOrderOnce',ctx)
-  const pending=ctx.place();await tick();epoch=2;ctx.posState={cart:[]};ctx.SESSION={authUserId:'B'};ctx.state.data={tickets:[]};reload.resolve();await pending
+  const pending=ctx.place();await tick();epoch=2;ctx.posState={cart:[]};ctx.SESSION={authUserId:'B'};ctx.state.data={tickets:[]};reload.resolve({ok:true,data:{id:7,outstanding:0}});await pending
   assert.equal(ctx.state.modal,null);assert.equal(notices,0);assert.equal(operations.get('original-repair').actor,'A');assert.equal(operations.get('original-repair').detached,true)
  }
 })

@@ -7,7 +7,7 @@ import { installNumericInputValidation } from './numeric-input.js'
 import { blockingErrorCopy } from './blocking-error.js'
 import { logLegacyUsage } from './platform/legacy.js'
 import { installThermalMeter } from './platform/thermal.js'
-import {nativeIdentity,setUIAuthority,invalidateUIAuthority,onPrivateReset} from './ui-authority.js'
+import {nativeIdentity,setUIAuthority,invalidateUIAuthority,onPrivateReset,captureAuthority,authorityIdentity} from './ui-authority.js'
 import {observeCommand} from './ui-command-records.js'
 import {captureView} from './ui-lifecycle.js'
 
@@ -225,32 +225,44 @@ export let CFG = {
 
 const entitlementKeys = ['repair_module_enabled','inventory_module_enabled','technician_module_enabled','live_tracking_enabled','ems_enabled']
 let configGeneration = 0
+const configFlights=new Map(),configHandoffs=new WeakMap()
+let verifiedConfigScope=null
+export function invalidateConfigReads(){configGeneration++;configFlights.clear();verifiedConfigScope=null}
+export function createConfigHandoff(){
+  if(verifiedConfigScope!=='app')return null
+  const proof={};configHandoffs.set(proof,{generation:configGeneration,identity:authorityIdentity(),current:captureAuthority()});return proof
+}
 export function resetClientEntitlements() {
-  configGeneration++
+  invalidateConfigReads()
   for (const key of entitlementKeys) CFG[key] = false
   state.modal = null
   try { sessionStorage.removeItem('retailos_collect_ticket') } catch {}
 }
 
-export async function loadConfig(publicOnly = false) {
+export function loadConfig(publicOnly = false,verifiedConfig) {
+  const proof=verifiedConfig&&configHandoffs.get(verifiedConfig)
+  if(verifiedConfig)configHandoffs.delete(verifiedConfig)
+  if(!publicOnly&&proof&&proof.generation===configGeneration&&proof.identity===authorityIdentity()&&proof.current())return Promise.resolve(true)
+  const key=(publicOnly?'public:':'app:')+(authorityIdentity()||'anonymous')
+  if(configFlights.has(key))return configFlights.get(key)
   const generation = ++configGeneration
+  const current=captureAuthority()
   const rpc = publicOnly ? 'get_public_shop_config' : 'get_app_config'
-  dlog('shared.loadConfig', `ENTRY -- rpc=${rpc}`)
-  let data, error
-  try { ({ data, error } = await sb.rpc(rpc)) } catch (failure) { error = failure }
-  if (generation !== configGeneration) return false
-  for (const key of entitlementKeys) CFG[key] = !error && data?.[key] === true
-  if (error || !data) {
-    state.modal = null
-    console.warn('Config unavailable; optional modules disabled.')
-    return false
-  }
-  // Ignore retired config keys from a server not yet on the cleanup migration.
-  for (const [key, value] of Object.entries(data)) {
-    if (key !== 'workshop_enabled' && !entitlementKeys.includes(key)) CFG[key] = value
-  }
-  dlog('shared.loadConfig', `DONE -- suspended=${CFG.suspended} ems_enabled=${CFG.ems_enabled}`)
-  return true
+  const request=(async()=>{
+    dlog('shared.loadConfig', `ENTRY -- rpc=${rpc}`)
+    let data,error
+    try{({data,error}=await sb.rpc(rpc))}catch(failure){error=failure}
+    if(generation!==configGeneration||!current())return false
+    for(const key of entitlementKeys)CFG[key]=!error&&data?.[key]===true
+    verifiedConfigScope=null
+    if(error||!data){state.modal=null;console.warn('Config unavailable; optional modules disabled.');return false}
+    for(const [key,value] of Object.entries(data))if(key!=='workshop_enabled'&&!entitlementKeys.includes(key))CFG[key]=value
+    verifiedConfigScope=publicOnly?'public':'app'
+    return true
+  })()
+  configFlights.set(key,request)
+  void request.finally(()=>{if(configFlights.get(key)===request)configFlights.delete(key)})
+  return request
 }
 
 export async function loadQuickItems() {
@@ -778,6 +790,9 @@ export async function resolvePasswordReset(requestId, email, newPassword, resolv
 }
 
 export async function invokeAccountAdmin(action, payload = {}) {
+  const configMutation=['update-config','complete-onboarding'].includes(action)
+  if(configMutation)invalidateConfigReads()
+  try {
   const { data, error } = await sb.functions.invoke('account-admin', {
     body: { action, ...payload },
   })
@@ -787,6 +802,7 @@ export async function invokeAccountAdmin(action, payload = {}) {
     return { ok:false,error:typeof message==='string' && message.length<=300 ? message : 'Shop settings request failed. Check your session and runtime setup, then retry.' };
   }
   return data
+  }finally{if(configMutation)invalidateConfigReads()}
 }
 
 export async function verifyStepUpPin(pin, purpose) {
