@@ -316,7 +316,7 @@ function dashboard() {
   ]
   return `
     ${tit('Dashboard','Live overview of sales, tickets, and operations.',
-      `<button class="primary-button" data-action="go-pos">Go to POS</button>`)}
+      can('pos',state.role)?`<button class="primary-button" data-action="go-pos">Go to POS</button>`:'')}
     <div class="grid kpi-grid">
       ${kpis.filter(([, ,target]) => target === 'udharList' || can(target, state.role)).map(([l,v,target]) => `
         <div class="card kpi" style="cursor:pointer" data-kpi-target="${target}">
@@ -358,7 +358,7 @@ function repairs() {
   const roots = groupRepairFamilies(state.data.tickets || []).map(family => family.root)
   const sc = {'Pending':'warn','In Progress':'warn','Ready':'good','Delivered':'good','Cancelled':'bad','Declined':'bad'}
   return `
-    ${tit('Repair Tickets','Search the complete repair family from one place.',`<button class="primary-button" data-action="go-pos" title="Create tickets from the POS counter">New Ticket (via POS)</button>`)}
+    ${tit('Repair Tickets','Search the complete repair family from one place.',can('pos',state.role)?`<button class="primary-button" data-action="go-pos" title="Create tickets from the POS counter">New Ticket (via POS)</button>`:'')}
     ${tlb('Search ticket, parent/child invoice, customer, phone, device…')}
     <p class="muted" style="font-size:12px;margin:-8px 0 12px">This search checks parent repairs and every child/sub-invoice, then opens the complete family.</p>
     <div class="grid two-col">
@@ -385,8 +385,8 @@ function repairs() {
                 <div style="display:flex;gap:6px;align-items:center">
                   <button class="secondary-button" style="font-size:12px;padding:4px 10px"
                     data-action="open-ticket-editor" data-ticket-id="${r.id}">Edit</button>
-                  <button class="secondary-button" style="font-size:12px;padding:4px 10px"
-                    data-action="admin-collect" data-ticket-id="${r.id}">Collect</button>
+                  ${can('pos',state.role)?`<button class="secondary-button" style="font-size:12px;padding:4px 10px"
+                    data-action="admin-collect" data-ticket-id="${r.id}">Collect</button>`:''}
                 </div>
               </td>
               </tr>`}).join('') :
@@ -824,10 +824,12 @@ function attachEvents() {
     }
 
     if (el.dataset.action === 'go-pos') {
+      if(!can('pos',state.role))return
       const { navigate } = await import('../router.js')
       navigate('/pos'); return
     }
     if (el.dataset.action === 'go-workshop') {
+      if(!can('workshop',state.role))return
       if (!can('workshop', state.role)) return
       const { navigate } = await import('../router.js')
       navigate('/workshop'); return
@@ -1110,6 +1112,7 @@ function attachEvents() {
     }
 
     if (el.dataset.action === 'admin-collect') {
+      if(!can('pos',state.role))return
       const found = state.data.tickets.find(t => String(t.id) === String(el.dataset.ticketId))
       if (!found) return
       sessionStorage.setItem('retailos_collect_ticket', String(found.id))

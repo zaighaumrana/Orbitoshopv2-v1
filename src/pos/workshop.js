@@ -518,8 +518,7 @@ function attachEvents() {
       navigate('/pos'); return
     }
     if (el.dataset.action === 'go-admin') {
-      const { initAdmin } = await import('../admin/admin.js')
-      initAdmin(SESSION, 'dashboard', {}); return
+      if(can('dashboard',state.role))navigate('/admin/dashboard'); return
     }
     if (el.dataset.action === 'install' && state.installPrompt) {
       await runInstallPrompt(); render(); return

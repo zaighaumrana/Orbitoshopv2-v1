@@ -966,3 +966,15 @@ numeric/handoff tests pass; exact logs are in permanent M1 evidence. Initial VM
 harness dependency/cross-realm assertion failures were corrected in test setup.
 No backend/release/DB/provider/Platform source change or deployment. Independent
 review NOT REVIEWED; R2 is a separately inspectable source boundary.
+
+## 2026-10-25 — M1 centralized Workshop navigation and Manager affordances
+Branch: feature/shop-modernization-m1
+
+Workshop Admin now navigates through the central router to /admin/dashboard instead
+of directly initializing Admin while /workshop remains the browser URL. Admin POS,
+New Ticket and Collect affordances use can(pos); denied collection cannot leave an
+intent in sessionStorage. Defensive navigation handlers also check can(). Existing
+Manager Admin access and all role/entitlement policies remain unchanged. Actual
+entry browser cases cover Owner/Support history/deep-link/refresh and Manager denial;
+final candidate results are recorded with integrated acceptance. No backend, DB,
+Platform or deployment change. Independent disposition remains NOT REVIEWED.
