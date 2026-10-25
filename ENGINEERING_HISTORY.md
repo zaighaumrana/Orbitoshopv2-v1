@@ -1047,3 +1047,21 @@ failed original URL; its fixture now uses the actual recovered namespace. All
 failed logs are retained. Integrated final source will run the complete sequence.
 No backend/release/DB/Platform/provider change or deployment. Independent review
 remains NOT REVIEWED.
+
+## 2026-10-25 — M1 current EMS controller and action ownership
+Branch: feature/shop-modernization-m1
+
+Persistent EMS handlers now read a current controller refreshed on every mount.
+They retain current route/native-session/generation checks; tab/filter reads have a
+request sequence so reverse completion cannot replace newer data. Successful leave
+and salary actions refresh the current controller once. Departed callbacks cannot
+refresh/toast elsewhere. Pending salary generation is fenced by native actor/session
+and employee/month/year, including leave/re-entry, without changing payroll policy.
+Required salary configuration/attendance/leave failures stop before generating a
+false zero-derived result; post-await ownership prevents departed follow-up writes.
+
+The focused fixture executes the actual EMS binder and common async wrapper: reentry,
+current tab/filter, one leave write/refresh, duplicate payroll submission, pending
+revisit and late-result suppression pass. Synthetic I/O is explicitly not hosted
+payroll acceptance. No backend/release/DB/Platform source/provider change or deployment.
+Independent review remains NOT REVIEWED.

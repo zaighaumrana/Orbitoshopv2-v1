@@ -189,14 +189,16 @@ async function load() {
     adminState._emsHTML = emsView(emsData, SESSION)
     render()
     const app = document.getElementById('app')
+    let emsReloadGeneration=0
     attachEMSEvents(app, () => adminState._emsData, async () => {
+      const reload=++emsReloadGeneration
       if (!current() || !can('ems', state.role) || window.location.pathname !== '/admin/ems') return
       const fresh = await loadEMSData()
-      if (!current()) return
+      if (!current()||reload!==emsReloadGeneration) return
       adminState._emsData = fresh
       adminState._emsHTML = emsView(fresh, SESSION)
       render()
-    }, SESSION)
+    }, SESSION,current)
     return
   }
 

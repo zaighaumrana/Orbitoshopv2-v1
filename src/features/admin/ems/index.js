@@ -27,12 +27,15 @@ import {
 } from '../../../shared.js'
 import { navigate } from '../../../router.js'
 import { dlog, dstack } from '../../../debuglog.js'
-import {onPrivateReset} from '../../../ui-authority.js'
+import {onPrivateReset,authorityIdentity} from '../../../ui-authority.js'
 import {settleRead,readStates} from '../../../read-state.js'
-import {captureView,ViewExpired} from '../../../ui-lifecycle.js'
+import {captureView,ViewExpired,listenOwned,viewAwait} from '../../../ui-lifecycle.js'
 
 let SESSION         = {}
 let _eventsAttached = false
+let emsController=null
+const pendingEMSActions=new Set()
+const ownsEMS=()=>!!emsController&&emsController.isCurrent()&&window.location.pathname==='/admin/ems'&&can('ems',state.role)&&state.role===emsController.sess.employee?.role
 
 const emsState = {
   tab:              'attendance',  // attendance | leaves | salary | slips
@@ -43,7 +46,7 @@ const emsState = {
   selectedYear:     new Date().getFullYear(),
 }
 const initialEMS={...emsState}
-onPrivateReset(()=>{SESSION={};Object.assign(emsState,initialEMS)})
+onPrivateReset(()=>{SESSION={};emsController=null;Object.assign(emsState,initialEMS)})
 
 /* ════════════════════════════════════════════════════════════════
    CLOCK-IN GATE
@@ -400,9 +403,12 @@ function slipsTab(emsData) {
    SALARY SLIP GENERATOR
 ════════════════════════════════════════════════════════════════ */
 export async function generateSalarySlip(employeeId, month, year, generatedBy) {
+  const current=captureView()
   // Get salary config
-  const { data: config } = await sb.from('salary_config')
+  const { data: config,error:configError } = await sb.from('salary_config')
     .select('*').eq('employee_id', employeeId).single()
+  if(!current())throw new ViewExpired()
+  if(configError)return {ok:false,error:'Salary configuration is unavailable.'}
   if (!config) return { ok: false, error: 'No salary configuration found for this employee. Please set it in the Salary tab first.' }
 
   // Calculate working days in the month
@@ -411,20 +417,24 @@ export async function generateSalarySlip(employeeId, month, year, generatedBy) {
 
   // Get attendance for this month
   const monthStr = `${year}-${String(month).padStart(2,'0')}`
-  const { data: attendance } = await sb.from('attendance')
+  const { data: attendance,error:attendanceError } = await sb.from('attendance')
     .select('*')
     .eq('employee_id', employeeId)
     .gte('date', `${escapeHTML(monthStr)}-01`)
     .lte('date', `${escapeHTML(monthStr)}-${daysInMonth}`)
+  if(!current())throw new ViewExpired()
+  if(attendanceError||!Array.isArray(attendance))return {ok:false,error:'Required attendance is unavailable; salary was not generated.'}
 
   const daysPresent = (attendance || []).filter(r => r.clock_out).length
 
   // Get approved leaves for this month
-  const { data: leaves } = await sb.from('leaves')
+  const { data: leaves,error:leavesError } = await sb.from('leaves')
     .select('*')
     .eq('employee_id', employeeId)
     .eq('status', 'Approved')
     .or(`from_date.gte.${escapeHTML(monthStr)}-01,to_date.lte.${escapeHTML(monthStr)}-${daysInMonth}`)
+  if(!current())throw new ViewExpired()
+  if(leavesError||!Array.isArray(leaves))return {ok:false,error:'Required leave history is unavailable; salary was not generated.'}
 
   const leaveDays = (leaves || []).reduce((total, l) => {
     const from = new Date(Math.max(new Date(l.from_date), new Date(`${escapeHTML(monthStr)}-01`)))
@@ -509,13 +519,15 @@ export function buildSalarySlipHTML(slip, employeeName, shopName) {
    EMS EVENT HANDLERS
    Call attachEMSEvents(app, emsData, reloadFn, sess) from admin.js
 ════════════════════════════════════════════════════════════════ */
-export function attachEMSEvents(app, getEMSData, reloadFn, sess) {
+export function attachEMSEvents(app, getEMSData, reloadFn, sess, isCurrent=captureView()) {
+  emsController={getEMSData,reloadFn,sess,isCurrent,busy:pendingEMSActions}
   SESSION = sess
   if (_eventsAttached) return
   _eventsAttached = true
   SESSION = sess
 
-  app.addEventListener('click', async e => {
+  listenOwned(app,'click',ownsEMS,async (e,eventCurrent) => {
+    const controller=emsController,{getEMSData,reloadFn,sess}=controller,current=()=>eventCurrent()&&emsController===controller
     if (window.location.pathname !== '/admin/ems' || !can('ems', state.role)) return
     const el = e.target.closest(
       '[data-ems-tab],[data-ems-leave-filter],[data-ems-leave-action],[data-print-slip]'
@@ -524,12 +536,12 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess) {
 
     if (el.dataset.emsTab) {
       emsState.tab = el.dataset.emsTab
-      reloadFn(); return
+      await viewAwait(current,()=>reloadFn()); return
     }
 
     if (el.dataset.emsLeaveFilter) {
       emsState.leaveFilter = el.dataset.emsLeaveFilter
-      reloadFn(); return
+      await viewAwait(current,()=>reloadFn()); return
     }
 
     if (el.dataset.emsLeaveAction) {
@@ -537,9 +549,10 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess) {
       const action  = el.dataset.emsLeaveAction
       const { error } = await sb.from('leaves').update({
         status:      action,
-        reviewed_by: SESSION.employee?.id || null,
+        reviewed_by: sess.employee?.id || null,
         reviewed_at: new Date().toISOString(),
       }).eq('id', leaveId)
+      if(!current())return
       if (error) { showBlockingError('Error: ' + error.message); return }
       await reloadFn(); return
     }
@@ -550,20 +563,23 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess) {
       const slip     = emsData.slips.find(s => s.id === slipId)
       if (!slip) return
       const { printThermal } = await import('../../../print/print.js')
+      if(!current())return
       printThermal(buildSalarySlipHTML(slip, slip.employees?.name || '—', CFG.shop_name))
       return
     }
-  })
+  },error=>showBlockingError(error.message))
 
-  app.addEventListener('input', e => {
+  listenOwned(app,'input',ownsEMS,async (e,eventCurrent) => {
+    const controller=emsController
     if (window.location.pathname !== '/admin/ems' || !can('ems', state.role)) return
     const t = e.target
     if (t.dataset.emsAttendanceFilter !== undefined) {
-      emsState.attendanceFilter = t.value; reloadFn()
+      emsState.attendanceFilter = t.value;await viewAwait(()=>eventCurrent()&&emsController===controller,()=>controller.reloadFn())
     }
-  })
+  },error=>showBlockingError(error.message))
 
-  app.addEventListener('submit', async e => {
+  listenOwned(app,'submit',ownsEMS,async (e,eventCurrent) => {
+    const controller=emsController,{reloadFn,sess}=controller,current=()=>eventCurrent()&&emsController===controller
     if (window.location.pathname !== '/admin/ems' || !can('ems', state.role)) return
     const form = e.target
     if (!form.dataset.form) return
@@ -579,6 +595,7 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess) {
         rate:           Number(data.rate),
         effective_from: new Date().toISOString().slice(0,10),
       }, { onConflict: 'employee_id' })
+      if(!current())return
       if (error) { showBlockingError('Error: ' + error.message); return }
       await reloadFn(); return
     }
@@ -588,13 +605,20 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess) {
       const month = Number(data.month)
       const year  = Number(data.year)
       if (!empId || !month || !year) { showBlockingError('Please fill all fields.'); return }
+      const busyKey=`${authorityIdentity()}:${empId}:${month}:${year}`
+      if(controller.busy.has(busyKey))return
+      controller.busy.add(busyKey)
       const btn = form.querySelector('button[type="submit"]') || form.querySelector('button')
       if (btn) { btn.disabled = true; btn.textContent = 'Generating…' }
-      const result = await generateSalarySlip(empId, month, year, SESSION.employee?.id)
+      let result
+      try{result=await generateSalarySlip(empId, month, year, sess.employee?.id)}
+      catch(error){if(!current())return;result={ok:false,error:'Salary outcome is unconfirmed. Review the original employee/month before retrying.'}}
+      finally{controller.busy.delete(busyKey);if(current()&&btn){btn.disabled=false;btn.textContent='Generate'}}
+      if(!current())return
       if (btn) { btn.disabled = false; btn.textContent = 'Generate' }
       if (!result.ok) { showBlockingError('Error: ' + result.error); return }
       showToast('Salary slip generated successfully.', 'success')
       await reloadFn(); return
     }
-  })
+  },error=>showBlockingError(error.message))
 }
