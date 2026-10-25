@@ -939,3 +939,30 @@ retained beside the passing evidence. Evidence: permanent M1 run
 20261025T013642Z-M1-003-629a9fb5. This is local synthetic verification, not hosted
 acceptance. No backend, release, Platform, DB or deployment changes. R1 is ready for
 independent inspection; independent disposition remains NOT REVIEWED.
+
+## 2026-10-25 — M1 private authority boundary and original checkout outcomes (R2)
+Branch: feature/shop-modernization-m1
+
+Verified native Auth session identity now owns UI state. Actor/session replacement,
+USER_UPDATED and signout invalidate private caches, cart/customer/tenders, repair
+working draft, Admin/Workshop/EMS data, PIN callbacks and app dialogs. Ordinary route
+activation within the same native session retains the cart/draft. Canonical role,
+consent, entitlement, onboarding and legal checks remain authoritative.
+
+Checkout and cart repair/payment records remain separately original-actor owned in
+memory. Replacement UI gets no old result; checkout retains immutable input/tax,
+UUID, outcome/uncertainty and old busy completion cannot unlock successor work.
+Only the original actor sees detached request references. Review reads the original
+sale/repair by UUID; absent/error is unconfirmed and never causes automatic replay.
+Detached payment uncertainty retains its original request/input and instructs review
+against original payment history. It does not claim an absent read means failure.
+These in-memory recovery records do not claim persistence through tab destruction.
+
+Validation: actual entry browser proves same-role account/session changes clear cart
+and repair data while same-session activation preserves drafts. Actual checkout/API
+fixture proves late ACK after A→B retains A UUID/payload/result, performs no B reload
+or replay and permits original-actor inspection. Focused transaction/repair/module/
+numeric/handoff tests pass; exact logs are in permanent M1 evidence. Initial VM
+harness dependency/cross-realm assertion failures were corrected in test setup.
+No backend/release/DB/provider/Platform source change or deployment. Independent
+review NOT REVIEWED; R2 is a separately inspectable source boundary.

@@ -7,6 +7,7 @@ import { installNumericInputValidation } from './numeric-input.js'
 import { blockingErrorCopy } from './blocking-error.js'
 import { logLegacyUsage } from './platform/legacy.js'
 import { installThermalMeter } from './platform/thermal.js'
+import {nativeIdentity,setUIAuthority,invalidateUIAuthority,onPrivateReset} from './ui-authority.js'
 
 /* ── Supabase ── */
 export const sb = createClient(
@@ -147,6 +148,7 @@ export async function loadCurrentSession() {
   // Old retailos_session is deliberately ignored and removed. Supabase Auth
   // plus app_users is the only identity/authorization source.
   try { sessionStorage.removeItem('retailos_session') } catch {}
+  const before = nativeIdentity((await sb.auth.getSession()).data?.session)
   const { data: userData, error: userError } = await sb.auth.getUser()
   if (userError || !userData.user) return null
   let { data: profile, error: profileError } = await sb
@@ -165,8 +167,11 @@ export async function loadCurrentSession() {
     await sb.auth.signOut({ scope: 'local' })
     return null
   }
+  const after = nativeIdentity((await sb.auth.getSession()).data?.session)
+  if (!before || before !== after || !after.startsWith(userData.user.id+':')) return null
+  setUIAuthority(after)
   state.role = profile.role
-  return profileToSession(profile)
+  return {...profileToSession(profile),uiAuthority:after}
 }
 
 export function _saveSession(_SESSION, route, module) {
@@ -177,6 +182,7 @@ export function _saveSession(_SESSION, route, module) {
   } catch {}
 }
 export async function _clearSession() {
+  invalidateUIAuthority()
   revokeSupportConsole()
   dstack('shared._clearSession', 'clearing session storage')
   try {
@@ -1045,3 +1051,12 @@ export function normalizeModalControls(root = document) {
     modal.prepend(close)
   })
 }
+
+onPrivateReset(() => {
+  state.data = {tickets:[],sales:[],employees:[],udharAccounts:[],financial:{},shiftFinancial:{},returns:[],inventory:[],quickItems:[],repairComponents:[]}
+  state.filter = ''
+  resetClientEntitlements()
+  cancelPinPrompt(null)
+  if (activeAppDialog) { activeAppDialog.busy=false;closeAppDialog(activeAppDialog,null) }
+  document.getElementById('app-toast-region')?.replaceChildren()
+})

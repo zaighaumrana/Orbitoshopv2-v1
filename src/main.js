@@ -6,6 +6,7 @@ import { needsOnboarding } from './onboarding-state.js'
 import { ensureOwnerAcceptance } from './legal/acceptance.js'
 import { takeSupportHandoff, startSupportHandoff } from './support-handoff.js'
 import {RECOVERY_KEY} from './platform/support-recovery.js'
+import {invalidateUIAuthority} from './ui-authority.js'
 
 let supportHandoff=takeSupportHandoff(location,history)
 
@@ -206,9 +207,10 @@ async function onLoginSuccess(session) {
 
 sb.auth.onAuthStateChange((event, authSession) => {
   const identity=authIdentity(authSession)
-  const changed=observedAuthIdentity!==null && identity!==observedAuthIdentity
+  const changed=identity!==observedAuthIdentity
   observedAuthIdentity=identity
   if((event==='SIGNED_IN'&&changed)||event==='USER_UPDATED'){
+    invalidateUIAuthority()
     clearPrivateRecovery()
     showLogin()
     const generation=applicationGeneration
@@ -219,6 +221,7 @@ sb.auth.onAuthStateChange((event, authSession) => {
     return
   }
   if (event !== 'SIGNED_OUT') return
+  invalidateUIAuthority()
   clearPrivateRecovery()
   state.role = null
   try {

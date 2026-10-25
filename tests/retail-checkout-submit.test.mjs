@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
+import {captureAuthority,setUIAuthority,invalidateUIAuthority} from '../src/ui-authority.js'
 
 test('retail checkout submits once across RPC/reload and retains request ID on failure', async () => {
   const pos = readFileSync(new URL('../src/pos/pos.js', import.meta.url), 'utf8')
@@ -16,7 +17,8 @@ test('retail checkout submits once across RPC/reload and retains request ID on f
   const posState = { cart:cart(), checkoutPayment:'Cash', cashTendered:100 }
   const state = { modal:null }
   const context = vm.createContext({
-    posState, state, CFG:{tax_rate:0}, SESSION:{employee:{name:'Fixture'}},
+    posState, state, CFG:{tax_rate:0}, SESSION:{authUserId:'actor-A',employee:{name:'Fixture'}},
+    captureAuthority:()=>()=>true,structuredClone,cartOperations:new Map(),
     crypto:{randomUUID:()=>`request-${++ids}`},
     sb:{rpc(name, args) { calls.push({name,args}); return rpcGate.promise }},
     dlog(){}, logBillEvent(){}, render(){},
@@ -54,3 +56,25 @@ test('retail checkout submits once across RPC/reload and retains request ID on f
   assert.equal(errors.length,1,'only the genuine failed attempt reports an error')
   assert.ok(calls.every(call=>call.name==='create_retail_sale'&&call.args.p_lines.length===1))
 })
+
+test('late checkout ACK remains original-actor owned after same-role/native-session replacement',async()=>{
+ const pos=readFileSync(new URL('../src/pos/pos.js',import.meta.url),'utf8');
+ const api=readFileSync(new URL('../src/features/pos/checkout/api.js',import.meta.url),'utf8');
+ const start=pos.indexOf('async function _finalizeCheckout()'),end=pos.indexOf('/* ═',start);
+ let complete,calls=0,reloads=0;const operations=new Map();
+ setUIAuthority('actor-A:native-A');
+ const old={cart:[{name:'A private item',qty:1,originalPrice:100,soldPrice:100}],checkoutPayment:'Cash',cashTendered:100};
+ const ctx=vm.createContext({posState:old,state:{modal:null},CFG:{tax_rate:0},SESSION:{authUserId:'actor-A',employee:{name:'A'}},
+  captureAuthority,structuredClone,cartOperations:operations,crypto:{randomUUID:()=> 'original-request'},
+  sb:{rpc:(_name,args)=>{calls++;assert.equal(args.p_request_id,'original-request');return new Promise(r=>complete=r)}},
+  dlog(){},logBillEvent(){},render(){},load:async()=>{reloads++},showBlockingError(){assert.fail('old response cannot show a B error')},confirmAction:async()=>{},window:{location:{pathname:'/pos'}}});
+ vm.runInContext(`let checkoutInFlight=false;${api.replace(/^import .*$/gm,'').replace('export async function','async function')}\n${pos.slice(start,end)}\nglobalThis.submit=_finalizeCheckout`,ctx);
+ const pending=ctx.submit();const retained=structuredClone(operations.get('original-request').inputs);
+ invalidateUIAuthority();setUIAuthority('actor-B:native-B');ctx.posState={cart:[],cashTendered:0};ctx.SESSION={authUserId:'actor-B',employee:{name:'B'}};
+ complete({data:{invoiceNumber:'A-INV',createdAt:'2026-10-25'}});await pending;
+ assert.equal(calls,1);assert.equal(reloads,0);assert.equal(ctx.state.modal,null);assert.equal(ctx.posState.cart.length,0);
+ const op=operations.get('original-request');assert.equal(op.actor,'actor-A');assert.equal(op.status,'succeeded');assert.equal(op.result.sale.receiptNo,'A-INV');assert.deepEqual(structuredClone(op.inputs),retained);
+ assert.equal([...operations.values()].filter(o=>o.actor===ctx.SESSION.authUserId).length,0);
+ setUIAuthority('actor-A:new-native');assert.equal(op.inputs.requestId,'original-request');assert.equal(calls,1,'return/reconciliation never replays a command');
+ invalidateUIAuthority();
+});

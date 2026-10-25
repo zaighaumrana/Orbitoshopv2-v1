@@ -42,9 +42,10 @@ import { settleUdhar } from '../features/checkout/udhar/api.js'
 
 import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
+import {captureAuthority,onPrivateReset} from '../ui-authority.js'
 
 /* ── POS-only state ── */
-const posState = {
+const emptyPOS = () => ({
   cart:            [],
   checkoutPayment: 'Cash',
   cashTendered:    0,
@@ -61,13 +62,20 @@ const posState = {
   checkoutRequestId: null,
   invSearch:       '',
   repairSearch:    '',
-}
+})
+let posState = emptyPOS()
 
 let SESSION = {}
 let _inv = null  // populated via dynamic import only when inventory_module_enabled
 let _eventsAttached = false
 let placingOrder = false
 let checkoutInFlight = false
+// Retain original-actor requests separately from replacement-account UI.
+const cartOperations = new Map()
+onPrivateReset(() => {
+  for(const operation of cartOperations.values())operation.detached=true
+  posState=emptyPOS();SESSION={};placingOrder=false;checkoutInFlight=false;resetDraft()
+})
 
 /* ── Load ── */
 async function load() {
@@ -199,6 +207,7 @@ function posView() {
   const hasTicketInCart = posState.cart.some(i => i.isTicket)
 
   return `
+    ${[...cartOperations.entries()].filter(([,op])=>op.detached&&op.actor===SESSION.authUserId).map(([id,op])=>`<div class="card" role="status">Original ${escapeHTML(op.kind||'checkout')} request ${escapeHTML(id)}: ${escapeHTML(op.status)}. ${op.status==='uncertain'?'Outcome is unconfirmed; do not create a replacement request.':''}<button class="secondary-button" data-action="reconcile-original" data-request-id="${escapeHTML(id)}">Review original outcome</button></div>`).join('')}
     <div class="page-title">
       <div>
         <h1>Point of Sale</h1>
@@ -894,23 +903,29 @@ function refreshRetailReturnPreview() {
 
 /* ── Place Order: lock the ticket, create the invoice ── */
 async function placeOrder() {
+  const current=captureAuthority(),ownerState=posState
   if (placingOrder) return
   placingOrder = true
   try {
     await placeOrderOnce()
   } finally {
-    placingOrder = false
+    if(current()&&posState===ownerState)placingOrder = false
   }
 }
 
 async function placeOrderOnce() {
+  const current=captureAuthority(),ownerState=posState
   dlog('POS.placeOrder', 'ENTRY')
   const ticketItem = posState.cart.find(i => i.isTicket)
   if (!ticketItem) { dlog('POS.placeOrder', 'no ticketItem in cart -- abort'); return }
+  const operation=cartOperations.get(ticketItem.requestId)||{actor:SESSION.authUserId,kind:ticketItem.isNewTicket?'repair':'payment',inputs:structuredClone(ticketItem),status:'pending'}
+  cartOperations.set(ticketItem.requestId,operation)
 
   if (ticketItem.isNewTicket) {
     dlog('POS.placeOrder', 'isNewTicket branch -- calling repairs.insertNewTicketFromCart()')
     const res = await insertNewTicketFromCart(ticketItem)
+    operation.result=res;operation.status=res.ok?'succeeded':'uncertain'
+    if (!current() || posState!==ownerState) return
     if (!res.ok) { dlog('POS.placeOrder', `INSERT FAILED: ${res.error}`); showBlockingError('Error placing order: ' + res.error); return }
     dlog('POS.placeOrder', `INSERT SUCCEEDED ticket_number=${res.data.ticket_number} id=${res.data.id} -- calling load() next`)
 
@@ -934,6 +949,8 @@ async function placeOrderOnce() {
   const payMethod = ticketItem.topupMethod
   dlog('POS.placeOrder', 'existing-ticket branch -- calling repairs.collectTicketPayment()')
   const res = await collectTicketPayment(ticket, payAmount, payMethod, ticketItem.requestId)
+  operation.result=res;operation.status=res.ok?'succeeded':'uncertain'
+  if (!current() || posState!==ownerState) return
   if (!res.ok) { showBlockingError('Error recording payment: ' + res.error); return }
 
   posState.cart = posState.cart.filter(i => !i.isTicket)
@@ -975,6 +992,7 @@ async function doCheckout() {
 }
 
 async function _finalizeCheckout() {
+  const current=captureAuthority(),ownerState=posState
   // Hold through cart clearing and reload: the old checkout UI can still receive
   // a second activation while the successful sale is being refreshed.
   if (checkoutInFlight || !posState.cart.length) return
@@ -983,16 +1001,19 @@ async function _finalizeCheckout() {
     render()
     await _finalizeCheckoutOnce()
   } finally {
-    checkoutInFlight = false
-    if (window.location.pathname.startsWith('/pos')) render()
+    if (current() && posState===ownerState) {
+      checkoutInFlight = false
+      if (window.location.pathname.startsWith('/pos')) render()
+    }
   }
 }
 
 async function _finalizeCheckoutOnce() {
+  const current=captureAuthority(),ownerState=posState,actor=SESSION.authUserId
   dlog('POS._finalizeCheckout', 'ENTRY -- calling checkout.finalizeCheckout()')
   posState.checkoutRequestId ||= crypto.randomUUID()
-  const res = await finalizeCheckout({
-    cart: posState.cart,
+  const inputs = {
+    cart: structuredClone(posState.cart),
     checkoutPayment: posState.checkoutPayment,
     cashTendered: posState.cashTendered,
     udharName: posState.udharName,
@@ -1004,7 +1025,16 @@ async function _finalizeCheckoutOnce() {
     splitCredit: posState.splitCredit,
     employeeName: SESSION.employee?.name,
     requestId: posState.checkoutRequestId,
-  })
+    taxRate: Number(CFG.tax_rate||0),
+  }
+  const operation=cartOperations.get(inputs.requestId)||{actor,kind:'checkout',inputs,status:'pending'}
+  cartOperations.set(inputs.requestId,operation)
+  let res
+  try {res=await finalizeCheckout(operation.inputs)}
+  catch {res={ok:false,error:'Outcome unavailable. Reconcile the original request before retrying.'}}
+  operation.status=res.ok?'succeeded':res.code==='incomplete-cash-payment'?'rejected':'uncertain'
+  operation.result=res
+  if (!current() || posState!==ownerState) return
   if (!res.ok) {
     dlog('POS._finalizeCheckout', `FAILED: ${res.error}`)
     if (res.code === 'incomplete-cash-payment') {
@@ -1040,6 +1070,18 @@ function attachEvents() {
   /* ── Click ── */
   app.addEventListener('click', async e => {
     if (!can('pos', state.role) || !modalEntitled(state.modal?.type)) return
+    const original=e.target.closest('[data-action="reconcile-original"]')
+    if(original){
+      const op=cartOperations.get(original.dataset.requestId),current=captureAuthority()
+      if(!op || op.actor!==SESSION.authUserId)return
+      if(op.status==='succeeded') {showTransactionSuccess('The original request was acknowledged. Review the original invoice/history; no request was resent.');return}
+      const table=op.kind==='checkout'?'sales':op.kind==='repair'?'tickets':null
+      if(!table){showBlockingError('Payment outcome remains uncertain. Reconcile the original request '+original.dataset.requestId+' against its original payment history; do not issue a new payment.');return}
+      const result=await sb.from(table).select('*').eq('request_id',original.dataset.requestId).maybeSingle()
+      if(!current() || op.actor!==SESSION.authUserId)return
+      if(result.error || !result.data){showBlockingError('Original outcome is still unconfirmed. Its UUID and intended payload are retained; no request was resent.');return}
+      op.status='succeeded';op.result={ok:true,data:result.data};render();return
+    }
     // Route guard: see the matching comment in admin.js's attachEvents()
     // for the full explanation -- this listener stays attached for the
     // rest of the session once /pos has been visited, even after

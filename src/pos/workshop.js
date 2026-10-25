@@ -25,6 +25,7 @@ import { findRepairFamilies, groupRepairFamilies, matchedRepairChild, repairFami
 
 import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
+import {onPrivateReset} from '../ui-authority.js'
 
 /* ── Workshop state ── */
 const wsState = {
@@ -35,6 +36,7 @@ const wsState = {
 
 let SESSION        = {}
 let _eventsAttached = false
+onPrivateReset(() => {SESSION={};wsState.familySummaries=new Map();wsState.filter='';wsState.statusFilter='all'})
 
 /* ── Load ── */
 async function load() {

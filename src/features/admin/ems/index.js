@@ -27,6 +27,7 @@ import {
 } from '../../../shared.js'
 import { navigate } from '../../../router.js'
 import { dlog, dstack } from '../../../debuglog.js'
+import {onPrivateReset} from '../../../ui-authority.js'
 
 let SESSION         = {}
 let _eventsAttached = false
@@ -39,6 +40,8 @@ const emsState = {
   selectedMonth:    new Date().getMonth() + 1,
   selectedYear:     new Date().getFullYear(),
 }
+const initialEMS={...emsState}
+onPrivateReset(()=>{SESSION={};Object.assign(emsState,initialEMS)})
 
 /* ════════════════════════════════════════════════════════════════
    CLOCK-IN GATE

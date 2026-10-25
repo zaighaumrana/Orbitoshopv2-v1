@@ -25,9 +25,11 @@ import {
   _clearSession, confirmAction, showBlockingError, showToast,
 } from '../../shared.js'
 import { dlog, dstack } from '../../debuglog.js'
+import {onPrivateReset} from '../../ui-authority.js'
 
 let SESSION         = {}
 let _onProceed      = null   // callback after clock-in
+onPrivateReset(()=>{SESSION={};_onProceed=null})
 
 export async function checkClockIn(sess, cfg, onProceed) {
   dlog('EMS.checkClockIn', `ENTRY isAdmin=${sess.isAdmin} role=${sess.employee?.role} ems_enabled=${cfg.ems_enabled}`)

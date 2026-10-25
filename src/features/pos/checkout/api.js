@@ -29,7 +29,7 @@ import { dlog } from '../../../debuglog.js'
 export async function finalizeCheckout({
   cart, checkoutPayment, cashTendered, udharName, udharPhone, udharPaidNow,
   splitCash, splitDigital, splitMethod, splitCredit,
-  employeeName, requestId,
+  employeeName, requestId, taxRate = CFG.tax_rate,
 }) {
   dlog('checkout.finalizeCheckout', `ENTRY items=${cart.length} payment=${checkoutPayment}`)
   const isSplit = checkoutPayment === 'Split Payment'
@@ -37,7 +37,7 @@ export async function finalizeCheckout({
   const roundMoney = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100
   const subtotal = roundMoney(cart.reduce((s,i) => s + i.soldPrice * i.qty, 0))
   const discount = roundMoney(cart.reduce((s,i) => s + (i.originalPrice - i.soldPrice) * i.qty, 0))
-  const tax      = roundMoney(subtotal * (Number(CFG.tax_rate||0) / 100))
+  const tax      = roundMoney(subtotal * (Number(taxRate||0) / 100))
   const total    = roundMoney(subtotal + tax)
   const paidNow = isSplit
     ? roundMoney(Number(splitCash||0)+Number(splitDigital||0))

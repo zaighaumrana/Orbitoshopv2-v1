@@ -6,11 +6,11 @@ import assert from 'node:assert/strict';
 const {chromium}=await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE_PATH).href);
 const server=await createServer({configFile:false,envFile:false,root:process.cwd(),server:{host:'127.0.0.1',port:0},define:{'import.meta.env.VITE_SUPABASE_URL':JSON.stringify('https://synthetic.invalid'),'import.meta.env.VITE_SUPABASE_ANON':JSON.stringify('synthetic-public'),'import.meta.env.VITE_TURNSTILE_SITE_KEY':JSON.stringify('synthetic-site')},plugins:[{name:'entry-sdk',enforce:'pre',resolveId:id=>id==='@supabase/supabase-js'?'\0entry-sdk':null,load:id=>id==='\0entry-sdk'?'export const createClient=()=>window.fixtureSDK;':null}]});
 function fixture(){
- const q=new URL(location.href).searchParams,uid='97000000-0000-4000-8000-000000000001',sid='97000000-0000-4000-8000-000000000002';
+ const q=new URL(location.href).searchParams;let uid='97000000-0000-4000-8000-000000000001',sid='97000000-0000-4000-8000-000000000002';
  if(q.has('fixtureRole'))sessionStorage.setItem('fixtureRole',q.get('fixtureRole'));
  let role=sessionStorage.getItem('fixtureRole')||'Business Owner';
  if(q.has('fixtureAuth'))sessionStorage.setItem('fixtureAuth',q.get('fixtureAuth'));
- const session={user:{id:uid},access_token:'x.'+btoa(JSON.stringify({session_id:sid}))+'.x'};
+ let session={user:{id:uid},access_token:'x.'+btoa(JSON.stringify({session_id:sid}))+'.x'};
  const listeners=[],signed=()=>sessionStorage.getItem('fixtureAuth')!=='none';
  window.fixtureCalls=[];window.fixtureUncertain=sessionStorage.getItem('fixtureUncertain')!=='done';
  const originalFetch=window.fetch.bind(window);window.fetch=async(url,settings)=>{
@@ -19,6 +19,7 @@ function fixture(){
  };
  const config={shop_name:'Synthetic Shop',onboarding_version:2,onboarding_completed_at:'2026-10-01',suspended:q.get('fixtureSuspended')==='true',repair_module_enabled:true,inventory_module_enabled:true,technician_module_enabled:true,ems_enabled:false,currency:'PKR'};
  window.fixtureSetRole=value=>{role=value;sessionStorage.setItem('fixtureRole',value);for(const fn of listeners)fn('USER_UPDATED',session)};
+ window.fixtureReplaceActor=(nextUid,nextSid)=>{uid=nextUid;sid=nextSid;session={user:{id:uid},access_token:'x.'+btoa(JSON.stringify({session_id:sid}))+'.x'};sessionStorage.setItem('fixtureAuth','signed');for(const fn of listeners)fn('SIGNED_IN',session)};
  const query=table=>{const builder={select:()=>builder,eq:()=>builder,is:()=>builder,in:()=>builder,neq:()=>builder,gte:()=>builder,lte:()=>builder,not:()=>builder,order:()=>builder,limit:()=>builder,single:async()=>({data:table==='app_users'?{auth_user_id:uid,employee_id:role==='Manager'?1:null,email:'owner@example.test',display_name:'Synthetic User',role,status:'Active'}:{}}),then:fn=>Promise.resolve({data:[]}).then(fn)};return builder;};
  window.fixtureSDK={from:query,auth:{getUser:async()=>({data:{user:signed()?session.user:null}}),getSession:async()=>({data:{session:signed()?session:null}}),setSession:async()=>{sessionStorage.setItem('fixtureAuth','signed');for(const fn of listeners)fn('SIGNED_IN',session);return {}},onAuthStateChange:fn=>{listeners.push(fn);queueMicrotask(()=>fn('INITIAL_SESSION',signed()?session:null));return {data:{subscription:{unsubscribe(){}}}}},signOut:async()=>{sessionStorage.setItem('fixtureAuth','none');for(const fn of listeners)fn('SIGNED_OUT',null);return {}}},
  rpc:async(name)=>{window.fixtureCalls.push({rpc:name});if(name==='get_app_config'&&window.fixtureHoldConfig){window.fixtureHoldConfig=false;return new Promise(resolve=>window.fixtureReleaseConfig=()=>resolve({data:config}))}if(['get_public_shop_config','get_app_config'].includes(name))return {data:config};if(name==='get_legal_status')return {data:{published:false}};if(name==='support_ticket_actor_context')return {data:{auth_user_id:uid,session_id:sid,role,employee_id:role==='Manager'?1:null,source_id:'98000000-0000-4000-8000-000000000001',client_binding:'fixture-client',platform_client_id:42}};return {data:[]};},
@@ -52,5 +53,17 @@ try{
  await page.evaluate(()=>window.fixtureCaptcha['expired-callback']());await page.locator('#login-password').fill('SyntheticPassword');await page.locator('#login-password').press('Enter');assert.equal(await page.evaluate(()=>window.fixtureCalls.filter(c=>c.function==='login').length),1);
  await page.evaluate(()=>{window.fixtureLoginSuccess=true;window.fixtureCaptcha.callback()});await page.getByRole('button',{name:'Login',exact:true}).click();await page.waitForURL('**/admin/dashboard');assert.equal(await page.evaluate(()=>window.fixtureCalls.filter(c=>c.function==='login').length),2);
  await page.evaluate(()=>window.fixtureSetRole('Cashier'));await page.waitForURL('**/pos');assert.equal(await page.locator('select[data-action="admin-module"] option[value="customer-support"]').count(),0);
+ await page.locator('#custom-item-name').fill('Actor A private item');await page.locator('#custom-item-price').fill('100');await page.locator('[data-action="add-custom-item"]').click();
+ await page.evaluate(async()=>{const {getDraft}=await import('/src/features/pos/repairs/state.js');getDraft().components.push({name:'A private repair',price:50})});
+ await page.evaluate(async()=>{const {navigate}=await import('/src/router.js');navigate('/pos')});await page.getByText('Actor A private item',{exact:true}).waitFor();
+ assert.equal(await page.evaluate(async()=>(await import('/src/features/pos/repairs/state.js')).getDraft().components.length),1,'same-session draft survives route activation');
+ await page.evaluate(()=>window.fixtureReplaceActor('97000000-0000-4000-8000-000000000003','97000000-0000-4000-8000-000000000004'));
+ await page.locator('#custom-item-name').waitFor();await page.waitForFunction(()=>!document.querySelector('#app').textContent.includes('Actor A private item'));
+ assert.equal(await page.evaluate(async()=>(await import('/src/features/pos/repairs/state.js')).getDraft().components.length),0,'same-role actor reset clears repair draft');
+ await page.locator('#custom-item-name').fill('B native draft');await page.locator('#custom-item-price').fill('100');await page.locator('[data-action="add-custom-item"]').click();
+ await page.evaluate(()=>window.fixtureReplaceActor('97000000-0000-4000-8000-000000000003','97000000-0000-4000-8000-000000000005'));await page.waitForFunction(()=>!document.querySelector('#app').textContent.includes('B native draft'));
+ await page.locator('#custom-item-name').fill('Before logout private');await page.locator('#custom-item-price').fill('100');await page.locator('[data-action="add-custom-item"]').click();
+ await page.evaluate(()=>window.fixtureSDK.auth.signOut());await page.locator('#login-form').waitFor();
+ await page.evaluate(()=>window.fixtureReplaceActor('97000000-0000-4000-8000-000000000006','97000000-0000-4000-8000-000000000007'));await page.locator('#custom-item-name').waitFor();assert.ok(!(await page.locator('#app').textContent()).includes('Before logout private'));
  assert.deepEqual(errors,[]);assert.deepEqual(external,[]);console.log('PASS: real Shop entry/router refresh, Owner/Manager Support, denied Cashier/Technician/Support, suspension, query Back/Forward, uncertain-request reload, semantic Enter/inflight single submission; no page errors or external traffic.');
 }finally{await browser?.close();await server.close();}

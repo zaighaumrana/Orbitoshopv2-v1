@@ -26,6 +26,7 @@ import {
 } from '../features/repairs/api.js'
 import { findRepairFamilies, groupRepairFamilies, matchedRepairChild } from '../features/repairs/family.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
+import {onPrivateReset} from '../ui-authority.js'
 import { reportsPage } from './pages/reports.js'
 import { billingUsagePage } from './pages/billing-usage.js'
 import { createPlatformBridge } from '../platform/bridge.js'
@@ -78,6 +79,14 @@ let _inv = null  // populated via dynamic import only when inventory_module_enab
 let adminNavigationIsCurrent = () => true
 let adminLoadGeneration = 0
 let restoreScroll = null
+const initialAdminState={...adminState}
+onPrivateReset(() => {
+  adminLoadGeneration++;adminNavigationIsCurrent=()=>false;SESSION={}
+  for(const key of Object.keys(adminState))delete adminState[key]
+  Object.assign(adminState,initialAdminState)
+  billingResult=null;legalStatus=null;paperObservation={};paperActor=null;resupplyBusy=false;restoreScroll=null
+  customerSupport.reset()
+})
 const saveNavigation = () => {
   if(adminNavigationIsCurrent() && state.role===SESSION.employee?.role)saveAdminView(history,location,SESSION,adminState,window.scrollY)
 }
