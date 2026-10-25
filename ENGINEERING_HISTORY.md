@@ -1065,3 +1065,21 @@ current tab/filter, one leave write/refresh, duplicate payroll submission, pendi
 revisit and late-result suppression pass. Synthetic I/O is explicitly not hosted
 payroll acceptance. No backend/release/DB/Platform source/provider change or deployment.
 Independent review remains NOT REVIEWED.
+
+## 2026-10-25 — M1 consistent persistent event ownership
+Branch: feature/shop-modernization-m1
+
+All remaining synchronous Admin/POS/Workshop input/change/keydown delegates now use
+the same current route/native-session/module predicate as async click/submit work.
+Inactive modules cannot consume shared selectors or keyboard input. The existing
+single shared PIN keyboard owner is retained; route/authority changes cancel stale
+PIN callbacks. Native form prevention still occurs synchronously in owned delegates.
+No stopPropagation patches, permission expansion or transaction changes are added.
+
+Focused EMS/loader/checkout regressions pass7/7. Actual entry browser passes recovery,
+role/history/privacy/read cases and100 transitions with stable app/document listener
+counts. The final Enter case initially used an additional-work selector rather than
+the current intake selector; corrected to the actual intake/tag controls. Integrated
+candidate verification additionally checks input/change/Enter/PIN. Prior failed
+runs remain. No backend/release/DB/Platform/provider changes or deployment. Independent
+review NOT REVIEWED; this is implementation-author validation only.

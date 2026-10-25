@@ -1588,6 +1588,8 @@ function attachEvents() {
 
   /* ── Input ── */
   app.addEventListener('input', e => {
+    if(!ownsPOS())return
+
     const t = e.target
     rememberAdditionalWorkInput(t, state.modal)
     if (t.dataset.cashTendered !== undefined) {
@@ -1629,6 +1631,8 @@ function attachEvents() {
 
   /* ── Enter key submits quick-add inputs that aren't inside a <form> ── */
   app.addEventListener('keydown', e => {
+    if(!ownsPOS())return
+
     if (e.key !== 'Enter') return
     const map = {
       'tag-custom-text':  'confirm-custom-tag',
@@ -1644,6 +1648,8 @@ function attachEvents() {
 
   /* ── Change ── */
   app.addEventListener('change', e => {
+    if(!ownsPOS())return
+
     const t = e.target
     if (t.dataset.action === 'payment') {
       posState.checkoutPayment = t.value; posState.cashTendered = 0; render(); return

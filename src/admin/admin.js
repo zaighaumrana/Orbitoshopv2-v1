@@ -709,6 +709,8 @@ function attachEvents() {
   dlog('ADMIN.attachEvents', 'listeners attached to #app (click + submit)')
 
   app.addEventListener('input',e=>{
+    if(!ownsAdmin())return
+
     const field=e.target.dataset.supportField
     if(window.location.pathname==='/admin/customer-support' && ['subject','category','message'].includes(field) && !customerSupport.view.pending)customerSupport.view.draft[field]=e.target.value
   })
@@ -1298,6 +1300,8 @@ function attachEvents() {
 
   // Input
   app.addEventListener('input', e => {
+    if(!ownsAdmin())return
+
     const t = e.target
     rememberAdditionalWorkInput(t, state.modal)
     if (t.dataset.filter !== undefined) { adminState.filter = t.value; render() }
@@ -1324,6 +1328,8 @@ function attachEvents() {
 
   // Enter key submits quick-add inputs that aren't inside a <form>
   app.addEventListener('keydown', e => {
+    if(!ownsAdmin())return
+
     if (e.key !== 'Enter') return
     if (e.target.id?.startsWith('qprice-input-')) {
       e.preventDefault()

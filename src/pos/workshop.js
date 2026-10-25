@@ -753,6 +753,8 @@ function attachEvents() {
   
   /* ── Input — live total update ── */
   app.addEventListener('input', e => {
+    if(!ownsWorkshop())return
+
     const t = e.target
     rememberAdditionalWorkInput(t, state.modal)
     if (t.dataset.wsFilter !== undefined) {
@@ -765,6 +767,8 @@ function attachEvents() {
 
   /* ── Keyboard ── */
   document.addEventListener('keydown', e => {
+    if(!ownsWorkshop())return
+
     if (window.location.pathname !== '/workshop' || !can('workshop', state.role)) return
     if (e.key === 'Enter') {
       const map = {
