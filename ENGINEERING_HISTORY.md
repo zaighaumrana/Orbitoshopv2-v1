@@ -1131,3 +1131,20 @@ actual entry/100-navigation/PIN, two-target builds, explicit BYO verify-dist and
 canonical support-v6 parity all passed. Final unit rerun and source-equivalence proof
 are archived at the next exact commit; no historical test is promoted without that
 proof. No hosted operation, backend/release, Platform or provider change occurred.
+
+## 2026-10-25 — M1 post-ACK refresh ownership correction
+Branch: feature/shop-modernization-m1
+
+Final audit preparation found a second await after successful repair creation/payment:
+the following resource reload also requires ownership before opening a receipt or
+showing remaining balance. Both continuations now recheck original authority/view
+and detach their original outcome when replaced. A successful payment with an
+unavailable current ticket read reports acknowledged payment plus unknown balance,
+never a fallback historical amount. Mixed retail carts require every applicable
+catalog resource, rather than selecting only the first type.
+
+An actual-function test exercises both repair and payment ACK→delayed reload→A/B
+replacement and proves no replacement-account modal/notice while the original
+actor/outcome remains retained. Final current-source validation is recorded in a
+new run; earlier successful runs remain associated with their exact prior source.
+No backend/release/DB/Platform/provider change or deployment.

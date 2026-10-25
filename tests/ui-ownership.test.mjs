@@ -60,3 +60,17 @@ test('read failures retain unknown truth and a partial Workshop family never bec
  const f=loaderFixture('pos/workshop.js');f.ctx.failChildren=true;const pending=f.ctx.load();await tick();f.pending[0].resolve({data:[{id:7}]});await pending
  assert.equal(f.state.data.tickets,null);assert.equal(f.state.resources.tickets.status,'incomplete');assert.equal(f.summaries.length,0)
 })
+
+test('actual repair/payment ACK followed by a delayed reload cannot publish into a replacement account',async()=>{
+ const source=readFileSync(new URL('../src/pos/pos.js',import.meta.url),'utf8'),node=parseAst(source).body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='placeOrderOnce')
+ for(const isNewTicket of [true,false]){
+  let epoch=1,notices=0;const reload=deferred(),operations=new Map()
+  const ticket={isTicket:true,isNewTicket,requestId:'original-repair',ticketId:7,topupAmount:10,topupMethod:'Cash'}
+  const ctx=vm.createContext({SESSION:{authUserId:'A'},posState:{cart:[ticket]},state:{modal:null,data:{tickets:[{id:7}]}},cartOperations:operations,
+   captureView:()=>{const e=epoch;return ()=>e===epoch},structuredClone,dlog(){},insertNewTicketFromCart:async()=>({ok:true,data:{id:7}}),collectTicketPayment:async()=>({ok:true,data:{}}),
+   load:()=>reload.promise,render(){notices++},showTransactionSuccess(){notices++},showBlockingError(){notices++},resourceReady,combinedBalance:()=>({total:0}),money:String})
+  vm.runInContext(source.slice(node.start,node.end)+';globalThis.place=placeOrderOnce',ctx)
+  const pending=ctx.place();await tick();epoch=2;ctx.posState={cart:[]};ctx.SESSION={authUserId:'B'};ctx.state.data={tickets:[]};reload.resolve();await pending
+  assert.equal(ctx.state.modal,null);assert.equal(notices,0);assert.equal(operations.get('original-repair').actor,'A');assert.equal(operations.get('original-repair').detached,true)
+ }
+})

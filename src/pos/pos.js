@@ -946,6 +946,7 @@ async function placeOrderOnce() {
     posState.cartTicketId = null
     posState.cartIsNewTicket = false
     await load()
+    if(!current()||posState!==ownerState){operation.detached=true;return}
     dlog('POS.placeOrder', 'load() returned -- setting state.modal=receipt and calling render() explicitly')
     state.modal = { type:'receipt', isTicketSlip:true, ticket: res.data }
     render()
@@ -970,6 +971,8 @@ async function placeOrderOnce() {
   posState.cartTicketId = null
   posState.cartIsNewTicket = false
   await load()
+  if(!current()||posState!==ownerState){operation.detached=true;return}
+  if(!resourceReady(state.resources,'tickets')){showTransactionSuccess('Payment acknowledged. Current balance is unavailable; retry reads before another collection.');return}
   const leftoverBalance = combinedBalance(state.data.tickets.find(t=>t.id===ticketId)||ticket).total
   showTransactionSuccess(`Payment of ${money(payAmount)} recorded. Remaining balance: ${money(leftoverBalance)}`)
 }
@@ -977,8 +980,8 @@ async function placeOrderOnce() {
 
 /* ── Standard checkout (retail items, no ticket in cart) ── */
 async function doCheckout() {
-  const required=posState.cart.some(i=>i.isInventory)?'inventory':posState.cart.some(i=>i.isQuick)?'quickItems':null
-  if(required&&!resourceReady(state.resources,required)){showBlockingError('Required catalog data is unavailable. Retry reads before checkout.');return}
+  const required=[...(posState.cart.some(i=>i.isInventory)?['inventory']:[]),...(posState.cart.some(i=>i.isQuick)?['quickItems']:[])]
+  if(!resourceReady(state.resources,...required)){showBlockingError('Required catalog data is unavailable. Retry reads before checkout.');return}
   if (checkoutInFlight || !posState.cart.length) return
   const isSplit = posState.checkoutPayment === 'Split Payment'
   const isUdhar = posState.checkoutPayment === 'Udhar (Credit)' || (isSplit && Number(posState.splitCredit||0)>0)
