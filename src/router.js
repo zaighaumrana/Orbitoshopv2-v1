@@ -8,6 +8,8 @@ import { dlog, dstack, callerInfo } from './debuglog.js'
 
 const routes = new Map()
 let notFoundHandler = null
+let routeErrorHandler=null
+export function registerRouteError(handler){routeErrorHandler=handler}
 let currentPath = null
 let currentURL = null
 let navigationGeneration = 0
@@ -16,6 +18,7 @@ export function captureNavigation(){const generation=navigationGeneration;return
 export function clearRoutes() {
   routes.clear()
   notFoundHandler = null
+  routeErrorHandler=null
   currentPath = null
   currentURL = null
   navigationGeneration++
@@ -49,8 +52,7 @@ export function navigate(path, options = {}) {
   if (target === currentURL && !options.force) {
     // Already here — just re-resolve (e.g. query string changed)
     dlog('router.navigate', `SAME-PATH re-resolve pathname=${pathname}`)
-    resolve(pathname, url.search)
-    return
+    return resolve(pathname, url.search)
   }
 
   if (options.replace) {
@@ -60,7 +62,7 @@ export function navigate(path, options = {}) {
     dlog('router.navigate', `history.pushState -> ${path}`)
     history.pushState({}, '', target)
   }
-  resolve(pathname, url.search)
+  return resolve(pathname, url.search)
 }
 
 /**
@@ -98,7 +100,7 @@ function parseQuery(search) {
   return out
 }
 
-function resolve(pathname, search = '') {
+async function resolve(pathname, search = '') {
   dlog('router.resolve', `ENTRY pathname=${pathname} caller=[${callerInfo()}]`)
   currentPath = pathname
   currentURL = pathname + search
@@ -107,15 +109,21 @@ function resolve(pathname, search = '') {
   const match = matchRoute(pathname)
   const query = parseQuery(search)
 
-  if (match) {
-    dlog('router.resolve', `MATCHED route -> handler invoked (unawaited)`)
-    match.handler(match.params, query, { isCurrent: () => generation === navigationGeneration })
+  const navigation={isCurrent:()=>generation===navigationGeneration}
+  try { if (match) {
+    dlog('router.resolve', `MATCHED route -> owned handler`)
+    await match.handler(match.params, query, navigation)
   } else if (notFoundHandler) {
     dlog('router.resolve', `NOT-FOUND -> calling notFoundHandler`)
-    notFoundHandler(pathname)
+    await notFoundHandler(pathname)
   } else {
     dlog('router.resolve', `NOT-FOUND and no notFoundHandler registered`)
     console.warn('No route matched:', pathname)
+  }}catch(error){
+    if(navigation.isCurrent()){
+      if(routeErrorHandler)routeErrorHandler(error,navigation)
+      else console.warn('Shop view unavailable.')
+    }
   }
 }
 

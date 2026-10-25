@@ -1026,3 +1026,24 @@ partial-family rejection. Existing browser fixture now contains denied report,
 optional catalog and partial-child oracles; final-candidate execution is recorded
 in integrated evidence. No backend/function/migration/release/DB/Platform/provider
 change or deployment. Independent review NOT REVIEWED.
+
+## 2026-10-25 — M1 owned route recovery and failed-chunk retry
+Branch: feature/shop-modernization-m1
+
+Router now awaits route handlers and catches import/initializer failures only for
+the current activation. Operational initializers are awaited. Current-session
+recovery provides Retry loading, Return home and Sign out through existing gates;
+retry does not submit a business command or clear same-session cart/operation memory.
+A failed module fetch is browser-cached: the focused real browser exposed that a
+plain repeated import never recovered. The loader now permits a cache-busted retry
+only for the exact same-origin operational module URL, then retains its successful
+namespace. Customer input cannot choose a module host/path. Init failure reuses the
+already-loaded namespace. No automatic page reload destroys unresolved context.
+
+Actual entry browser confirms route/role/privacy and denied/optional/partial read
+cases, then successfully recovers the deliberately503 module after transport is
+restored. The follow-on synthetic initializer test initially referenced the known
+failed original URL; its fixture now uses the actual recovered namespace. All
+failed logs are retained. Integrated final source will run the complete sequence.
+No backend/release/DB/Platform/provider change or deployment. Independent review
+remains NOT REVIEWED.

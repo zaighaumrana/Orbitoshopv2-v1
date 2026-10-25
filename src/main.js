@@ -1,12 +1,16 @@
 import { sb, loadConfig, applyBranding, loadCurrentSession, _clearSession, resetClientEntitlements, state, CFG, can } from './shared.js'
 import { renderLogin } from './auth.js'
-import { registerRoute, registerNotFound, startRouter, navigate, clearRoutes } from './router.js'
+import { registerRoute, registerNotFound, registerRouteError, startRouter, navigate, clearRoutes } from './router.js'
 import { dlog } from './debuglog.js'
 import { needsOnboarding } from './onboarding-state.js'
 import { ensureOwnerAcceptance } from './legal/acceptance.js'
 import { takeSupportHandoff, startSupportHandoff } from './support-handoff.js'
 import {RECOVERY_KEY} from './platform/support-recovery.js'
 import {invalidateUIAuthority} from './ui-authority.js'
+import {routeModule} from './route-module.js'
+const loadPOS=routeModule(()=>import('./pos/pos.js'),'pos')
+const loadWorkshop=routeModule(()=>import('./pos/workshop.js'),'workshop')
+const loadAdmin=routeModule(()=>import('./admin/admin.js'),'admin')
 
 let supportHandoff=takeSupportHandoff(location,history)
 
@@ -79,6 +83,15 @@ function setupRoutes(session) {
   const generation = applicationGeneration
   const role = canonicalRole(session)
   state.role = role
+  registerRouteError((_error,navigation)=>{
+    if(!navigation.isCurrent()||generation!==applicationGeneration||state.role!==role)return
+    const path=location.pathname+location.search
+    document.getElementById('app').innerHTML='<main class="card" style="max-width:520px;margin:8vh auto;padding:28px" role="alert"><h1>Shop view unavailable</h1><p>This screen could not be loaded completely. Your current draft and original pending operations remain owned by your session. Retry loading data; no transaction is repeated.</p><button id="route-retry" class="primary-button">Retry loading</button><button id="route-return" class="secondary-button">Return home</button><button id="route-signout" class="secondary-button">Sign out</button></main>'
+    const current=()=>navigation.isCurrent()&&generation===applicationGeneration&&state.role===role
+    document.getElementById('route-retry').onclick=()=>{if(current())void navigate(path,{replace:true})}
+    document.getElementById('route-return').onclick=()=>{if(current())routeForRole(role,true)}
+    document.getElementById('route-signout').onclick=()=>{if(current())void _clearSession()}
+  })
   registerRoute('/login', () => renderLogin(onLoginSuccess))
 
   registerRoute('/pos', async (_params, _query, navigation) => {
@@ -86,7 +99,7 @@ function setupRoutes(session) {
     if (!can('pos', role)) return routeForRole(role, true)
     state.modal = null
     document.getElementById('app').textContent = 'Loading…'
-    const { initPOS } = await import('./pos/pos.js')
+    const { initPOS } = await loadPOS()
     if (!navigation.isCurrent() || generation !== applicationGeneration || state.role !== role || window.location.pathname !== '/pos') return
     await initPOS(session,navigation.isCurrent)
   })
@@ -96,7 +109,7 @@ function setupRoutes(session) {
     if (!can('workshop', role)) return routeForRole(role, true)
     state.modal = null
     document.getElementById('app').textContent = 'Loading…'
-    const { initWorkshop } = await import('./pos/workshop.js')
+    const { initWorkshop } = await loadWorkshop()
     if (!navigation.isCurrent() || generation !== applicationGeneration || state.role !== role || window.location.pathname !== '/workshop') return
     await initWorkshop(session,navigation.isCurrent)
   })
@@ -110,7 +123,7 @@ function setupRoutes(session) {
       if (!can(mod, role)) return routeForRole(role, true)
       state.modal = null
       document.getElementById('app').textContent = 'Loading…'
-      const { initAdmin } = await import('./admin/admin.js')
+      const { initAdmin } = await loadAdmin()
       if (!navigation.isCurrent() || generation !== applicationGeneration || state.role !== role || window.location.pathname !== `/admin/${mod}`) return
       await initAdmin(session, mod, query, navigation.isCurrent)
     })
