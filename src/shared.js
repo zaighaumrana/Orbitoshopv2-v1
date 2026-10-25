@@ -52,6 +52,7 @@ export const state = {
   modal:         null,
   installPrompt: null,
   data:          { tickets:[], sales:[], employees:[], udharAccounts:[], financial:{}, shiftFinancial:{}, returns:[], inventory:[], quickItems:[], repairComponents:[] },
+  resources: {},
 }
 
 /* ── Global editable-control focus persistence ──
@@ -254,13 +255,13 @@ export async function loadConfig(publicOnly = false) {
 
 export async function loadQuickItems() {
   const { data, error } = await sb.from('quick_items').select('*').order('sort_order')
-  if (error) { console.warn('Quick items load failed:', error.message); return [] }
+  if (error) throw Error('Quick items unavailable. Retry reads before using the catalog.')
   return data || []
 }
 
 export async function loadRepairComponents() {
   const { data, error } = await sb.from('repair_components').select('*').order('sort_order')
-  if (error) { console.warn('Repair components load failed:', error.message); return [] }
+  if (error) throw Error('Repair components unavailable. Retry reads before using the catalog.')
   return data || []
 }
 
@@ -1074,6 +1075,7 @@ onPrivateReset(() => {
   sessionLoadGeneration++
   state.data = {tickets:[],sales:[],employees:[],udharAccounts:[],financial:{},shiftFinancial:{},returns:[],inventory:[],quickItems:[],repairComponents:[]}
   state.filter = ''
+  state.resources={}
   resetClientEntitlements()
   cancelPinPrompt(null)
   if (activeAppDialog) { activeAppDialog.busy=false;closeAppDialog(activeAppDialog,null) }

@@ -1,4 +1,5 @@
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
+import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
 import { createSupportClient } from '../platform/support.js'
 import { supportPage } from './pages/support.js'
 import {readAdminView,saveAdminView,safeAdminState} from './navigation-state.js'
@@ -104,8 +105,9 @@ async function load() {
   const navigationIsCurrent=adminNavigationIsCurrent
   const current = () => view() && generation === adminLoadGeneration && navigationIsCurrent() && SESSION === loadSession && state.role === loadSession.employee?.role && window.location.pathname === loadPath
   dlog('ADMIN.load', `ENTRY adminModule=${adminState.adminModule}`)
-  await loadConfig()
+  const configReady=await loadConfig()
   if (!current() || !window.location.pathname.startsWith('/admin')) return
+  if(!configReady){state.resources={config:{status:'unavailable'}};render();return}
   if (!can(adminState.adminModule, state.role)) {
     state.modal = null
     adminState.adminModule = 'dashboard'
@@ -131,7 +133,7 @@ async function load() {
     catch { result = null }
     if (!current()) return
     if(result){billingResult=result;paperObservation={checkedAt:new Date().toISOString(),accepted:paperObservation.accepted&&!result.paper_requests?.some(r=>r.request_id===paperObservation.accepted)?paperObservation.accepted:null}}
-    else paperObservation={...paperObservation,error:true}
+    else {billingResult=null;paperObservation={...paperObservation,error:true}}
   }
   if (mod === 'customer-support' && can(mod, state.role)) {
     try { await customerSupport.list(customerSupport.view.offset) } catch(error) { if(current())customerSupport.view.error=error.message }
@@ -155,6 +157,7 @@ async function load() {
   const skip = { data: [] }
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
   const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
+  state.resources=Object.fromEntries(Object.entries(needs).filter(([,needed])=>needed).map(([k])=>[k,{status:'loading'}]));render()
   const [tickets, sales, employees, udharAccounts, financial, financialToday, returns_, inv, quickItems, repairComponents] = await Promise.all([
     needs.tickets ? sb.from('tickets').select('*').order('id', { ascending: false }) : skip,
     needs.sales ? sb.from('sales').select('*').order('id', { ascending: false }) : skip,
@@ -170,20 +173,10 @@ async function load() {
     needs.inventory ? sb.from('inventory').select('*').order('name') : skip,
     needs.quickItems ? sb.from('quick_items').select('*').order('sort_order') : skip,
     needs.repairComponents ? sb.from('repair_components').select('*').order('sort_order') : skip,
-  ])
+  ].map(settleRead))
   if (!current()) return
-  state.data = {
-    tickets:          tickets.data          || [],
-    sales:            sales.data            || [],
-    employees:        employees.data        || [],
-    udharAccounts:    udharAccounts.data    || [],
-    financial:        financial.data        || {},
-    financialToday:   financialToday.data   || {},
-    returns:          returns_.data         || [],
-    inventory:        inv.data              || [],
-    quickItems:       quickItems.data       || [],
-    repairComponents: repairComponents.data || [],
-  }
+  const reads=readStates({tickets,sales,employees,udharAccounts,financial,financialToday,returns:returns_,inventory:inv,quickItems,repairComponents},['financial','financialToday'])
+  state.data=reads.values;state.resources=reads.resources
   applyBranding()
   dlog('ADMIN.load', `DATA READY (queries resolved) adminModule=${adminState.adminModule}`)
 
@@ -278,6 +271,8 @@ function render() {
 }
 
 function pageContent() {
+  const failed=Object.entries(state.resources||{}).filter(([,r])=>r.status!=='ready'&&r.status!=='disabled')
+  if(failed.length)return adminShell(resourceNotice('Current '+adminState.adminModule+' data',failed.some(([,r])=>r.status==='loading')?'loading':'unavailable'))
   if (adminState.adminModule === 'customer-support') return adminShell(supportPage(customerSupport.view,SESSION.employee?.role==='Business Owner'))
   if (adminState.adminModule === 'billing-usage') return adminShell(billingUsagePage(billingResult, resupplyBusy, Date.now(), paperObservation))
   const pages = { dashboard, repairs, inventory, catalog, reports, employees, receipts, settings }
@@ -579,6 +574,7 @@ function renderModal() {
   if (!state.modal) return ''
   if (!modalEntitled(state.modal.type)) { state.modal = null; return '' }
   const { type, id } = state.modal
+  if(!['myAccount','pinPrompt'].includes(type)&&Object.values(state.resources||{}).some(r=>r.status!=='ready'&&r.status!=='disabled'))return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Required detail')}<button type="button" data-close>Close</button></div></div>`
 
   if (type === 'pinPrompt') return `<div class="modal-backdrop">${pinPromptHTML(state.modal.purpose)}</div>`
 
@@ -716,6 +712,7 @@ function attachEvents() {
   })
   // Click delegation
   listenOwned(app,'click',ownsAdmin,async (e,eventCurrent)=>{
+    if(e.target.closest('[data-action="retry-resources"]')){await load();return}
     if (!can(adminState.adminModule, state.role) || !modalEntitled(state.modal?.type)) return
     // Route guard: this listener is permanently attached to #app for the
     // rest of the session once /admin has been visited once, even after

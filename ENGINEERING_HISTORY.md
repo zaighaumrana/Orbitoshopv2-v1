@@ -1004,3 +1004,25 @@ pre-existing Admin shell/page duplicate headings; the fixture now selects the fi
 current heading. No styling redesign is included. Initial failures and editing-aid
 provenance remain in permanent M1 evidence. No backend/release/DB/Platform source or
 provider setting changes. Local source verification is not independent audit.
+
+## 2026-10-25 — M1 truthful failed and incomplete reads
+Branch: feature/shop-modernization-m1
+
+POS/Admin/Workshop now settle thrown and ordinary Supabase error results into
+explicit loading/ready/unavailable states. Failed required values remain null;
+Admin suppresses unverifiable reports/history instead of presenting zero/empty
+success. Workshop rejects partial root/child queues before summaries or actions.
+Child-detail helpers throw on failed reads. EMS validates its required resources.
+Configuration read failure is a fail-closed screen. Read retries perform no command.
+
+POS scopes optional failure: unavailable quick items/inventory/repair/credit/shift
+resources have notices, and dependent actions cannot use those missing inputs.
+Safe custom-item work remains available under optional catalog failure. Existing
+working drafts and original command outcomes are retained; no transaction retry is
+inferred from a failed read. No new pagination/read API or M2 redesign is introduced.
+
+Focused actual-loader/read/checkout tests pass6/6, including reversed results and
+partial-family rejection. Existing browser fixture now contains denied report,
+optional catalog and partial-child oracles; final-candidate execution is recorded
+in integrated evidence. No backend/function/migration/release/DB/Platform/provider
+change or deployment. Independent review NOT REVIEWED.

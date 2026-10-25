@@ -28,6 +28,8 @@ import {
 import { navigate } from '../../../router.js'
 import { dlog, dstack } from '../../../debuglog.js'
 import {onPrivateReset} from '../../../ui-authority.js'
+import {settleRead,readStates} from '../../../read-state.js'
+import {captureView,ViewExpired} from '../../../ui-lifecycle.js'
 
 let SESSION         = {}
 let _eventsAttached = false
@@ -50,6 +52,7 @@ onPrivateReset(()=>{SESSION={};Object.assign(emsState,initialEMS)})
    If not needed it calls onProceed() immediately.
 ════════════════════════════════════════════════════════════════ */
 export async function loadEMSData() {
+  const current=captureView()
   const today = new Date().toISOString().slice(0, 10)
   const [employees, attendance, leaves, salaryConfigs, slips] = await Promise.all([
     sb.from('employees').select('id, name, role, status, email').order('name'),
@@ -59,13 +62,17 @@ export async function loadEMSData() {
       .order('created_at', { ascending: false }),
     sb.from('salary_config').select('*, employees(name, role)'),
     sb.from('salary_slips').select('*, employees(name)').order('year', { ascending: false }).order('month', { ascending: false }),
-  ])
+  ].map(settleRead))
+  if(!current())throw new ViewExpired()
 
   // Who is live clocked in right now
-  const { data: liveNow } = await sb.from('attendance')
+  const live = await settleRead(sb.from('attendance')
     .select('*, employees(name, role)')
     .eq('date', today)
-    .is('clock_out', null)
+    .is('clock_out', null))
+  if(!current())throw new ViewExpired()
+  const reads=readStates({employees,attendance,leaves,salaryConfigs,slips,liveNow:live})
+  if(Object.values(reads.resources).some(r=>r.status!=='ready'))throw Error('EMS data unavailable. Retry reads; no empty history or payroll result is implied.')
 
   return {
     employees:     employees.data    || [],
@@ -73,7 +80,7 @@ export async function loadEMSData() {
     leaves:        leaves.data       || [],
     salaryConfigs: salaryConfigs.data|| [],
     slips:         slips.data        || [],
-    liveNow:       liveNow           || [],
+    liveNow:       live.data,
   }
 }
 

@@ -1,4 +1,5 @@
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
+import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
 import { escapeHTML, safeImageURL } from "../html.js"
 import { createSubInvoiceModalHTML, rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 /* ═══════════════════════════════════════════════════════════════════
@@ -87,8 +88,9 @@ async function load() {
   const current=()=>generation===posLoadGeneration&&view()&&navigation()
   const loadSession = SESSION
   dlog('POS.load', 'ENTRY')
-  await loadConfig()
+  const configReady=await loadConfig()
   if(!current())return
+  if(!configReady){state.resources={config:{status:'unavailable'}};render();return}
   if (window.location.pathname !== '/pos' || state.role !== SESSION.employee?.role) return
   if (!CFG.repair_module_enabled) posState.cart = posState.cart.filter(item => !item.isTicket)
   if (!CFG.inventory_module_enabled) posState.cart = posState.cart.filter(item => !item.isInventory)
@@ -101,6 +103,8 @@ async function load() {
     : Promise.resolve({ data: [] })
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
   const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
+  state.resources=Object.fromEntries(['tickets','sales','udharAccounts','shiftFinancial','returns','inventory','quickItems','repairComponents'].map(k=>[k,{status:'loading'}]))
+  render()
   const [tickets, sales, udharAccounts, shiftFinancial, returns_, inv, quickItems, repairComponents] = await Promise.all([
     CFG.repair_module_enabled ? sb.from('tickets').select('*').order('id', { ascending: false }) : { data:[] },
     sb.from('sales').select('*').order('id', { ascending: false }),
@@ -112,19 +116,10 @@ async function load() {
     fetchInv,
     sb.from('quick_items').select('*').order('sort_order'),
     CFG.repair_module_enabled ? sb.from('repair_components').select('*').order('sort_order') : { data:[] },
-  ])
+  ].map(settleRead))
   if (!current() || SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== '/pos') return
-  state.data = {
-    tickets:          tickets.data          || [],
-    sales:            sales.data            || [],
-    employees:        [],
-    udharAccounts:    udharAccounts.data    || [],
-    shiftFinancial:   shiftFinancial.data   || {},
-    returns:          returns_.data         || [],
-    inventory:        inv.data              || [],
-    quickItems:       quickItems.data       || [],
-    repairComponents: repairComponents.data || [],
-  }
+  const reads=readStates({tickets,sales,udharAccounts,shiftFinancial,returns:returns_,inventory:inv,quickItems,repairComponents},['shiftFinancial'])
+  state.data={...reads.values,employees:[]};state.resources=reads.resources
   applyBranding()
   dlog('POS.load', 'DATA READY (queries resolved) -- calling render()')
   render()
@@ -133,7 +128,7 @@ async function load() {
   const handoffId = sessionStorage.getItem('retailos_collect_ticket')
   if (handoffId) {
     sessionStorage.removeItem('retailos_collect_ticket')
-    const found = state.data.tickets.find(t => String(t.id) === String(handoffId))
+    const found = state.data.tickets?.find(t => String(t.id) === String(handoffId))
     if (found) openCollectTicket(found)
   }
 }
@@ -206,6 +201,7 @@ function render() {
 
 /* ── POS View ── */
 function posView() {
+  if(!resourceReady(state.resources,'config'))return resourceNotice('Shop configuration')
   const tenant   = currentTenant()
   const subtotal = posState.cart.reduce((s,i) => s + i.soldPrice * i.qty, 0)
   const disc     = posState.cart.reduce((s,i) => s + (i.originalPrice - i.soldPrice) * i.qty, 0)
@@ -224,7 +220,7 @@ function posView() {
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <button class="secondary-button" data-action="shift-stats">📋 Shift Stats</button>
-        ${CFG.repair_module_enabled ? `
+        ${CFG.repair_module_enabled && resourceReady(state.resources,'tickets','repairComponents') ? `
           <button class="primary-button" data-modal="repair">+ New Ticket</button>
           <button class="secondary-button" data-action="open-repair-collection">🔧 Repairs</button>` : ''}
           <button class="secondary-button" data-action="open-return">↩ Return</button>
@@ -234,7 +230,7 @@ function posView() {
     <div class="grid pos-layout">
       <div class="grid" style="align-content:start;gap:12px">
         ${quickItemsPanel()}
-        ${CFG.inventory_module_enabled && _inv ? _inv.inventoryPanel(posState) : ''}
+        ${CFG.inventory_module_enabled && _inv ? resourceReady(state.resources,'inventory')?_inv.inventoryPanel(posState):resourceNotice('Inventory',state.resources.inventory.status) : ''}
         ${recentRepairPanel()}
       </div>
       <aside class="card cart">
@@ -335,6 +331,7 @@ function posView() {
 }
 
 function quickItemsPanel() {
+  if(!resourceReady(state.resources,'quickItems'))return resourceNotice('Quick items',state.resources.quickItems.status)+`<div class="card"><h2>Custom Item</h2>${customItemEntry()}</div>`
   if (!(state.data.quickItems||[]).length) return `
     <div class="card">
       <h2 style="margin-bottom:12px">Custom Item</h2>
@@ -372,6 +369,7 @@ function customItemEntry() {
 
 /* Main screen — only 3 most recent PENDING (balance_due > 0) tickets */
 function recentRepairPanel() {
+  if(!resourceReady(state.resources,'tickets'))return resourceNotice('Repairs',state.resources.tickets.status)
   if (!CFG.repair_module_enabled) return `
     <div class="card"><h2>Quick Sale</h2>
       <p class="muted" style="font-size:13px">Add items using the cart panel.</p>
@@ -426,6 +424,7 @@ function _addComponentToDraft(name, tag, customText) {
 
 /* ── Shift stats ── */
 function buildShiftStats() {
+  if(!resourceReady(state.resources,'shiftFinancial','sales','tickets'))return resourceNotice('Shift statistics')
   const tenant    = currentTenant()
   const todayStr  = new Date().toISOString().slice(0,10)
   const empName   = SESSION.employee?.name || ''
@@ -582,6 +581,8 @@ function renderModal() {
   if (!state.modal) return ''
   if (!modalEntitled(state.modal.type)) { state.modal = null; return '' }
   const { type } = state.modal
+  const required=type==='udharList'?['udharAccounts']:type==='repair-collection'?['tickets']:['repair','create-sub-invoice','edit-components'].includes(type)?['tickets','repairComponents']:[]
+  if(!resourceReady(state.resources,...required))return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Required detail')}<button type="button" data-close>Close</button></div></div>`
 
   if (type === 'leave-request') return leaveRequestHTML()
 
@@ -914,6 +915,7 @@ function refreshRetailReturnPreview() {
 
 /* ── Place Order: lock the ticket, create the invoice ── */
 async function placeOrder() {
+  if(!resourceReady(state.resources,'tickets','repairComponents')){showBlockingError('Repair data is unavailable. Retry reads before placing an order.');return}
   const current=captureAuthority(),ownerState=posState
   if (placingOrder) return
   placingOrder = true
@@ -975,6 +977,8 @@ async function placeOrderOnce() {
 
 /* ── Standard checkout (retail items, no ticket in cart) ── */
 async function doCheckout() {
+  const required=posState.cart.some(i=>i.isInventory)?'inventory':posState.cart.some(i=>i.isQuick)?'quickItems':null
+  if(required&&!resourceReady(state.resources,required)){showBlockingError('Required catalog data is unavailable. Retry reads before checkout.');return}
   if (checkoutInFlight || !posState.cart.length) return
   const isSplit = posState.checkoutPayment === 'Split Payment'
   const isUdhar = posState.checkoutPayment === 'Udhar (Credit)' || (isSplit && Number(posState.splitCredit||0)>0)
@@ -1080,6 +1084,7 @@ function attachEvents() {
 
   /* ── Click ── */
   listenOwned(app,'click',ownsPOS,async (e,eventCurrent)=>{
+    if(e.target.closest('[data-action="retry-resources"]')){await load();return}
     if (!can('pos', state.role) || !modalEntitled(state.modal?.type)) return
     const original=e.target.closest('[data-action="reconcile-original"]')
     if(original){
@@ -1319,7 +1324,7 @@ function attachEvents() {
 
     /* ── Shift stats ── */
     if (el.dataset.action === 'shift-stats')  { state.modal = { type:'shiftStats' }; render(); return }
-    if (el.dataset.action === 'print-shift')  { const { printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal); printThermal(buildShiftStats()); return }
+    if (el.dataset.action === 'print-shift')  { if(!resourceReady(state.resources,'shiftFinancial','sales','tickets'))return; const { printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal); printThermal(buildShiftStats()); return }
     if (el.dataset.action === 'print-receipt') {
       if (state.modal?.sale) {
         const { buildReceiptSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)

@@ -1,4 +1,5 @@
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
+import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
 import { escapeHTML, safeImageURL } from '../html.js'
 import { createSubInvoiceModalHTML, rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 /* ═══════════════════════════════════════════════════════════════════
@@ -47,8 +48,9 @@ async function load() {
   const current=()=>generation===workshopLoadGeneration&&view()&&navigation()
   const loadSession = SESSION
   dlog('WORKSHOP.load', 'ENTRY')
-  await loadConfig()
+  const configReady=await loadConfig()
   if(!current())return
+  if(!configReady){state.resources={config:{status:'unavailable'}};render();return}
   if (window.location.pathname !== '/workshop' || state.role !== SESSION.employee?.role) return
   if (!can('workshop', state.role)) {
     state.modal = null
@@ -62,19 +64,23 @@ async function load() {
       .not('status', 'in', '("Delivered","Declined","Cancelled")')
       .order('created_at', { ascending: false }),
     sb.from('repair_components').select('*').order('sort_order'),
-  ])
+  ].map(settleRead))
   if(!current())return
   // Child lifecycle may differ from its active root. Fetch those children
   // without loading unrelated closed families or consulting financial RPCs.
-  const roots = tickets.data || []
-  const children = roots.length ? await sb.from('tickets').select('*')
+  const roots = tickets.error?[]:tickets.data || []
+  const children = roots.length ? await settleRead(sb.from('tickets').select('*')
     .in('parent_ticket_id', roots.map(ticket => ticket.id))
-    .order('created_at', {ascending:true}) : {data:[]}
+    .order('created_at', {ascending:true})) : {data:[]}
   if(!current())return
-  if (tickets.error || children.error) showBlockingError('Repair work could not be loaded completely. Reload to retry.')
   if (SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== '/workshop' || !can('workshop', state.role)) return
-  state.data.tickets = [...roots, ...(children.data || [])]
-  state.data.repairComponents = repairComponents.data || []
+  const reads=readStates({tickets,children,repairComponents})
+  state.resources=reads.resources
+  if(!resourceReady(reads.resources,'tickets','children')){
+    state.resources.tickets.status='incomplete';state.data.tickets=null;wsState.familySummaries=new Map();render();return
+  }
+  state.data.tickets = [...roots, ...reads.values.children]
+  state.data.repairComponents = reads.values.repairComponents
   wsState.familySummaries = new Map()
   if (['Business Owner','Manager','Cashier','Orbito Support'].includes(SESSION.employee?.role)) {
     const roots = groupRepairFamilies(state.data.tickets)
@@ -161,6 +167,8 @@ function render() {
 
 /* ── Workshop View ── */
 function workshopView() {
+  if(!resourceReady(state.resources,'config'))return resourceNotice('Shop configuration')
+  if(!resourceReady(state.resources,'tickets','children'))return resourceNotice('Complete repair queue')
   const all    = state.data.tickets || []
   const roots = groupRepairFamilies(all).map(family => family.root)
   const filtered = findRepairFamilies(all, wsState.filter)
@@ -490,6 +498,7 @@ function attachEvents() {
 
   /* ── Click ── */
   listenOwned(app,'click',ownsWorkshop,async (e,eventCurrent)=>{
+    if(e.target.closest('[data-action="retry-resources"]')){await load();return}
     if (!can('workshop', state.role) || !modalEntitled(state.modal?.type)) return
     // Route guard: see the matching comment in admin.js's attachEvents()
     // for the full explanation -- this is the listener whose collision
@@ -629,6 +638,7 @@ function attachEvents() {
 
     /* Open sub-invoice creation form */
     if (el.dataset.action === 'open-create-sub-invoice') {
+      if(!resourceReady(state.resources,'repairComponents')){showBlockingError('Repair catalog unavailable. Retry reads before adding work.');return}
       state.modal = { type: 'create-sub-invoice', parentId: el.dataset.ticketId, draftComponents: [], draftLabour: 0 }
       render(); return
     }
