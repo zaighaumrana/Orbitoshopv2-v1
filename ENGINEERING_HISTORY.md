@@ -896,3 +896,26 @@ immutable v6, Platform or excluded BYO checkout changed. Normal Shop commit/push
 no skip marker; existing Git-connected production builds are authorized. Actual
 deployment results are in external shop-support-ui evidence. PR1 stays Open/Draft/
 unmerged to development; no Cloudflare settings or Platform deployment changes.
+
+## 2026-10-25 — M1 preflight and current Support fixtures
+Branch: feature/shop-modernization-m1
+
+Both owner-specified historical post-merge annotated tags were created, pushed and
+peeled against the exact development baselines before this branch existed. The
+permanent M1 evidence archive retains merge/ref/provider checks; neither development
+moved. Cloudflare's four connected projects retained their canonical/latest IDs.
+
+Shop parity CI now pins read-only Platform development commit
+a329287df71ad031a3f2ea90a1b4cb5333848dad and covers the M1 push branch. PR path filters,
+least privilege and parity validation remain. Platform workflow/source is unchanged.
+The obsolete Support fixtures now supply consent/native-session binding and exercise
+missing consent, failed current binding, invalid OTP evidence and required audit.
+The packaging assertion uses selected immutable support-v6 rather than historical
+v3; old release assertions remain. No production handler was changed.
+
+Validation: Support/customer-Support/billing 20/20 pass (baseline 15/19, four obsolete
+fixture failures); billing assertions execute with existing locked dependencies.
+Canonical parity passes support-v6, 38 migrations/7 functions/eight requirements.
+Node24.21.0/npm11.19.0; Vite8.2.4; Supabase SDK2.114.0. No migration/function/release,
+hosted DB, provider setting, deployment or Platform source change. Publication uses
+[CF-Pages-Skip]; exact remote skip confirmation follows publication.
