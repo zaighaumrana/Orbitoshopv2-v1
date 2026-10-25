@@ -1159,3 +1159,23 @@ close named M1 acceptance oracles rather than adding duplicate test permutations
 Application source is unchanged by this coverage commit. Final exact-candidate
 results and source archive follow in the permanent evidence register; no independent
 review, owner acceptance, merge, deployment or backend operation is implied.
+
+## 2026-10-26 — M2 local baseline and resource contracts
+Branch: feature/shop-modernization-m2
+
+Owner authorized local M2 development atop the verified unmerged M1 tip 4186b518.
+Its empty Cloudflare refresh commit has the same application tree as 1ca15ba3.
+Both development refs and historical checkpoint tags remain unchanged. M1 PR #2 is
+still draft/unmerged with no independent review or owner acceptance recorded;
+M2 publication waits for that dependency or a specific owner decision.
+
+Defined fourteen screen resource/ownership/error/detail contracts and a comparable
+actual-Chromium, synthetic-Auth, delayed-loopback HTTP performance harness. Baseline
+is captured before modifying application loading. Harness development failures and
+early invalid markers are retained outside source and excluded from comparisons.
+Independent full-fixture family/receipt gap tests reproduce why independently
+truncated arrays cannot establish complete search/dedup/family counts. The narrow
+backend scope memo is proposed only; no SQL/function/release/Platform edit is made.
+Disposable Shop identity was verified read-only; available SQL settings did not
+expose its API cap, so the fixture cap is explicitly synthetic. No hosted write,
+provider setting change, agent deployment, push, merge or Platform operation.
