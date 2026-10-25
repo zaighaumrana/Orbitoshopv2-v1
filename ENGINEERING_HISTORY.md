@@ -919,3 +919,23 @@ Canonical parity passes support-v6, 38 migrations/7 functions/eight requirements
 Node24.21.0/npm11.19.0; Vite8.2.4; Supabase SDK2.114.0. No migration/function/release,
 hosted DB, provider setting, deployment or Platform source change. Publication uses
 [CF-Pages-Skip]; exact remote skip confirmation follows publication.
+
+## 2026-10-25 — M1 tracker exact build destination (R1)
+Branch: feature/shop-modernization-m1
+
+The standalone /track.html imported a fixed foreign customer destination/key. It now
+imports shop-public-config.js, generated in dev/build from the same validated public
+input that explicitly defines the main app's Vite values. Customer query parameters
+cannot select the project. Managed environment builds and explicit BYO builds retain
+exact project/anon-key validation; verified-dist additionally checks tracker config.
+Ticket/phone lookup, public-track and renderer semantics are unchanged.
+
+Validation: tests/tracker-target-browser.mjs creates two independent synthetic builds,
+inspects compiled main/tracker destinations and exercises both with real bundled SDK
+under Chrome. All non-loopback transport is intercepted; foreign transport aborts.
+Both builds pass exact URL/key assertions and hostile target-query/ticket/phone checks.
+No hosted request was sent. Initial runner-shape and sandbox-loopback failures are
+retained beside the passing evidence. Evidence: permanent M1 run
+20261025T013642Z-M1-003-629a9fb5. This is local synthetic verification, not hosted
+acceptance. No backend, release, Platform, DB or deployment changes. R1 is ready for
+independent inspection; independent disposition remains NOT REVIEWED.

@@ -418,8 +418,7 @@
   import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.108.2/+esm'
 
   /* ── Supabase — reads from the same client project ── */
-  const SUPABASE_URL  = 'https://kxmovywgshyltwusghhj.supabase.co'
-  const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4bW92eXdnc2h5bHR3dXNnaGhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExODM2OTIsImV4cCI6MjA5Njc1OTY5Mn0.JGDedCaow_Vg5Pk5RC6XprzKmRsaCCUNGWg1TaWAGLg'
+  import { SUPABASE_URL, SUPABASE_ANON } from './shop-public-config.js'
   const sb = createClient(SUPABASE_URL, SUPABASE_ANON)
 
   /* ── Load shop branding ── */
