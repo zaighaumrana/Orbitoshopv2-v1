@@ -978,3 +978,29 @@ Manager Admin access and all role/entitlement policies remain unchanged. Actual
 entry browser cases cover Owner/Support history/deep-link/refresh and Manager denial;
 final candidate results are recorded with integrated acceptance. No backend, DB,
 Platform or deployment change. Independent disposition remains NOT REVIEWED.
+
+## 2026-10-25 — M1 async continuation and operation ownership
+Branch: feature/shop-modernization-m1
+
+POS/Workshop loads now capture route activation, native authority and resource
+sequence, including child/family continuations. Admin retains its resource sequence
+and also captures native/route ownership. Async delegated actions check current view
+and selected modal before and after each await, including before starting follow-up
+work. A shared listener wrapper preserves synchronous preventDefault and owns async
+failures. This async event wrapper is a dependency of M1-006; remaining synchronous
+input/change/keyboard listener ownership is deferred to M1-010 after EMS.
+
+UI reset and late-result guards are separate from a private in-memory financial
+command journal: exact original actor/session, UUID and arguments survive UI reset.
+Only the same current actor can inspect those records; no retry is scheduled. Known
+business-command RPCs pin the original transient bearer before submission; credentials
+are never journaled. A changed session before submission fails closed. Existing
+server transaction/consent/role/PIN authority and idempotent RPCs remain unchanged.
+
+Actual-loader reverse completion, departed-follow-up and late family-summary tests
+pass, as do original checkout/actor/payload tests (5 focused cases). The real entry
+browser passed its existing cases, then exposed a selector ambiguity caused by the
+pre-existing Admin shell/page duplicate headings; the fixture now selects the first
+current heading. No styling redesign is included. Initial failures and editing-aid
+provenance remain in permanent M1 evidence. No backend/release/DB/Platform source or
+provider setting changes. Local source verification is not independent audit.

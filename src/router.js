@@ -11,6 +11,7 @@ let notFoundHandler = null
 let currentPath = null
 let currentURL = null
 let navigationGeneration = 0
+export function captureNavigation(){const generation=navigationGeneration;return ()=>generation===navigationGeneration}
 
 export function clearRoutes() {
   routes.clear()
@@ -102,6 +103,7 @@ function resolve(pathname, search = '') {
   currentPath = pathname
   currentURL = pathname + search
   const generation = ++navigationGeneration
+  window.dispatchEvent?.(new Event('shop-navigation'))
   const match = matchRoute(pathname)
   const query = parseQuery(search)
 

@@ -18,7 +18,7 @@ test('retail checkout submits once across RPC/reload and retains request ID on f
   const state = { modal:null }
   const context = vm.createContext({
     posState, state, CFG:{tax_rate:0}, SESSION:{authUserId:'actor-A',employee:{name:'Fixture'}},
-    captureAuthority:()=>()=>true,structuredClone,cartOperations:new Map(),
+    captureAuthority:()=>()=>true,captureView:()=>()=>true,structuredClone,cartOperations:new Map(),
     crypto:{randomUUID:()=>`request-${++ids}`},
     sb:{rpc(name, args) { calls.push({name,args}); return rpcGate.promise }},
     dlog(){}, logBillEvent(){}, render(){},
@@ -65,7 +65,7 @@ test('late checkout ACK remains original-actor owned after same-role/native-sess
  setUIAuthority('actor-A:native-A');
  const old={cart:[{name:'A private item',qty:1,originalPrice:100,soldPrice:100}],checkoutPayment:'Cash',cashTendered:100};
  const ctx=vm.createContext({posState:old,state:{modal:null},CFG:{tax_rate:0},SESSION:{authUserId:'actor-A',employee:{name:'A'}},
-  captureAuthority,structuredClone,cartOperations:operations,crypto:{randomUUID:()=> 'original-request'},
+  captureAuthority,captureView:captureAuthority,structuredClone,cartOperations:operations,crypto:{randomUUID:()=> 'original-request'},
   sb:{rpc:(_name,args)=>{calls++;assert.equal(args.p_request_id,'original-request');return new Promise(r=>complete=r)}},
   dlog(){},logBillEvent(){},render(){},load:async()=>{reloads++},showBlockingError(){assert.fail('old response cannot show a B error')},confirmAction:async()=>{},window:{location:{pathname:'/pos'}}});
  vm.runInContext(`let checkoutInFlight=false;${api.replace(/^import .*$/gm,'').replace('export async function','async function')}\n${pos.slice(start,end)}\nglobalThis.submit=_finalizeCheckout`,ctx);

@@ -25,10 +25,12 @@ async function boot() {
   const generation = applicationGeneration
   if(supportHandoff!==null){const token=supportHandoff;supportHandoff=null;await startSupportHandoff(token,onLoginSuccess);return}
   await loadConfig(true)
+  if(generation!==applicationGeneration)return
   applyBranding()
 
   if (location.pathname === '/invite/accept') {
     const { acceptInvite } = await import('./onboarding.js')
+    if(generation!==applicationGeneration)return
     await acceptInvite(async () => {
       const session = await loadCurrentSession()
       if (!session) throw new Error('Owner profile is still provisioning. Retry shortly.')
@@ -86,7 +88,7 @@ function setupRoutes(session) {
     document.getElementById('app').textContent = 'Loading…'
     const { initPOS } = await import('./pos/pos.js')
     if (!navigation.isCurrent() || generation !== applicationGeneration || state.role !== role || window.location.pathname !== '/pos') return
-    initPOS(session)
+    await initPOS(session,navigation.isCurrent)
   })
 
   registerRoute('/workshop', async (_params, _query, navigation) => {
@@ -96,7 +98,7 @@ function setupRoutes(session) {
     document.getElementById('app').textContent = 'Loading…'
     const { initWorkshop } = await import('./pos/workshop.js')
     if (!navigation.isCurrent() || generation !== applicationGeneration || state.role !== role || window.location.pathname !== '/workshop') return
-    initWorkshop(session)
+    await initWorkshop(session,navigation.isCurrent)
   })
 
   const adminModules = ['dashboard','repairs','inventory','reports','employees','receipts','ems','settings','catalog','billing-usage','customer-support']
@@ -110,7 +112,7 @@ function setupRoutes(session) {
       document.getElementById('app').textContent = 'Loading…'
       const { initAdmin } = await import('./admin/admin.js')
       if (!navigation.isCurrent() || generation !== applicationGeneration || state.role !== role || window.location.pathname !== `/admin/${mod}`) return
-      initAdmin(session, mod, query, navigation.isCurrent)
+      await initAdmin(session, mod, query, navigation.isCurrent)
     })
   })
 

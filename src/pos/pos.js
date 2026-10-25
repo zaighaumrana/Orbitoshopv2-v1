@@ -1,3 +1,4 @@
+import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
 import { escapeHTML, safeImageURL } from "../html.js"
 import { createSubInvoiceModalHTML, rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 /* ═══════════════════════════════════════════════════════════════════
@@ -70,23 +71,30 @@ let _inv = null  // populated via dynamic import only when inventory_module_enab
 let _eventsAttached = false
 let placingOrder = false
 let checkoutInFlight = false
+let posNavigationIsCurrent=()=>false,posLoadGeneration=0
+const ownsPOS=()=>posNavigationIsCurrent()&&window.location.pathname==='/pos'&&state.role===SESSION.employee?.role&&can('pos',state.role)
 // Retain original-actor requests separately from replacement-account UI.
 const cartOperations = new Map()
 onPrivateReset(() => {
   for(const operation of cartOperations.values())operation.detached=true
+  posLoadGeneration++;posNavigationIsCurrent=()=>false
   posState=emptyPOS();SESSION={};placingOrder=false;checkoutInFlight=false;resetDraft()
 })
 
 /* ── Load ── */
 async function load() {
+  const generation=++posLoadGeneration,view=captureView(),navigation=posNavigationIsCurrent
+  const current=()=>generation===posLoadGeneration&&view()&&navigation()
   const loadSession = SESSION
   dlog('POS.load', 'ENTRY')
   await loadConfig()
+  if(!current())return
   if (window.location.pathname !== '/pos' || state.role !== SESSION.employee?.role) return
   if (!CFG.repair_module_enabled) posState.cart = posState.cart.filter(item => !item.isTicket)
   if (!CFG.inventory_module_enabled) posState.cart = posState.cart.filter(item => !item.isInventory)
   if (CFG.inventory_module_enabled && !_inv) {
     _inv = await import('../features/pos/inventory/render.js')
+    if(!current())return
   }
   const fetchInv = CFG.inventory_module_enabled
     ? sb.from('inventory').select('*').order('name')
@@ -105,7 +113,7 @@ async function load() {
     sb.from('quick_items').select('*').order('sort_order'),
     CFG.repair_module_enabled ? sb.from('repair_components').select('*').order('sort_order') : { data:[] },
   ])
-  if (SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== '/pos') return
+  if (!current() || SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== '/pos') return
   state.data = {
     tickets:          tickets.data          || [],
     sales:            sales.data            || [],
@@ -132,6 +140,7 @@ async function load() {
 
 /* ── Render ── */
 function render() {
+  if(!ownsPOS())return
   if (window.location.pathname !== '/pos' || state.role !== SESSION.employee?.role) return
   dstack('POS.render', `*** #app REWRITE ***`)
   if (!SESSION.employee) { navigate('/login'); return }
@@ -546,6 +555,7 @@ function ticketPaymentModalHTML(modal) {
 }
 
 async function openCollectTicket(ticket) {
+  const current=captureView()
   if (!ticket.is_locked) {
     // Ticket was never placed (shouldn't normally happen) — open edit form
     showBlockingError('This ticket has not been placed yet.')
@@ -555,6 +565,7 @@ async function openCollectTicket(ticket) {
   state.modal = { type: 'ticket-payment', ticket, summaryStatus:'loading', summary:null, requestId }
   render()
   const result = await getRepairFamilySummary(Number(ticket.id))
+  if(!current())return
   if (state.modal?.type !== 'ticket-payment' || state.modal.requestId !== requestId) return
   if (!result.ok) {
     state.modal.summaryStatus = 'error'
@@ -914,7 +925,7 @@ async function placeOrder() {
 }
 
 async function placeOrderOnce() {
-  const current=captureAuthority(),ownerState=posState
+  const current=captureView(),ownerState=posState
   dlog('POS.placeOrder', 'ENTRY')
   const ticketItem = posState.cart.find(i => i.isTicket)
   if (!ticketItem) { dlog('POS.placeOrder', 'no ticketItem in cart -- abort'); return }
@@ -925,7 +936,7 @@ async function placeOrderOnce() {
     dlog('POS.placeOrder', 'isNewTicket branch -- calling repairs.insertNewTicketFromCart()')
     const res = await insertNewTicketFromCart(ticketItem)
     operation.result=res;operation.status=res.ok?'succeeded':'uncertain'
-    if (!current() || posState!==ownerState) return
+    if (!current() || posState!==ownerState) {operation.detached=true;return}
     if (!res.ok) { dlog('POS.placeOrder', `INSERT FAILED: ${res.error}`); showBlockingError('Error placing order: ' + res.error); return }
     dlog('POS.placeOrder', `INSERT SUCCEEDED ticket_number=${res.data.ticket_number} id=${res.data.id} -- calling load() next`)
 
@@ -950,7 +961,7 @@ async function placeOrderOnce() {
   dlog('POS.placeOrder', 'existing-ticket branch -- calling repairs.collectTicketPayment()')
   const res = await collectTicketPayment(ticket, payAmount, payMethod, ticketItem.requestId)
   operation.result=res;operation.status=res.ok?'succeeded':'uncertain'
-  if (!current() || posState!==ownerState) return
+  if (!current() || posState!==ownerState) {operation.detached=true;return}
   if (!res.ok) { showBlockingError('Error recording payment: ' + res.error); return }
 
   posState.cart = posState.cart.filter(i => !i.isTicket)
@@ -1009,7 +1020,7 @@ async function _finalizeCheckout() {
 }
 
 async function _finalizeCheckoutOnce() {
-  const current=captureAuthority(),ownerState=posState,actor=SESSION.authUserId
+  const current=captureView(),ownerState=posState,actor=SESSION.authUserId
   dlog('POS._finalizeCheckout', 'ENTRY -- calling checkout.finalizeCheckout()')
   posState.checkoutRequestId ||= crypto.randomUUID()
   const inputs = {
@@ -1034,7 +1045,7 @@ async function _finalizeCheckoutOnce() {
   catch {res={ok:false,error:'Outcome unavailable. Reconcile the original request before retrying.'}}
   operation.status=res.ok?'succeeded':res.code==='incomplete-cash-payment'?'rejected':'uncertain'
   operation.result=res
-  if (!current() || posState!==ownerState) return
+  if (!current() || posState!==ownerState) {operation.detached=true;return}
   if (!res.ok) {
     dlog('POS._finalizeCheckout', `FAILED: ${res.error}`)
     if (res.code === 'incomplete-cash-payment') {
@@ -1068,7 +1079,7 @@ function attachEvents() {
   dlog('POS.attachEvents', 'listeners attached to #app (click + submit)')
 
   /* ── Click ── */
-  app.addEventListener('click', async e => {
+  listenOwned(app,'click',ownsPOS,async (e,eventCurrent)=>{
     if (!can('pos', state.role) || !modalEntitled(state.modal?.type)) return
     const original=e.target.closest('[data-action="reconcile-original"]')
     if(original){
@@ -1077,7 +1088,7 @@ function attachEvents() {
       if(op.status==='succeeded') {showTransactionSuccess('The original request was acknowledged. Review the original invoice/history; no request was resent.');return}
       const table=op.kind==='checkout'?'sales':op.kind==='repair'?'tickets':null
       if(!table){showBlockingError('Payment outcome remains uncertain. Reconcile the original request '+original.dataset.requestId+' against its original payment history; do not issue a new payment.');return}
-      const result=await sb.from(table).select('*').eq('request_id',original.dataset.requestId).maybeSingle()
+      const result=await viewAwait(eventCurrent,()=>(sb.from(table).select('*').eq('request_id',original.dataset.requestId).maybeSingle()),()=>state.modal)
       if(!current() || op.actor!==SESSION.authUserId)return
       if(result.error || !result.data){showBlockingError('Original outcome is still unconfirmed. Its UUID and intended payload are retained; no request was resent.');return}
       op.status='succeeded';op.result={ok:true,data:result.data};render();return
@@ -1157,7 +1168,7 @@ function attachEvents() {
       const ticketId = el.dataset.ticketId
       openPinPrompt('admin', async (verified) => {
         if (!verified) return
-        const subs = await getSubInvoices(ticketId)
+        const subs = await viewAwait(eventCurrent,()=>(getSubInvoices(ticketId)),()=>state.modal)
         state.modal = { type: 'edit-components', id: ticketId, subInvoices: subs }
         render()
       }, render)
@@ -1178,10 +1189,10 @@ function attachEvents() {
         if (!verified) return
         const tk = state.data.tickets.find(t => String(t.id) === String(ticketId))
         if (!tk) return
-        const res = await markComponentNotNeeded(Number(ticketId), index, reason)
+        const res = await viewAwait(eventCurrent,()=>(markComponentNotNeeded(Number(ticketId), index, reason)),()=>state.modal)
         if (!res.ok) { showBlockingError('Error: ' + res.error); return }
-        await load()
-        const subs = await getSubInvoices(ticketId)
+        await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
+        const subs = await viewAwait(eventCurrent,()=>(getSubInvoices(ticketId)),()=>state.modal)
         state.modal = { type: 'edit-components', id: ticketId, subInvoices: subs }
         render()
       }, render)
@@ -1258,15 +1269,15 @@ function attachEvents() {
       const comps = readSubInvCompsFromDOM()
       const labour = readSubInvLabourFromDOM()
       if (!comps.length && !labour) { showBlockingError('Add at least one component or a labour charge.'); return }
-      const res = await submitAdditionalWorkDraft(parentId, comps, labour, modal, false)
+      const res = await viewAwait(eventCurrent,()=>(submitAdditionalWorkDraft(parentId, comps, labour, modal, false)),()=>state.modal)
       if (res.busy) return
       if (!res.ok) { showBlockingError(res.error); return }
       if (res.ticket) {
-        const {buildSubInvoiceSlip,printThermal} = await import('../print/print.js')
+        const {buildSubInvoiceSlip,printThermal} = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
         printThermal(buildSubInvoiceSlip(res.ticket,tk))
       }
       if (state.modal === modal) state.modal = null
-      await load()
+      await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
       if (!res.ticket) showTransactionSuccess(`Additional work saved as ${(res.proposal?.decision || 'Pending').toLowerCase()}.`)
       return
     }
@@ -1280,38 +1291,38 @@ function attachEvents() {
       applyBranding(); render(); return
     }
     if (el.dataset.action === 'ems-clock-out') {
-      const { handleClockOut } = await import('../features/ems/index.js')
+      const { handleClockOut } = await viewAwait(eventCurrent,()=>(import('../features/ems/index.js')),()=>state.modal)
       handleClockOut(SESSION, async () => {
-        await confirmAction({
+        await viewAwait(eventCurrent,()=>(confirmAction({
           title: 'Log out?',
           message: 'Your shift is clocked out. Log out now?',
           confirmLabel: 'Log out',
           tone: 'danger',
-          action: async () => { await _clearSession(); return true },
-        })
+          action: async () => { await viewAwait(eventCurrent,()=>(_clearSession()),()=>state.modal); return true },
+        })),()=>state.modal)
       })
       return
     }
     if (el.dataset.action === 'logout') {
-      await confirmAction({
+      await viewAwait(eventCurrent,()=>(confirmAction({
         title: 'Log out?',
         message: 'Are you sure you want to log out?',
         confirmLabel: 'Log out',
         tone: 'danger',
-        action: async () => { await _clearSession(); return true },
-      })
+        action: async () => { await viewAwait(eventCurrent,()=>(_clearSession()),()=>state.modal); return true },
+      })),()=>state.modal)
       return
     }
     if (el.dataset.action === 'install' && state.installPrompt) {
-      await runInstallPrompt(); render(); return
+      await viewAwait(eventCurrent,()=>(runInstallPrompt()),()=>state.modal); render(); return
     }
 
     /* ── Shift stats ── */
     if (el.dataset.action === 'shift-stats')  { state.modal = { type:'shiftStats' }; render(); return }
-    if (el.dataset.action === 'print-shift')  { const { printThermal } = await import('../print/print.js'); printThermal(buildShiftStats()); return }
+    if (el.dataset.action === 'print-shift')  { const { printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal); printThermal(buildShiftStats()); return }
     if (el.dataset.action === 'print-receipt') {
       if (state.modal?.sale) {
-        const { buildReceiptSlip, printThermal } = await import('../print/print.js')
+        const { buildReceiptSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
         printThermal(buildReceiptSlip(state.modal.sale))
       }
       return
@@ -1319,7 +1330,7 @@ function attachEvents() {
     if (el.dataset.action === 'print-ticket-slip') {
       dlog('POS.click', `PRINT-TICKET-SLIP branch firing -- state.modal.ticket=${JSON.stringify(state.modal?.ticket?.ticket_number)}`)
       if (state.modal?.ticket) {
-        const { buildTicketSlip, printThermal } = await import('../print/print.js')
+        const { buildTicketSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
         printThermal(buildTicketSlip(state.modal.ticket))
       }
       return
@@ -1332,7 +1343,7 @@ function attachEvents() {
     }
     if (el.dataset.action === 'retry-repair-summary') {
       const ticket = state.data.tickets.find(t => String(t.id) === String(el.dataset.ticketId)) || state.modal?.ticket
-      if (ticket) await openCollectTicket(ticket)
+      if (ticket) await viewAwait(eventCurrent,()=>(openCollectTicket(ticket)),()=>state.modal)
       return
     }
 
@@ -1375,25 +1386,25 @@ function attachEvents() {
 
     if (el.dataset.action === 'deliver-repair') {
       const ticketId = Number(el.dataset.ticketId)
-      await confirmAction({
+      await viewAwait(eventCurrent,()=>(confirmAction({
         title: 'Deliver repair?',
         message: 'Mark this fully paid repair as delivered to the customer?',
         confirmLabel: 'Deliver device',
         action: async () => {
-          const res = await deliverRepair(ticketId, false)
+          const res = await viewAwait(eventCurrent,()=>(deliverRepair(ticketId, false)),()=>state.modal)
           if (!res.ok) { showBlockingError('Delivery error: ' + res.error); return false }
           state.modal = null
-          await load()
+          await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
           showTransactionSuccess('Device marked as Delivered.')
           return true
         },
-      })
+      })),()=>state.modal)
       return
     }
     if (el.dataset.action === 'print-repair-summary') {
-      const summaryResult = await getRepairFamilySummary(Number(el.dataset.ticketId))
+      const summaryResult = await viewAwait(eventCurrent,()=>(getRepairFamilySummary(Number(el.dataset.ticketId))),()=>state.modal)
       if (!summaryResult.ok) { showBlockingError('Summary error: ' + summaryResult.error); return }
-      const { buildRepairSummary, printThermal } = await import('../print/print.js')
+      const { buildRepairSummary, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
       printThermal(buildRepairSummary(summaryResult.data)); return
     }
 
@@ -1401,10 +1412,10 @@ function attachEvents() {
       const ticketId = Number(el.dataset.ticketId)
       openPinPrompt('udhar', async verified => {
         if (!verified) return
-        const res = await deliverRepair(ticketId, true)
+        const res = await viewAwait(eventCurrent,()=>(deliverRepair(ticketId, true)),()=>state.modal)
         if (!res.ok) { showBlockingError('Delivery error: ' + res.error); return }
         state.modal = null
-        await load()
+        await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
         showTransactionSuccess('Device delivered with the remaining balance approved as Udhar.')
       }, render)
       return
@@ -1412,7 +1423,7 @@ function attachEvents() {
 
     /* ── Place Order (ticket in cart) ── */
     if (el.dataset.action === 'place-order') {
-      await placeOrder(); return
+      await viewAwait(eventCurrent,()=>(placeOrder()),()=>state.modal); return
     }
 
     /* ── Standard Checkout ── */
@@ -1422,10 +1433,10 @@ function attachEvents() {
       if (hasDiscount && CFG.discount_pin_required) {
         openPinPrompt('discount', async (verified) => {
         if (!verified) return
-        await doCheckout()
+        await viewAwait(eventCurrent,()=>(doCheckout()),()=>state.modal)
       }, render); return
       }
-      await doCheckout(); return
+      await viewAwait(eventCurrent,()=>(doCheckout()),()=>state.modal); return
     }
 
     /* ── Cart qty + remove ── */
@@ -1560,15 +1571,15 @@ function attachEvents() {
       openPinPrompt('settle', async (verified) => {
         if (!verified) return
         const rec = (state.data.udharAccounts || []).find(u => `${u.kind}:${u.sourceId}` === accountKey)
-        const res = await settleUdhar(rec, amount, method)
+        const res = await viewAwait(eventCurrent,()=>(settleUdhar(rec, amount, method)),()=>state.modal)
         if (!res.ok) { showBlockingError('Settle error: ' + res.error); return }
-        await load()
+        await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
         state.modal = { type:'udharList' }
         render()
         showTransactionSuccess('Udhar payment recorded.')
       }, render); return
     }
-  })
+  },error=>showBlockingError(error?.message||'Unable to confirm the result. Refresh reads before retrying.'))
 
   /* ── Input ── */
   app.addEventListener('input', e => {
@@ -1639,7 +1650,7 @@ function attachEvents() {
   })
 
   /* ── Submit ── */
-  app.addEventListener('submit', async e => {
+  listenOwned(app,'submit',ownsPOS,async (e,eventCurrent)=>{
     if (!can('pos', state.role) || !modalEntitled(state.modal?.type)) { e.preventDefault(); return }
     if (!window.location.pathname.startsWith('/pos')) return
     e.preventDefault()
@@ -1702,7 +1713,7 @@ function attachEvents() {
       posState.udharName  = data.udharName
       posState.udharPhone = data.udharPhone
       state.modal = null
-      await doCheckout(); return
+      await viewAwait(eventCurrent,()=>(doCheckout()),()=>state.modal); return
     }
 
     if (type === 'return-lookup') {
@@ -1711,7 +1722,7 @@ function attachEvents() {
         state.modal = { type:'returnFlow', notFound:true, receiptNo:data.receiptNo }
         render(); return
       }
-      const lookup = await getRetailReturnContext(found.id)
+      const lookup = await viewAwait(eventCurrent,()=>(getRetailReturnContext(found.id)),()=>state.modal)
       if (!lookup.ok) { showBlockingError('Return lookup failed: '+lookup.error); return }
       state.modal = { type:'returnFlow', receiptNo:found.invoice_number, context:lookup.data }
       render(); return
@@ -1727,22 +1738,22 @@ function attachEvents() {
       if (!reason) { showBlockingError('Enter a return reason.'); return }
       openPinPrompt('return', async (verified) => {
         if (!verified) return
-        const result = await createRetailReturn(saleId,preview.lines.map(({saleLineId,quantity,restock}) => ({saleLineId,quantity,restock})),data.refundMethod,reason)
+        const result = await viewAwait(eventCurrent,()=>(createRetailReturn(saleId,preview.lines.map(({saleLineId,quantity,restock}) => ({saleLineId,quantity,restock})),data.refundMethod,reason)),()=>state.modal)
         if (!result.ok) { showBlockingError('Return error: '+result.error); return }
         const refund = Number(result.data?.return?.refund_amount||0)
-        const { buildReturnSlip, printThermal } = await import('../print/print.js')
+        const { buildReturnSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
         printThermal(buildReturnSlip({
           invoiceNumber:context?.sale?.invoiceNumber||`#${saleId}`,
           items:preview.lines.map(line => ({ name:line.name, qty:line.quantity, sold_price:line.sold_price })),
           refund, method:refund>0?data.refundMethod:'No cash refund',
         }))
-        state.modal = null; await load()
+        state.modal = null; await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
         showTransactionSuccess(`Return completed. Refund: ${money(refund)}`)
       }, render); return
     }
 
     if (type === 'change-password') {
-      const result = await handleChangePasswordSubmit(SESSION, data)
+      const result = await viewAwait(eventCurrent,()=>(handleChangePasswordSubmit(SESSION, data)),()=>state.modal)
       const errEl = document.getElementById('change-password-error')
       if (!result.ok) {
         if (errEl) { errEl.textContent = result.error; errEl.classList.remove('hidden') }
@@ -1754,7 +1765,7 @@ function attachEvents() {
     }
 
     if (type === 'leave-request') {
-      const result = await submitLeaveRequest(SESSION, data)
+      const result = await viewAwait(eventCurrent,()=>(submitLeaveRequest(SESSION, data)),()=>state.modal)
       if (!result.ok) { showBlockingError('Error: ' + result.error); return }
       state.modal = null
       showToast('Leave request submitted. Your manager will review it.', 'success')
@@ -1769,7 +1780,7 @@ function attachEvents() {
       }
       state.modal = null; render(); return
     }
-  })
+  },error=>showBlockingError(error?.message||'Unable to confirm the result. Refresh reads before retrying.'))
 
 }
 
@@ -1792,7 +1803,8 @@ function _refreshDraftTotals() {
 /* ═══════════════════════════════════════════════════════════════════
    PUBLIC ENTRY POINT
 ═══════════════════════════════════════════════════════════════════ */
-export async function initPOS(sess) {
+export async function initPOS(sess,isCurrent=()=>true) {
+  const authority=captureAuthority();posNavigationIsCurrent=()=>isCurrent()&&authority()
   dlog('POS.initPOS', `ENTRY _eventsAttached=${_eventsAttached} caller=[${callerInfo()}]`)
   SESSION = sess
   state.role = sess.employee?.role || null
