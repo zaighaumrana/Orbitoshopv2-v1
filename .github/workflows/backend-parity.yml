@@ -4,7 +4,7 @@ on:
     branches: [development]
     paths: ['supabase/**', 'scripts/**', '.github/workflows/backend-parity.yml', 'package.json', 'AGENTS.md']
   push:
-    branches: [feature/shop-modernization-m1]
+    branches: [feature/shop-modernization-m2]
     paths: ['supabase/**', 'scripts/**', '.github/workflows/backend-parity.yml', 'package.json', 'AGENTS.md']
   workflow_dispatch:
 permissions:
@@ -21,8 +21,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: zaighaumrana/orbito
-          # Reviewed post-PR5 development checkpoint; Platform stays read-only in M1.
-          ref: a329287df71ad031a3f2ea90a1b4cb5333848dad
+          # Local-only owner-reviewed integration; remote publication is not authorized.
+          ref: cedde3838e039b2ec9aebc163153e01253ede1ca
           path: orbito
           fetch-depth: 0
           persist-credentials: false
@@ -30,6 +30,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Validate committed backend and both installation plans
+      - name: Review unpromoted support-v7 candidate and both installation plans
+        working-directory: orbito
+        run: node scripts/release-parity.mjs --candidate support-v7
+      - name: Enforce approved active release gate (promotion remains required)
         working-directory: orbito
         run: node scripts/release-parity.mjs

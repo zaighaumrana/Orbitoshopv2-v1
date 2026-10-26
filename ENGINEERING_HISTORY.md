@@ -1439,3 +1439,18 @@ fingerprint is c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada.
 The earlier6f candidate is superseded and never a final approved package. Platform
 integration is local-only under the owner's explicit approval; no remote Platform
 operation, application deployment, push, PR or merge has occurred.
+
+## 2026-10-26 — Pair local M2 release review sources without promotion
+Branch: feature/shop-modernization-m2
+
+The owner-authorized local Platform candidate is committed at
+cedde3838e039b2ec9aebc163153e01253ede1ca. Pinned the paired review workflow to that
+exact source and added explicit support-v7 candidate review while retaining the
+ordinary approved-active release gate. That latter gate intentionally blocks
+promotion until the actual Managed selector and BYO manifest are separately
+reviewed. No workflow ran remotely and no Platform operation was published.
+Final backend source remains 50b94931ecf743166136b2c562cbb6d2fbaebdc7 with fingerprint
+c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada.
+This workflow/history-only change does not alter the backend package or browser
+behavior. Exact local candidate parity and immutable-source proofs are archived
+with M2 review evidence; no database, merge or deployment change occurred.
