@@ -17,6 +17,7 @@ import { escapeHTML, safeImageURL } from '../../../html.js'
 import { state, CFG, money, moneyHTML, currentTenant } from '../../../shared.js'
 import { getDraft, calcDraftTotal, calcDraftPaid } from './state.js'
 import { findRepairFamilies, matchedRepairChild } from '../../repairs/family.js'
+import {pageControls} from '../../../bounded-read.js'
 
 /** Combines a ticket's own balance with any sub-invoices billed under it. */
 export function combinedBalance(t) {
@@ -52,7 +53,7 @@ export function repairRowHTML(t, family = null) {
     </div>`
 }
 
-export function repairCollectionHTML(searchQuery = '') {
+export function repairCollectionHTML(searchQuery = '',page=null) {
   const pending = findRepairFamilies(state.data.tickets || [], searchQuery)
     .filter(family => combinedBalance(family.root).total > 0 || !family.root.is_locked)
     .sort((a,b) => new Date(b.root.created_at) - new Date(a.root.created_at))
@@ -63,7 +64,8 @@ export function repairCollectionHTML(searchQuery = '') {
       <input class="search" placeholder="Search name, phone, device, IMEI, ticket #…"
         data-repair-search value="${escapeHTML(searchQuery)}"
         style="width:100%;margin:10px 0;font-size:14px">
-      <p class="muted" style="font-size:12px;margin-bottom:10px">${pending.length} pending ticket${pending.length!==1?'s':''}</p>
+      <p class="muted" style="font-size:12px;margin-bottom:10px">${pending.length} pending ticket${pending.length!==1?'s':''}${page?' on this page; pagination counts all matching families':''}</p>
+      ${pageControls(page,'data-collection-page')}
       ${pending.length ? `<div style="display:grid;gap:8px">${pending.map(family => repairRowHTML(family.root, family)).join('')}</div>` :
         `<div class="empty">No pending tickets match.</div>`}
       <div class="modal-actions">

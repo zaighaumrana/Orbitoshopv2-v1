@@ -32,10 +32,10 @@ test('optional modules fail closed for every role; Workshop uses technician flag
 test('config shares only equivalent inflight work, isolates public/native scopes and consumes initial handoff once',async()=>{
  const calls=[],pending=[];const api=harness(name=>{calls.push(name);return new Promise(resolve=>pending.push(resolve))})
  const first=api.loadConfig(),same=api.loadConfig();assert.deepEqual(calls,['get_app_config'])
- pending[0]({data:{repair_module_enabled:true,shop_logo:'data:image/png;base64,'+'A'.repeat(699052)}});assert.deepEqual(await Promise.all([first,same]),[true,true])
+ pending[0]({data:{repair_module_enabled:true,read_contracts:{repair_families:1,receipt_archive:1},shop_logo:'data:image/png;base64,'+'A'.repeat(699052)}});assert.deepEqual(await Promise.all([first,same]),[true,true]);assert.equal(api.CFG.read_contracts.repair_families,1)
  const handoff=api.createConfigHandoff();assert.equal(await api.loadConfig(false,handoff),true);assert.equal(calls.length,1)
  const fresh=api.loadConfig(false,handoff);assert.equal(calls.length,2,'completed/handoff work cannot become a permission cache')
- pending[1]({data:{repair_module_enabled:false}});await fresh;assert.equal(api.CFG.repair_module_enabled,false)
+ pending[1]({data:{repair_module_enabled:false}});await fresh;assert.equal(api.CFG.repair_module_enabled,false);assert.equal(api.CFG.read_contracts.repair_families,undefined,'old backend must not retain a newer backend capability')
  const old=api.loadConfig();api.replaceIdentity('B:session-B');const replacement=api.loadConfig();pending[2]({data:{repair_module_enabled:true}});assert.equal(await old,false);pending[3]({data:{repair_module_enabled:false}});await replacement;assert.equal(api.CFG.repair_module_enabled,false)
  const publicRead=api.loadConfig(true),appRead=api.loadConfig(false);assert.deepEqual(calls.slice(-2),['get_public_shop_config','get_app_config'])
  pending[4]({data:{repair_module_enabled:true}});assert.equal(await publicRead,false);pending[5]({data:{repair_module_enabled:false}});await appRead

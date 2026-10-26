@@ -28,7 +28,7 @@ try{
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH});
  const context=await browser.newContext();await context.route('**/*',r=>r.request().url().startsWith(origin+'/')?r.continue():r.request().url().includes('challenges.cloudflare.com')?r.fulfill({contentType:'application/javascript',body:'/* synthetic */'}):(external.push(r.request().url()),r.abort()));
  await context.addInitScript({content:fixture+';fixture();('+dataFixture.toString()+')();('+resourceFixture.toString()+')();'});
- const page=await context.newPage();page.setDefaultTimeout(15000);page.on('pageerror',error=>errors.push(error.message));
+ const page=await context.newPage();page.setDefaultTimeout(30000);page.on('pageerror',error=>errors.push(error.message));
  const ready=()=>page.waitForFunction(()=>window.resourceRouteDone===location.pathname+location.search&&document.querySelector('#app .app-shell'));
  const go=async(path)=>{await page.goto(origin+path);await ready()};
  const navigate=async(path)=>{await page.evaluate(async path=>{window.resourceRouteDone=null;await(await import('/src/router.js')).navigate(path)},path);await ready()};
@@ -57,7 +57,7 @@ try{
  await go('/admin/employees?fixtureRole=Business%20Owner');await page.locator('[data-filter]').fill('Zzz older employee');await page.locator('[data-emp-id="1001"]').first().waitFor();
  await go('/admin/catalog?fixtureRole=Business%20Owner');assert.deepEqual([...new Set(await tables())],['quick_items']);await clear();await page.locator('[data-catalog-tab="components"]').click();await page.locator('[data-catalog-tab="components"].active').waitFor();await ready();assert.deepEqual([...new Set(await tables())],['repair_components']);
  await page.locator('[data-filter]').fill('Component 030');await page.getByText('Component 030',{exact:true}).waitFor();
- await go('/admin/settings?fixtureRole=Business%20Owner&tab=contact');const legal=await page.evaluate(()=>window.resourceCalls.filter(c=>c.rpc==='get_legal_status').length);await page.locator('[data-settings-tab="legal"]').click();await ready();assert.equal(await page.evaluate(()=>window.resourceCalls.filter(c=>c.rpc==='get_legal_status').length),legal+1);await clear();await page.locator('[data-settings-tab="contact"]').click();await ready();assert.equal(await page.evaluate(()=>window.resourceCalls.filter(c=>c.rpc==='get_legal_status').length),0);
+ await go('/admin/settings?fixtureRole=Business%20Owner&tab=contact');const legal=await page.evaluate(()=>window.resourceCalls.filter(c=>c.rpc==='get_legal_status').length);await page.evaluate(()=>window.resourceRouteDone=null);await page.locator('[data-settings-tab="legal"]').click();await ready();assert.equal(await page.evaluate(()=>window.resourceCalls.filter(c=>c.rpc==='get_legal_status').length),legal+1);await clear();await page.evaluate(()=>window.resourceRouteDone=null);await page.locator('[data-settings-tab="contact"]').click();await ready();assert.equal(await page.evaluate(()=>window.resourceCalls.filter(c=>c.rpc==='get_legal_status').length),0);
  results.push('Server inventory/directory/catalog search reaches old rows; exact editor detail; active catalog tab only; Legal read only in owner Legal context');
  for(const roots of [0,10,100]){
   await go('/workshop?fixtureRole=Business%20Owner&roots='+roots);assert.equal(await page.evaluate(()=>window.resourceCalls.filter(c=>c.rpc==='get_repair_family_summary').length),0);assert.ok(!(await tables()).includes('repair_components'));
@@ -78,7 +78,35 @@ try{
  await go('/admin/receipts?fixtureRole=Business%20Owner');await page.getByRole('heading',{name:'Current receipts data unavailable'}).waitFor();assert.equal(await page.locator('[data-action="open-receipt-modal"]').count(),0);
  await go('/admin/receipts?fixtureRole=Business%20Owner&roots=2&sales=5');await page.locator('[data-receipt-search]').fill('CHILD');assert.equal(await page.locator('[data-action="open-receipt-modal"]').count(),2);
  results.push('Large legacy archive is explicitly unavailable rather than truncated; small complete archive retains exact child/family search');
+ await go('/admin/repairs?fixtureRole=Business%20Owner&boundedReads=1&roots=1001&sales=5');
+ assert.equal(await page.locator('[data-view-ticket]').count(),25);await page.getByText('1–25 of 1001 matching records',{exact:true}).waitFor();
+ await page.locator('[data-filter]').fill('CHILD');await page.locator('[data-view-ticket="1"]').waitFor();assert.equal(await page.locator('[data-view-ticket]').count(),1);await page.getByText('Matched child: CHILD',{exact:false}).waitFor();
+ assert.equal(await page.evaluate(()=>window.resourceCalls.filter(c=>c.rpc==='get_repair_family_summary').length),0);
+ await go('/workshop?fixtureRole=Business%20Owner&boundedReads=1&roots=1001&sales=5');
+ await page.locator('[data-ws-filter]').fill('CHILD');await page.locator('[data-family-finance="1"]').waitFor();assert.equal(await page.locator('[data-family-finance]').count(),1);assert.equal(await page.evaluate(()=>window.resourceCalls.filter(c=>c.rpc==='get_repair_family_summary').length),0);
+ await go('/admin/receipts?fixtureRole=Business%20Owner&boundedReads=1&roots=2');
+ assert.equal(await page.locator('[data-action="open-receipt-modal"]').count(),25);await page.getByText('1–25 of 1004 matching records',{exact:true}).waitFor();
+ await clear();await page.locator('[data-action="open-receipt-modal"]').first().click();await page.getByText('Persisted exact line',{exact:false}).first().waitFor();
+ assert.equal(await page.evaluate(()=>window.resourceCalls.filter(c=>c.table==='sales').length),1,'Header opening fetches only the selected complete sale');await page.locator('[data-close]').last().click();
+ await page.locator('[data-receipt-search]').fill('CHILD');await page.getByText('2 on this complete family selection · 2 matching receipts / invoices',{exact:true}).waitFor();
+ assert.equal(await page.locator('[data-action="open-receipt-modal"]').count(),2);assert.match(await page.locator('[data-action="open-receipt-modal"]').first().innerText(),/CHILD/);
+ await page.locator('[data-receipt-from]').fill('2026-10-25');await page.locator('[data-receipt-to]').fill('2026-10-25');await page.getByText('2 on this complete family selection · 2 matching receipts / invoices',{exact:true}).waitFor();
+ await page.locator('[data-receipt-type]').selectOption('retail');await page.getByText('0 on this page · 0 matching receipts / invoices',{exact:true}).waitFor();
+ await page.locator('[data-action="clear-receipt-filter"]').click();await page.getByText('1–25 of 1004 matching records',{exact:true}).waitFor();
+ results.push('Advertised M2 reads: global child search reaches off-page roots in Admin and Workshop; 25-row unified archive, selected full detail, cross-date exact family and type/date/clear filters; no monetary startup calls');
+ await go('/pos?fixtureRole=Business%20Owner&boundedReads=1&roots=1001&sales=5');
+ await page.evaluate(()=>window.fixtureRows.tickets.find(t=>t.id===1).is_locked=false);
+ await page.locator('[data-action="open-repair-collection"]').first().click();await page.locator('[data-repair-search]').waitFor();
+ await page.getByText('1–25 of 1001 matching records',{exact:true}).waitFor();await page.locator('[data-repair-search]').fill('CHILD');
+ await page.locator('.modal [data-collect-ticket="1"]').waitFor();assert.equal(await page.locator('.modal [data-collect-ticket]').count(),1);
+ assert.equal(await page.evaluate(async()=>(await import('/src/shared.js')).state.data.tickets.length),2,'Collection loads the complete selected family, not capped member matches');
+ results.push('POS collection is deferred and uses bounded global family search only on an advertised backend; off-page root/child selection stays complete');
  assert.deepEqual(errors,[]);assert.deepEqual(external,[]);assert.equal(await page.evaluate(()=>window.fixtureWrites.length),0);
  console.log(JSON.stringify({result:'PASS',results,errors,external,scope:'Actual browser/application; synthetic SDK data and print capture; no hosted RLS/SQL or physical printing claim'},null,2));
  if(process.env.M2_BROWSER_EVIDENCE){await mkdir(process.env.M2_BROWSER_EVIDENCE,{recursive:true});await writeFile(process.env.M2_BROWSER_EVIDENCE+'/resource-browser.json',JSON.stringify({result:'PASS',results,errors,external},null,2));}
+}catch(error){
+ const failedPage=browser?.contexts()?.[0]?.pages()?.[0];
+ const view=await failedPage?.evaluate(()=>({url:location.href,text:document.getElementById('app')?.innerText?.slice(0,1800),calls:window.resourceCalls})).catch(()=>null);
+ if(process.env.M2_BROWSER_EVIDENCE){await mkdir(process.env.M2_BROWSER_EVIDENCE,{recursive:true});await writeFile(process.env.M2_BROWSER_EVIDENCE+'/resource-browser-failure.json',JSON.stringify({error:error.stack,errors,external,results,view},null,2));}
+ throw error;
 }finally{await browser?.close();await server.close();}

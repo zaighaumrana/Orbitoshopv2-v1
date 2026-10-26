@@ -59,3 +59,44 @@ Until this scope is approved and verified, M2-008/009 and their affected M2-010/
 013 gates remain **BLOCKED**, F05 remains open, and M2 cannot be called complete.
 The local frontend changes remain reviewable independently. M1 PR #2 must also be
 integrated or receive a specific publication decision before the final M2 PR.
+
+## 26 October 2026 — expanded owner authorization and local implementation
+
+The later owner instruction authorizes Shop SQL development and Docker validation.
+The initial NOT AUTHORIZED / NOT IMPLEMENTED statement above is historical. The
+Platform boundary remains unchanged: explicit approval is required before any
+Platform source, branch, commit, selector, manifest or database change. The owner
+also requires repository-delivered migrations instead of direct hosted SQL.
+
+Implemented locally: `20261025233743_m2_bounded_operational_reads.sql`, two invoker
+read RPCs, an additive authenticated config availability field, a structural
+capability and the existing both-mode requirement manifest. No Edge function,
+business write command, financial summary, table grant or historical artifact is
+changed. Stable bounded offsets use created-at/id order; they make no claim of a
+cross-request snapshot while other operators mutate history. Exact invoice search
+returns family identity; the existing complete selected-family helper preserves
+the established JavaScript natural sort and cross-date semantics. Selected family
+reads fail closed above the explicit verified detail bound.
+
+Both real SQL envelopes pass fresh v6-plus-forward and populated v4-to-v6-plus-
+forward fixtures. Initial read-contract oracle checks cover 1,001 children, global
+distinct roots, cancelled children, off-page duplicate sales and exact child/date
+behavior. Replays are inert; conflicting source is denied; an intentional failure
+rolls back its business insert and ledger entry. Final capability-source checks
+are recorded separately. These fixtures use synthetic Auth and are not hosted
+provider or JWT acceptance evidence.
+
+At 12,003 tickets / 11,003 sales, the exploratory warm SQL measurement reports a
+complete-table alternative at 16,176,578 decoded JSON bytes and 1,631.229ms median
+(three samples), versus a 25-row receipt page at 9,455 bytes and 828.190ms. The
+inherited capped alternative is incomplete and is not an equivalent correctness
+baseline. No index is added without plan evidence. SQL scans for exact counts and
+arbitrary substring search still scale with eligible history; bounded network
+transfer does not imply constant database cost.
+
+New frontend calls require `get_app_config().read_contracts` version1. Missing,
+public, failed or replacement-session config clears availability. Older shops do
+not call the new RPCs. Their complete legacy path remains when verifiable; large
+capped histories explicitly report unavailable rather than presenting partial
+results as complete. Backend packaging/parity and M2 completion remain BLOCKED
+pending the focused Platform integration decision and final exact-source gates.

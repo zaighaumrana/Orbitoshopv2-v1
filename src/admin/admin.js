@@ -31,11 +31,12 @@ import { dlog, dstack, callerInfo } from '../debuglog.js'
 import {onPrivateReset} from '../ui-authority.js'
 import {pageControls,readComplete,readPreview} from '../bounded-read.js'
 import {adminPage,flatResource,verifiedLegacyMembers} from '../features/admin/resources.js'
+import {hasReadContract,repairFamilyPage,receiptArchivePage} from '../backend-reads.js'
 import { reportsPage } from './pages/reports.js'
 import { billingUsagePage } from './pages/billing-usage.js'
 import { createPlatformBridge } from '../platform/bridge.js'
 import { catalogPage, qiVariantRowHTML, addQuickItemModalHTML } from '../features/admin/catalog/render.js'
-import { receiptsPage, udharListModalHTML, receiptDetailModalHTML } from '../features/admin/checkout/render.js'
+import { receiptsPage, receiptArchive, udharListModalHTML, receiptDetailModalHTML } from '../features/admin/checkout/render.js'
 import { settleUdhar } from '../features/checkout/udhar/api.js'
 import {
   ticketCreatedModalHTML, ticketDetailModalHTML, markNotNeededModalHTML,
@@ -105,6 +106,7 @@ async function load(verifiedConfig) {
   const view=captureView()
   const generation = ++adminLoadGeneration
   flatGeneration++;clearTimeout(flatTimer);adminState._page=null
+  adminState._receiptPage=null
   const loadSession = SESSION
   const loadPath = window.location.pathname
   const navigationIsCurrent=adminNavigationIsCurrent
@@ -148,9 +150,12 @@ async function load(verifiedConfig) {
       if(!current())return
     }
   }
+  const pagedFamilies=mod==='repairs'&&hasReadContract('repair_families')
+  const pagedReceipts=mod==='receipts'&&hasReadContract('receipt_archive')
   const needs = {
-    tickets: CFG.repair_module_enabled && ['repairs','receipts'].includes(mod),
-    sales: ['dashboard','reports','receipts'].includes(mod),
+    tickets: CFG.repair_module_enabled && (mod==='repairs'||mod==='receipts'&&!pagedReceipts),
+    archive:pagedReceipts,
+    sales: ['dashboard','reports'].includes(mod)||mod==='receipts'&&!pagedReceipts,
     employees: mod==='employees',
     udhar: false,
     financial: ['dashboard','reports'].includes(mod),
@@ -168,8 +173,8 @@ async function load(verifiedConfig) {
     sb.from('employees').select('id',{count:'exact',head:true}),
     sb.from('employees').select('id',{count:'exact',head:true}).eq('status','Active'),
   ].map(settleRead)):null
-  const [tickets, sales, employees, udharAccounts, financial, financialToday, returns_, inv, quickItems, repairComponents] = await Promise.all([
-    needs.tickets ? verifiedLegacyMembers('tickets',current) : skip,
+  const [tickets, sales, employees, udharAccounts, financial, financialToday, returns_, inv, quickItems, repairComponents, archive] = await Promise.all([
+    needs.tickets ? pagedFamilies?repairFamilyPage({search:adminState.filter,current}):verifiedLegacyMembers('tickets',current) : skip,
     needs.sales ? mod==='receipts'?verifiedLegacyMembers('sales',current):readPreview(()=>sb.from('sales').select(mod==='dashboard'?'id,invoice_number,customer_name,payment_method,total_bill,created_at':'id,invoice_number,customer_name,payment_method,total_bill,created_at,items_sold').order('created_at',{ascending:false}).order('id',{ascending:false}),mod==='dashboard'?8:15,current) : skip,
     needs.employees ? adminPage(mod,adminState.catalogTab,adminState.filter,0,current) : skip,
     needs.udhar ? sb.rpc('get_unified_udhar_accounts') : skip,
@@ -183,12 +188,15 @@ async function load(verifiedConfig) {
     needs.inventory ? adminPage(mod,adminState.catalogTab,adminState.filter,0,current) : skip,
     needs.quickItems ? adminPage(mod,adminState.catalogTab,adminState.filter,0,current) : skip,
     needs.repairComponents ? adminPage(mod,adminState.catalogTab,adminState.filter,0,current) : skip,
+    needs.archive?receiptArchivePage(adminState,{current}):skip,
   ].map(settleRead))
   if (!current()) return
-  const reads=readStates({tickets,sales,employees,udharAccounts,financial,financialToday,returns:returns_,inventory:inv,quickItems,repairComponents},['financial','financialToday'])
+  const reads=readStates({tickets,sales,employees,udharAccounts,financial,financialToday,returns:returns_,inventory:inv,quickItems,repairComponents,archive},['financial','financialToday'])
   state.data=reads.values;state.resources=reads.resources
   const resource=flatResource(mod,adminState.catalogTab)
   if(resource)adminState._page={inventory:inv,employees,quickItems,repairComponents}[resource]
+  if(pagedFamilies&&!tickets.error)adminState._page={...tickets,data:tickets.rootIds}
+  if(pagedReceipts&&!archive.error)adminState._page=adminState._receiptPage=archive
   if(mod==='dashboard'){
     const counts=await dashboardCounts
     if(!current())return
@@ -223,18 +231,54 @@ async function load(verifiedConfig) {
   render()
 }
 
+function pagedAdminResource(){
+  if(adminState.adminModule==='repairs'&&CFG.repair_module_enabled&&hasReadContract('repair_families'))return 'tickets'
+  if(adminState.adminModule==='receipts'&&hasReadContract('receipt_archive'))return 'archive'
+  return flatResource(adminState.adminModule,adminState.catalogTab)
+}
+function queueAdminSearch(){
+  const key=pagedAdminResource()
+  if(!key){render();return}
+  const revision=++flatGeneration;clearTimeout(flatTimer)
+  state.resources[key]={status:'loading'}
+  document.querySelector('.content')?.setAttribute('aria-busy','true')
+  document.querySelectorAll('[data-inv-edit],[data-inv-adjust],[data-inv-delete],[data-emp-id],[data-remove-qitem],[data-add-qprice],[data-remove-qprice],[data-remove-quick],[data-view-ticket],[data-ticket-id],[data-sale-id],[data-receipt-idx],[data-admin-page]').forEach(button=>button.disabled=true)
+  flatTimer=setTimeout(()=>{if(ownsAdmin())void loadFlatPage(0,revision)},180)
+}
 async function loadFlatPage(offset=0,revision=++flatGeneration) {
   const view=captureView(),mod=adminState.adminModule,tab=adminState.catalogTab,query=adminState.filter
-  const key=flatResource(mod,tab),current=()=>view()&&ownsAdmin()&&revision===flatGeneration&&adminState.filter===query&&adminState.catalogTab===tab
+  const receiptQuery=JSON.stringify([adminState.receiptSearch,adminState.receiptType,adminState.receiptDateFrom,adminState.receiptDateTo])
+  const key=pagedAdminResource(),current=()=>view()&&ownsAdmin()&&revision===flatGeneration&&adminState.filter===query&&adminState.catalogTab===tab&&receiptQuery===JSON.stringify([adminState.receiptSearch,adminState.receiptType,adminState.receiptDateFrom,adminState.receiptDateTo])
   if(!key||!current())return
   state.resources[key]={status:'loading'}
   document.querySelector('.content')?.setAttribute('aria-busy','true')
-  const result=await settleRead(adminPage(mod,tab,query,offset,current,offset?adminState._page?.size||25:25))
+  const result=await settleRead(key==='tickets'?repairFamilyPage({search:query,offset,current}):key==='archive'?receiptArchivePage(adminState,{offset,current}):adminPage(mod,tab,query,offset,current,offset?adminState._page?.size||25:25))
   if(!current())return
   state.data[key]=result.error?null:result.data
   state.resources[key]={status:result.error?'unavailable':'ready'}
-  adminState._page=result.error?null:result
+  adminState._page=result.error?null:key==='tickets'?{...result,data:result.rootIds}:result
+  if(key==='archive')adminState._receiptPage=result.error?null:result
   render()
+}
+
+async function openReceiptDetail(index){
+  const record=receiptArchive(adminState)[index]
+  if(!record)return
+  adminState.receiptModalIdx=index
+  const view=captureView(),modal={type:'receipt-detail',readStatus:record.raw?'ready':'loading'},current=()=>view()&&ownsAdmin()&&state.modal===modal&&receiptArchive(adminState)[index]===record
+  state.modal=modal;render()
+  if(record.raw)return
+  const result=await settleRead(sb.from(record.kind==='ticket'?'tickets':'sales').select('*').eq('id',record.id).single())
+  if(!current())return
+  if(result.error||!result.data){modal.readStatus='unavailable';render();return}
+  let parent=null
+  if(result.data.parent_ticket_id){
+    const selected=await settleRead(sb.from('tickets').select('*').eq('id',result.data.parent_ticket_id).single())
+    if(!current())return
+    if(selected.error||!selected.data){modal.readStatus='unavailable';render();return}
+    parent=selected.data
+  }
+  record.raw=result.data;record.parent=parent;modal.readStatus='ready';render()
 }
 
 async function openAdminUdhar() {
@@ -443,11 +487,11 @@ function repairs() {
         </table></div>
       </div>
       <div class="card">
-        <h2>Status Summary</h2>
+        <h2>${adminState._page?.statusCounts?'Matching families by status':'Status Summary'}</h2>
         <div class="list">
           ${['Pending','In Progress','Ready','Delivered','Cancelled','Declined'].map(s => `
             <div class="list-row"><span>${s}</span>
-              <strong>${roots.filter(t=>t.status===s).length}</strong>
+              <strong>${adminState._page?.statusCounts?adminState._page.statusCounts[s]||0:roots.filter(t=>t.status===s).length}</strong>
             </div>`).join('')}
         </div>
       </div>
@@ -786,6 +830,8 @@ function attachEvents() {
     )
     if (!el) return
     if(el.dataset.adminPage){const page=adminState._page;if(page)await loadFlatPage(el.dataset.adminPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
+    const pagedResource=pagedAdminResource()
+    if(pagedResource&&!resourceReady(state.resources,pagedResource)&&(el.dataset.viewTicket||el.dataset.ticketId||el.dataset.saleId||el.dataset.receiptIdx!==undefined))return
     const activeFlat=flatResource(adminState.adminModule,adminState.catalogTab)
     if(activeFlat&&!resourceReady(state.resources,activeFlat)&&(el.dataset.invEdit||el.dataset.invAdjust||el.dataset.invDelete||el.dataset.empId||el.dataset.removeQitem!==undefined||el.dataset.addQprice!==undefined||el.dataset.removeQprice!==undefined||el.dataset.removeQuick!==undefined))return
     if(el.dataset.action==='support-consent-revoke'){
@@ -1230,28 +1276,23 @@ function attachEvents() {
       adminState.receiptDateTo   = ''
       adminState.receiptSearch   = ''
       adminState.receiptType     = 'all'
-      render(); return
+      queueAdminSearch(); return
     }
 
     if (el.dataset.action === 'open-receipt-modal') {
-      adminState.receiptModalIdx = Number(el.dataset.receiptIdx)
-      state.modal = { type: 'receipt-detail' }
-      render(); return
+      await openReceiptDetail(Number(el.dataset.receiptIdx));return
     }
+    if(el.dataset.action==='retry-receipt-detail'){await openReceiptDetail(adminState.receiptModalIdx);return}
 
     if (el.dataset.action === 'receipt-prev') {
       if (adminState.receiptModalIdx > 0) {
-        adminState.receiptModalIdx--
-        state.modal = { type: 'receipt-detail' }
-        render()
+        await openReceiptDetail(adminState.receiptModalIdx-1)
       }
       return
     }
 
     if (el.dataset.action === 'receipt-next') {
-      adminState.receiptModalIdx++
-      state.modal = { type: 'receipt-detail' }
-      render()
+      await openReceiptDetail(adminState.receiptModalIdx+1)
       return
     }
 
@@ -1370,15 +1411,11 @@ function attachEvents() {
     rememberAdditionalWorkInput(t, state.modal)
     if (t.dataset.filter !== undefined) {
       adminState.filter=t.value
-      if(flatResource(adminState.adminModule,adminState.catalogTab)){
-        const revision=++flatGeneration;clearTimeout(flatTimer)
-        document.querySelectorAll('[data-inv-edit],[data-inv-adjust],[data-inv-delete],[data-emp-id],[data-remove-qitem],[data-add-qprice],[data-remove-qprice],[data-remove-quick]').forEach(button=>button.disabled=true)
-        flatTimer=setTimeout(()=>{if(ownsAdmin())void loadFlatPage(0,revision)},180)
-      }else render()
+      queueAdminSearch()
     }
-    if (t.dataset.receiptSearch !== undefined) { adminState.receiptSearch = t.value; render() }
-    if (t.dataset.receiptFrom !== undefined) { adminState.receiptDateFrom = t.value; render() }
-    if (t.dataset.receiptTo   !== undefined) { adminState.receiptDateTo   = t.value; render() }
+    if (t.dataset.receiptSearch !== undefined) { adminState.receiptSearch = t.value; queueAdminSearch() }
+    if (t.dataset.receiptFrom !== undefined) { adminState.receiptDateFrom = t.value; queueAdminSearch() }
+    if (t.dataset.receiptTo   !== undefined) { adminState.receiptDateTo   = t.value; queueAdminSearch() }
     if (t.dataset.subinvCompPrice !== undefined || t.dataset.subinvLabour !== undefined) {
       const prices = [...document.querySelectorAll('[data-subinv-comp-price]')].reduce((s,inp) => s+(Number(inp.value)||0), 0)
       const labour = Number(document.querySelector('[data-subinv-labour]')?.value||0)
@@ -1431,7 +1468,7 @@ function attachEvents() {
     if (t.dataset.receiptType !== undefined) {
       adminState.receiptType = t.value
       adminState.receiptModalIdx = null
-      render()
+      queueAdminSearch()
       return
     }
   },error=>showBlockingError(error?.message||'Unable to confirm the result. Refresh reads before retrying.'))

@@ -221,6 +221,7 @@ export let CFG = {
   repair_module_enabled: false, inventory_module_enabled: false,
   technician_module_enabled: false, live_tracking_enabled: false,
   ems_enabled: false, suspended: false,
+  read_contracts: {},
 }
 
 const entitlementKeys = ['repair_module_enabled','inventory_module_enabled','technician_module_enabled','live_tracking_enabled','ems_enabled']
@@ -235,6 +236,7 @@ export function createConfigHandoff(){
 export function resetClientEntitlements() {
   invalidateConfigReads()
   for (const key of entitlementKeys) CFG[key] = false
+  CFG.read_contracts={}
   state.modal = null
   try { sessionStorage.removeItem('retailos_collect_ticket') } catch {}
 }
@@ -254,9 +256,10 @@ export function loadConfig(publicOnly = false,verifiedConfig) {
     try{({data,error}=await sb.rpc(rpc))}catch(failure){error=failure}
     if(generation!==configGeneration||!current())return false
     for(const key of entitlementKeys)CFG[key]=!error&&data?.[key]===true
+    CFG.read_contracts=!publicOnly&&!error&&data?.read_contracts&&typeof data.read_contracts==='object'?data.read_contracts:{}
     verifiedConfigScope=null
     if(error||!data){state.modal=null;console.warn('Config unavailable; optional modules disabled.');return false}
-    for(const [key,value] of Object.entries(data))if(key!=='workshop_enabled'&&!entitlementKeys.includes(key))CFG[key]=value
+    for(const [key,value] of Object.entries(data))if(!['workshop_enabled','read_contracts'].includes(key)&&!entitlementKeys.includes(key))CFG[key]=value
     verifiedConfigScope=publicOnly?'public':'app'
     return true
   })()

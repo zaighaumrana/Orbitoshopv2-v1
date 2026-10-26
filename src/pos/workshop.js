@@ -29,6 +29,7 @@ import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
 import {captureAuthority,onPrivateReset} from '../ui-authority.js'
 import {readPage,readComplete,pageControls} from '../bounded-read.js'
+import {hasReadContract,repairFamilyPage} from '../backend-reads.js'
 
 /* ── Workshop state ── */
 const wsState = {
@@ -43,8 +44,9 @@ const wsState = {
 let SESSION        = {}
 let _eventsAttached = false
 let workshopNavigationIsCurrent=()=>false,workshopLoadGeneration=0
+let workshopSearchTimer=null
 const ownsWorkshop=()=>workshopNavigationIsCurrent()&&window.location.pathname==='/workshop'&&state.role===SESSION.employee?.role&&can('workshop',state.role)
-onPrivateReset(() => {workshopLoadGeneration++;workshopNavigationIsCurrent=()=>false;SESSION={};wsState.familySummaries=new Map();wsState.filter='';wsState.statusFilter='all';wsState.page=null;wsState.expandedFinance=null;wsState.financeRequest++})
+onPrivateReset(() => {workshopLoadGeneration++;clearTimeout(workshopSearchTimer);workshopNavigationIsCurrent=()=>false;SESSION={};wsState.familySummaries=new Map();wsState.filter='';wsState.statusFilter='all';wsState.page=null;wsState.expandedFinance=null;wsState.financeRequest++})
 
 /* ── Load ── */
 async function load(verifiedConfig,offset=0) {
@@ -61,7 +63,8 @@ async function load(verifiedConfig,offset=0) {
     document.getElementById('app').textContent = 'Workshop is unavailable for this client. Contact your administrator.'
     return
   }
-  const tickets=await settleRead(readPage(()=>{
+  const completeSearch=hasReadContract('repair_families')
+  const tickets=await settleRead(completeSearch?repairFamilyPage({search:wsState.filter,context:'workshop',status:wsState.statusFilter,offset,current}):readPage(()=>{
     let query=sb.from('tickets')
       .select('*',{count:'exact'})
       .is('parent_ticket_id', null)
@@ -73,7 +76,7 @@ async function load(verifiedConfig,offset=0) {
   // Child lifecycle may differ from its active root. Fetch those children
   // without loading unrelated closed families or consulting financial RPCs.
   const roots = tickets.error?[]:tickets.data || []
-  const children = roots.length ? await settleRead(readComplete(()=>sb.from('tickets').select('*',{count:'exact'})
+  const children = !completeSearch&&roots.length ? await settleRead(readComplete(()=>sb.from('tickets').select('*',{count:'exact'})
     .in('parent_ticket_id', roots.map(ticket => ticket.id))
     .order('created_at', {ascending:true}).order('id'),{current})) : {data:[]}
   if(!current())return
@@ -200,14 +203,14 @@ function render() {
 /* ── Workshop View ── */
 function workshopView() {
   if(!resourceReady(state.resources,'config'))return resourceNotice('Shop configuration')
-  if(!resourceReady(state.resources,'tickets','children'))return resourceNotice('Complete repair queue')
+  if(!resourceReady(state.resources,'tickets','children'))return `<input class="search" data-ws-filter value="${escapeHTML(wsState.filter)}" placeholder="Search name, phone, device, IMEI, ticket #…">${resourceNotice('Complete repair queue',state.resources?.tickets?.status==='loading'?'loading':'unavailable')}`
   const all    = state.data.tickets || []
   const roots = groupRepairFamilies(all).map(family => family.root)
   const filtered = findRepairFamilies(all, wsState.filter)
     .filter(family => wsState.statusFilter === 'all' || family.root.status === wsState.statusFilter)
     .map(family => ({ ...family.root, _matchedChild:matchedRepairChild(family), _work:repairFamilyWork(family) }))
 
-  const counts = {
+  const counts = wsState.page?.statusCounts || {
     Pending:     roots.filter(t => t.status === 'Pending').length,
     'In Progress': roots.filter(t => t.status === 'In Progress').length,
     Ready:       roots.filter(t => t.status === 'Ready').length,
@@ -247,7 +250,7 @@ function workshopView() {
             ? 'primary-button' : 'secondary-button'}"
             style="font-size:12px;padding:5px 12px"
             data-status-filter="all">
-            All on page: ${roots.length}
+            ${wsState.page?.statusCounts?'All matching: '+Object.values(counts).reduce((sum,n)=>sum+n,0):'All on page: '+roots.length}
           </button>
         </div>
       </div>
@@ -256,8 +259,8 @@ function workshopView() {
       <input class="search" placeholder="Search name, phone, device, IMEI, ticket #…"
         data-ws-filter value="${escapeHTML(wsState.filter)}"
         style="font-size:14px;padding:10px 14px">
-      <p class="muted">Search filters this operational page. Status and Next/Previous retrieve matching active roots; each displayed family includes its complete required work.</p>
-      ${pageControls(wsState.page,'data-workshop-page')}
+        <p class="muted">${hasReadContract('repair_families')?'Search checks every parent and child in the active queue. Status counts cover all matching families.':'Search filters this operational page. Status and Next/Previous retrieve matching active roots.'} Each displayed family includes its complete required work.</p>
+        ${pageControls(wsState.page&&{...wsState.page,data:wsState.page.rootIds||wsState.page.data},'data-workshop-page')}
 
       <!-- Ticket Cards -->
       ${filtered.length ? filtered.map(t => `
@@ -787,7 +790,14 @@ function attachEvents() {
     const t = e.target
     rememberAdditionalWorkInput(t, state.modal)
     if (t.dataset.wsFilter !== undefined) {
-      wsState.filter = t.value; render(); return
+        wsState.filter = t.value
+        if(hasReadContract('repair_families')){
+          clearTimeout(workshopSearchTimer);workshopLoadGeneration++
+          state.resources.tickets={status:'loading'};render()
+          const current=captureView()
+          workshopSearchTimer=setTimeout(()=>{if(current()&&ownsWorkshop())void load()},180)
+        }else render()
+        return
     }
     if (t.dataset.draftCompPrice !== undefined || t.dataset.draftLabour !== undefined) {
       updateDraftTotal()

@@ -64,7 +64,27 @@ export function resourceFixture(){
   else if(name==='get_repair_family_summary'){
    const root=(window.fixtureRows?.tickets||[]).find(r=>String(r.id)===String(args.p_ticket_id));
    result=window.fixtureRevokeConsent?{data:null,error:Error('consent revoked')}:{data:{root,invoices:root?[root]:[],effectiveObligation:100,netPayments:58,outstanding:42}};
+  }else if(new URLSearchParams(location.search).get('boundedReads')==='1'&&['get_repair_family_page','get_receipt_archive_page'].includes(name)){
+   if(window.fixtureRevokeConsent)result={data:null,error:Error('consent revoked')};
+   else{
+    const tickets=[...(window.fixtureRows.tickets||[])].sort((a,b)=>b.id-a.id),sales=[...(window.fixtureRows.sales||[])].sort((a,b)=>b.id-a.id);
+    if(name==='get_repair_family_page'){
+     const {findRepairFamilies}=await import('/src/features/repairs/family.js');
+     let families=findRepairFamilies(tickets,args.p_search);
+     if(args.p_context==='workshop')families=families.filter(f=>!['Delivered','Declined','Cancelled'].includes(f.root.status));
+     const statusCounts={};for(const f of families)statusCounts[f.root.status]=(statusCounts[f.root.status]||0)+1;
+     families=families.filter(f=>args.p_status==='all'||f.root.status===args.p_status).sort((a,b)=>new Date(b.root.created_at)-new Date(a.root.created_at)||b.root.id-a.root.id);
+     result={data:{contract:1,offset:args.p_offset,size:args.p_limit,count:families.length,statusCounts,rows:families.slice(args.p_offset,args.p_offset+args.p_limit).map(f=>({id:f.root.id,created_at:f.root.created_at,status:f.root.status}))}};
+    }else{
+     const {buildReceiptRecords,filterReceiptRecords}=await import('/src/features/admin/checkout/receipts.js'),{localDateKey}=await import('/src/datetime.js');
+     const filters={receiptSearch:args.p_search,receiptType:args.p_type,receiptDateFrom:args.p_from?localDateKey(args.p_from):'',receiptDateTo:args.p_to?localDateKey(new Date(new Date(args.p_to).getTime()-1)):''};
+     const records=buildReceiptRecords(sales,tickets),filtered=filterReceiptRecords(records,filters),search=args.p_search.toLowerCase().trim();
+     const exact=records.filter(r=>r.kind==='ticket'&&(args.p_type==='all'||args.p_type===r.type)&&r.invoiceNumber.toLowerCase().trim()===search);
+     result={data:{contract:1,offset:args.p_offset,size:args.p_limit,count:filtered.length,mode:exact.length?'family':'page',matches:exact.filter(r=>filtered.some(x=>x.key===r.key)).map(r=>({id:r.id,rootTicketId:r.rootTicketId})),rows:exact.length?[]:filtered.slice(args.p_offset,args.p_offset+args.p_limit).map(({raw,parent,...header})=>header)}};
+    }
+   }
   }else result=await originalRPC(name,args);
+  if(name==='get_app_config'&&new URLSearchParams(location.search).get('boundedReads')==='1'&&result.data)result={...result,data:{...result.data,read_contracts:{repair_families:1,receipt_archive:1}}};
   if(window.fixtureHoldRPC===name){window.fixtureHoldRPC=null;return new Promise(resolve=>window.fixtureRPCReleases.push(()=>resolve(result)))}
   return result;
  };

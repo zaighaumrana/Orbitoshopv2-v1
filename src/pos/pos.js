@@ -48,6 +48,7 @@ import {captureAuthority,onPrivateReset} from '../ui-authority.js'
 import {readComplete,readPage,pageControls} from '../bounded-read.js'
 import {stockPage,quickPage,intakeComponents,completeTicketSelection,legacyCompleteCollection} from '../features/pos/resources.js'
 import {localReportPeriod,actorPeriodRows} from '../datetime.js'
+import {hasReadContract,repairFamilyPage} from '../backend-reads.js'
 
 /* ── POS-only state ── */
 const emptyPOS = () => ({
@@ -68,6 +69,7 @@ const emptyPOS = () => ({
   invSearch:       '',
   repairSearch:    '',
   collectionsReady:false,
+  collectionPage:null,
   inventoryPage:null,
   quickPage:null,
 })
@@ -79,6 +81,7 @@ let _eventsAttached = false
 let placingOrder = false
 let checkoutInFlight = false
 let posNavigationIsCurrent=()=>false,posLoadGeneration=0
+let collectionGeneration=0,collectionTimer=null
 const ownsPOS=()=>posNavigationIsCurrent()&&window.location.pathname==='/pos'&&state.role===SESSION.employee?.role&&can('pos',state.role)
 // Retain original-actor requests separately from replacement-account UI.
 const cartOperations = new Map()
@@ -87,6 +90,7 @@ onPrivateReset(() => {
   posLoadGeneration++;posNavigationIsCurrent=()=>false
   posState=emptyPOS();SESSION={};placingOrder=false;checkoutInFlight=false;resetDraft()
   selectorGeneration++;clearTimeout(selectorTimer)
+  collectionGeneration++;clearTimeout(collectionTimer)
 })
 
 /* ── Load ── */
@@ -147,15 +151,17 @@ async function refreshStock(offset=0,revision=++selectorGeneration) {
   state.data.inventory=result.error?null:result.data;posState.inventoryPage=result.error?null:result
   render()
 }
-async function openDeferredPOS(type) {
-  const view=captureView(),modal={type,readStatus:'loading'},current=()=>view()&&ownsPOS()&&state.modal===modal
+async function openDeferredPOS(type,offset=0) {
+  const revision=++collectionGeneration
+  const view=captureView(),modal={type,readStatus:'loading'},current=()=>view()&&ownsPOS()&&state.modal===modal&&revision===collectionGeneration
   state.modal=modal;render()
   try {
     if(type==='repair')state.data.repairComponents=(await intakeComponents(current)).data
     if(type==='repair-collection'){
-      const result=await legacyCompleteCollection(current)
+      const result=await (hasReadContract('repair_families')?repairFamilyPage({search:posState.repairSearch,context:'collection',offset,current}):legacyCompleteCollection(current))
       if(!current())return
       state.data.tickets=result.data;posState.collectionsReady=true
+      posState.collectionPage=result.rootIds?{...result,data:result.rootIds}:null
     }
     if(type==='udharList'){
       const result=await sb.rpc('get_unified_udhar_accounts')
@@ -443,7 +449,7 @@ function recentRepairPanel() {
   return `
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h2 style="margin:0">Recent Repair Tickets</h2>
+        <h2 style="margin:0">${posState.collectionPage?'Matching Repair Tickets':'Recent Repair Tickets'}</h2>
         <button class="secondary-button" style="font-size:12px" data-action="open-repair-collection">View All</button>
       </div>
       ${pending.length ? pending.map(t => repairRowHTML(t)).join('') : `<div class="empty">No pending tickets.</div>`}
@@ -640,6 +646,7 @@ function renderModal() {
   if (!state.modal) return ''
   if (!modalEntitled(state.modal.type)) { state.modal = null; return '' }
   const { type } = state.modal
+    if(type==='repair-collection'&&state.modal.readStatus==='loading'&&hasReadContract('repair_families'))return `<div class="modal-backdrop"><div class="modal"><h2>Repair Collection</h2><input class="search" data-repair-search value="${escapeHTML(posState.repairSearch)}" placeholder="Search name, phone, device, IMEI, ticket #…">${resourceNotice('Repair collection','loading')}<button class="secondary-button" data-close>Close</button></div></div>`
   if(state.modal.readStatus&&state.modal.readStatus!=='ready')return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Selected '+(type==='shiftStats'?'shift':type==='repair'?'repair intake':'detail'),state.modal.readStatus==='loading'?'loading':'unavailable')}${state.modal.readError?`<p>${escapeHTML(state.modal.readError)}</p>`:''}<button class="secondary-button" data-action="retry-pos-detail">Retry detail</button><button class="secondary-button" data-close>Close</button></div></div>`
   const required=type==='udharList'?['udharAccounts']:type==='repair-collection'?['tickets']:['repair','create-sub-invoice','edit-components'].includes(type)?['tickets','repairComponents']:[]
   if(!resourceReady(state.resources,...required))return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Required detail')}<button type="button" data-close>Close</button></div></div>`
@@ -788,7 +795,7 @@ function renderModal() {
     })
   }
   if (type === 'comp-tag-picker') return compTagPickerHTML(state.modal.name)
-  if (type === 'repair-collection') return repairCollectionHTML(posState.repairSearch)
+  if (type === 'repair-collection') return repairCollectionHTML(posState.repairSearch,posState.collectionPage)
   if (type === 'ticket-payment')  return ticketPaymentModalHTML(state.modal)
 
   if (type === 'override') {
@@ -1186,7 +1193,8 @@ function attachEvents() {
     )
     if (!el) return
     if(el.dataset.stockPage){const page=posState.inventoryPage;if(page)await refreshStock(el.dataset.stockPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
-    if(el.dataset.quickPage){const page=posState.quickPage;if(!page)return;const revision=++quickGeneration,current=()=>eventCurrent()&&revision===quickGeneration;state.resources.quickItems={status:'loading'};render();const result=await settleRead(quickPage('',el.dataset.quickPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size),current));if(!current())return;state.data.quickItems=result.error?null:result.data;state.resources.quickItems={status:result.error?'unavailable':'ready'};posState.quickPage=result.error?null:result;render();return}
+    if(el.dataset.quickPage){const page=posState.quickPage;if(!page)return;const revision=++quickGeneration,current=()=>eventCurrent()&&revision===quickGeneration;state.resources.quickItems={status:'loading'};render();const result=await settleRead(quickPage('',el.dataset.quickPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size),current,page.size));if(!current())return;state.data.quickItems=result.error?null:result.data;state.resources.quickItems={status:result.error?'unavailable':'ready'};posState.quickPage=result.error?null:result;render();return}
+    if(el.dataset.collectionPage){const page=posState.collectionPage;if(page&&state.modal?.readStatus==='ready')await openDeferredPOS('repair-collection',el.dataset.collectionPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
     if (placingOrder) return
     if (!CFG.repair_module_enabled && (el.dataset.ticketId || el.dataset.collectTicket || ['open-repair-collection','edit-cart-repair','place-order'].includes(el.dataset.action))) return
     if (el.dataset.action === 'go-workshop' && !can('workshop', state.role)) return
@@ -1695,7 +1703,15 @@ function attachEvents() {
       document.querySelectorAll('[data-inv-pos-add]').forEach(button=>button.disabled=true)
       selectorTimer=setTimeout(()=>{if(ownsPOS())void refreshStock(0,revision)},180)
     }
-    if (t.dataset.repairSearch !== undefined) { posState.repairSearch = t.value; render() }
+    if (t.dataset.repairSearch !== undefined) {
+      posState.repairSearch=t.value
+      if(hasReadContract('repair_families')){
+        collectionGeneration++;clearTimeout(collectionTimer)
+        const modal=state.modal,current=captureView()
+        modal.readStatus='loading';render()
+        collectionTimer=setTimeout(()=>{if(current()&&ownsPOS()&&state.modal===modal)void openDeferredPOS('repair-collection')},180)
+      }else render()
+    }
     if (t.dataset.returnQty !== undefined) refreshRetailReturnPreview()
     if (t.dataset.draftCompPrice !== undefined) {
       const idx = Number(t.dataset.draftCompPrice)

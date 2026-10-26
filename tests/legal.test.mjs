@@ -253,7 +253,7 @@ test('current provider register and documents preserve data-return limits and qu
 
 test('current enterApplication completes Onboarding V2 before legal and keeps normal routing behind the gate', async () => {
   const main = read('src/main.js')
-  const source = main.slice(main.indexOf('async function enterApplication(session)'),main.indexOf('async function onLoginSuccess(session)'))
+  const source = main.slice(main.indexOf('async function enterApplication('),main.indexOf('async function onLoginSuccess(session)'))
     .replace(/await import\('([^']+)'\)/g, "await importModule('$1')")
   const calls = [], routes = new Map()
   let finishOnboarding, allowLegal = true

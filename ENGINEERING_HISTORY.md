@@ -1340,3 +1340,34 @@ catalog/manifests/selectors and parity approval are pending explicit Platform
 integration authorization. Two integrated unit release gates correctly reject the
 old manifest against this new backend source; they have not been relaxed. No
 hosted write, push, PR, merge or deployment is performed by this backend slice.
+
+## 2026-10-26 — M2 capability-gated family and receipt screens
+Branch: feature/shop-modernization-m2
+
+Frontend reads new family/archive APIs only when authenticated bootstrap advertises
+version1. Missing/public/failed/replacement config clears availability; older shops
+retain verified legacy behavior and no newly introduced RPC call. Selected roots
+retain server page order and complete selected children; unsafe numeric identities,
+count drift, duplicate rows, missing roots and departed owners fail closed.
+Admin repairs/Workshop/POS collection search checks parent and child history on an
+upgraded backend. Receipt headers use stable bounded pages; exact child search
+loads the complete cross-date family with the inherited helper and natural sort.
+Opening a normal receipt fetches the full selected sale/ticket, with owned loading,
+error/retry and parent reads. Counts distinguish matching families, pending tickets
+on the current collection page and archive rows. Filtered POS previews say matching
+rather than recent. No command identity, financial authority or role is widened.
+
+Final frontend local evidence: existing M2 archive run
+20261026T153456Z-M2-013-6776983-dialog-browser. Resource browser, M1 entry/100
+transitions/listener/Enter/PIN/privacy/recovery browser and local Vite build all exit0;
+33focused read/config/ownership/legal/period/EMS cases pass. Earlier startup timeout,
+ambiguous main/dialog selectors and predecessor-route test race remain archived;
+fixture synchronization/selectors were corrected without weakening assertions.
+The integrated86-case run retains2 release-source blockers pending approved paired
+integration. Its outdated legal function-signature fixture is repaired and passes.
+
+Backend source remains677698391ae1a77d259022b2453d20dc76e79cd9. A focused local
+Platform release-integration decision is pending in the permanent archive. Final
+paired performance profiles, package/parity, independent audit and M1 publication
+dependency remain open; this slice is not a complete/release-ready M2 milestone.
+No Platform source edit, hosted write, push, PR, merge or deployment is performed.

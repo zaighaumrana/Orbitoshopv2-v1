@@ -19,7 +19,7 @@ function loaderFixture(module){
  }
  const ctx=vm.createContext({SESSION:{employee:{role:state.role}},state,CFG,_inv:{},
   sb:{from:query,rpc:async name=>({data:name==='get_financial_report'?{}:[]})},loadConfig:async()=>true,can:()=>true,
-  settleRead,readStates,resourceReady,readPage,readComplete,clearTimeout(){},
+  settleRead,readStates,resourceReady,readPage,readComplete,hasReadContract:()=>false,clearTimeout(){},
   quickPage:()=>{const g=deferred();pending.push(g);return g.promise},stockPage:async()=>({data:[],count:0}),
   captureView:()=>{const e=epoch;return ()=>e===epoch},posNavigationIsCurrent:()=>true,workshopNavigationIsCurrent:()=>true,
   posState:{cart:[]},wsState:{familySummaries:new Map(),statusFilter:'all',financeRequest:0},groupRepairFamilies:rows=>rows.map(root=>({root})),ownsWorkshop:()=>true,
