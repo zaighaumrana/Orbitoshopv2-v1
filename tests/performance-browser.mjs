@@ -120,7 +120,7 @@ try{
    else await page.waitForFunction(({match,all})=>{const row=document.querySelector(match);return row&&!row.disabled&&document.querySelectorAll(all).length===1},{match,all},{timeout:25000});
    const search=await page.evaluate(({begin,screen,run,status})=>({screen,run,status,ms:performance.now()-begin.time,reads:window.perfReads.slice(begin.index)}),{begin,screen,run,status});if(run>=0)output.searches.push(search);
   }
-  }catch(error){output.failures.push({run,screen,error:error.message,errors,url:page.url()});console.log('FAIL',screen,run,error.message.slice(0,180));}finally{await context.close();}
+  }catch(error){let diagnostic;try{diagnostic=await page.evaluate(()=>({routeDone:window.perfRouteDone,path:location.pathname+location.search,resources:window.perfState?.resources,role:window.perfState?.role,body:document.querySelector('#app')?.textContent?.slice(0,4000),reads:window.perfReads,auth:window.perfAuth,requests:performance.getEntriesByType('resource').filter(x=>x.name.includes('/__performance-data')).map(x=>({name:x.name,start:x.startTime,end:x.responseEnd}))}))}catch(e){diagnostic={error:e.message}}output.failures.push({run,screen,error:error.message,errors,url:page.url(),diagnostic});console.log('FAIL',screen,run,error.message.slice(0,180));}finally{await context.close();}
   if(run>=0)console.log('sample',run+1,screen);
  }
  if(longSession){

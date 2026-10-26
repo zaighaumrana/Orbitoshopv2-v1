@@ -100,3 +100,34 @@ not call the new RPCs. Their complete legacy path remains when verifiable; large
 capped histories explicitly report unavailable rather than presenting partial
 results as complete. Backend packaging/parity and M2 completion remain BLOCKED
 pending the focused Platform integration decision and final exact-source gates.
+
+## 26 October 2026 — final local candidate and older-backend continuity
+
+The owner subsequently approved local-only Platform release integration, including
+its feature branch, source changes, commits and focused tests. Platform commit is
+cedde3838e039b2ec9aebc163153e01253ede1ca. No remote Platform operation, PR, merge,
+deployment or hosted database change is authorized or performed. V7 remains
+candidate-local, unsupported and unapproved; actual Managed/BYO selectors stay v6.
+
+Final backend source is50b94931ecf743166136b2c562cbb6d2fbaebdc7. Migration SHA256 is
+ab1f175ab24b4590fa7523ec906aa018c625b628c51f4dcc6a579a4dcb8d2c00; final fingerprint
+c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada. An independent
+undated/pre-epoch receipt oracle found a dateTo-only mismatch in the earlier
+uncommitted candidate; the failed source and old draft are preserved. Corrected
+SQL passed all four fresh/populated Managed/BYO fixtures before regeneration.
+
+Older large backends now retain bounded exact ticket/invoice lookup with complete
+selected family/receipt detail, without the new RPCs. Small complete histories
+retain free-text legacy search. Controls state their actual page/lookup scope;
+there is no forced upgrade or false complete global search on a capped history.
+
+Final local candidate parity passes with39 migrations,7 unchanged functions and
+9 requirements. Targeted parity/health/pin/assessment15/15 and actual upgrade
+planner/executor/denial3/3 pass. Eight historical package/selector files, old catalog
+rows and actual BYO manifest are unchanged. The ordinary active gate and the old
+CLI-success fixture remain blocked by real unpromoted-source checks; they are not
+weakened or counted as passes. Both paired workflows retain the ordinary gate.
+
+See the permanent M2 archive's20261026T180000Z-M2-012-cedde38-local-review for exact
+patches, source ZIPs, hashes and detailed review report. Full provider staging,
+release promotion, independent audit and owner acceptance remain separate gates.

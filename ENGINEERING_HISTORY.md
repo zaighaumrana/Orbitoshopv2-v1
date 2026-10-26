@@ -1454,3 +1454,18 @@ c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada.
 This workflow/history-only change does not alter the backend package or browser
 behavior. Exact local candidate parity and immutable-source proofs are archived
 with M2 review evidence; no database, merge or deployment change occurred.
+
+## 2026-10-26 — Preserve benchmark timeout diagnostics and final release decision
+Branch: feature/shop-modernization-m2
+
+Added failure-only DOM/resource/read/route diagnostics to the browser measurement
+harness after one cold Reports sample timed out without a page error. The failed
+20-sample batch is preserved (Reports19valid, all other screens20); a separate
+30-sample Reports candidate run passes without reproduction. This is an unresolved
+benchmark anomaly, not silently discarded evidence or an established production
+root cause. Diagnostics do not change the timed path or application/backend code.
+Updated the backend decision with the owner-approved local Platform integration,
+final corrected c4 fingerprint, old-backend exact-lookup compatibility and retained
+promotion gates. These test/documentation changes do not invalidate packaged
+backend bytes or prior business/security tests. Final profile closure remains
+pending; no remote operation or deployment occurred.
