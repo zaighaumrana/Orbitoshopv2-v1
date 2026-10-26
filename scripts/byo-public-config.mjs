@@ -1,5 +1,9 @@
 // Static checks only. A real browser challenge is required to verify CAPTCHA.
 export class ConfigurationError extends Error {}
+// Public tracker module emitted from the same validated inputs as the app.
+export function trackerPublicConfig(config){
+ return `export const SUPABASE_URL=${JSON.stringify(config.VITE_SUPABASE_URL)};\nexport const SUPABASE_ANON=${JSON.stringify(config.VITE_SUPABASE_ANON)};\n`;
+}
 const fail=message=>{throw new ConfigurationError(message)};
 export function validatePublicConfig(config,ref){
  const keys=['VITE_SUPABASE_URL','VITE_SUPABASE_ANON','VITE_TURNSTILE_SITE_KEY'];

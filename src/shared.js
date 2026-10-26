@@ -7,6 +7,9 @@ import { installNumericInputValidation } from './numeric-input.js'
 import { blockingErrorCopy } from './blocking-error.js'
 import { logLegacyUsage } from './platform/legacy.js'
 import { installThermalMeter } from './platform/thermal.js'
+import {nativeIdentity,setUIAuthority,invalidateUIAuthority,onPrivateReset} from './ui-authority.js'
+import {observeCommand} from './ui-command-records.js'
+import {captureView} from './ui-lifecycle.js'
 
 /* ── Supabase ── */
 export const sb = createClient(
@@ -23,6 +26,17 @@ export const sb = createClient(
 )
 
 initializeSupportConsole(sb)
+const nativeRPC=sb.rpc.bind(sb)
+const recordedCommands=new Set(['create_retail_sale','create_repair_ticket','record_repair_payment','approve_additional_work','save_additional_work_proposal','decide_additional_work','create_repair_adjustment','cancel_repair','deliver_repair','mark_repair_component_not_needed','settle_udhar','create_retail_return','create_inventory_item','adjust_inventory_stock'])
+sb.rpc=(name,args,options)=>recordedCommands.has(name)&&args?.p_request_id
+  ? observeCommand(name,args,async (identity,originalArgs)=>{
+      const session=(await sb.auth.getSession()).data?.session
+      if(nativeIdentity(session)!==identity)throw Error('Session changed before command submission. Original request retained; outcome unconfirmed.')
+      const request=nativeRPC(name,originalArgs,options)
+      // Keep an initiated operation on its original bearer. Never journal it.
+      return request.setHeader?request.setHeader('Authorization','Bearer '+session.access_token):request
+    })
+  : nativeRPC(name,args,options)
 installThermalMeter(sb)
 
 // Do not hold a completed Shop operation open while legacy Platform is offline.
@@ -38,6 +52,7 @@ export const state = {
   modal:         null,
   installPrompt: null,
   data:          { tickets:[], sales:[], employees:[], udharAccounts:[], financial:{}, shiftFinancial:{}, returns:[], inventory:[], quickItems:[], repairComponents:[] },
+  resources: {},
 }
 
 /* ── Global editable-control focus persistence ──
@@ -143,10 +158,13 @@ function profileToSession(profile) {
   }
 }
 
+let sessionLoadGeneration=0
 export async function loadCurrentSession() {
+  const sessionGeneration=++sessionLoadGeneration
   // Old retailos_session is deliberately ignored and removed. Supabase Auth
   // plus app_users is the only identity/authorization source.
   try { sessionStorage.removeItem('retailos_session') } catch {}
+  const before = nativeIdentity((await sb.auth.getSession()).data?.session)
   const { data: userData, error: userError } = await sb.auth.getUser()
   if (userError || !userData.user) return null
   let { data: profile, error: profileError } = await sb
@@ -165,8 +183,11 @@ export async function loadCurrentSession() {
     await sb.auth.signOut({ scope: 'local' })
     return null
   }
+  const after = nativeIdentity((await sb.auth.getSession()).data?.session)
+  if (sessionGeneration!==sessionLoadGeneration || !before || before !== after || !after.startsWith(userData.user.id+':')) return null
+  setUIAuthority(after)
   state.role = profile.role
-  return profileToSession(profile)
+  return {...profileToSession(profile),uiAuthority:after}
 }
 
 export function _saveSession(_SESSION, route, module) {
@@ -177,6 +198,7 @@ export function _saveSession(_SESSION, route, module) {
   } catch {}
 }
 export async function _clearSession() {
+  invalidateUIAuthority()
   revokeSupportConsole()
   dstack('shared._clearSession', 'clearing session storage')
   try {
@@ -233,13 +255,13 @@ export async function loadConfig(publicOnly = false) {
 
 export async function loadQuickItems() {
   const { data, error } = await sb.from('quick_items').select('*').order('sort_order')
-  if (error) { console.warn('Quick items load failed:', error.message); return [] }
+  if (error) throw Error('Quick items unavailable. Retry reads before using the catalog.')
   return data || []
 }
 
 export async function loadRepairComponents() {
   const { data, error } = await sb.from('repair_components').select('*').order('sort_order')
-  if (error) { console.warn('Repair components load failed:', error.message); return [] }
+  if (error) throw Error('Repair components unavailable. Retry reads before using the catalog.')
   return data || []
 }
 
@@ -448,7 +470,7 @@ function openAppDialog({
     backdrop.append(form)
     document.body.append(backdrop)
 
-    const dialog = { backdrop, resolve, busy: false, keyHandler: null,
+    const dialog = { backdrop, resolve, busy: false, keyHandler: null, current:captureView(),
       actionFailed:false,
       showFailure(copy) {
         error.textContent = `${copy.title}: ${copy.message}`
@@ -495,6 +517,7 @@ function openAppDialog({
     form.addEventListener('submit', async event => {
       event.preventDefault()
       if (dialog.busy) return
+      if(!dialog.current()){closeAppDialog(dialog,null);return}
       const values = Object.fromEntries(new FormData(form).entries())
       const validationError = validate?.(values)
       if (validationError) {
@@ -513,6 +536,7 @@ function openAppDialog({
       form.setAttribute('aria-busy', 'true')
       try {
         const result = action ? await action(values) : values
+        if(activeAppDialog!==dialog||!dialog.current())return
         if (result === false || dialog.actionFailed) {
           dialog.busy = false
           ;[close, cancel, confirm, ...controls].forEach(control => { control.disabled = false })
@@ -524,6 +548,7 @@ function openAppDialog({
         dialog.busy = false
         closeAppDialog(dialog, { confirmed: true, value: result })
       } catch (caught) {
+        if(activeAppDialog!==dialog||!dialog.current())return
         dialog.busy = false
         ;[close, cancel, confirm, ...controls].forEach(control => { control.disabled = false })
         confirm.textContent = originalLabel
@@ -1045,3 +1070,19 @@ export function normalizeModalControls(root = document) {
     modal.prepend(close)
   })
 }
+
+onPrivateReset(() => {
+  sessionLoadGeneration++
+  state.data = {tickets:[],sales:[],employees:[],udharAccounts:[],financial:{},shiftFinancial:{},returns:[],inventory:[],quickItems:[],repairComponents:[]}
+  state.filter = ''
+  state.resources={}
+  resetClientEntitlements()
+  cancelPinPrompt(null)
+  if (activeAppDialog) { activeAppDialog.busy=false;closeAppDialog(activeAppDialog,null) }
+  document.getElementById('app-toast-region')?.replaceChildren()
+})
+
+window.addEventListener('shop-navigation',()=>{
+  cancelPinPrompt(null)
+  if(activeAppDialog){activeAppDialog.busy=false;closeAppDialog(activeAppDialog,null)}
+})

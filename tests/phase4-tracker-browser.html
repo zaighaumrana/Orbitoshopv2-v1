@@ -9,6 +9,7 @@ document.querySelector('#run').onclick=async()=>{
  let source=await (await fetch('/track.html')).text()
  // Keep the real tracker render code; replace only its external transport and startup.
  source=source.replace("from './ui-text.js'","from '/ui-text.js'")
+ source=source.replace("from './shop-public-config.js'","from '/shop-public-config.js'")
  source=source.replace(/import \{ createClient \} from '[^']+'/,'const createClient=()=>({rpc:async()=>({data:{shop_name:"Fixture shop",live_tracking_enabled:true}})}); window.fetch=async()=>{throw Error("Live transport forbidden in fixture")}')
  source=source.replace(/  loadBranding\(\)\r?\n/,`  await loadBranding(); renderResult(${JSON.stringify(ticket)}); parent.postMessage('phase4-tracker-ready',parent.location.origin)\n`)
  const frame=document.createElement('iframe')

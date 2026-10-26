@@ -17,6 +17,7 @@ import { escapeHTML } from "../../html.js"
 import { state, money, moneyHTML } from '../../shared.js'
 
 export function reportsPage({ tit }) {
+  if(state.resources?.financial?.status==='unavailable'||state.resources?.financialToday?.status==='unavailable')return '<div class="card" role="alert"><h2>Reports unavailable</h2><p>Financial totals could not be verified.</p><button data-action="retry-resources">Retry reads</button></div>'
   const sales   = state.data.sales   || []
   const report  = state.data.financial || {}
   const metric = key => Number(report[key] || 0)

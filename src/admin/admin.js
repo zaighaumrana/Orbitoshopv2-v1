@@ -1,3 +1,5 @@
+import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
+import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
 import { createSupportClient } from '../platform/support.js'
 import { supportPage } from './pages/support.js'
 import {readAdminView,saveAdminView,safeAdminState} from './navigation-state.js'
@@ -26,6 +28,7 @@ import {
 } from '../features/repairs/api.js'
 import { findRepairFamilies, groupRepairFamilies, matchedRepairChild } from '../features/repairs/family.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
+import {onPrivateReset} from '../ui-authority.js'
 import { reportsPage } from './pages/reports.js'
 import { billingUsagePage } from './pages/billing-usage.js'
 import { createPlatformBridge } from '../platform/bridge.js'
@@ -77,7 +80,16 @@ let paperActor = null
 let _inv = null  // populated via dynamic import only when inventory_module_enabled
 let adminNavigationIsCurrent = () => true
 let adminLoadGeneration = 0
+const ownsAdmin=()=>adminNavigationIsCurrent()&&window.location.pathname==='/admin/'+adminState.adminModule&&state.role===SESSION.employee?.role&&can(adminState.adminModule,state.role)
 let restoreScroll = null
+const initialAdminState={...adminState}
+onPrivateReset(() => {
+  adminLoadGeneration++;adminNavigationIsCurrent=()=>false;SESSION={}
+  for(const key of Object.keys(adminState))delete adminState[key]
+  Object.assign(adminState,initialAdminState)
+  billingResult=null;legalStatus=null;paperObservation={};paperActor=null;resupplyBusy=false;restoreScroll=null
+  customerSupport.reset()
+})
 const saveNavigation = () => {
   if(adminNavigationIsCurrent() && state.role===SESSION.employee?.role)saveAdminView(history,location,SESSION,adminState,window.scrollY)
 }
@@ -86,14 +98,16 @@ window.addEventListener('scroll',saveNavigation,{passive:true})
 
 /* ── Load ── */
 async function load() {
+  const view=captureView()
   const generation = ++adminLoadGeneration
   const loadSession = SESSION
   const loadPath = window.location.pathname
   const navigationIsCurrent=adminNavigationIsCurrent
-  const current = () => generation === adminLoadGeneration && navigationIsCurrent() && SESSION === loadSession && state.role === loadSession.employee?.role && window.location.pathname === loadPath
+  const current = () => view() && generation === adminLoadGeneration && navigationIsCurrent() && SESSION === loadSession && state.role === loadSession.employee?.role && window.location.pathname === loadPath
   dlog('ADMIN.load', `ENTRY adminModule=${adminState.adminModule}`)
-  await loadConfig()
+  const configReady=await loadConfig()
   if (!current() || !window.location.pathname.startsWith('/admin')) return
+  if(!configReady){state.resources={config:{status:'unavailable'}};render();return}
   if (!can(adminState.adminModule, state.role)) {
     state.modal = null
     adminState.adminModule = 'dashboard'
@@ -119,10 +133,10 @@ async function load() {
     catch { result = null }
     if (!current()) return
     if(result){billingResult=result;paperObservation={checkedAt:new Date().toISOString(),accepted:paperObservation.accepted&&!result.paper_requests?.some(r=>r.request_id===paperObservation.accepted)?paperObservation.accepted:null}}
-    else paperObservation={...paperObservation,error:true}
+    else {billingResult=null;paperObservation={...paperObservation,error:true}}
   }
   if (mod === 'customer-support' && can(mod, state.role)) {
-    try { await customerSupport.list(customerSupport.view.offset) } catch(error) { customerSupport.view.error=error.message }
+    try { await customerSupport.list(customerSupport.view.offset) } catch(error) { if(current())customerSupport.view.error=error.message }
     if (!current()) return
     if(SESSION.employee?.role==='Business Owner'){
       try{await customerSupport.consents()}catch(error){if(current())customerSupport.view.error=error.message}
@@ -143,6 +157,7 @@ async function load() {
   const skip = { data: [] }
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
   const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
+  state.resources=Object.fromEntries(Object.entries(needs).filter(([,needed])=>needed).map(([k])=>[k,{status:'loading'}]));render()
   const [tickets, sales, employees, udharAccounts, financial, financialToday, returns_, inv, quickItems, repairComponents] = await Promise.all([
     needs.tickets ? sb.from('tickets').select('*').order('id', { ascending: false }) : skip,
     needs.sales ? sb.from('sales').select('*').order('id', { ascending: false }) : skip,
@@ -158,20 +173,10 @@ async function load() {
     needs.inventory ? sb.from('inventory').select('*').order('name') : skip,
     needs.quickItems ? sb.from('quick_items').select('*').order('sort_order') : skip,
     needs.repairComponents ? sb.from('repair_components').select('*').order('sort_order') : skip,
-  ])
+  ].map(settleRead))
   if (!current()) return
-  state.data = {
-    tickets:          tickets.data          || [],
-    sales:            sales.data            || [],
-    employees:        employees.data        || [],
-    udharAccounts:    udharAccounts.data    || [],
-    financial:        financial.data        || {},
-    financialToday:   financialToday.data   || {},
-    returns:          returns_.data         || [],
-    inventory:        inv.data              || [],
-    quickItems:       quickItems.data       || [],
-    repairComponents: repairComponents.data || [],
-  }
+  const reads=readStates({tickets,sales,employees,udharAccounts,financial,financialToday,returns:returns_,inventory:inv,quickItems,repairComponents},['financial','financialToday'])
+  state.data=reads.values;state.resources=reads.resources
   applyBranding()
   dlog('ADMIN.load', `DATA READY (queries resolved) adminModule=${adminState.adminModule}`)
 
@@ -184,14 +189,16 @@ async function load() {
     adminState._emsHTML = emsView(emsData, SESSION)
     render()
     const app = document.getElementById('app')
+    let emsReloadGeneration=0
     attachEMSEvents(app, () => adminState._emsData, async () => {
+      const reload=++emsReloadGeneration
       if (!current() || !can('ems', state.role) || window.location.pathname !== '/admin/ems') return
       const fresh = await loadEMSData()
-      if (!current()) return
+      if (!current()||reload!==emsReloadGeneration) return
       adminState._emsData = fresh
       adminState._emsHTML = emsView(fresh, SESSION)
       render()
-    }, SESSION)
+    }, SESSION,current)
     return
   }
 
@@ -266,6 +273,8 @@ function render() {
 }
 
 function pageContent() {
+  const failed=Object.entries(state.resources||{}).filter(([,r])=>r.status!=='ready'&&r.status!=='disabled')
+  if(failed.length)return adminShell(resourceNotice('Current '+adminState.adminModule+' data',failed.some(([,r])=>r.status==='loading')?'loading':'unavailable'))
   if (adminState.adminModule === 'customer-support') return adminShell(supportPage(customerSupport.view,SESSION.employee?.role==='Business Owner'))
   if (adminState.adminModule === 'billing-usage') return adminShell(billingUsagePage(billingResult, resupplyBusy, Date.now(), paperObservation))
   const pages = { dashboard, repairs, inventory, catalog, reports, employees, receipts, settings }
@@ -307,7 +316,7 @@ function dashboard() {
   ]
   return `
     ${tit('Dashboard','Live overview of sales, tickets, and operations.',
-      `<button class="primary-button" data-action="go-pos">Go to POS</button>`)}
+      can('pos',state.role)?`<button class="primary-button" data-action="go-pos">Go to POS</button>`:'')}
     <div class="grid kpi-grid">
       ${kpis.filter(([, ,target]) => target === 'udharList' || can(target, state.role)).map(([l,v,target]) => `
         <div class="card kpi" style="cursor:pointer" data-kpi-target="${target}">
@@ -349,7 +358,7 @@ function repairs() {
   const roots = groupRepairFamilies(state.data.tickets || []).map(family => family.root)
   const sc = {'Pending':'warn','In Progress':'warn','Ready':'good','Delivered':'good','Cancelled':'bad','Declined':'bad'}
   return `
-    ${tit('Repair Tickets','Search the complete repair family from one place.',`<button class="primary-button" data-action="go-pos" title="Create tickets from the POS counter">New Ticket (via POS)</button>`)}
+    ${tit('Repair Tickets','Search the complete repair family from one place.',can('pos',state.role)?`<button class="primary-button" data-action="go-pos" title="Create tickets from the POS counter">New Ticket (via POS)</button>`:'')}
     ${tlb('Search ticket, parent/child invoice, customer, phone, device…')}
     <p class="muted" style="font-size:12px;margin:-8px 0 12px">This search checks parent repairs and every child/sub-invoice, then opens the complete family.</p>
     <div class="grid two-col">
@@ -376,8 +385,8 @@ function repairs() {
                 <div style="display:flex;gap:6px;align-items:center">
                   <button class="secondary-button" style="font-size:12px;padding:4px 10px"
                     data-action="open-ticket-editor" data-ticket-id="${r.id}">Edit</button>
-                  <button class="secondary-button" style="font-size:12px;padding:4px 10px"
-                    data-action="admin-collect" data-ticket-id="${r.id}">Collect</button>
+                  ${can('pos',state.role)?`<button class="secondary-button" style="font-size:12px;padding:4px 10px"
+                    data-action="admin-collect" data-ticket-id="${r.id}">Collect</button>`:''}
                 </div>
               </td>
               </tr>`}).join('') :
@@ -567,6 +576,7 @@ function renderModal() {
   if (!state.modal) return ''
   if (!modalEntitled(state.modal.type)) { state.modal = null; return '' }
   const { type, id } = state.modal
+  if(!['myAccount','pinPrompt'].includes(type)&&Object.values(state.resources||{}).some(r=>r.status!=='ready'&&r.status!=='disabled'))return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Required detail')}<button type="button" data-close>Close</button></div></div>`
 
   if (type === 'pinPrompt') return `<div class="modal-backdrop">${pinPromptHTML(state.modal.purpose)}</div>`
 
@@ -667,6 +677,7 @@ function renderModal() {
 }
 
 async function openTicketDetail(ticketId) {
+  const current=captureView()
   const requestedId = String(ticketId)
   const requestId = crypto.randomUUID()
   state.modal = {
@@ -678,6 +689,7 @@ async function openTicketDetail(ticketId) {
   }
   render()
   const summaryResult = await getRepairFamilySummary(Number(requestedId))
+  if(!current())return
   if (state.modal?.type !== 'ticketDetail' || state.modal.requestId !== requestId) return
   if (!summaryResult.ok) {
     state.modal.summaryStatus = 'error'
@@ -697,11 +709,14 @@ function attachEvents() {
   dlog('ADMIN.attachEvents', 'listeners attached to #app (click + submit)')
 
   app.addEventListener('input',e=>{
+    if(!ownsAdmin())return
+
     const field=e.target.dataset.supportField
     if(window.location.pathname==='/admin/customer-support' && ['subject','category','message'].includes(field) && !customerSupport.view.pending)customerSupport.view.draft[field]=e.target.value
   })
   // Click delegation
-  app.addEventListener('click', async e => {
+  listenOwned(app,'click',ownsAdmin,async (e,eventCurrent)=>{
+    if(e.target.closest('[data-action="retry-resources"]')){await load();return}
     if (!can(adminState.adminModule, state.role) || !modalEntitled(state.modal?.type)) return
     // Route guard: this listener is permanently attached to #app for the
     // rest of the session once /admin has been visited once, even after
@@ -723,7 +738,7 @@ function attachEvents() {
     if(el.dataset.action==='support-consent-revoke'){
       if(SESSION.employee?.role!=='Business Owner'||customerSupport.view.busy)return
       const nav=adminNavigationIsCurrent;customerSupport.view.busy=true
-      try{await customerSupport.consents('revoke',{p_consent:el.dataset.consentId})}catch(error){if(nav())customerSupport.view.error=error.message}
+      try{await viewAwait(eventCurrent,()=>(customerSupport.consents('revoke',{p_consent:el.dataset.consentId})),()=>state.modal)}catch(error){if(nav())customerSupport.view.error=error.message}
       finally{if(nav()){customerSupport.view.busy=false;render()}}return
     }
     if (el.dataset.action?.startsWith('customer-support-')) {
@@ -731,10 +746,10 @@ function attachEvents() {
       const session=SESSION,path=window.location.pathname,v=customerSupport.view
       v.busy=true;v.error='';render()
       try {
-        if(el.dataset.action==='customer-support-detail')await customerSupport.get(el.dataset.ticketId)
-        else await customerSupport.list(el.dataset.action==='customer-support-next'?v.offset+50:el.dataset.action==='customer-support-previous'?Math.max(0,v.offset-50):v.offset)
+        if(el.dataset.action==='customer-support-detail')await viewAwait(eventCurrent,()=>(customerSupport.get(el.dataset.ticketId)),()=>state.modal)
+        else await viewAwait(eventCurrent,()=>(customerSupport.list(el.dataset.action==='customer-support-next'?v.offset+50:el.dataset.action==='customer-support-previous'?Math.max(0,v.offset-50):v.offset)),()=>state.modal)
       }catch(error){if(SESSION===session)v.error=error.message}
-      finally{v.busy=false;if(SESSION===session&&window.location.pathname===path)render()}
+      finally{if(eventCurrent()&&SESSION===session){v.busy=false;if(window.location.pathname===path)render()}}
       return
     }
     dlog('ADMIN.click', `el MATCHED selector -- action=${el.dataset.action} close=${el.dataset.close} tag=${el.tagName}`)
@@ -754,15 +769,15 @@ function attachEvents() {
       resupplyBusy = true; render()
       try {
         if(submit){
-          const { data: { user }, error } = await sb.auth.getUser()
+          const { data: { user }, error } = await viewAwait(eventCurrent,()=>(sb.auth.getUser()),()=>state.modal)
           if(!current())return
           if (error || !user || ((session.authUserId||session.user?.id)&&(session.authUserId||session.user.id)!==user.id)) throw new Error('Please sign in again.')
-          const receipt=await platformBridge.requestResupply(user.id)
+          const receipt=await viewAwait(eventCurrent,()=>(platformBridge.requestResupply(user.id)),()=>state.modal)
           if(!current())return
           paperObservation={...paperObservation,accepted:receipt.request_id||true}
         }
         try{
-          const result=await platformBridge.readBilling(session.authUserId||session.user?.id)
+          const result=await viewAwait(eventCurrent,()=>(platformBridge.readBilling(session.authUserId||session.user?.id)),()=>state.modal)
           if(!current())return
           billingResult=result;paperObservation={checkedAt:new Date().toISOString(),accepted:paperObservation.accepted&&!result.paper_requests?.some(r=>r.request_id===paperObservation.accepted)?paperObservation.accepted:null}
         }catch{if(current())paperObservation={...paperObservation,error:true}}
@@ -774,15 +789,15 @@ function attachEvents() {
     if (el.dataset.action === 'print-ticket-slip') {
       dlog('ADMIN.click', `PRINT-TICKET-SLIP branch firing -- state.modal.ticket=${JSON.stringify(state.modal?.ticket?.ticket_number)}`)
       if (state.modal?.ticket) {
-        const { buildTicketSlip, printThermal } = await import('../print/print.js')
+        const { buildTicketSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
         printThermal(buildTicketSlip(state.modal.ticket))
       }
       return
     }
     if (el.dataset.action === 'print-repair-summary') {
-      const summary = (await getRepairFamilySummary(Number(el.dataset.ticketId))).data
+      const summary = (await viewAwait(eventCurrent,()=>(getRepairFamilySummary(Number(el.dataset.ticketId))),()=>state.modal)).data
       if (!summary) { showBlockingError('Repair summary is unavailable.'); return }
-      const { buildRepairSummary, printThermal } = await import('../print/print.js')
+      const { buildRepairSummary, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
       printThermal(buildRepairSummary(summary)); return
     }
 
@@ -791,7 +806,7 @@ function attachEvents() {
       if (target === 'udharList') { state.modal = { type:'udharList' }; render(); return }
       if (ADMIN_MODULES.find(([k]) => k === target)) {
         adminState.filter = ''
-        const { navigate } = await import('../router.js')
+        const { navigate } = await viewAwait(eventCurrent,()=>(import('../router.js')),()=>state.modal)
         navigate(`/admin/${target}`)
         return
       }
@@ -799,13 +814,13 @@ function attachEvents() {
     }
 
     if (el.dataset.settingsTab) {
-      const { navigate } = await import('../router.js')
+      const { navigate } = await viewAwait(eventCurrent,()=>(import('../router.js')),()=>state.modal)
       navigate(`/admin/settings?tab=${el.dataset.settingsTab}`)
       return
     }
     if (el.dataset.catalogTab) {
       if (el.dataset.catalogTab === 'components' && !CFG.repair_module_enabled) return
-      const { navigate } = await import('../router.js')
+      const { navigate } = await viewAwait(eventCurrent,()=>(import('../router.js')),()=>state.modal)
       navigate(`/admin/catalog?tab=${el.dataset.catalogTab}`)
       return
     }
@@ -815,12 +830,14 @@ function attachEvents() {
     }
 
     if (el.dataset.action === 'go-pos') {
-      const { navigate } = await import('../router.js')
+      if(!can('pos',state.role))return
+      const { navigate } = await viewAwait(eventCurrent,()=>(import('../router.js')),()=>state.modal)
       navigate('/pos'); return
     }
     if (el.dataset.action === 'go-workshop') {
+      if(!can('workshop',state.role))return
       if (!can('workshop', state.role)) return
-      const { navigate } = await import('../router.js')
+      const { navigate } = await viewAwait(eventCurrent,()=>(import('../router.js')),()=>state.modal)
       navigate('/workshop'); return
     }
 
@@ -854,10 +871,10 @@ function attachEvents() {
         if (!verified) return
         const tk = state.data.tickets.find(t => String(t.id) === String(ticketId))
         if (!tk) return
-        const res = await markComponentNotNeeded(Number(ticketId), index, reason)
+        const res = await viewAwait(eventCurrent,()=>(markComponentNotNeeded(Number(ticketId), index, reason)),()=>state.modal)
         if (!res.ok) { showBlockingError('Error: ' + res.error); return }
-        await load()
-        await openTicketDetail(ticketId)
+        await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
+        await viewAwait(eventCurrent,()=>(openTicketDetail(ticketId)),()=>state.modal)
       }, render)
       return
     }
@@ -932,22 +949,22 @@ function attachEvents() {
       const comps = readSubInvCompsFromDOM()
       const labour = readSubInvLabourFromDOM()
       if (!comps.length && !labour) { showBlockingError('Add at least one component or a labour charge.'); return }
-      const res = await submitAdditionalWorkDraft(parentId, comps, labour, modal, false)
+      const res = await viewAwait(eventCurrent,()=>(submitAdditionalWorkDraft(parentId, comps, labour, modal, false)),()=>state.modal)
       if (res.busy) return
       if (!res.ok) { showBlockingError(res.error); return }
       if (res.ticket) {
-        const {buildSubInvoiceSlip,printThermal} = await import('../print/print.js')
+        const {buildSubInvoiceSlip,printThermal} = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
         printThermal(buildSubInvoiceSlip(res.ticket,tk))
       }
       if (state.modal === modal) state.modal = null
-      await load()
+      await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
       if (!res.ticket) showTransactionSuccess(`Additional work saved as ${(res.proposal?.decision || 'Pending').toLowerCase()}.`)
       return
     }
 
     if (el.dataset.action === 'decide-additional-work') {
       const decision = el.dataset.decision
-      const input = await requestInput({
+      const input = await viewAwait(eventCurrent,()=>(requestInput({
         title: `${decision} additional work?`,
         message: 'Record how the customer decision was received.',
         confirmLabel: `Save ${decision.toLowerCase()}`,
@@ -955,21 +972,21 @@ function attachEvents() {
           { name:'method', label:'Decision method', type:'select', value:'Phone', options:['Phone','In person','WhatsApp','Other'] },
           { name:'note', label:'Decision note (optional)', type:'textarea', value:'' },
         ],
-      })
+      })),()=>state.modal)
       if (!input?.confirmed) return
       const method = input.value.method
       const note = input.value.note || ''
-      const result = await decideAdditionalWork(Number(el.dataset.proposalId), decision, method, note)
+      const result = await viewAwait(eventCurrent,()=>(decideAdditionalWork(Number(el.dataset.proposalId), decision, method, note)),()=>state.modal)
       if (!result.ok) { showBlockingError('Decision error: ' + result.error); return }
       if (result.ticket) {
         const root = state.data.tickets.find(t=>!t.parent_ticket_id && String(t.id)===String(result.proposal.root_ticket_id))
         if (root) {
-          const { buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
+          const { buildSubInvoiceSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
           printThermal(buildSubInvoiceSlip(result.ticket, root))
         }
       }
       showTransactionSuccess(`Additional work ${decision.toLowerCase()}.`)
-      state.modal = null; await load(); return
+      state.modal = null; await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
 
     if (el.dataset.action === 'open-repair-adjustment') {
@@ -983,14 +1000,14 @@ function attachEvents() {
       if (amount <= 0 || !reason) { showBlockingError('Enter a positive reduction and a reason.'); return }
       openPinPrompt('discount', async verified => {
         if (!verified) return
-        const result = await createRepairAdjustment(Number(el.dataset.ticketId), amount, type, reason)
+        const result = await viewAwait(eventCurrent,()=>(createRepairAdjustment(Number(el.dataset.ticketId), amount, type, reason)),()=>state.modal)
         if (!result.ok) { showBlockingError('Adjustment error: ' + result.error); return }
         showTransactionSuccess('Repair invoice adjustment completed.')
-        state.modal = null; await load()
+        state.modal = null; await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
       }, render); return
     }
     if (el.dataset.action === 'open-repair-cancellation') {
-      const summaryResult = await getRepairFamilySummary(Number(el.dataset.ticketId))
+      const summaryResult = await viewAwait(eventCurrent,()=>(getRepairFamilySummary(Number(el.dataset.ticketId))),()=>state.modal)
       if (!summaryResult.ok) { showBlockingError('Summary error: ' + summaryResult.error); return }
       state.modal = { type:'repair-cancellation', rootId:Number(el.dataset.ticketId), summary:summaryResult.data }
       render(); return
@@ -1002,36 +1019,36 @@ function attachEvents() {
       if (refund < 0 || !reason) { showBlockingError('Enter a valid refund and a reason.'); return }
       openPinPrompt('repair-refund', async verified => {
         if (!verified) return
-        const result = await cancelRepair(Number(el.dataset.ticketId), refund, method, reason)
+        const result = await viewAwait(eventCurrent,()=>(cancelRepair(Number(el.dataset.ticketId), refund, method, reason)),()=>state.modal)
         if (!result.ok) { showBlockingError('Cancellation error: ' + result.error); return }
         showTransactionSuccess(refund > 0 ? 'Repair cancelled and refund completed.' : 'Repair cancelled.')
-        state.modal = null; await load()
+        state.modal = null; await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
       }, render); return
     }
 
     if (el.dataset.action === 'install' && state.installPrompt) {
-      await runInstallPrompt(); render(); return
+      await viewAwait(eventCurrent,()=>(runInstallPrompt()),()=>state.modal); render(); return
     }
     if (el.dataset.action === 'my-account') {
       state.modal = { type: 'myAccount' }; render(); return
     }
     if (el.dataset.action === 'open-password-resets') {
-      const requests = await listPendingResetRequests()
+      const requests = await viewAwait(eventCurrent,()=>(listPendingResetRequests()),()=>state.modal)
       state.modal = { type: 'passwordResets', requests }
       render(); return
     }
     if (el.dataset.action === 'resolve-reset') {
       const email = el.dataset.resetEmail
       const newPass = generateTempPassword()
-      const res = await resolvePasswordReset(el.dataset.resetId, email, newPass, SESSION.employee?.name || 'Admin')
+      const res = await viewAwait(eventCurrent,()=>(resolvePasswordReset(el.dataset.resetId, email, newPass, SESSION.employee?.name || 'Admin')),()=>state.modal)
       if (!res.ok) { showBlockingError('Error: ' + res.error); return }
-      await confirmAction({
+      await viewAwait(eventCurrent,()=>(confirmAction({
         title: 'Temporary password created',
         message: `New password for ${email}:\n\n${newPass}\n\nShare this directly. It will not be shown again.`,
         confirmLabel: 'Done',
         cancelLabel: 'Close',
-      })
-      const requests = await listPendingResetRequests()
+      })),()=>state.modal)
+      const requests = await viewAwait(eventCurrent,()=>(listPendingResetRequests()),()=>state.modal)
       state.modal = { type: 'passwordResets', requests }
       render(); return
     }
@@ -1041,13 +1058,13 @@ function attachEvents() {
       applyBranding(); render(); return
     }
     if (el.dataset.action === 'logout') {
-      await confirmAction({
+      await viewAwait(eventCurrent,()=>(confirmAction({
         title: 'Log out?',
         message: 'Are you sure you want to log out?',
         confirmLabel: 'Log out',
         tone: 'danger',
-        action: async () => { await _clearSession(); return true },
-      })
+        action: async () => { await viewAwait(eventCurrent,()=>(_clearSession()),()=>state.modal); return true },
+      })),()=>state.modal)
       return
     }
 
@@ -1055,7 +1072,7 @@ function attachEvents() {
       adminState.adminModule = 'employees'
       adminState.settingsTab = 'branding'
       adminState.catalogTab  = 'quickitems'
-      const { navigate } = await import('../router.js')
+      const { navigate } = await viewAwait(eventCurrent,()=>(import('../router.js')),()=>state.modal)
       navigate('/admin/employees'); return
     }
 
@@ -1069,42 +1086,43 @@ function attachEvents() {
     if (el.dataset.action === 'remove-employee') {
       const name      = el.dataset.empName || 'this employee'
       const empId     = el.dataset.empId
-      const confirmation = await confirmAction({
+      const confirmation = await viewAwait(eventCurrent,()=>(confirmAction({
         title: 'Deactivate employee?',
         message: `Make ${name} inactive? Historical records will be preserved.`,
         confirmLabel: 'Continue',
         tone: 'danger',
-      })
+      })),()=>state.modal)
       if (!confirmation?.confirmed) return
 
       openPinPrompt('admin', async (verified) => {
         if (!verified) return
         const found = state.data.employees.find(e => String(e.id) === String(empId))
         if (!found) return
-        const result = await invokeAccountAdmin('update-employee', {
+        const result = await viewAwait(eventCurrent,()=>(invokeAccountAdmin('update-employee', {
           employeeId: Number(empId), name: found.name, email: found.email,
           role: found.role, status: 'Inactive',
-        })
+        })),()=>state.modal)
         if (!result.ok) { showBlockingError('Error deactivating: ' + result.error); return }
-        await load()
+        await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
       }, render); return
     }
 
     if (el.dataset.action === 'open-ticket-editor') {
       const ticketId = el.dataset.ticketId
-      await openTicketDetail(ticketId)
+      await viewAwait(eventCurrent,()=>(openTicketDetail(ticketId)),()=>state.modal)
       return
     }
     if (el.dataset.action === 'retry-ticket-detail') {
-      await openTicketDetail(el.dataset.ticketId)
+      await viewAwait(eventCurrent,()=>(openTicketDetail(el.dataset.ticketId)),()=>state.modal)
       return
     }
 
     if (el.dataset.action === 'admin-collect') {
+      if(!can('pos',state.role))return
       const found = state.data.tickets.find(t => String(t.id) === String(el.dataset.ticketId))
       if (!found) return
       sessionStorage.setItem('retailos_collect_ticket', String(found.id))
-      const { navigate } = await import('../router.js')
+      const { navigate } = await viewAwait(eventCurrent,()=>(import('../router.js')),()=>state.modal)
       navigate('/pos'); return
     }
 
@@ -1112,16 +1130,16 @@ function attachEvents() {
       const newStatus   = document.getElementById('td-status')?.value
       const note        = document.getElementById('td-note')?.value||''
       const upd = { status:newStatus, update_note:note }
-      const { error } = await sb.from('tickets').update(upd).eq('id', el.dataset.id)
+      const { error } = await viewAwait(eventCurrent,()=>(sb.from('tickets').update(upd).eq('id', el.dataset.id)),()=>state.modal)
       if (error) { showBlockingError('Update failed: '+error.message); return }
-      state.modal = null; await load(); return
+      state.modal = null; await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
 
     if (el.dataset.action === 'reprint-receipt') {
       const saleId = Number(el.dataset.saleId)
       const sale   = state.data.sales.find(s => s.id === saleId)
       if (!sale) { showBlockingError('Sale not found.'); return }
-      const { buildReceiptSlip, printThermal } = await import('../print/print.js')
+      const { buildReceiptSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
       const reprSale = {
         receiptNo: sale.invoice_number||`INV-${sale.id}`, date: sale.created_at,
         cashier: sale.employee_name||'Counter', customer: sale.customer_name||'Walk-in',
@@ -1138,7 +1156,7 @@ function attachEvents() {
     if (el.dataset.action === 'print-repair-invoice') {
       const ticket = state.data.tickets.find(item => String(item.id) === String(el.dataset.ticketId))
       if (!ticket) { showBlockingError('Repair invoice not found.'); return }
-      const { buildTicketSlip, buildSubInvoiceSlip, printThermal } = await import('../print/print.js')
+      const { buildTicketSlip, buildSubInvoiceSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
       if (ticket.parent_ticket_id) {
         const parent = state.data.tickets.find(item => String(item.id) === String(ticket.parent_ticket_id))
         if (!parent) { showBlockingError('Parent repair record not found.'); return }
@@ -1187,44 +1205,44 @@ function attachEvents() {
 
     if (el.dataset.action === 'add-quick-comp') {
       const val = document.getElementById('new-comp-input')?.value?.trim(); if (!val) return
-      const { error } = await sb.from('repair_components').insert({
+      const { error } = await viewAwait(eventCurrent,()=>(sb.from('repair_components').insert({
         name: val, sort_order: (state.data.repairComponents||[]).length + 1
-      })
+      })),()=>state.modal)
       if (error) { showBlockingError('Error: '+error.message); return }
       const input = document.getElementById('new-comp-input')
       if (input) input.value = ''
-      await load(); return
+      await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
     if (el.dataset.action === 'save-quick-comps') {
       // No longer needed — adds/removes go directly to DB
-      await load(); return
+      await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
     if (el.dataset.removeQuick !== undefined) {
       const compId = Number(el.dataset.removeQuick)
-      const { error } = await sb.from('repair_components').delete().eq('id', compId)
+      const { error } = await viewAwait(eventCurrent,()=>(sb.from('repair_components').delete().eq('id', compId)),()=>state.modal)
       if (error) { showBlockingError('Error: '+error.message); return }
-      await load(); return
+      await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
 
     if (el.dataset.action === 'add-qitem') {
       const val = document.getElementById('qitem-name')?.value?.trim(); if (!val) return
-      const { error } = await sb.from('quick_items').insert({
+      const { error } = await viewAwait(eventCurrent,()=>(sb.from('quick_items').insert({
         name: val, prices: [], sort_order: (state.data.quickItems||[]).length + 1
-      })
+      })),()=>state.modal)
       if (error) { showBlockingError('Error: '+error.message); return }
-      await load(); return
+      await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
     if (el.dataset.action === 'save-qitems') {
       // Save is now per-item directly to quick_items table
       // Individual add/remove handlers do the DB work — this just refreshes
-      await load(); return
+      await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
     if (el.dataset.removeQitem !== undefined) {
       const item = (state.data.quickItems||[])[Number(el.dataset.removeQitem)]
       if (!item) return
-      const { error } = await sb.from('quick_items').delete().eq('id', item.id)
+      const { error } = await viewAwait(eventCurrent,()=>(sb.from('quick_items').delete().eq('id', item.id)),()=>state.modal)
       if (error) { showBlockingError('Error: '+error.message); return }
-      await load(); return
+      await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
     if (el.dataset.addQprice !== undefined) {
       const idx  = Number(el.dataset.addQprice)
@@ -1234,9 +1252,9 @@ function attachEvents() {
       const item = (state.data.quickItems||[])[idx]
       if (!item) return
       const newPrices = [...(item.prices||[]), { name: variantName, price: val }]
-      const { error } = await sb.from('quick_items').update({ prices: newPrices }).eq('id', item.id)
+      const { error } = await viewAwait(eventCurrent,()=>(sb.from('quick_items').update({ prices: newPrices }).eq('id', item.id)),()=>state.modal)
       if (error) { showBlockingError('Error: '+error.message); return }
-      await load(); return
+      await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
     if (el.dataset.removeQprice !== undefined) {
       const [i,pi] = el.dataset.removeQprice.split('-').map(Number)
@@ -1244,16 +1262,16 @@ function attachEvents() {
       if (!item) return
       const newPrices = [...(item.prices||[])]
       newPrices.splice(pi, 1)
-      const { error } = await sb.from('quick_items').update({ prices: newPrices }).eq('id', item.id)
+      const { error } = await viewAwait(eventCurrent,()=>(sb.from('quick_items').update({ prices: newPrices }).eq('id', item.id)),()=>state.modal)
       if (error) { showBlockingError('Error: '+error.message); return }
-      await load(); return
+      await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
 
     if (el.dataset.invEdit && _inv) { _inv.handleInvEdit(el); render(); return }
     if (el.dataset.invAdjust && _inv) { _inv.handleInvAdjust(el); render(); return }
     if (el.dataset.invDelete && _inv) {
-      const { deleted } = await _inv.handleInvDelete(el)
-      if (deleted) await load()
+      const { deleted } = await viewAwait(eventCurrent,()=>(_inv.handleInvDelete(el)),()=>state.modal)
+      if (deleted) await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
       return
     }
 
@@ -1265,9 +1283,9 @@ function attachEvents() {
       openPinPrompt('settle', async (verified) => {
         if (!verified) return
         const rec = (state.data.udharAccounts || []).find(u => `${u.kind}:${u.sourceId}` === accountKey)
-        const result = await settleUdhar(rec, amount, method)
+        const result = await viewAwait(eventCurrent,()=>(settleUdhar(rec, amount, method)),()=>state.modal)
         if (!result.ok) { showBlockingError('Settle error: '+result.error); return }
-        await load(); state.modal = { type:'udharList' }; render()
+        await viewAwait(eventCurrent,()=>(load()),()=>state.modal); state.modal = { type:'udharList' }; render()
         showTransactionSuccess('Udhar payment recorded.')
       }, render); return
     }
@@ -1275,13 +1293,15 @@ function attachEvents() {
     const viewTicketEl = el.closest('[data-view-ticket]')
     if (viewTicketEl && el.tagName !== 'BUTTON' && !el.closest('button')) {
       const ticketId = String(viewTicketEl.dataset.viewTicket)
-      await openTicketDetail(ticketId)
+      await viewAwait(eventCurrent,()=>(openTicketDetail(ticketId)),()=>state.modal)
       return
     }
-  })
+  },error=>showBlockingError(error?.message||'Unable to confirm the result. Refresh reads before retrying.'))
 
   // Input
   app.addEventListener('input', e => {
+    if(!ownsAdmin())return
+
     const t = e.target
     rememberAdditionalWorkInput(t, state.modal)
     if (t.dataset.filter !== undefined) { adminState.filter = t.value; render() }
@@ -1308,6 +1328,8 @@ function attachEvents() {
 
   // Enter key submits quick-add inputs that aren't inside a <form>
   app.addEventListener('keydown', e => {
+    if(!ownsAdmin())return
+
     if (e.key !== 'Enter') return
     if (e.target.id?.startsWith('qprice-input-')) {
       e.preventDefault()
@@ -1327,11 +1349,11 @@ function attachEvents() {
   })
 
   // Change
-  app.addEventListener('change', async e => {
+  listenOwned(app,'change',ownsAdmin,async (e,eventCurrent)=>{
     const t = e.target
     if (t.dataset.action === 'admin-module') {
       adminState.filter = ''
-      const { navigate } = await import('../router.js')
+      const { navigate } = await viewAwait(eventCurrent,()=>(import('../router.js')),()=>state.modal)
       navigate(`/admin/${t.value}`)
       return
     }
@@ -1341,10 +1363,10 @@ function attachEvents() {
       render()
       return
     }
-  })
+  },error=>showBlockingError(error?.message||'Unable to confirm the result. Refresh reads before retrying.'))
 
   // Submit
-  app.addEventListener('submit', async e => {
+  listenOwned(app,'submit',ownsAdmin,async (e,eventCurrent)=>{
     if (!can(adminState.adminModule, state.role) || !modalEntitled(state.modal?.type)) { e.preventDefault(); return }
     if (!window.location.pathname.startsWith('/admin')) return
     e.preventDefault()
@@ -1356,7 +1378,7 @@ function attachEvents() {
     if(type==='support-consent'){
       if(SESSION.employee?.role!=='Business Owner'||customerSupport.view.busy)return
       const nav=adminNavigationIsCurrent;customerSupport.view.busy=true;render()
-      try{await customerSupport.consents('approve',{p_case:data.ticket_id,p_purpose:data.purpose,p_confirmation:data.confirmation})}
+      try{await viewAwait(eventCurrent,()=>(customerSupport.consents('approve',{p_case:data.ticket_id,p_purpose:data.purpose,p_confirmation:data.confirmation})),()=>state.modal)}
       catch(error){if(nav())customerSupport.view.error=error.message}
       finally{if(nav()){customerSupport.view.busy=false;render()}}return
     }
@@ -1365,8 +1387,8 @@ function attachEvents() {
       const session=SESSION,path=window.location.pathname,v=customerSupport.view
       if(!v.pending)v.draft={subject:data.subject,category:data.category,message:data.message}
       v.busy=true;v.error='';render()
-      try {await customerSupport.create();await customerSupport.list(0)}catch(error){if(SESSION===session)v.error=error.message}
-      finally{v.busy=false;if(SESSION===session&&window.location.pathname===path)render()}
+      try {await viewAwait(eventCurrent,()=>(customerSupport.create()),()=>state.modal);await viewAwait(eventCurrent,()=>(customerSupport.list(0)),()=>state.modal)}catch(error){if(SESSION===session)v.error=error.message}
+      finally{if(eventCurrent()&&SESSION===session){v.busy=false;if(window.location.pathname===path)render()}}
       return
     }
     if (type === 'add-quick-item') {
@@ -1375,17 +1397,17 @@ function attachEvents() {
       const names  = [...form.querySelectorAll('[name="variantName[]"]')].map(i => i.value.trim())
       const prices = [...form.querySelectorAll('[name="variantPrice[]"]')].map(i => Number(i.value) || 0)
       const variants = names.map((name, i) => ({ name, price: prices[i] })).filter(v => v.price > 0)
-      const { error } = await sb.from('quick_items').insert({
+      const { error } = await viewAwait(eventCurrent,()=>(sb.from('quick_items').insert({
         name: itemName, prices: variants,
         sort_order: (state.data.quickItems||[]).length + 1
-      })
+      })),()=>state.modal)
       if (error) { showBlockingError('Error: ' + error.message); return }
       state.modal = null
-      await load(); return
+      await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
 
     if (type === 'change-password') {
-      const result = await handleChangePasswordSubmit(SESSION, data)
+      const result = await viewAwait(eventCurrent,()=>(handleChangePasswordSubmit(SESSION, data)),()=>state.modal)
       const errEl = document.getElementById('change-password-error')
       if (!result.ok) {
         if (errEl) { errEl.textContent = result.error; errEl.classList.remove('hidden') }
@@ -1403,45 +1425,45 @@ function attachEvents() {
         const err = validatePassword(data.password)
         if (err) { showBlockingError(err); return }
       }
-      const result = await invokeAccountAdmin('update-employee', updates)
+      const result = await viewAwait(eventCurrent,()=>(invokeAccountAdmin('update-employee', updates)),()=>state.modal)
       if (!result.ok) { showBlockingError('Error updating: '+result.error); return }
       if (data.password?.trim()) {
-        const reset = await invokeAccountAdmin('reset-password', { email: updates.email, newPassword: data.password })
+        const reset = await viewAwait(eventCurrent,()=>(invokeAccountAdmin('reset-password', { email: updates.email, newPassword: data.password })),()=>state.modal)
         if (!reset.ok) { showBlockingError('Employee details were saved, but password reset failed: ' + reset.error); return }
       }
-      state.modal = null; await load(); return
+      state.modal = null; await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
 
     if (type === 'employee') {
       const pwErr = validatePassword(data.password||'')
       if (pwErr) { showBlockingError(pwErr); return }
-      const result = await invokeAccountAdmin('create-employee', {
+      const result = await viewAwait(eventCurrent,()=>(invokeAccountAdmin('create-employee', {
         name:data.name, email:(data.email||'').toLowerCase().trim(),
         password:data.password, role:data.role||'Cashier',
-      })
+      })),()=>state.modal)
       if (!result.ok) { showBlockingError('Error saving employee: '+result.error); return }
-      state.modal = null; await load(); return
+      state.modal = null; await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
 
     if (type === 'settings') {
       let updates
-      try { updates = await settingsUpdates(form) } catch (error) { showBlockingError(error.message); return }
-      const result = await invokeAccountAdmin('update-config', { updates })
+      try { updates = await viewAwait(eventCurrent,()=>(settingsUpdates(form)),()=>state.modal) } catch (error) { showBlockingError(error.message); return }
+      const result = await viewAwait(eventCurrent,()=>(invokeAccountAdmin('update-config', { updates })),()=>state.modal)
       if (!result.ok) { showBlockingError('Settings error: '+result.error); return }
-      state.modal = null; await load(); return
+      state.modal = null; await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
 
     if (type === 'owner-login') {
       const email = data.owner_email?.toLowerCase().trim()
       if (!email) { showBlockingError('Enter an owner email.'); return }
-      const result = await invokeAccountAdmin('update-owner', { email })
+      const result = await viewAwait(eventCurrent,()=>(invokeAccountAdmin('update-owner', { email })),()=>state.modal)
       if (!result.ok) { showBlockingError('Error: '+result.error); return }
       showToast('Owner email updated.', 'success'); return
     }
 
     if (type === 'override-pin') {
       if (!data.new_pin?.trim()) { showBlockingError('Enter a PIN.'); return }
-      const result = await invokeAccountAdmin('set-pin', { pin:data.new_pin })
+      const result = await viewAwait(eventCurrent,()=>(invokeAccountAdmin('set-pin', { pin:data.new_pin })),()=>state.modal)
       if (!result.ok) { showBlockingError('Error: '+result.error); return }
       showToast('Override PIN updated.', 'success'); return
     }
@@ -1449,9 +1471,9 @@ function attachEvents() {
     if ((type === 'inv-add' || type === 'inv-edit' || type === 'inv-adjust') && CFG.inventory_module_enabled && _inv) {
       const fn = type === 'inv-add' ? _inv.submitInvAdd
         : type === 'inv-edit' ? _inv.submitInvEdit : _inv.submitInvAdjust
-      const { ok } = await fn(data)
+      const { ok } = await viewAwait(eventCurrent,()=>(fn(data)),()=>state.modal)
       if (!ok) return
-      state.modal = null; await load(); return
+      state.modal = null; await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
 
     // Unrecognized form type -- this listener is intentionally global for
@@ -1460,7 +1482,7 @@ function attachEvents() {
     // doesn't own (e.g. pos.js's own "repair" form) bubbling through the
     // shared #app element must be a no-op here, not assumed to be ours.
     dlog('ADMIN.submit', `type=${type} not recognized by this listener -- no-op`)
-  })
+  },error=>showBlockingError(error?.message||'Unable to confirm the result. Refresh reads before retrying.'))
 
 }
 

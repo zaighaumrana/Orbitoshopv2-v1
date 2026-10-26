@@ -1,3 +1,5 @@
+import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
+import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
 import { escapeHTML, safeImageURL } from "../html.js"
 import { createSubInvoiceModalHTML, rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 /* ═══════════════════════════════════════════════════════════════════
@@ -42,9 +44,10 @@ import { settleUdhar } from '../features/checkout/udhar/api.js'
 
 import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
+import {captureAuthority,onPrivateReset} from '../ui-authority.js'
 
 /* ── POS-only state ── */
-const posState = {
+const emptyPOS = () => ({
   cart:            [],
   checkoutPayment: 'Cash',
   cashTendered:    0,
@@ -61,30 +64,47 @@ const posState = {
   checkoutRequestId: null,
   invSearch:       '',
   repairSearch:    '',
-}
+})
+let posState = emptyPOS()
 
 let SESSION = {}
 let _inv = null  // populated via dynamic import only when inventory_module_enabled
 let _eventsAttached = false
 let placingOrder = false
 let checkoutInFlight = false
+let posNavigationIsCurrent=()=>false,posLoadGeneration=0
+const ownsPOS=()=>posNavigationIsCurrent()&&window.location.pathname==='/pos'&&state.role===SESSION.employee?.role&&can('pos',state.role)
+// Retain original-actor requests separately from replacement-account UI.
+const cartOperations = new Map()
+onPrivateReset(() => {
+  for(const operation of cartOperations.values())operation.detached=true
+  posLoadGeneration++;posNavigationIsCurrent=()=>false
+  posState=emptyPOS();SESSION={};placingOrder=false;checkoutInFlight=false;resetDraft()
+})
 
 /* ── Load ── */
 async function load() {
+  const generation=++posLoadGeneration,view=captureView(),navigation=posNavigationIsCurrent
+  const current=()=>generation===posLoadGeneration&&view()&&navigation()
   const loadSession = SESSION
   dlog('POS.load', 'ENTRY')
-  await loadConfig()
+  const configReady=await loadConfig()
+  if(!current())return
+  if(!configReady){state.resources={config:{status:'unavailable'}};render();return}
   if (window.location.pathname !== '/pos' || state.role !== SESSION.employee?.role) return
   if (!CFG.repair_module_enabled) posState.cart = posState.cart.filter(item => !item.isTicket)
   if (!CFG.inventory_module_enabled) posState.cart = posState.cart.filter(item => !item.isInventory)
   if (CFG.inventory_module_enabled && !_inv) {
     _inv = await import('../features/pos/inventory/render.js')
+    if(!current())return
   }
   const fetchInv = CFG.inventory_module_enabled
     ? sb.from('inventory').select('*').order('name')
     : Promise.resolve({ data: [] })
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
   const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1)
+  state.resources=Object.fromEntries(['tickets','sales','udharAccounts','shiftFinancial','returns','inventory','quickItems','repairComponents'].map(k=>[k,{status:'loading'}]))
+  render()
   const [tickets, sales, udharAccounts, shiftFinancial, returns_, inv, quickItems, repairComponents] = await Promise.all([
     CFG.repair_module_enabled ? sb.from('tickets').select('*').order('id', { ascending: false }) : { data:[] },
     sb.from('sales').select('*').order('id', { ascending: false }),
@@ -96,19 +116,10 @@ async function load() {
     fetchInv,
     sb.from('quick_items').select('*').order('sort_order'),
     CFG.repair_module_enabled ? sb.from('repair_components').select('*').order('sort_order') : { data:[] },
-  ])
-  if (SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== '/pos') return
-  state.data = {
-    tickets:          tickets.data          || [],
-    sales:            sales.data            || [],
-    employees:        [],
-    udharAccounts:    udharAccounts.data    || [],
-    shiftFinancial:   shiftFinancial.data   || {},
-    returns:          returns_.data         || [],
-    inventory:        inv.data              || [],
-    quickItems:       quickItems.data       || [],
-    repairComponents: repairComponents.data || [],
-  }
+  ].map(settleRead))
+  if (!current() || SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== '/pos') return
+  const reads=readStates({tickets,sales,udharAccounts,shiftFinancial,returns:returns_,inventory:inv,quickItems,repairComponents},['shiftFinancial'])
+  state.data={...reads.values,employees:[]};state.resources=reads.resources
   applyBranding()
   dlog('POS.load', 'DATA READY (queries resolved) -- calling render()')
   render()
@@ -117,13 +128,14 @@ async function load() {
   const handoffId = sessionStorage.getItem('retailos_collect_ticket')
   if (handoffId) {
     sessionStorage.removeItem('retailos_collect_ticket')
-    const found = state.data.tickets.find(t => String(t.id) === String(handoffId))
+    const found = state.data.tickets?.find(t => String(t.id) === String(handoffId))
     if (found) openCollectTicket(found)
   }
 }
 
 /* ── Render ── */
 function render() {
+  if(!ownsPOS())return
   if (window.location.pathname !== '/pos' || state.role !== SESSION.employee?.role) return
   dstack('POS.render', `*** #app REWRITE ***`)
   if (!SESSION.employee) { navigate('/login'); return }
@@ -189,6 +201,7 @@ function render() {
 
 /* ── POS View ── */
 function posView() {
+  if(!resourceReady(state.resources,'config'))return resourceNotice('Shop configuration')
   const tenant   = currentTenant()
   const subtotal = posState.cart.reduce((s,i) => s + i.soldPrice * i.qty, 0)
   const disc     = posState.cart.reduce((s,i) => s + (i.originalPrice - i.soldPrice) * i.qty, 0)
@@ -199,6 +212,7 @@ function posView() {
   const hasTicketInCart = posState.cart.some(i => i.isTicket)
 
   return `
+    ${[...cartOperations.entries()].filter(([,op])=>op.detached&&op.actor===SESSION.authUserId).map(([id,op])=>`<div class="card" role="status">Original ${escapeHTML(op.kind||'checkout')} request ${escapeHTML(id)}: ${escapeHTML(op.status)}. ${op.status==='uncertain'?'Outcome is unconfirmed; do not create a replacement request.':''}<button class="secondary-button" data-action="reconcile-original" data-request-id="${escapeHTML(id)}">Review original outcome</button></div>`).join('')}
     <div class="page-title">
       <div>
         <h1>Point of Sale</h1>
@@ -206,7 +220,7 @@ function posView() {
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <button class="secondary-button" data-action="shift-stats">📋 Shift Stats</button>
-        ${CFG.repair_module_enabled ? `
+        ${CFG.repair_module_enabled && resourceReady(state.resources,'tickets','repairComponents') ? `
           <button class="primary-button" data-modal="repair">+ New Ticket</button>
           <button class="secondary-button" data-action="open-repair-collection">🔧 Repairs</button>` : ''}
           <button class="secondary-button" data-action="open-return">↩ Return</button>
@@ -216,7 +230,7 @@ function posView() {
     <div class="grid pos-layout">
       <div class="grid" style="align-content:start;gap:12px">
         ${quickItemsPanel()}
-        ${CFG.inventory_module_enabled && _inv ? _inv.inventoryPanel(posState) : ''}
+        ${CFG.inventory_module_enabled && _inv ? resourceReady(state.resources,'inventory')?_inv.inventoryPanel(posState):resourceNotice('Inventory',state.resources.inventory.status) : ''}
         ${recentRepairPanel()}
       </div>
       <aside class="card cart">
@@ -317,6 +331,7 @@ function posView() {
 }
 
 function quickItemsPanel() {
+  if(!resourceReady(state.resources,'quickItems'))return resourceNotice('Quick items',state.resources.quickItems.status)+`<div class="card"><h2>Custom Item</h2>${customItemEntry()}</div>`
   if (!(state.data.quickItems||[]).length) return `
     <div class="card">
       <h2 style="margin-bottom:12px">Custom Item</h2>
@@ -354,6 +369,7 @@ function customItemEntry() {
 
 /* Main screen — only 3 most recent PENDING (balance_due > 0) tickets */
 function recentRepairPanel() {
+  if(!resourceReady(state.resources,'tickets'))return resourceNotice('Repairs',state.resources.tickets.status)
   if (!CFG.repair_module_enabled) return `
     <div class="card"><h2>Quick Sale</h2>
       <p class="muted" style="font-size:13px">Add items using the cart panel.</p>
@@ -408,6 +424,7 @@ function _addComponentToDraft(name, tag, customText) {
 
 /* ── Shift stats ── */
 function buildShiftStats() {
+  if(!resourceReady(state.resources,'shiftFinancial','sales','tickets'))return resourceNotice('Shift statistics')
   const tenant    = currentTenant()
   const todayStr  = new Date().toISOString().slice(0,10)
   const empName   = SESSION.employee?.name || ''
@@ -537,6 +554,7 @@ function ticketPaymentModalHTML(modal) {
 }
 
 async function openCollectTicket(ticket) {
+  const current=captureView()
   if (!ticket.is_locked) {
     // Ticket was never placed (shouldn't normally happen) — open edit form
     showBlockingError('This ticket has not been placed yet.')
@@ -546,6 +564,7 @@ async function openCollectTicket(ticket) {
   state.modal = { type: 'ticket-payment', ticket, summaryStatus:'loading', summary:null, requestId }
   render()
   const result = await getRepairFamilySummary(Number(ticket.id))
+  if(!current())return
   if (state.modal?.type !== 'ticket-payment' || state.modal.requestId !== requestId) return
   if (!result.ok) {
     state.modal.summaryStatus = 'error'
@@ -562,6 +581,8 @@ function renderModal() {
   if (!state.modal) return ''
   if (!modalEntitled(state.modal.type)) { state.modal = null; return '' }
   const { type } = state.modal
+  const required=type==='udharList'?['udharAccounts']:type==='repair-collection'?['tickets']:['repair','create-sub-invoice','edit-components'].includes(type)?['tickets','repairComponents']:[]
+  if(!resourceReady(state.resources,...required))return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Required detail')}<button type="button" data-close>Close</button></div></div>`
 
   if (type === 'leave-request') return leaveRequestHTML()
 
@@ -894,23 +915,30 @@ function refreshRetailReturnPreview() {
 
 /* ── Place Order: lock the ticket, create the invoice ── */
 async function placeOrder() {
+  if(!resourceReady(state.resources,'tickets','repairComponents')){showBlockingError('Repair data is unavailable. Retry reads before placing an order.');return}
+  const current=captureAuthority(),ownerState=posState
   if (placingOrder) return
   placingOrder = true
   try {
     await placeOrderOnce()
   } finally {
-    placingOrder = false
+    if(current()&&posState===ownerState)placingOrder = false
   }
 }
 
 async function placeOrderOnce() {
+  const current=captureView(),ownerState=posState
   dlog('POS.placeOrder', 'ENTRY')
   const ticketItem = posState.cart.find(i => i.isTicket)
   if (!ticketItem) { dlog('POS.placeOrder', 'no ticketItem in cart -- abort'); return }
+  const operation=cartOperations.get(ticketItem.requestId)||{actor:SESSION.authUserId,kind:ticketItem.isNewTicket?'repair':'payment',inputs:structuredClone(ticketItem),status:'pending'}
+  cartOperations.set(ticketItem.requestId,operation)
 
   if (ticketItem.isNewTicket) {
     dlog('POS.placeOrder', 'isNewTicket branch -- calling repairs.insertNewTicketFromCart()')
     const res = await insertNewTicketFromCart(ticketItem)
+    operation.result=res;operation.status=res.ok?'succeeded':'uncertain'
+    if (!current() || posState!==ownerState) {operation.detached=true;return}
     if (!res.ok) { dlog('POS.placeOrder', `INSERT FAILED: ${res.error}`); showBlockingError('Error placing order: ' + res.error); return }
     dlog('POS.placeOrder', `INSERT SUCCEEDED ticket_number=${res.data.ticket_number} id=${res.data.id} -- calling load() next`)
 
@@ -918,6 +946,7 @@ async function placeOrderOnce() {
     posState.cartTicketId = null
     posState.cartIsNewTicket = false
     await load()
+    if(!current()||posState!==ownerState){operation.detached=true;return}
     dlog('POS.placeOrder', 'load() returned -- setting state.modal=receipt and calling render() explicitly')
     state.modal = { type:'receipt', isTicketSlip:true, ticket: res.data }
     render()
@@ -934,12 +963,16 @@ async function placeOrderOnce() {
   const payMethod = ticketItem.topupMethod
   dlog('POS.placeOrder', 'existing-ticket branch -- calling repairs.collectTicketPayment()')
   const res = await collectTicketPayment(ticket, payAmount, payMethod, ticketItem.requestId)
+  operation.result=res;operation.status=res.ok?'succeeded':'uncertain'
+  if (!current() || posState!==ownerState) {operation.detached=true;return}
   if (!res.ok) { showBlockingError('Error recording payment: ' + res.error); return }
 
   posState.cart = posState.cart.filter(i => !i.isTicket)
   posState.cartTicketId = null
   posState.cartIsNewTicket = false
   await load()
+  if(!current()||posState!==ownerState){operation.detached=true;return}
+  if(!resourceReady(state.resources,'tickets')){showTransactionSuccess('Payment acknowledged. Current balance is unavailable; retry reads before another collection.');return}
   const leftoverBalance = combinedBalance(state.data.tickets.find(t=>t.id===ticketId)||ticket).total
   showTransactionSuccess(`Payment of ${money(payAmount)} recorded. Remaining balance: ${money(leftoverBalance)}`)
 }
@@ -947,6 +980,8 @@ async function placeOrderOnce() {
 
 /* ── Standard checkout (retail items, no ticket in cart) ── */
 async function doCheckout() {
+  const required=[...(posState.cart.some(i=>i.isInventory)?['inventory']:[]),...(posState.cart.some(i=>i.isQuick)?['quickItems']:[])]
+  if(!resourceReady(state.resources,...required)){showBlockingError('Required catalog data is unavailable. Retry reads before checkout.');return}
   if (checkoutInFlight || !posState.cart.length) return
   const isSplit = posState.checkoutPayment === 'Split Payment'
   const isUdhar = posState.checkoutPayment === 'Udhar (Credit)' || (isSplit && Number(posState.splitCredit||0)>0)
@@ -975,6 +1010,7 @@ async function doCheckout() {
 }
 
 async function _finalizeCheckout() {
+  const current=captureAuthority(),ownerState=posState
   // Hold through cart clearing and reload: the old checkout UI can still receive
   // a second activation while the successful sale is being refreshed.
   if (checkoutInFlight || !posState.cart.length) return
@@ -983,16 +1019,19 @@ async function _finalizeCheckout() {
     render()
     await _finalizeCheckoutOnce()
   } finally {
-    checkoutInFlight = false
-    if (window.location.pathname.startsWith('/pos')) render()
+    if (current() && posState===ownerState) {
+      checkoutInFlight = false
+      if (window.location.pathname.startsWith('/pos')) render()
+    }
   }
 }
 
 async function _finalizeCheckoutOnce() {
+  const current=captureView(),ownerState=posState,actor=SESSION.authUserId
   dlog('POS._finalizeCheckout', 'ENTRY -- calling checkout.finalizeCheckout()')
   posState.checkoutRequestId ||= crypto.randomUUID()
-  const res = await finalizeCheckout({
-    cart: posState.cart,
+  const inputs = {
+    cart: structuredClone(posState.cart),
     checkoutPayment: posState.checkoutPayment,
     cashTendered: posState.cashTendered,
     udharName: posState.udharName,
@@ -1004,7 +1043,22 @@ async function _finalizeCheckoutOnce() {
     splitCredit: posState.splitCredit,
     employeeName: SESSION.employee?.name,
     requestId: posState.checkoutRequestId,
-  })
+    taxRate: Number(CFG.tax_rate||0),
+  }
+  const operation=cartOperations.get(inputs.requestId)||{actor,kind:'checkout',inputs,status:'pending'}
+  if(JSON.stringify(operation.inputs)!==JSON.stringify(inputs)){
+    operation.detached=true
+    showBlockingError('The original checkout '+inputs.requestId+' has different intended inputs. Review its original outcome before creating another sale.');return
+  }
+  cartOperations.set(inputs.requestId,operation)
+  let res
+  try {res=await finalizeCheckout(operation.inputs)}
+  catch {res={ok:false,error:'Outcome unavailable. Reconcile the original request before retrying.'}}
+  operation.status=res.ok?'succeeded':res.code==='incomplete-cash-payment'?'rejected':'uncertain'
+  operation.result=res
+  if(operation.status==='rejected')cartOperations.delete(inputs.requestId)
+  if(operation.status==='uncertain')operation.detached=true
+  if (!current() || posState!==ownerState) {operation.detached=true;return}
   if (!res.ok) {
     dlog('POS._finalizeCheckout', `FAILED: ${res.error}`)
     if (res.code === 'incomplete-cash-payment') {
@@ -1038,8 +1092,21 @@ function attachEvents() {
   dlog('POS.attachEvents', 'listeners attached to #app (click + submit)')
 
   /* ── Click ── */
-  app.addEventListener('click', async e => {
+  listenOwned(app,'click',ownsPOS,async (e,eventCurrent)=>{
+    if(e.target.closest('[data-action="retry-resources"]')){await load();return}
     if (!can('pos', state.role) || !modalEntitled(state.modal?.type)) return
+    const original=e.target.closest('[data-action="reconcile-original"]')
+    if(original){
+      const op=cartOperations.get(original.dataset.requestId),current=captureAuthority()
+      if(!op || op.actor!==SESSION.authUserId)return
+      if(op.status==='succeeded') {showTransactionSuccess('The original request was acknowledged. Review the original invoice/history; no request was resent.');return}
+      const table=op.kind==='checkout'?'sales':op.kind==='repair'?'tickets':null
+      if(!table){showBlockingError('Payment outcome remains uncertain. Reconcile the original request '+original.dataset.requestId+' against its original payment history; do not issue a new payment.');return}
+      const result=await viewAwait(eventCurrent,()=>(sb.from(table).select('*').eq('request_id',original.dataset.requestId).maybeSingle()),()=>state.modal)
+      if(!current() || op.actor!==SESSION.authUserId)return
+      if(result.error || !result.data){showBlockingError('Original outcome is still unconfirmed. Its UUID and intended payload are retained; no request was resent.');return}
+      op.status='succeeded';op.result={ok:true,data:result.data};render();return
+    }
     // Route guard: see the matching comment in admin.js's attachEvents()
     // for the full explanation -- this listener stays attached for the
     // rest of the session once /pos has been visited, even after
@@ -1115,7 +1182,7 @@ function attachEvents() {
       const ticketId = el.dataset.ticketId
       openPinPrompt('admin', async (verified) => {
         if (!verified) return
-        const subs = await getSubInvoices(ticketId)
+        const subs = await viewAwait(eventCurrent,()=>(getSubInvoices(ticketId)),()=>state.modal)
         state.modal = { type: 'edit-components', id: ticketId, subInvoices: subs }
         render()
       }, render)
@@ -1136,10 +1203,10 @@ function attachEvents() {
         if (!verified) return
         const tk = state.data.tickets.find(t => String(t.id) === String(ticketId))
         if (!tk) return
-        const res = await markComponentNotNeeded(Number(ticketId), index, reason)
+        const res = await viewAwait(eventCurrent,()=>(markComponentNotNeeded(Number(ticketId), index, reason)),()=>state.modal)
         if (!res.ok) { showBlockingError('Error: ' + res.error); return }
-        await load()
-        const subs = await getSubInvoices(ticketId)
+        await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
+        const subs = await viewAwait(eventCurrent,()=>(getSubInvoices(ticketId)),()=>state.modal)
         state.modal = { type: 'edit-components', id: ticketId, subInvoices: subs }
         render()
       }, render)
@@ -1216,15 +1283,15 @@ function attachEvents() {
       const comps = readSubInvCompsFromDOM()
       const labour = readSubInvLabourFromDOM()
       if (!comps.length && !labour) { showBlockingError('Add at least one component or a labour charge.'); return }
-      const res = await submitAdditionalWorkDraft(parentId, comps, labour, modal, false)
+      const res = await viewAwait(eventCurrent,()=>(submitAdditionalWorkDraft(parentId, comps, labour, modal, false)),()=>state.modal)
       if (res.busy) return
       if (!res.ok) { showBlockingError(res.error); return }
       if (res.ticket) {
-        const {buildSubInvoiceSlip,printThermal} = await import('../print/print.js')
+        const {buildSubInvoiceSlip,printThermal} = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
         printThermal(buildSubInvoiceSlip(res.ticket,tk))
       }
       if (state.modal === modal) state.modal = null
-      await load()
+      await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
       if (!res.ticket) showTransactionSuccess(`Additional work saved as ${(res.proposal?.decision || 'Pending').toLowerCase()}.`)
       return
     }
@@ -1238,38 +1305,38 @@ function attachEvents() {
       applyBranding(); render(); return
     }
     if (el.dataset.action === 'ems-clock-out') {
-      const { handleClockOut } = await import('../features/ems/index.js')
+      const { handleClockOut } = await viewAwait(eventCurrent,()=>(import('../features/ems/index.js')),()=>state.modal)
       handleClockOut(SESSION, async () => {
-        await confirmAction({
+        await viewAwait(eventCurrent,()=>(confirmAction({
           title: 'Log out?',
           message: 'Your shift is clocked out. Log out now?',
           confirmLabel: 'Log out',
           tone: 'danger',
-          action: async () => { await _clearSession(); return true },
-        })
+          action: async () => { await viewAwait(eventCurrent,()=>(_clearSession()),()=>state.modal); return true },
+        })),()=>state.modal)
       })
       return
     }
     if (el.dataset.action === 'logout') {
-      await confirmAction({
+      await viewAwait(eventCurrent,()=>(confirmAction({
         title: 'Log out?',
         message: 'Are you sure you want to log out?',
         confirmLabel: 'Log out',
         tone: 'danger',
-        action: async () => { await _clearSession(); return true },
-      })
+        action: async () => { await viewAwait(eventCurrent,()=>(_clearSession()),()=>state.modal); return true },
+      })),()=>state.modal)
       return
     }
     if (el.dataset.action === 'install' && state.installPrompt) {
-      await runInstallPrompt(); render(); return
+      await viewAwait(eventCurrent,()=>(runInstallPrompt()),()=>state.modal); render(); return
     }
 
     /* ── Shift stats ── */
     if (el.dataset.action === 'shift-stats')  { state.modal = { type:'shiftStats' }; render(); return }
-    if (el.dataset.action === 'print-shift')  { const { printThermal } = await import('../print/print.js'); printThermal(buildShiftStats()); return }
+    if (el.dataset.action === 'print-shift')  { if(!resourceReady(state.resources,'shiftFinancial','sales','tickets'))return; const { printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal); printThermal(buildShiftStats()); return }
     if (el.dataset.action === 'print-receipt') {
       if (state.modal?.sale) {
-        const { buildReceiptSlip, printThermal } = await import('../print/print.js')
+        const { buildReceiptSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
         printThermal(buildReceiptSlip(state.modal.sale))
       }
       return
@@ -1277,7 +1344,7 @@ function attachEvents() {
     if (el.dataset.action === 'print-ticket-slip') {
       dlog('POS.click', `PRINT-TICKET-SLIP branch firing -- state.modal.ticket=${JSON.stringify(state.modal?.ticket?.ticket_number)}`)
       if (state.modal?.ticket) {
-        const { buildTicketSlip, printThermal } = await import('../print/print.js')
+        const { buildTicketSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
         printThermal(buildTicketSlip(state.modal.ticket))
       }
       return
@@ -1290,7 +1357,7 @@ function attachEvents() {
     }
     if (el.dataset.action === 'retry-repair-summary') {
       const ticket = state.data.tickets.find(t => String(t.id) === String(el.dataset.ticketId)) || state.modal?.ticket
-      if (ticket) await openCollectTicket(ticket)
+      if (ticket) await viewAwait(eventCurrent,()=>(openCollectTicket(ticket)),()=>state.modal)
       return
     }
 
@@ -1333,25 +1400,25 @@ function attachEvents() {
 
     if (el.dataset.action === 'deliver-repair') {
       const ticketId = Number(el.dataset.ticketId)
-      await confirmAction({
+      await viewAwait(eventCurrent,()=>(confirmAction({
         title: 'Deliver repair?',
         message: 'Mark this fully paid repair as delivered to the customer?',
         confirmLabel: 'Deliver device',
         action: async () => {
-          const res = await deliverRepair(ticketId, false)
+          const res = await viewAwait(eventCurrent,()=>(deliverRepair(ticketId, false)),()=>state.modal)
           if (!res.ok) { showBlockingError('Delivery error: ' + res.error); return false }
           state.modal = null
-          await load()
+          await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
           showTransactionSuccess('Device marked as Delivered.')
           return true
         },
-      })
+      })),()=>state.modal)
       return
     }
     if (el.dataset.action === 'print-repair-summary') {
-      const summaryResult = await getRepairFamilySummary(Number(el.dataset.ticketId))
+      const summaryResult = await viewAwait(eventCurrent,()=>(getRepairFamilySummary(Number(el.dataset.ticketId))),()=>state.modal)
       if (!summaryResult.ok) { showBlockingError('Summary error: ' + summaryResult.error); return }
-      const { buildRepairSummary, printThermal } = await import('../print/print.js')
+      const { buildRepairSummary, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
       printThermal(buildRepairSummary(summaryResult.data)); return
     }
 
@@ -1359,10 +1426,10 @@ function attachEvents() {
       const ticketId = Number(el.dataset.ticketId)
       openPinPrompt('udhar', async verified => {
         if (!verified) return
-        const res = await deliverRepair(ticketId, true)
+        const res = await viewAwait(eventCurrent,()=>(deliverRepair(ticketId, true)),()=>state.modal)
         if (!res.ok) { showBlockingError('Delivery error: ' + res.error); return }
         state.modal = null
-        await load()
+        await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
         showTransactionSuccess('Device delivered with the remaining balance approved as Udhar.')
       }, render)
       return
@@ -1370,7 +1437,7 @@ function attachEvents() {
 
     /* ── Place Order (ticket in cart) ── */
     if (el.dataset.action === 'place-order') {
-      await placeOrder(); return
+      await viewAwait(eventCurrent,()=>(placeOrder()),()=>state.modal); return
     }
 
     /* ── Standard Checkout ── */
@@ -1380,10 +1447,10 @@ function attachEvents() {
       if (hasDiscount && CFG.discount_pin_required) {
         openPinPrompt('discount', async (verified) => {
         if (!verified) return
-        await doCheckout()
+        await viewAwait(eventCurrent,()=>(doCheckout()),()=>state.modal)
       }, render); return
       }
-      await doCheckout(); return
+      await viewAwait(eventCurrent,()=>(doCheckout()),()=>state.modal); return
     }
 
     /* ── Cart qty + remove ── */
@@ -1518,18 +1585,20 @@ function attachEvents() {
       openPinPrompt('settle', async (verified) => {
         if (!verified) return
         const rec = (state.data.udharAccounts || []).find(u => `${u.kind}:${u.sourceId}` === accountKey)
-        const res = await settleUdhar(rec, amount, method)
+        const res = await viewAwait(eventCurrent,()=>(settleUdhar(rec, amount, method)),()=>state.modal)
         if (!res.ok) { showBlockingError('Settle error: ' + res.error); return }
-        await load()
+        await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
         state.modal = { type:'udharList' }
         render()
         showTransactionSuccess('Udhar payment recorded.')
       }, render); return
     }
-  })
+  },error=>showBlockingError(error?.message||'Unable to confirm the result. Refresh reads before retrying.'))
 
   /* ── Input ── */
   app.addEventListener('input', e => {
+    if(!ownsPOS())return
+
     const t = e.target
     rememberAdditionalWorkInput(t, state.modal)
     if (t.dataset.cashTendered !== undefined) {
@@ -1571,6 +1640,8 @@ function attachEvents() {
 
   /* ── Enter key submits quick-add inputs that aren't inside a <form> ── */
   app.addEventListener('keydown', e => {
+    if(!ownsPOS())return
+
     if (e.key !== 'Enter') return
     const map = {
       'tag-custom-text':  'confirm-custom-tag',
@@ -1586,6 +1657,8 @@ function attachEvents() {
 
   /* ── Change ── */
   app.addEventListener('change', e => {
+    if(!ownsPOS())return
+
     const t = e.target
     if (t.dataset.action === 'payment') {
       posState.checkoutPayment = t.value; posState.cashTendered = 0; render(); return
@@ -1597,7 +1670,7 @@ function attachEvents() {
   })
 
   /* ── Submit ── */
-  app.addEventListener('submit', async e => {
+  listenOwned(app,'submit',ownsPOS,async (e,eventCurrent)=>{
     if (!can('pos', state.role) || !modalEntitled(state.modal?.type)) { e.preventDefault(); return }
     if (!window.location.pathname.startsWith('/pos')) return
     e.preventDefault()
@@ -1660,7 +1733,7 @@ function attachEvents() {
       posState.udharName  = data.udharName
       posState.udharPhone = data.udharPhone
       state.modal = null
-      await doCheckout(); return
+      await viewAwait(eventCurrent,()=>(doCheckout()),()=>state.modal); return
     }
 
     if (type === 'return-lookup') {
@@ -1669,7 +1742,7 @@ function attachEvents() {
         state.modal = { type:'returnFlow', notFound:true, receiptNo:data.receiptNo }
         render(); return
       }
-      const lookup = await getRetailReturnContext(found.id)
+      const lookup = await viewAwait(eventCurrent,()=>(getRetailReturnContext(found.id)),()=>state.modal)
       if (!lookup.ok) { showBlockingError('Return lookup failed: '+lookup.error); return }
       state.modal = { type:'returnFlow', receiptNo:found.invoice_number, context:lookup.data }
       render(); return
@@ -1685,22 +1758,22 @@ function attachEvents() {
       if (!reason) { showBlockingError('Enter a return reason.'); return }
       openPinPrompt('return', async (verified) => {
         if (!verified) return
-        const result = await createRetailReturn(saleId,preview.lines.map(({saleLineId,quantity,restock}) => ({saleLineId,quantity,restock})),data.refundMethod,reason)
+        const result = await viewAwait(eventCurrent,()=>(createRetailReturn(saleId,preview.lines.map(({saleLineId,quantity,restock}) => ({saleLineId,quantity,restock})),data.refundMethod,reason)),()=>state.modal)
         if (!result.ok) { showBlockingError('Return error: '+result.error); return }
         const refund = Number(result.data?.return?.refund_amount||0)
-        const { buildReturnSlip, printThermal } = await import('../print/print.js')
+        const { buildReturnSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
         printThermal(buildReturnSlip({
           invoiceNumber:context?.sale?.invoiceNumber||`#${saleId}`,
           items:preview.lines.map(line => ({ name:line.name, qty:line.quantity, sold_price:line.sold_price })),
           refund, method:refund>0?data.refundMethod:'No cash refund',
         }))
-        state.modal = null; await load()
+        state.modal = null; await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
         showTransactionSuccess(`Return completed. Refund: ${money(refund)}`)
       }, render); return
     }
 
     if (type === 'change-password') {
-      const result = await handleChangePasswordSubmit(SESSION, data)
+      const result = await viewAwait(eventCurrent,()=>(handleChangePasswordSubmit(SESSION, data)),()=>state.modal)
       const errEl = document.getElementById('change-password-error')
       if (!result.ok) {
         if (errEl) { errEl.textContent = result.error; errEl.classList.remove('hidden') }
@@ -1712,7 +1785,7 @@ function attachEvents() {
     }
 
     if (type === 'leave-request') {
-      const result = await submitLeaveRequest(SESSION, data)
+      const result = await viewAwait(eventCurrent,()=>(submitLeaveRequest(SESSION, data)),()=>state.modal)
       if (!result.ok) { showBlockingError('Error: ' + result.error); return }
       state.modal = null
       showToast('Leave request submitted. Your manager will review it.', 'success')
@@ -1727,7 +1800,7 @@ function attachEvents() {
       }
       state.modal = null; render(); return
     }
-  })
+  },error=>showBlockingError(error?.message||'Unable to confirm the result. Refresh reads before retrying.'))
 
 }
 
@@ -1750,7 +1823,8 @@ function _refreshDraftTotals() {
 /* ═══════════════════════════════════════════════════════════════════
    PUBLIC ENTRY POINT
 ═══════════════════════════════════════════════════════════════════ */
-export async function initPOS(sess) {
+export async function initPOS(sess,isCurrent=()=>true) {
+  const authority=captureAuthority();posNavigationIsCurrent=()=>isCurrent()&&authority()
   dlog('POS.initPOS', `ENTRY _eventsAttached=${_eventsAttached} caller=[${callerInfo()}]`)
   SESSION = sess
   state.role = sess.employee?.role || null

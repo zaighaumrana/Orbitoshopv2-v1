@@ -21,7 +21,9 @@
    is already the one place that logic lives.
 ═══════════════════════════════════════════════════════════════════ */
 
+import {onPrivateReset} from '../../../ui-authority.js'
 let draft = null
+onPrivateReset(resetDraft)
 
 /** Returns the current draft, lazily creating an empty one if none
  *  exists yet. Never returns null/undefined -- callers can rely on

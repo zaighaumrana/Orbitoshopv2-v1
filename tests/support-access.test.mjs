@@ -7,8 +7,9 @@ import {webcrypto} from 'node:crypto';
 const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 const supportNames=['PLATFORM_SUPABASE_URL','PLATFORM_SUPABASE_ANON','PLATFORM_AUTH_EMAIL'];
 const actor='99000000-0000-4000-8000-000000000001',source='99000000-0000-4000-8000-000000000003',token='a'.repeat(64);
-function fixture({configured=true,suspended=true,auditError=false,exchangeStatus=200,assertion={},mappedSupport=false,newSupport=false}={}){
- let handler;const audit=[],writes=[],fetches=[],logs=[];let customerSignins=0,bootstraps=0;
+const consent='99000000-0000-4000-8000-000000000004',sessionId='99000000-0000-4000-8000-000000000005';
+function fixture({configured=true,suspended=true,auditError=false,exchangeStatus=200,assertion={},mappedSupport=false,newSupport=false,bindingError=false,otpSession=true}={}){
+ let handler;const audit=[],writes=[],fetches=[],logs=[],bindings=[];let customerSignins=0,bootstraps=0;
  const email='orbitosupport+abcdefghijklmnopqrst@support.orbito.internal';
  const supportProfile={auth_user_id:'shop-support',employee_id:null,email,display_name:'Orbito Support',role:'Orbito Support',status:'Active'};
  let storedSupport=newSupport?null:supportProfile;
@@ -16,24 +17,30 @@ function fixture({configured=true,suspended=true,auditError=false,exchangeStatus
  const env={SUPABASE_URL:'https://abcdefghijklmnopqrst.supabase.co',SUPABASE_ANON_KEY:'shop-anon',SUPABASE_SERVICE_ROLE_KEY:'private-service',TURNSTILE_SECRET:'private-turnstile',PLATFORM_BRIDGE_CALL_SECRET:'private-call',PLATFORM_BRIDGE_SOURCE_SECRET:'private-source-'.repeat(4),PLATFORM_BRIDGE_ENDPOINT:'https://zyxwvutsrqponmlkjihg.supabase.co/functions/v1/platform-bridge',
   ...(configured?{PLATFORM_SUPABASE_URL:'https://zyxwvutsrqponmlkjihg.supabase.co',PLATFORM_SUPABASE_ANON:'platform-anon',PLATFORM_AUTH_EMAIL:'obsolete-master@example.test'}:{})};
  const admin={auth:{admin:{getUserById:async()=>({data:{user:{id:supportProfile.auth_user_id,email}}}),generateLink:async()=>{bootstraps++;return {data:{properties:{hashed_token:'support-token'}}};},listUsers:async()=>({data:{users:[]}}),createUser:async payload=>{assert.equal(payload.email,email);assert.equal(payload.email_confirm,true);assert.equal(payload.password,undefined);return {data:{user:{id:supportProfile.auth_user_id,email}}};}}},
-  rpc:async name=>name==='bridge_onboarding'?{data:{client_binding:'client-42',source_id:source}}:{data:{checks:Object.fromEntries(['migrations','database_privileges','rpc_privileges','sequence_privileges','private_config','storage','owner_reservation','bridge_mode','config_projection'].map(k=>[k,true])),owner_account:'active'}},
+  rpc:async (name,args)=>{
+   if(name==='support_consent_bind'){
+    assert.deepEqual(JSON.parse(JSON.stringify(args)),{p_consent:consent,p_actor:'shop-support',p_session:sessionId,p_platform_actor:actor});
+    bindings.push(args);return {error:bindingError?{message:'expired or revoked'}:null};
+   }
+   return name==='bridge_onboarding'?{data:{client_binding:'client-42',source_id:source}}:{data:{checks:Object.fromEntries(['migrations','database_privileges','rpc_privileges','sequence_privileges','private_config','storage','owner_reservation','bridge_mode','config_projection'].map(k=>[k,true])),owner_account:'active'}};
+  },
   from:table=>({filter:null,select(){return this},eq(k,v){this.filter=[k,v];return this},
    single:async()=>({data:{id:1,suspended,platform_client_id:42,onboarding_version:2}}),maybeSingle(){assert.equal(table,'app_users');return {data:this.filter[0]==='role'||mappedSupport||this.filter[1]===email?storedSupport:ownerProfile};},
    insert:async payload=>{writes.push({table,payload});if(table==='app_users'){assert.equal(payload.role,'Orbito Support');storedSupport=payload;return {error:null};}assert.equal(table,'support_access_log');audit.push(payload);return {error:auditError?{}:null};},delete(){assert.fail('support must not change owner, credentials or lifecycle');}})};
- const auth={auth:{signInWithPassword:async()=>{customerSignins++;assert.fail('suspended customer/support must not reach password Auth');},verifyOtp:async args=>{assert.equal(args.token_hash,'support-token');return {data:{user:{id:supportProfile.auth_user_id},session:{access_token:'support-session',refresh_token:'support-refresh'}}};}}};
- const ctx=vm.createContext({Request,Response,URL,URLSearchParams,TextEncoder,Uint8Array,crypto:webcrypto,AbortSignal,Deno:{env:{get:k=>env[k]},serve:fn=>handler=fn},createClient:(_url,key)=>key==='private-service'?admin:auth,
+ const auth={auth:{signInWithPassword:async()=>{customerSignins++;assert.fail('suspended customer/support must not reach password Auth');},verifyOtp:async args=>{assert.equal(args.token_hash,'support-token');assert.equal(args.type,'email');return {data:{user:{id:supportProfile.auth_user_id},session:{access_token:otpSession?'x.'+Buffer.from(JSON.stringify({session_id:sessionId})).toString('base64url')+'.x':'invalid-session',refresh_token:'support-refresh'}}};}}};
+ const ctx=vm.createContext({Request,Response,URL,URLSearchParams,TextEncoder,Uint8Array,atob,crypto:webcrypto,AbortSignal,Deno:{env:{get:k=>env[k]},serve:fn=>handler=fn},createClient:(_url,key)=>key==='private-service'?admin:auth,
   console:{error:(...args)=>logs.push(args)},fetch:async(url,init)=>{
    fetches.push({url,init});assert.ok(!url.includes('/auth/v1/token'),'no Platform password auth');
    if(url.includes('siteverify'))return Response.json({success:true});
    if(url.endsWith('/platform-support')){
     assert.equal(init.headers.Authorization,'Bearer '+env.PLATFORM_BRIDGE_SOURCE_SECRET);assert.equal(init.redirect,'error');
     assert.deepEqual(JSON.parse(init.body),{action:'exchange',token,client_id:42,project_ref:'abcdefghijklmnopqrst',client_binding:'client-42',source_id:source});
-    return Response.json(exchangeStatus===200?{ok:true,contract:'orbito-support-handoff-v1',platform_user_id:actor,platform_email:'canonical-master@example.test',client_id:42,project_ref:'abcdefghijklmnopqrst',client_binding:'client-42',source_id:source,...assertion}:{error:'expired or replayed'},{status:exchangeStatus});
+    return Response.json(exchangeStatus===200?{ok:true,contract:'orbito-support-handoff-v1',platform_user_id:actor,platform_email:'canonical-master@example.test',client_id:42,project_ref:'abcdefghijklmnopqrst',client_binding:'client-42',source_id:source,consent_id:consent,...assertion}:{error:'expired or replayed'},{status:exchangeStatus});
    }
    return ctx.runtimeProbe(new Request(url,init),url.split('/').at(-1),['SUPABASE_URL','SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY','TURNSTILE_SECRET']);
   }});
  vm.runInContext(stripTypeScriptTypes(['supabase/functions/_shared/runtime-preflight.ts','supabase/functions/_shared/support-handoff.ts','supabase/functions/login/index.ts'].map(read).join('\n').replace(/^import .*$/gm,'').replace(/^export /gm,'')),ctx);
- return {ctx,env,audit,writes,logs,fetches,get customerSignins(){return customerSignins;},get bootstraps(){return bootstraps;},runtime:()=>ctx.checkRuntime(admin,{owner_setup:'owner_active'}),
+ return {ctx,env,audit,writes,logs,fetches,bindings,get customerSignins(){return customerSignins;},get bootstraps(){return bootstraps;},runtime:()=>ctx.checkRuntime(admin,{owner_setup:'owner_active'}),
   send:async(mode,extra={})=>{const body=mode==='support-handoff'?{mode,token,...extra}:{mode,email:'owner@example.test',password:'synthetic-password',turnstileToken:'captcha',...extra};const r=await handler(new Request('https://shop.test/login',{method:'POST',headers:{'user-agent':'handoff-test'},body:JSON.stringify(body)}));return {status:r.status,body:await r.json()};}};
 }
 test('suspended Shop blocks Business Owner but server handoff bootstraps local support and requires canonical audit',async()=>{
@@ -51,6 +58,18 @@ test('handoff fails closed for expired/replayed grants, untrusted assertions, mi
 });
 test('first handoff creates a password-free local Support identity, verifies its OTP and audits before returning session',async()=>{
  const f=fixture({newSupport:true,configured:false}),r=await f.send('support-handoff');assert.equal(r.status,200);assert.equal(r.body.profile.role,'Orbito Support');assert.equal(f.bootstraps,1);assert.equal(f.audit.length,1);assert.equal(f.writes.length,2);assert.equal(f.writes[0].table,'app_users');assert.equal(f.writes[1].table,'support_access_log');assert.equal(f.customerSignins,0);
+});
+
+test('consent, native session and current binding are mandatory before audit or browser session',async()=>{
+ for(const consent_id of [null,'','invalid']){
+  const f=fixture({assertion:{consent_id}}),r=await f.send('support-handoff');
+  assert.equal(r.status,401);assert.equal(f.bootstraps,0);assert.equal(f.bindings.length,0);assert.equal(f.audit.length,0);
+ }
+ // The trusted binding RPC rejects expired/revoked/already-used approvals.
+ const denied=fixture({bindingError:true}),r=await denied.send('support-handoff');
+ assert.equal(r.status,401);assert.match(r.body.error,/expired, revoked/);assert.equal(denied.bindings.length,1);assert.equal(denied.audit.length,0);assert.equal(r.body.session,undefined);
+ const missing=fixture({otpSession:false});assert.equal((await missing.send('support-handoff')).status,401);assert.equal(missing.bindings.length,0);assert.equal(missing.audit.length,0);
+ const valid=fixture();assert.equal((await valid.send('support-handoff')).status,200);assert.equal(valid.bindings.length,1);assert.equal(valid.audit.length,1);
 });
 test('old support password route and mapped support password route cannot authenticate',async()=>{
  const f=fixture(),r=await f.send('support');assert.equal(r.status,401);assert.match(r.body.error,/Open Shop as Support/);assert.equal(f.fetches.length,0);

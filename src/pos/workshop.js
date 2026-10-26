@@ -1,3 +1,5 @@
+import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
+import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
 import { escapeHTML, safeImageURL } from '../html.js'
 import { createSubInvoiceModalHTML, rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
 /* ═══════════════════════════════════════════════════════════════════
@@ -25,6 +27,7 @@ import { findRepairFamilies, groupRepairFamilies, matchedRepairChild, repairFami
 
 import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
+import {captureAuthority,onPrivateReset} from '../ui-authority.js'
 
 /* ── Workshop state ── */
 const wsState = {
@@ -35,12 +38,19 @@ const wsState = {
 
 let SESSION        = {}
 let _eventsAttached = false
+let workshopNavigationIsCurrent=()=>false,workshopLoadGeneration=0
+const ownsWorkshop=()=>workshopNavigationIsCurrent()&&window.location.pathname==='/workshop'&&state.role===SESSION.employee?.role&&can('workshop',state.role)
+onPrivateReset(() => {workshopLoadGeneration++;workshopNavigationIsCurrent=()=>false;SESSION={};wsState.familySummaries=new Map();wsState.filter='';wsState.statusFilter='all'})
 
 /* ── Load ── */
 async function load() {
+  const generation=++workshopLoadGeneration,view=captureView(),navigation=workshopNavigationIsCurrent
+  const current=()=>generation===workshopLoadGeneration&&view()&&navigation()
   const loadSession = SESSION
   dlog('WORKSHOP.load', 'ENTRY')
-  await loadConfig()
+  const configReady=await loadConfig()
+  if(!current())return
+  if(!configReady){state.resources={config:{status:'unavailable'}};render();return}
   if (window.location.pathname !== '/workshop' || state.role !== SESSION.employee?.role) return
   if (!can('workshop', state.role)) {
     state.modal = null
@@ -54,25 +64,33 @@ async function load() {
       .not('status', 'in', '("Delivered","Declined","Cancelled")')
       .order('created_at', { ascending: false }),
     sb.from('repair_components').select('*').order('sort_order'),
-  ])
+  ].map(settleRead))
+  if(!current())return
   // Child lifecycle may differ from its active root. Fetch those children
   // without loading unrelated closed families or consulting financial RPCs.
-  const roots = tickets.data || []
-  const children = roots.length ? await sb.from('tickets').select('*')
+  const roots = tickets.error?[]:tickets.data || []
+  const children = roots.length ? await settleRead(sb.from('tickets').select('*')
     .in('parent_ticket_id', roots.map(ticket => ticket.id))
-    .order('created_at', {ascending:true}) : {data:[]}
-  if (tickets.error || children.error) showBlockingError('Repair work could not be loaded completely. Reload to retry.')
+    .order('created_at', {ascending:true})) : {data:[]}
+  if(!current())return
   if (SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== '/workshop' || !can('workshop', state.role)) return
-  state.data.tickets = [...roots, ...(children.data || [])]
-  state.data.repairComponents = repairComponents.data || []
+  const reads=readStates({tickets,children,repairComponents})
+  state.resources=reads.resources
+  if(!resourceReady(reads.resources,'tickets','children')){
+    state.resources.tickets.status='incomplete';state.data.tickets=null;wsState.familySummaries=new Map();render();return
+  }
+  state.data.tickets = [...roots, ...reads.values.children]
+  state.data.repairComponents = reads.values.repairComponents
   wsState.familySummaries = new Map()
   if (['Business Owner','Manager','Cashier','Orbito Support'].includes(SESSION.employee?.role)) {
     const roots = groupRepairFamilies(state.data.tickets)
     await Promise.all(roots.map(async ({root}) => {
       const result = await getRepairFamilySummary(root.id)
+      if(!current())return
       if (result.ok) wsState.familySummaries.set(String(root.id), result.data)
     }))
   }
+  if(!current())return
   applyBranding()
   dlog('WORKSHOP.load', 'DATA READY -- calling render()')
   render()
@@ -80,6 +98,7 @@ async function load() {
 
 /* ── Render ── */
 function render() {
+  if(!ownsWorkshop())return
   if (window.location.pathname !== '/workshop' || !can('workshop', state.role) || state.role !== SESSION.employee?.role) return
   dstack('WORKSHOP.render', '*** #app REWRITE ***')
   if (!SESSION.employee) { navigate('/login'); return }
@@ -148,6 +167,8 @@ function render() {
 
 /* ── Workshop View ── */
 function workshopView() {
+  if(!resourceReady(state.resources,'config'))return resourceNotice('Shop configuration')
+  if(!resourceReady(state.resources,'tickets','children'))return resourceNotice('Complete repair queue')
   const all    = state.data.tickets || []
   const roots = groupRepairFamilies(all).map(family => family.root)
   const filtered = findRepairFamilies(all, wsState.filter)
@@ -476,7 +497,8 @@ function attachEvents() {
   }
 
   /* ── Click ── */
-  app.addEventListener('click', async e => {
+  listenOwned(app,'click',ownsWorkshop,async (e,eventCurrent)=>{
+    if(e.target.closest('[data-action="retry-resources"]')){await load();return}
     if (!can('workshop', state.role) || !modalEntitled(state.modal?.type)) return
     // Route guard: see the matching comment in admin.js's attachEvents()
     // for the full explanation -- this is the listener whose collision
@@ -516,11 +538,10 @@ function attachEvents() {
       navigate('/pos'); return
     }
     if (el.dataset.action === 'go-admin') {
-      const { initAdmin } = await import('../admin/admin.js')
-      initAdmin(SESSION, 'dashboard', {}); return
+      if(can('dashboard',state.role))navigate('/admin/dashboard'); return
     }
     if (el.dataset.action === 'install' && state.installPrompt) {
-      await runInstallPrompt(); render(); return
+      await viewAwait(eventCurrent,()=>(runInstallPrompt()),()=>state.modal); render(); return
     }
     if (el.dataset.action === 'my-account') {
       state.modal = { type: 'myAccount' }; render(); return
@@ -531,25 +552,25 @@ function attachEvents() {
       applyBranding(); render(); return
     }
     if (el.dataset.action === 'logout') {
-      await confirmAction({
+      await viewAwait(eventCurrent,()=>(confirmAction({
         title: 'Log out?',
         message: 'Are you sure you want to log out?',
         confirmLabel: 'Log out',
         tone: 'danger',
-        action: async () => { await _clearSession(); return true },
-      })
+        action: async () => { await viewAwait(eventCurrent,()=>(_clearSession()),()=>state.modal); return true },
+      })),()=>state.modal)
       return
     }
     if (el.dataset.action === 'ems-clock-out') {
-      const { handleClockOut } = await import('../features/ems/index.js')
+      const { handleClockOut } = await viewAwait(eventCurrent,()=>(import('../features/ems/index.js')),()=>state.modal)
       handleClockOut(SESSION, async () => {
-        await confirmAction({
+        await viewAwait(eventCurrent,()=>(confirmAction({
           title: 'Log out?',
           message: 'Your shift is clocked out. Log out now?',
           confirmLabel: 'Log out',
           tone: 'danger',
-          action: async () => { await _clearSession(); return true },
-        })
+          action: async () => { await viewAwait(eventCurrent,()=>(_clearSession()),()=>state.modal); return true },
+        })),()=>state.modal)
       })
       return
     }
@@ -562,9 +583,9 @@ function attachEvents() {
     if (el.dataset.wsStatus) {
       const ticketId = el.dataset.wsStatus
       const newStatus = el.dataset.wsNewStatus
-      const { error } = await sb.from('tickets')
+      const { error } = await viewAwait(eventCurrent,()=>(sb.from('tickets')
         .update({ status: newStatus })
-        .eq('id', ticketId)
+        .eq('id', ticketId)),()=>state.modal)
       if (error) { showBlockingError('Error: ' + error.message); return }
       const tk = state.data.tickets.find(t => String(t.id) === String(ticketId))
       if (tk) tk.status = newStatus
@@ -576,7 +597,7 @@ function attachEvents() {
       const ticketId = el.dataset.ticketId
       state.modal = { type: 'edit-components', id: ticketId, subInvoices: [] }
       render()
-      const subs = await getSubInvoices(ticketId)
+      const subs = await viewAwait(eventCurrent,()=>(getSubInvoices(ticketId)),()=>state.modal)
       if (state.modal?.type === 'edit-components' && String(state.modal.id) === String(ticketId)) {
         state.modal.subInvoices = subs
         render()
@@ -605,10 +626,10 @@ function attachEvents() {
         if (!verified) return
         const tk = state.data.tickets.find(t => String(t.id) === String(ticketId))
         if (!tk) return
-        const res = await markComponentNotNeeded(Number(ticketId), index, reason)
+        const res = await viewAwait(eventCurrent,()=>(markComponentNotNeeded(Number(ticketId), index, reason)),()=>state.modal)
         if (!res.ok) { showBlockingError('Error: ' + res.error); return }
-        await load()
-        const subs = await getSubInvoices(ticketId)
+        await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
+        const subs = await viewAwait(eventCurrent,()=>(getSubInvoices(ticketId)),()=>state.modal)
         state.modal = { type: 'edit-components', id: ticketId, subInvoices: subs }
         render()
       }, render)
@@ -617,6 +638,7 @@ function attachEvents() {
 
     /* Open sub-invoice creation form */
     if (el.dataset.action === 'open-create-sub-invoice') {
+      if(!resourceReady(state.resources,'repairComponents')){showBlockingError('Repair catalog unavailable. Retry reads before adding work.');return}
       state.modal = { type: 'create-sub-invoice', parentId: el.dataset.ticketId, draftComponents: [], draftLabour: 0 }
       render(); return
     }
@@ -687,22 +709,22 @@ function attachEvents() {
       const comps = readDraftCompsFromDOM()
       const labour = readDraftLabourFromDOM()
       if (!comps.length && !labour) { showBlockingError('Add at least one component or a labour charge.'); return }
-      const res = await submitAdditionalWorkDraft(parentId, comps, labour, modal, SESSION.employee?.role === 'Technician')
+      const res = await viewAwait(eventCurrent,()=>(submitAdditionalWorkDraft(parentId, comps, labour, modal, SESSION.employee?.role === 'Technician')),()=>state.modal)
       if (res.busy) return
       if (!res.ok) { showBlockingError(res.error); return }
       if (res.ticket) {
-        const {buildSubInvoiceSlip,printThermal} = await import('../print/print.js')
+        const {buildSubInvoiceSlip,printThermal} = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
         printThermal(buildSubInvoiceSlip(res.ticket,tk))
       }
       if (state.modal === modal) state.modal = null
-      await load()
+      await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
       if (!res.ticket) showTransactionSuccess(`Additional work saved as ${(res.proposal?.decision || 'Pending').toLowerCase()}.`)
       return
     }
-  })
+  },error=>showBlockingError(error?.message||'Unable to confirm the result. Refresh reads before retrying.'))
 
   /* ── Submit ── */
-  app.addEventListener('submit', async e => {
+  listenOwned(app,'submit',ownsWorkshop,async (e,eventCurrent)=>{
     if (!can('workshop', state.role) || !modalEntitled(state.modal?.type)) { e.preventDefault(); return }
     if (!window.location.pathname.startsWith('/workshop')) return
     e.preventDefault()
@@ -710,14 +732,14 @@ function attachEvents() {
     const data = Object.fromEntries(new FormData(form).entries())
     dlog('WORKSHOP.submit', `ENTRY form.dataset.form=${form.dataset.form}`)
     if (form.dataset.form === 'leave-request') {
-      const result = await submitLeaveRequest(SESSION, data)
+      const result = await viewAwait(eventCurrent,()=>(submitLeaveRequest(SESSION, data)),()=>state.modal)
       if (!result.ok) { showBlockingError('Error: ' + result.error); return }
       state.modal = null
       showToast('Leave request submitted. Your manager will review it.', 'success')
       render(); return
     }
     if (form.dataset.form === 'change-password') {
-      const result = await handleChangePasswordSubmit(SESSION, data)
+      const result = await viewAwait(eventCurrent,()=>(handleChangePasswordSubmit(SESSION, data)),()=>state.modal)
       const errEl = document.getElementById('change-password-error')
       if (!result.ok) {
         if (errEl) { errEl.textContent = result.error; errEl.classList.remove('hidden') }
@@ -727,10 +749,12 @@ function attachEvents() {
       showToast('Password updated.', 'success')
       render(); return
     }
-  })
+  },error=>showBlockingError(error?.message||'Unable to confirm the result. Refresh reads before retrying.'))
   
   /* ── Input — live total update ── */
   app.addEventListener('input', e => {
+    if(!ownsWorkshop())return
+
     const t = e.target
     rememberAdditionalWorkInput(t, state.modal)
     if (t.dataset.wsFilter !== undefined) {
@@ -743,6 +767,8 @@ function attachEvents() {
 
   /* ── Keyboard ── */
   document.addEventListener('keydown', e => {
+    if(!ownsWorkshop())return
+
     if (window.location.pathname !== '/workshop' || !can('workshop', state.role)) return
     if (e.key === 'Enter') {
       const map = {
@@ -769,7 +795,8 @@ function _addComponentToDraft(name, tag, customText) {
 /* ═══════════════════════════════════════════════════════════════════
    PUBLIC ENTRY POINT
 ═══════════════════════════════════════════════════════════════════ */
-export async function initWorkshop(sess) {
+export async function initWorkshop(sess,isCurrent=()=>true) {
+  const authority=captureAuthority();workshopNavigationIsCurrent=()=>isCurrent()&&authority()
   dlog('WORKSHOP.initWorkshop', `ENTRY isAdmin=${sess.isAdmin} caller=[${callerInfo()}]`)
   SESSION          = sess
   state.role       = sess.employee?.role || null

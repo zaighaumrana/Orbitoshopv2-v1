@@ -70,7 +70,7 @@ export async function updateTicket(id, updates) {
 export async function getSubInvoices(parentId) {
   const { data, error } = await sb.from('tickets')
     .select('*').eq('parent_ticket_id', parentId).order('created_at', { ascending: true })
-  if (error) { console.warn('getSubInvoices failed:', error.message); return [] }
+  if (error) throw Error('Repair family is incomplete because child work is unavailable. Retry reads.')
   return data || []
 }
 

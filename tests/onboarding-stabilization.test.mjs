@@ -71,12 +71,13 @@ test('BYO apply installs only separate allowed files, deploys exact six function
  const f=toolFixture();await runSetup([...toolArgs,'--apply','--remove-pairing'],f.deps);assert.equal(f.commands.filter(c=>c.args[0]==='secrets'&&!c.args.includes('--help')).length,2);assert.equal(f.commands.filter(c=>c.args[0]==='functions'&&!c.args.includes('--help')).length,6);assert.deepEqual(f.removed,['pair']);assert.doesNotMatch(f.reports.join('\n'),/private-test-only|a{64}|b{64}/);
  const bad=toolFixture({ready:false});await assert.rejects(runSetup([...toolArgs,'--apply','--remove-pairing'],bad.deps),/runtime checks/);assert.equal(bad.removed.length,0);
 });
-function adminHandlerFixture({role='Business Owner',verified=true}={}){
+function adminHandlerFixture({role='Business Owner',verified=true,supportAuthorized=true}={}){
  let handler;const writes=[],rpcCalls=[];const profile={auth_user_id:'verified-owner',employee_id:null,email:'owner@example.test',role,status:'Active',display_name:'Owner'};
- const admin={from:table=>({select(){return this},eq(){return this},single:async()=>({data:table==='app_users'?profile:{suspended:false}}),update:updates=>{writes.push({table,updates});return {eq:async()=>({})}}}),rpc:async(name,args)=>{rpcCalls.push({name,args});return {data:{}}}};
- const ctx={Response,atob,Deno:{serve:fn=>handler=fn,env:{get:key=>({SUPABASE_URL:'https://shop.test',SUPABASE_ANON_KEY:'anon',SUPABASE_SERVICE_ROLE_KEY:'service'})[key]}},runtimeProbe:async()=>null,createClient:(_url,key)=>key==='service'?admin:{auth:{getUser:async token=>{assert.equal(token,'session-jwt');return {data:{user:verified?{id:profile.auth_user_id}:null}}}}},console:{error(){assert.fail('unexpected settings exception')}}};
- vm.createContext(ctx);vm.runInContext(stripTypeScriptTypes(read('supabase/functions/account-admin/index.ts').replace(/^import .*$/gm,'')),ctx);
- return {writes,rpcCalls,send:async(body)=>{const r=await handler(new Request('https://shop.test/settings',{method:'POST',headers:{Authorization:'Bearer session-jwt'},body:JSON.stringify(body)}));return {status:r.status,body:await r.json()}}};
+ const sessionToken='x.'+Buffer.from(JSON.stringify({sub:profile.auth_user_id,session_id:'97000000-0000-4000-8000-000000000002'})).toString('base64url')+'.synthetic';
+ const admin={from:table=>({select(){return this},eq(){return this},single:async()=>({data:table==='app_users'?profile:{suspended:false}}),update:updates=>{writes.push({table,updates});return {eq:async()=>({})}}}),rpc:async(name,args)=>{rpcCalls.push({name,args});return {data:name==='support_session_authorized'?supportAuthorized:{}}}};
+ const ctx={Response,atob,Deno:{serve:fn=>handler=fn,env:{get:key=>({SUPABASE_URL:'https://shop.test',SUPABASE_ANON_KEY:'anon',SUPABASE_SERVICE_ROLE_KEY:'service'})[key]}},runtimeProbe:async()=>null,createClient:(_url,key)=>key==='service'?admin:{auth:{getUser:async token=>{assert.equal(token,sessionToken);return {data:{user:verified?{id:profile.auth_user_id}:null}}}}},console:{error(){assert.fail('unexpected settings exception')}}};
+ vm.createContext(ctx);vm.runInContext(stripTypeScriptTypes((read('supabase/functions/_shared/support-consent.ts')+'\n'+read('supabase/functions/account-admin/index.ts')).replace(/^import .*$/gm,'').replace(/^export /gm,'')),ctx);
+ return {writes,rpcCalls,send:async(body)=>{const r=await handler(new Request('https://shop.test/settings',{method:'POST',headers:{Authorization:'Bearer '+sessionToken},body:JSON.stringify(body)}));return {status:r.status,body:await r.json()}}};
 }
 test('real account-admin handler saves authenticated owner branding and completes only using verified caller UUID',async()=>{
  const f=adminHandlerFixture();assert.equal((await f.send({action:'update-config',updates:{shop_name:'Saved brand',shop_logo:'data:image/png;base64,aGVsbG8=',owner_email:'attacker@example.test',ems_enabled:true}})).status,200);
@@ -85,6 +86,7 @@ test('real account-admin handler saves authenticated owner branding and complete
  assert.equal((await adminHandlerFixture({verified:false}).send({action:'update-config',updates:{shop_name:'Denied'}})).status,401);
  const cashier=adminHandlerFixture({role:'Cashier'});assert.equal((await cashier.send({action:'update-config',updates:{shop_name:'Denied'}})).status,403);assert.equal(cashier.writes.length,0);
  assert.equal((await adminHandlerFixture({role:'Orbito Support'}).send({action:'complete-onboarding'})).status,403);
+ const revoked=adminHandlerFixture({role:'Orbito Support',supportAuthorized:false});assert.equal((await revoked.send({action:'update-config',updates:{shop_name:'Denied'}})).status,401);assert.equal(revoked.writes.length,0);
 });
 test('logo endpoint enforces decoded 512 KB size, supported image MIME and valid base64 for direct callers',async()=>{
  const f=adminHandlerFixture();for(const logo of ['data:image/svg+xml;base64,PHN2Zz4=',`data:image/png;base64,${Buffer.alloc(512*1024+1).toString('base64')}`,'data:image/png;base64,a=bb'])assert.equal((await f.send({action:'update-config',updates:{shop_logo:logo}})).status,403);

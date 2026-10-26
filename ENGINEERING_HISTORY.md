@@ -896,3 +896,266 @@ immutable v6, Platform or excluded BYO checkout changed. Normal Shop commit/push
 no skip marker; existing Git-connected production builds are authorized. Actual
 deployment results are in external shop-support-ui evidence. PR1 stays Open/Draft/
 unmerged to development; no Cloudflare settings or Platform deployment changes.
+
+## 2026-10-25 — M1 preflight and current Support fixtures
+Branch: feature/shop-modernization-m1
+
+Both owner-specified historical post-merge annotated tags were created, pushed and
+peeled against the exact development baselines before this branch existed. The
+permanent M1 evidence archive retains merge/ref/provider checks; neither development
+moved. Cloudflare's four connected projects retained their canonical/latest IDs.
+
+Shop parity CI now pins read-only Platform development commit
+a329287df71ad031a3f2ea90a1b4cb5333848dad and covers the M1 push branch. PR path filters,
+least privilege and parity validation remain. Platform workflow/source is unchanged.
+The obsolete Support fixtures now supply consent/native-session binding and exercise
+missing consent, failed current binding, invalid OTP evidence and required audit.
+The packaging assertion uses selected immutable support-v6 rather than historical
+v3; old release assertions remain. No production handler was changed.
+
+Validation: Support/customer-Support/billing 20/20 pass (baseline 15/19, four obsolete
+fixture failures); billing assertions execute with existing locked dependencies.
+Canonical parity passes support-v6, 38 migrations/7 functions/eight requirements.
+Node24.21.0/npm11.19.0; Vite8.2.4; Supabase SDK2.114.0. No migration/function/release,
+hosted DB, provider setting, deployment or Platform source change. Publication uses
+[CF-Pages-Skip]; exact remote skip confirmation follows publication.
+
+## 2026-10-25 — M1 tracker exact build destination (R1)
+Branch: feature/shop-modernization-m1
+
+The standalone /track.html imported a fixed foreign customer destination/key. It now
+imports shop-public-config.js, generated in dev/build from the same validated public
+input that explicitly defines the main app's Vite values. Customer query parameters
+cannot select the project. Managed environment builds and explicit BYO builds retain
+exact project/anon-key validation; verified-dist additionally checks tracker config.
+Ticket/phone lookup, public-track and renderer semantics are unchanged.
+
+Validation: tests/tracker-target-browser.mjs creates two independent synthetic builds,
+inspects compiled main/tracker destinations and exercises both with real bundled SDK
+under Chrome. All non-loopback transport is intercepted; foreign transport aborts.
+Both builds pass exact URL/key assertions and hostile target-query/ticket/phone checks.
+No hosted request was sent. Initial runner-shape and sandbox-loopback failures are
+retained beside the passing evidence. Evidence: permanent M1 run
+20261025T013642Z-M1-003-629a9fb5. This is local synthetic verification, not hosted
+acceptance. No backend, release, Platform, DB or deployment changes. R1 is ready for
+independent inspection; independent disposition remains NOT REVIEWED.
+
+## 2026-10-25 — M1 private authority boundary and original checkout outcomes (R2)
+Branch: feature/shop-modernization-m1
+
+Verified native Auth session identity now owns UI state. Actor/session replacement,
+USER_UPDATED and signout invalidate private caches, cart/customer/tenders, repair
+working draft, Admin/Workshop/EMS data, PIN callbacks and app dialogs. Ordinary route
+activation within the same native session retains the cart/draft. Canonical role,
+consent, entitlement, onboarding and legal checks remain authoritative.
+
+Checkout and cart repair/payment records remain separately original-actor owned in
+memory. Replacement UI gets no old result; checkout retains immutable input/tax,
+UUID, outcome/uncertainty and old busy completion cannot unlock successor work.
+Only the original actor sees detached request references. Review reads the original
+sale/repair by UUID; absent/error is unconfirmed and never causes automatic replay.
+Detached payment uncertainty retains its original request/input and instructs review
+against original payment history. It does not claim an absent read means failure.
+These in-memory recovery records do not claim persistence through tab destruction.
+
+Validation: actual entry browser proves same-role account/session changes clear cart
+and repair data while same-session activation preserves drafts. Actual checkout/API
+fixture proves late ACK after A→B retains A UUID/payload/result, performs no B reload
+or replay and permits original-actor inspection. Focused transaction/repair/module/
+numeric/handoff tests pass; exact logs are in permanent M1 evidence. Initial VM
+harness dependency/cross-realm assertion failures were corrected in test setup.
+No backend/release/DB/provider/Platform source change or deployment. Independent
+review NOT REVIEWED; R2 is a separately inspectable source boundary.
+
+## 2026-10-25 — M1 centralized Workshop navigation and Manager affordances
+Branch: feature/shop-modernization-m1
+
+Workshop Admin now navigates through the central router to /admin/dashboard instead
+of directly initializing Admin while /workshop remains the browser URL. Admin POS,
+New Ticket and Collect affordances use can(pos); denied collection cannot leave an
+intent in sessionStorage. Defensive navigation handlers also check can(). Existing
+Manager Admin access and all role/entitlement policies remain unchanged. Actual
+entry browser cases cover Owner/Support history/deep-link/refresh and Manager denial;
+final candidate results are recorded with integrated acceptance. No backend, DB,
+Platform or deployment change. Independent disposition remains NOT REVIEWED.
+
+## 2026-10-25 — M1 async continuation and operation ownership
+Branch: feature/shop-modernization-m1
+
+POS/Workshop loads now capture route activation, native authority and resource
+sequence, including child/family continuations. Admin retains its resource sequence
+and also captures native/route ownership. Async delegated actions check current view
+and selected modal before and after each await, including before starting follow-up
+work. A shared listener wrapper preserves synchronous preventDefault and owns async
+failures. This async event wrapper is a dependency of M1-006; remaining synchronous
+input/change/keyboard listener ownership is deferred to M1-010 after EMS.
+
+UI reset and late-result guards are separate from a private in-memory financial
+command journal: exact original actor/session, UUID and arguments survive UI reset.
+Only the same current actor can inspect those records; no retry is scheduled. Known
+business-command RPCs pin the original transient bearer before submission; credentials
+are never journaled. A changed session before submission fails closed. Existing
+server transaction/consent/role/PIN authority and idempotent RPCs remain unchanged.
+
+Actual-loader reverse completion, departed-follow-up and late family-summary tests
+pass, as do original checkout/actor/payload tests (5 focused cases). The real entry
+browser passed its existing cases, then exposed a selector ambiguity caused by the
+pre-existing Admin shell/page duplicate headings; the fixture now selects the first
+current heading. No styling redesign is included. Initial failures and editing-aid
+provenance remain in permanent M1 evidence. No backend/release/DB/Platform source or
+provider setting changes. Local source verification is not independent audit.
+
+## 2026-10-25 — M1 truthful failed and incomplete reads
+Branch: feature/shop-modernization-m1
+
+POS/Admin/Workshop now settle thrown and ordinary Supabase error results into
+explicit loading/ready/unavailable states. Failed required values remain null;
+Admin suppresses unverifiable reports/history instead of presenting zero/empty
+success. Workshop rejects partial root/child queues before summaries or actions.
+Child-detail helpers throw on failed reads. EMS validates its required resources.
+Configuration read failure is a fail-closed screen. Read retries perform no command.
+
+POS scopes optional failure: unavailable quick items/inventory/repair/credit/shift
+resources have notices, and dependent actions cannot use those missing inputs.
+Safe custom-item work remains available under optional catalog failure. Existing
+working drafts and original command outcomes are retained; no transaction retry is
+inferred from a failed read. No new pagination/read API or M2 redesign is introduced.
+
+Focused actual-loader/read/checkout tests pass6/6, including reversed results and
+partial-family rejection. Existing browser fixture now contains denied report,
+optional catalog and partial-child oracles; final-candidate execution is recorded
+in integrated evidence. No backend/function/migration/release/DB/Platform/provider
+change or deployment. Independent review NOT REVIEWED.
+
+## 2026-10-25 — M1 owned route recovery and failed-chunk retry
+Branch: feature/shop-modernization-m1
+
+Router now awaits route handlers and catches import/initializer failures only for
+the current activation. Operational initializers are awaited. Current-session
+recovery provides Retry loading, Return home and Sign out through existing gates;
+retry does not submit a business command or clear same-session cart/operation memory.
+A failed module fetch is browser-cached: the focused real browser exposed that a
+plain repeated import never recovered. The loader now permits a cache-busted retry
+only for the exact same-origin operational module URL, then retains its successful
+namespace. Customer input cannot choose a module host/path. Init failure reuses the
+already-loaded namespace. No automatic page reload destroys unresolved context.
+
+Actual entry browser confirms route/role/privacy and denied/optional/partial read
+cases, then successfully recovers the deliberately503 module after transport is
+restored. The follow-on synthetic initializer test initially referenced the known
+failed original URL; its fixture now uses the actual recovered namespace. All
+failed logs are retained. Integrated final source will run the complete sequence.
+No backend/release/DB/Platform/provider change or deployment. Independent review
+remains NOT REVIEWED.
+
+## 2026-10-25 — M1 current EMS controller and action ownership
+Branch: feature/shop-modernization-m1
+
+Persistent EMS handlers now read a current controller refreshed on every mount.
+They retain current route/native-session/generation checks; tab/filter reads have a
+request sequence so reverse completion cannot replace newer data. Successful leave
+and salary actions refresh the current controller once. Departed callbacks cannot
+refresh/toast elsewhere. Pending salary generation is fenced by native actor/session
+and employee/month/year, including leave/re-entry, without changing payroll policy.
+Required salary configuration/attendance/leave failures stop before generating a
+false zero-derived result; post-await ownership prevents departed follow-up writes.
+
+The focused fixture executes the actual EMS binder and common async wrapper: reentry,
+current tab/filter, one leave write/refresh, duplicate payroll submission, pending
+revisit and late-result suppression pass. Synthetic I/O is explicitly not hosted
+payroll acceptance. No backend/release/DB/Platform source/provider change or deployment.
+Independent review remains NOT REVIEWED.
+
+## 2026-10-25 — M1 consistent persistent event ownership
+Branch: feature/shop-modernization-m1
+
+All remaining synchronous Admin/POS/Workshop input/change/keydown delegates now use
+the same current route/native-session/module predicate as async click/submit work.
+Inactive modules cannot consume shared selectors or keyboard input. The existing
+single shared PIN keyboard owner is retained; route/authority changes cancel stale
+PIN callbacks. Native form prevention still occurs synchronously in owned delegates.
+No stopPropagation patches, permission expansion or transaction changes are added.
+
+Focused EMS/loader/checkout regressions pass7/7. Actual entry browser passes recovery,
+role/history/privacy/read cases and100 transitions with stable app/document listener
+counts. The final Enter case initially used an additional-work selector rather than
+the current intake selector; corrected to the actual intake/tag controls. Integrated
+candidate verification additionally checks input/change/Enter/PIN. Prior failed
+runs remain. No backend/release/DB/Platform/provider changes or deployment. Independent
+review NOT REVIEWED; this is implementation-author validation only.
+
+## 2026-10-25 — M1 integrated ownership closure
+Branch: feature/shop-modernization-m1
+
+Final source review found that shared EMS clock-in/out gate continuations also need
+native/session ownership, beyond Admin EMS. They now capture the gate owner and
+recheck after reads/ACKs before rendering, proceeding, clocking out or signing out.
+Failed attendance reads remain unavailable rather than becoming a missing shift.
+A focused actual-gate test proves a departed same-role response cannot open/proceed
+under the new account. Existing payroll/business-day policy is unchanged.
+
+The financial RPC observer sends a detached copy of original arguments after live
+session verification. Conflicting changes to a pending checkout cannot silently
+replace/reuse the original UUID; local pre-send insufficient-cash validation remains
+correctable. Original uncertain outcomes are offered for read-only review, never
+automatic replay. Existing Paper race fixture is adapted only for the new async
+wrapper dependency; its original successor-data/busy assertions remain.
+
+This is a small M1-006/011 closure, no new backend/release/DB/provider/Platform source
+scope. Final candidate commands/results,13-case ledger and audit handoff are in the
+permanent archive. No independent audit or owner acceptance is claimed.
+
+## 2026-10-25 — M1 explicit public build validation coverage
+Branch: feature/shop-modernization-m1
+
+The two-target synthetic browser regression now also executes the actual explicit
+BYO build CLI and its verify-dist digest/target check using only synthetic public
+input. Managed-style Vite builds and explicit customer builds therefore share direct
+execution evidence for the tracker correction. This adds no public configuration
+field, backend component, provider operation or release. Integrated final-candidate
+logs are retained in the permanent M1 evidence run.
+
+## 2026-10-25 — M1 final validation fixture repair
+Branch: feature/shop-modernization-m1
+
+Integrated candidate validation executed70 focused tests:68 passed and two inherited
+account-admin onboarding fixture cases failed. Both the test and production handler
+were unchanged since development; the VM omitted the handler's current imported
+supportSessionAllowed helper. The fixture now executes that real helper, supplies a
+synthetic native-session token and models the trusted binding response. Owner-only
+completion and revoked-Support denial assertions remain; no handler is weakened.
+The focused onboarding group passes8/8 after repair. Earlier68/70 evidence is retained.
+
+Application/browser/build sources are byte-identical to the passing2643b8f1 candidate:
+actual entry/100-navigation/PIN, two-target builds, explicit BYO verify-dist and
+canonical support-v6 parity all passed. Final unit rerun and source-equivalence proof
+are archived at the next exact commit; no historical test is promoted without that
+proof. No hosted operation, backend/release, Platform or provider change occurred.
+
+## 2026-10-25 — M1 post-ACK refresh ownership correction
+Branch: feature/shop-modernization-m1
+
+Final audit preparation found a second await after successful repair creation/payment:
+the following resource reload also requires ownership before opening a receipt or
+showing remaining balance. Both continuations now recheck original authority/view
+and detach their original outcome when replaced. A successful payment with an
+unavailable current ticket read reports acknowledged payment plus unknown balance,
+never a fallback historical amount. Mixed retail carts require every applicable
+catalog resource, rather than selecting only the first type.
+
+An actual-function test exercises both repair and payment ACK→delayed reload→A/B
+replacement and proves no replacement-account modal/notice while the original
+actor/outcome remains retained. Final current-source validation is recorded in a
+new run; earlier successful runs remain associated with their exact prior source.
+No backend/release/DB/Platform/provider change or deployment.
+
+## 2026-10-25 — M1 final acceptance boundary coverage
+Branch: feature/shop-modernization-m1
+
+Extended existing acceptance fixtures to explicitly cover private customer/tender
+reset, Cashier/Technician denied operational bundles/data, /admin alias and unknown
+route fallback, and actual-router suppression of a departed async failure. These
+close named M1 acceptance oracles rather than adding duplicate test permutations.
+Application source is unchanged by this coverage commit. Final exact-candidate
+results and source archive follow in the permanent evidence register; no independent
+review, owner acceptance, merge, deployment or backend operation is implied.
