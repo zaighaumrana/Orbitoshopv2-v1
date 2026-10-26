@@ -2,18 +2,19 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import vm from 'node:vm'
 import {readFileSync} from 'node:fs'
-import {readComplete} from '../src/bounded-read.js'
+import {readPage,readComplete} from '../src/bounded-read.js'
 import {buildReceiptRecords,filterReceiptRecords} from '../src/features/admin/checkout/receipts.js'
 const source=readFileSync(new URL('../src/backend-reads.js',import.meta.url),'utf8')
 function harness(){
   const CFG={read_contracts:{}},calls=[],rows=[{id:1,invoice_number:'ROOT',created_at:'2025-01-01T10:00:00Z',status:'Pending'},...Array.from({length:1001},(_,i)=>({id:i+2,parent_ticket_id:1,invoice_number:'CHILD-'+i,created_at:'2026-10-25T10:00:00Z',status:'Ready'}))]
+  const sales=[]
   let reply={contract:1,offset:0,size:25,count:1,rows:[{id:1}],statusCounts:{Pending:1}}
   const sb={rpc:async(name,args)=>{calls.push({name,args});return typeof reply==='function'?reply():{data:reply}},from:table=>{
-    let data=rows;const q={select(){return q},in(key,ids){data=data.filter(r=>ids.includes(r[key]));return q},is(key,value){data=data.filter(r=>(r[key]??null)===value);return q},order(){return q},async range(a,b){calls.push({table,a,b});return {data:data.slice(a,Math.min(b+1,a+7)),count:data.length}}};return q
+    let data=table==='sales'?sales:rows;const q={select(){return q},ilike(key,value){data=data.filter(r=>String(r[key]||'').toLowerCase()===String(value).replace(/\\(.)/g,'$1').toLowerCase());return q},or(filter){const patterns=[...filter.matchAll(/(invoice_number|ticket_number)\.ilike\."([^"]*)"/g)];const id=/id\.eq\.(\d+)/.exec(filter)?.[1];data=data.filter(r=>patterns.some(([,key,value])=>String(r[key]||'').toLowerCase()===value.replace(/\\(.)/g,'$1').toLowerCase())||id&&String(r.id)===id);return q},in(key,ids){data=data.filter(r=>ids.includes(r[key]));return q},is(key,value){data=data.filter(r=>(r[key]??null)===value);return q},order(){return q},async range(a,b){calls.push({table,a,b});return {data:data.slice(a,Math.min(b+1,a+7)),count:data.length}}};return q
   }}
-  const ctx=vm.createContext({CFG,sb,readComplete,buildReceiptRecords,filterReceiptRecords,Date})
-  vm.runInContext(source.replace(/^import .*$/gm,'').replace(/^export /gm,'')+';globalThis.api={repairFamilyPage,receiptArchivePage,receiptPeriod,decodeReadPage};',ctx)
-  return {...ctx.api,CFG,calls,rows,setReply:value=>reply=value}
+  const ctx=vm.createContext({CFG,sb,readPage,readComplete,buildReceiptRecords,filterReceiptRecords,Date})
+  vm.runInContext(source.replace(/^import .*$/gm,'').replace(/^export /gm,'')+';globalThis.api={repairFamilyPage,receiptArchivePage,receiptPeriod,decodeReadPage,legacyMembers,legacyFamilyPage,legacyReceiptLookup};',ctx)
+  return {...ctx.api,CFG,calls,rows,sales,setReply:value=>reply=value}
 }
 test('new reads require advertised capability and selected families remain complete below the API cap',async()=>{
   const f=harness();await assert.rejects(f.repairFamilyPage(),/unavailable/);assert.equal(f.calls.length,0)
@@ -33,7 +34,7 @@ test('exact child invoice uses complete cross-date family and inherited ordering
 test('stale RPCs, wrong root selection and ambiguous response counts cannot publish a complete result',async()=>{
   const f=harness();f.CFG.read_contracts={repair_families:1,receipt_archive:1};let current=true
   f.setReply(async()=>{current=false;return {data:{}}});await assert.rejects(f.repairFamilyPage({current:()=>current}),/expired/)
-  f.setReply({contract:1,offset:0,size:25,count:1,rows:[{id:99}]});await assert.rejects(f.repairFamilyPage(),/roots changed/)
+  f.setReply({contract:1,offset:0,size:25,count:1,statusCounts:{Pending:1},rows:[{id:99}]});await assert.rejects(f.repairFamilyPage(),/roots changed/)
   f.setReply({contract:1,offset:0,size:25,count:2,mode:'family',matches:[{rootTicketId:1}],rows:[]});await assert.rejects(f.receiptArchivePage({receiptSearch:'CHILD-1000'}),/family changed/)
   assert.throws(()=>f.decodeReadPage({contract:1,offset:0,size:25,count:2,rows:[{id:1},{id:1}]}),/duplicate/)
   assert.throws(()=>f.decodeReadPage({contract:1,offset:0,size:25,count:1,rows:[{id:Number.MAX_SAFE_INTEGER+1}]}),/numeric bound/)
@@ -45,3 +46,17 @@ test('receipt bounds preserve browser-local days and DST rather than inventing a
     process.env.TZ='America/New_York';assert.deepEqual(JSON.parse(JSON.stringify(harness().receiptPeriod({receiptDateFrom:'2026-11-01',receiptDateTo:'2026-11-01'}))),{p_from:'2026-11-01T04:00:00.000Z',p_to:'2026-11-02T05:00:00.000Z'})
   }finally{if(previous===undefined)delete process.env.TZ;else process.env.TZ=previous}
 })
+
+
+test('older backends keep bounded root collection and complete exact invoice lookup without a new RPC',async()=>{
+ const f=harness();f.CFG.repair_module_enabled=true;
+ await assert.rejects(f.legacyMembers('tickets'),error=>error.code==='HISTORY_REQUIRES_LOOKUP');
+ const first=await f.legacyFamilyPage();assert.equal(first.mode,'exact-identifiers');assert.equal(first.count,1);assert.equal(first.data.length,1002);
+ const selected=await f.legacyFamilyPage({search:'CHILD-1000',exactOnly:true});assert.equal(selected.count,1);assert.equal(selected.data.length,1002);
+ const noExact=await f.legacyFamilyPage({search:'CHILD',exactOnly:true});assert.equal(noExact.count,0,'Broad text is not falsely advertised as complete exact lookup');
+ f.sales.push({id:40,ticket_id:1,invoice_number:'LEGACY-DUP',total_bill:20},{id:41,invoice_number:'RETAIL-EXACT',total_bill:30,items_sold:[{name:'Persisted line'}]});
+ const dedup=await f.legacyReceiptLookup({receiptSearch:'LEGACY-DUP'});assert.equal(dedup.count,0,'Off-page linked repair sale is still excluded');
+ const receipt=await f.legacyReceiptLookup({receiptSearch:'RETAIL-EXACT'});assert.equal(receipt.count,1);assert.equal(receipt.data[0].raw.items_sold[0].name,'Persisted line');
+ const family=await f.legacyReceiptLookup({receiptSearch:'CHILD-1000'});assert.equal(family.count,1002);assert.equal(family.data[0].id,1002);
+ assert.equal(f.calls.filter(c=>c.name).length,0,'Missing capability never calls a new backend RPC');
+});

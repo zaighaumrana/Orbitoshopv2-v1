@@ -59,8 +59,9 @@ export function receiptsPage({ tit, adminState }) {
       </label>
       <button class="secondary-button" data-action="clear-receipt-filter">Clear</button>
     </div>
+    ${adminState._receiptLookupOnly?'<p class="muted">Enter an exact invoice number to find its complete receipt or repair family.</p>':''}
     <p class="muted" style="font-size:13px;margin-bottom:8px">
-      ${adminState._receiptPage?`${filtered.length} on this ${adminState._receiptPage.mode==='family'?'complete family selection':'page'} · ${adminState._receiptPage.count} matching receipts / invoices`:`${filtered.length} receipts / invoices found`}
+      ${adminState._receiptLookupOnly&&!adminState._receiptPage?'Exact invoice lookup':adminState._receiptPage?.mode==='exact-lookup'?`${filtered.length} exact lookup results`:adminState._receiptPage?`${filtered.length} on this ${adminState._receiptPage.mode==='family'?'complete family selection':'page'} · ${adminState._receiptPage.count} matching receipts / invoices`:`${filtered.length} receipts / invoices found`}
     </p>
     <div class="card" style="display:grid;gap:0">
       ${filtered.length ? filtered.map((record, idx) => `
@@ -89,7 +90,7 @@ export function receiptsPage({ tit, adminState }) {
             ${record.kind === 'ticket' ? `<button class="secondary-button" style="font-size:12px" data-action="print-repair-summary" data-ticket-id="${record.rootTicketId}">Print Summary</button>` : ''}
           </div>
         </div>`).join('') :
-      `<div class="empty" style="padding:24px;text-align:center">No receipts found.</div>`}
+      `<div class="empty" style="padding:24px;text-align:center">${adminState._receiptLookupOnly&&!adminState._receiptPage?'Enter the invoice number above.':'No receipts found.'}</div>`}
     </div>`
 }
 

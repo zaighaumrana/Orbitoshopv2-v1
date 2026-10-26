@@ -1,4 +1,5 @@
 import {sb} from '../../shared.js'
+import {legacyMembers} from '../../backend-reads.js'
 import {readPage,searchColumns} from '../../bounded-read.js'
 
 export function flatResource(module,tab) {
@@ -18,9 +19,5 @@ export function adminPage(module,tab,search,offset,current,size=25) {
     .order(order).order('id'),{offset,size,current})
 }
 export async function verifiedLegacyMembers(table,current) {
-  const result=await sb.from(table).select('*',{count:'exact'}).order('id',{ascending:false}).range(0,999)
-  if(!current())throw Error('Read owner expired.')
-  if(result.error||!Array.isArray(result.data)||result.count!==result.data.length)
-    throw Error('Complete history is unavailable. No truncated list or family count is implied.')
-  return result
+  return legacyMembers(table,current)
 }

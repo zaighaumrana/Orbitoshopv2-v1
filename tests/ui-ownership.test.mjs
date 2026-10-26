@@ -94,3 +94,14 @@ test('actual router contains current failures and ignores departed asynchronous 
  ctx.router.registerRoute('/broken',async()=>{throw Error('current initializer failure')});await ctx.router.navigate('/broken');assert.equal(recovery.length,1)
  ctx.router.registerRoute('/broken',async()=>{reads++});await ctx.router.navigate('/broken');assert.equal(reads,2);assert.equal(recovery.length,1)
 })
+
+test('actual Workshop renders only known status controls and escapes untrusted stored status text',async()=>{
+ const {findRepairFamilies,groupRepairFamilies,matchedRepairChild,repairFamilyWork}=await import('../src/features/repairs/family.js');
+ const {escapeHTML}=await import('../src/html.js');const {pageControls}=await import('../src/bounded-read.js');
+ const source=readFileSync(new URL('../src/pos/workshop.js',import.meta.url),'utf8'),node=parseAst(source).body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='workshopView');
+ const status='"><img src=x onerror=alert(1)>',root={id:1,parent_ticket_id:null,status,customer_name:'Fixture',invoice_number:'ONE',ticket_number:'T1',components_noted:[]};
+ const ctx=vm.createContext({state:{role:'Technician',resources:{},data:{tickets:[root]}},CFG:{repair_module_enabled:true,technician_module_enabled:true},SESSION:{employee:{id:5,role:'Technician'},isAdmin:false},wsState:{filter:'',statusFilter:'all',page:{data:[root],rootIds:[1],count:1,offset:0,size:25,hasMore:false,statusCounts:{[status]:1}},familySummaries:new Map()},resourceReady,resourceNotice:()=>'',escapeHTML,pageControls,findRepairFamilies,groupRepairFamilies,matchedRepairChild,repairFamilyWork,familyMoney:()=>'',moneyHTML:String,money:String,can:()=>true,hasReadContract:()=>true});
+ vm.runInContext(source.slice(node.start,node.end)+';globalThis.html=workshopView();',ctx);
+ assert.equal(ctx.html.includes('<img'),false);assert.ok(ctx.html.includes('&lt;img'));
+ assert.ok(ctx.html.includes('data-status-filter="Pending"'));assert.ok(ctx.html.includes('Ready: 0'));assert.ok(ctx.html.includes('All matching: 1'));
+});

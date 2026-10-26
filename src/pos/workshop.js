@@ -210,7 +210,7 @@ function workshopView() {
     .filter(family => wsState.statusFilter === 'all' || family.root.status === wsState.statusFilter)
     .map(family => ({ ...family.root, _matchedChild:matchedRepairChild(family), _work:repairFamilyWork(family) }))
 
-  const counts = wsState.page?.statusCounts || {
+  const counts = wsState.page?.statusCounts ? {Pending:wsState.page.statusCounts.Pending||0,'In Progress':wsState.page.statusCounts['In Progress']||0,Ready:wsState.page.statusCounts.Ready||0} : {
     Pending:     roots.filter(t => t.status === 'Pending').length,
     'In Progress': roots.filter(t => t.status === 'In Progress').length,
     Ready:       roots.filter(t => t.status === 'Ready').length,
@@ -250,7 +250,7 @@ function workshopView() {
             ? 'primary-button' : 'secondary-button'}"
             style="font-size:12px;padding:5px 12px"
             data-status-filter="all">
-            ${wsState.page?.statusCounts?'All matching: '+Object.values(counts).reduce((sum,n)=>sum+n,0):'All on page: '+roots.length}
+            ${wsState.page?.statusCounts?'All matching: '+Object.values(wsState.page.statusCounts).reduce((sum,n)=>sum+n,0):'All on page: '+roots.length}
           </button>
         </div>
       </div>

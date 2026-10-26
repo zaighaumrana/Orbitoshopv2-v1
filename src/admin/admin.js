@@ -31,7 +31,7 @@ import { dlog, dstack, callerInfo } from '../debuglog.js'
 import {onPrivateReset} from '../ui-authority.js'
 import {pageControls,readComplete,readPreview} from '../bounded-read.js'
 import {adminPage,flatResource,verifiedLegacyMembers} from '../features/admin/resources.js'
-import {hasReadContract,repairFamilyPage,receiptArchivePage} from '../backend-reads.js'
+import {hasReadContract,repairFamilyPage,receiptArchivePage,legacyFamilyPage,legacyReceiptLookup} from '../backend-reads.js'
 import { reportsPage } from './pages/reports.js'
 import { billingUsagePage } from './pages/billing-usage.js'
 import { createPlatformBridge } from '../platform/bridge.js'
@@ -106,7 +106,7 @@ async function load(verifiedConfig) {
   const view=captureView()
   const generation = ++adminLoadGeneration
   flatGeneration++;clearTimeout(flatTimer);adminState._page=null
-  adminState._receiptPage=null
+  adminState._receiptPage=null;adminState._receiptLookupOnly=false
   const loadSession = SESSION
   const loadPath = window.location.pathname
   const navigationIsCurrent=adminNavigationIsCurrent
@@ -174,7 +174,7 @@ async function load(verifiedConfig) {
     sb.from('employees').select('id',{count:'exact',head:true}).eq('status','Active'),
   ].map(settleRead)):null
   const [tickets, sales, employees, udharAccounts, financial, financialToday, returns_, inv, quickItems, repairComponents, archive] = await Promise.all([
-    needs.tickets ? pagedFamilies?repairFamilyPage({search:adminState.filter,current}):verifiedLegacyMembers('tickets',current) : skip,
+    needs.tickets ? pagedFamilies?repairFamilyPage({search:adminState.filter,current}):legacyFamilyPage({search:adminState.filter,current}) : skip,
     needs.sales ? mod==='receipts'?verifiedLegacyMembers('sales',current):readPreview(()=>sb.from('sales').select(mod==='dashboard'?'id,invoice_number,customer_name,payment_method,total_bill,created_at':'id,invoice_number,customer_name,payment_method,total_bill,created_at,items_sold').order('created_at',{ascending:false}).order('id',{ascending:false}),mod==='dashboard'?8:15,current) : skip,
     needs.employees ? adminPage(mod,adminState.catalogTab,adminState.filter,0,current) : skip,
     needs.udhar ? sb.rpc('get_unified_udhar_accounts') : skip,
@@ -192,10 +192,15 @@ async function load(verifiedConfig) {
   ].map(settleRead))
   if (!current()) return
   const reads=readStates({tickets,sales,employees,udharAccounts,financial,financialToday,returns:returns_,inventory:inv,quickItems,repairComponents,archive},['financial','financialToday'])
+  const legacyErrors=[tickets,sales].filter(r=>r.error)
+  if(mod==='receipts'&&!pagedReceipts&&legacyErrors.length&&legacyErrors.every(r=>r.error.code==='HISTORY_REQUIRES_LOOKUP')){
+    adminState._receiptLookupOnly=true
+    for(const key of ['tickets','sales']){reads.values[key]=[];reads.resources[key]={status:'ready'}}
+  }
   state.data=reads.values;state.resources=reads.resources
   const resource=flatResource(mod,adminState.catalogTab)
   if(resource)adminState._page={inventory:inv,employees,quickItems,repairComponents}[resource]
-  if(pagedFamilies&&!tickets.error)adminState._page={...tickets,data:tickets.rootIds}
+  if(mod==='repairs'&&tickets.rootIds&&!tickets.error)adminState._page={...tickets,data:tickets.rootIds}
   if(pagedReceipts&&!archive.error)adminState._page=adminState._receiptPage=archive
   if(mod==='dashboard'){
     const counts=await dashboardCounts
@@ -232,6 +237,8 @@ async function load(verifiedConfig) {
 }
 
 function pagedAdminResource(){
+  if(adminState.adminModule==='receipts'&&adminState._receiptLookupOnly)return 'archiveLookup'
+  if(adminState.adminModule==='repairs'&&adminState._page?.mode==='exact-identifiers')return 'tickets'
   if(adminState.adminModule==='repairs'&&CFG.repair_module_enabled&&hasReadContract('repair_families'))return 'tickets'
   if(adminState.adminModule==='receipts'&&hasReadContract('receipt_archive'))return 'archive'
   return flatResource(adminState.adminModule,adminState.catalogTab)
@@ -252,12 +259,12 @@ async function loadFlatPage(offset=0,revision=++flatGeneration) {
   if(!key||!current())return
   state.resources[key]={status:'loading'}
   document.querySelector('.content')?.setAttribute('aria-busy','true')
-  const result=await settleRead(key==='tickets'?repairFamilyPage({search:query,offset,current}):key==='archive'?receiptArchivePage(adminState,{offset,current}):adminPage(mod,tab,query,offset,current,offset?adminState._page?.size||25:25))
+  const result=await settleRead(key==='tickets'?(hasReadContract('repair_families')?repairFamilyPage({search:query,offset,current}):legacyFamilyPage({search:query,offset,size:offset?adminState._page?.size||25:25,current,exactOnly:true})):key==='archiveLookup'?legacyReceiptLookup(adminState,{current}):key==='archive'?receiptArchivePage(adminState,{offset,current}):adminPage(mod,tab,query,offset,current,offset?adminState._page?.size||25:25))
   if(!current())return
   state.data[key]=result.error?null:result.data
   state.resources[key]={status:result.error?'unavailable':'ready'}
   adminState._page=result.error?null:key==='tickets'?{...result,data:result.rootIds}:result
-  if(key==='archive')adminState._receiptPage=result.error?null:result
+  if(key==='archive'||key==='archiveLookup'){adminState._receiptPage=result.error||key==='archiveLookup'&&!adminState.receiptSearch.trim()?null:result;if(key==='archiveLookup'&&!adminState.receiptSearch.trim())adminState._page=null}
   render()
 }
 
@@ -452,7 +459,7 @@ function repairs() {
   return `
     ${tit('Repair Tickets','Search the complete repair family from one place.',can('pos',state.role)?`<button class="primary-button" data-action="go-pos" title="Create tickets from the POS counter">New Ticket (via POS)</button>`:'')}
     ${tlb('Search ticket, parent/child invoice, customer, phone, device…')}
-    <p class="muted" style="font-size:12px;margin:-8px 0 12px">This search checks parent repairs and every child/sub-invoice, then opens the complete family.</p>
+    <p class="muted" style="font-size:12px;margin:-8px 0 12px">${adminState._page?.mode==='exact-identifiers'?'Enter an exact ticket or invoice number to search beyond this page. Each result opens its complete family.':'This search checks parent repairs and every child/sub-invoice, then opens the complete family.'}</p>
     <div class="grid two-col">
       <div class="card">
         <div class="table-wrap"><table>
@@ -487,7 +494,7 @@ function repairs() {
         </table></div>
       </div>
       <div class="card">
-        <h2>${adminState._page?.statusCounts?'Matching families by status':'Status Summary'}</h2>
+        <h2>${adminState._page?.statusCounts?'Matching families by status':adminState._page?.mode==='exact-identifiers'?'Status on this page':'Status Summary'}</h2>
         <div class="list">
           ${['Pending','In Progress','Ready','Delivered','Cancelled','Declined'].map(s => `
             <div class="list-row"><span>${s}</span>

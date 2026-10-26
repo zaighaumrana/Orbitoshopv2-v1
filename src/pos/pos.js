@@ -46,9 +46,9 @@ import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
 import {captureAuthority,onPrivateReset} from '../ui-authority.js'
 import {readComplete,readPage,pageControls} from '../bounded-read.js'
-import {stockPage,quickPage,intakeComponents,completeTicketSelection,legacyCompleteCollection} from '../features/pos/resources.js'
+import {stockPage,quickPage,intakeComponents,completeTicketSelection} from '../features/pos/resources.js'
 import {localReportPeriod,actorPeriodRows} from '../datetime.js'
-import {hasReadContract,repairFamilyPage} from '../backend-reads.js'
+import {hasReadContract,repairFamilyPage,legacyFamilyPage} from '../backend-reads.js'
 
 /* ── POS-only state ── */
 const emptyPOS = () => ({
@@ -158,7 +158,7 @@ async function openDeferredPOS(type,offset=0) {
   try {
     if(type==='repair')state.data.repairComponents=(await intakeComponents(current)).data
     if(type==='repair-collection'){
-      const result=await (hasReadContract('repair_families')?repairFamilyPage({search:posState.repairSearch,context:'collection',offset,current}):legacyCompleteCollection(current))
+      const result=await (hasReadContract('repair_families')?repairFamilyPage({search:posState.repairSearch,context:'collection',offset,current}):legacyFamilyPage({search:posState.repairSearch,context:'collection',offset,size:offset?posState.collectionPage?.size||25:25,current,exactOnly:posState.collectionPage?.mode==='exact-identifiers'}))
       if(!current())return
       state.data.tickets=result.data;posState.collectionsReady=true
       posState.collectionPage=result.rootIds?{...result,data:result.rootIds}:null
@@ -646,7 +646,7 @@ function renderModal() {
   if (!state.modal) return ''
   if (!modalEntitled(state.modal.type)) { state.modal = null; return '' }
   const { type } = state.modal
-    if(type==='repair-collection'&&state.modal.readStatus==='loading'&&hasReadContract('repair_families'))return `<div class="modal-backdrop"><div class="modal"><h2>Repair Collection</h2><input class="search" data-repair-search value="${escapeHTML(posState.repairSearch)}" placeholder="Search name, phone, device, IMEI, ticket #…">${resourceNotice('Repair collection','loading')}<button class="secondary-button" data-close>Close</button></div></div>`
+    if(type==='repair-collection'&&state.modal.readStatus==='loading'&&(hasReadContract('repair_families')||posState.collectionPage?.mode==='exact-identifiers'))return `<div class="modal-backdrop"><div class="modal"><h2>Repair Collection</h2><input class="search" data-repair-search value="${escapeHTML(posState.repairSearch)}" placeholder="Search name, phone, device, IMEI, ticket #…">${resourceNotice('Repair collection','loading')}<button class="secondary-button" data-close>Close</button></div></div>`
   if(state.modal.readStatus&&state.modal.readStatus!=='ready')return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Selected '+(type==='shiftStats'?'shift':type==='repair'?'repair intake':'detail'),state.modal.readStatus==='loading'?'loading':'unavailable')}${state.modal.readError?`<p>${escapeHTML(state.modal.readError)}</p>`:''}<button class="secondary-button" data-action="retry-pos-detail">Retry detail</button><button class="secondary-button" data-close>Close</button></div></div>`
   const required=type==='udharList'?['udharAccounts']:type==='repair-collection'?['tickets']:['repair','create-sub-invoice','edit-components'].includes(type)?['tickets','repairComponents']:[]
   if(!resourceReady(state.resources,...required))return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Required detail')}<button type="button" data-close>Close</button></div></div>`
@@ -1705,7 +1705,7 @@ function attachEvents() {
     }
     if (t.dataset.repairSearch !== undefined) {
       posState.repairSearch=t.value
-      if(hasReadContract('repair_families')){
+      if(hasReadContract('repair_families')||posState.collectionPage?.mode==='exact-identifiers'){
         collectionGeneration++;clearTimeout(collectionTimer)
         const modal=state.modal,current=captureView()
         modal.readStatus='loading';render()

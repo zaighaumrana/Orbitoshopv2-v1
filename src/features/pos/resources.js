@@ -28,12 +28,3 @@ export async function completeTicketSelection(id,current) {
   return {data:[root.data,...children.data],error:null}
 }
 
-// Compatibility read while the unified family-search contract awaits approval.
-// Never present a capped member array as complete. No all-history paging at boot.
-export async function legacyCompleteCollection(current) {
-  const result=await sb.from('tickets').select('*',{count:'exact'}).order('id',{ascending:false}).range(0,999)
-  if(!current())throw Error('Read owner expired.')
-  if(result.error||!Array.isArray(result.data)||result.count!==result.data.length)
-    throw Error('Complete repair search could not be verified for this history size. No partial search results are shown.')
-  return result
-}

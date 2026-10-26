@@ -1398,3 +1398,44 @@ No hosted write or remote Platform operation occurred. The prior local fixture
 container disappeared during the environment restart; its replacement is owned
 container808955b36125974f5ad171aab504c46733017e2dcccf556a6f2d8c4ee13afdd3,
 networknone/ports{}, with synthetic data only.
+
+## 2026-10-26 — M2 older-Shop operation and final paired profile harness
+Branch: feature/shop-modernization-m2
+
+Older supported backends with large histories now retain bounded root pages and
+explicit exact ticket/invoice lookup through existing authenticated APIs. Complete
+small histories retain free-text behavior; a capped member array is never advertised
+as complete. Exact old-invoice lookup fetches the full parent/children and excludes
+repair-linked duplicate retail rows even when the linked repair was outside the
+first page. Old shops need no new RPC for these operations. Broader global text
+search and unified archive pages remain availability-gated for the new backend.
+Page/global/status labels are distinct; the effective cap is preserved when moving
+back from a short final page. Superseded capped-reader code is removed. Workshop
+filters render known statuses only, rather than interpolating arbitrary stored
+status names; unknown text stays escaped and metadata counts are validated.
+
+Actual old/new browser compatibility passes in
+20261026T161730Z-M2-013-941cf69-legacy-compatibility, including full exact receipt/
+family lookup beyond1000 members. Final-short-page cap7 navigation passes in
+20261026T162717Z-M2-013-941cf69-legacy-paging.34focused cases, M1 entry/100-transition/
+listener/Enter/PIN/privacy browser and compile pass in the intervening compatibility
+run; additional actual-render stored-status and benchmark-fixture checks pass.
+Final compile after the pagination/label cleanup exits0. These are local synthetic
+I/O checks, not hosted business or physical-print acceptance.
+
+The matched harness is source-snapshot based, uses schema-correct fixtures and
+real loopback HTTP, fixed response delay and browserCPU4. It supports measured
+search, a max-size merchant logo payload and100-transition GC/DOM observation.
+One unreported warmup and actual cold/warm contexts remain. A fixture unit verifies
+literal punctuation search, exact counts and stable multi-column ordering. Both
+immutable M1 and current-source one-sample smoke profiles pass; these are not final
+20-sample distributions. Initial fixture/header corrections and failed text-edit
+source are retained, as are all original pre-implementation baseline distributions.
+
+The local v7 customer catalog and existing parity wrapper support explicit candidate
+review, without changing the ordinary approved-active gate or v6 BYO selector.
+Backend source is50b94931ecf743166136b2c562cbb6d2fbaebdc7; verified replacement
+fingerprint is c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada.
+The earlier6f candidate is superseded and never a final approved package. Platform
+integration is local-only under the owner's explicit approval; no remote Platform
+operation, application deployment, push, PR or merge has occurred.

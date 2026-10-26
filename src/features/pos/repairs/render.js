@@ -64,6 +64,7 @@ export function repairCollectionHTML(searchQuery = '',page=null) {
       <input class="search" placeholder="Search name, phone, device, IMEI, ticket #…"
         data-repair-search value="${escapeHTML(searchQuery)}"
         style="width:100%;margin:10px 0;font-size:14px">
+      ${page?.mode==='exact-identifiers'?'<p class="muted">Enter an exact ticket or invoice number to search beyond this page.</p>':''}
       <p class="muted" style="font-size:12px;margin-bottom:10px">${pending.length} pending ticket${pending.length!==1?'s':''}${page?' on this page; pagination counts all matching families':''}</p>
       ${pageControls(page,'data-collection-page')}
       ${pending.length ? `<div style="display:grid;gap:8px">${pending.map(family => repairRowHTML(family.root, family)).join('')}</div>` :
