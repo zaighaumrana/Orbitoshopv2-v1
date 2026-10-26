@@ -1371,3 +1371,30 @@ Platform release-integration decision is pending in the permanent archive. Final
 paired performance profiles, package/parity, independent audit and M1 publication
 dependency remain open; this slice is not a complete/release-ready M2 milestone.
 No Platform source edit, hosted write, push, PR, merge or deployment is performed.
+
+## 2026-10-26 — M2 undated receipt oracle correction before release freeze
+Branch: feature/shop-modernization-m2
+
+A schema-permitted legacy receipt with a NULL stored date exposed a mismatch in
+an additional independent oracle: the inherited helper includes it for a to-only
+filter, while the initial unpromoted candidate excluded it. The unreleased M2
+draft read migration now preserves that behavior and uses the inherited epoch-zero
+ordering for unknown dates without altering the returned stored date or time policy.
+Nullable parent/child invoices and pre-epoch records are included in the oracle.
+
+All four real Managed/BYO SQL envelope fixtures pass again, including populated
+upgrades, direct/current RLS denial, replay, source conflict, transaction failure and
+lock-timeout/retry. Evidence run:
+20261026T171054Z-M2-012-941cf69-corrected-date-source. The failed preceding oracle
+is retained in20261026T170312Z-M2-009-6776983-null-oracle-run.
+
+The earlier6f817827 local v7 candidate had never been committed, pushed or installed
+by this task. It was verified untracked/unapproved/unsupported and moved, with both
+absolute paths checked inside the workspace, into the failed-oracle evidence as
+superseded-support-v7-6f817827.json. Its fingerprint is invalidated; it is not a final
+release. A replacement is generated only from this newly committed, verified source.
+Older immutable releases, all existing pins and both active v6 selectors stay intact.
+No hosted write or remote Platform operation occurred. The prior local fixture
+container disappeared during the environment restart; its replacement is owned
+container808955b36125974f5ad171aab504c46733017e2dcccf556a6f2d8c4ee13afdd3,
+networknone/ports{}, with synthetic data only.

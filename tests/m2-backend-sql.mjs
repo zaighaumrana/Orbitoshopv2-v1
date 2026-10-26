@@ -70,21 +70,24 @@ insert into public.sales(id,invoice_number,customer_name,total_bill,created_at) 
 select n,'SALE-'||n,'Retail '||n,20,'2026-10-25T10:00:00Z'::timestamptz from generate_series(1,1001)n;
 insert into public.sales(id,invoice_number,ticket_id,customer_name,total_bill,created_at) overriding system value values
 (2000,'ROOTINV-1',null,'Duplicate by old off-page invoice',50,now()),(2001,'DUPLICATE-TICKET',1,'Duplicate by ticket ID',50,now());
+insert into public.tickets(id,invoice_number,created_at) overriding system value values(99000020,'UNDATED-ROOT',null),(99000019,'PRE-EPOCH-ROOT','1960-01-01T12:00:00Z');
+insert into public.tickets(id,parent_ticket_id,invoice_number,created_at) overriding system value values(99000021,99000020,'UNDATED-CHILD',null);
+insert into public.sales(id,invoice_number,created_at) overriding system value values(99000022,'UNDATED-SALE',null),(99000023,'PRE-EPOCH-SALE','1960-01-01T12:00:00Z');
 analyze public.tickets;analyze public.sales;
 `)}
 function verify(db,run){
   const tickets=JSON.parse(sql(db,'select jsonb_agg(to_jsonb(t) order by id desc) from public.tickets t'))
   const sales=JSON.parse(sql(db,'select jsonb_agg(to_jsonb(s) order by id desc) from public.sales s'))
   run.checks=[]
-  for(const search of ['','needle child','Brand Model','%','_','CHILDINV-1002']){
-    const expected=findRepairFamilies(tickets,search).map(f=>f.root.id).sort((a,b)=>b-a)
+  for(const search of ['','needle child','Brand Model','%','_','CHILDINV-1002','UNDATED-CHILD']){
+    const expected=findRepairFamilies(tickets,search).sort((a,b)=>(new Date(b.root.created_at).getTime()||0)-(new Date(a.root.created_at).getTime()||0)||b.root.id-a.root.id).map(f=>f.root.id)
     const actual=[]
     const pages=JSON.parse(actor(db,1,`select jsonb_agg(public.get_repair_family_page('${search}','admin','all',n,50) order by n) from generate_series(0,${Math.max(0,expected.length-1)},50)n`))
     for(const page of pages){actual.push(...page.rows.map(r=>r.id));assert.equal(page.count,expected.length)}
     assert.deepEqual(actual,expected);run.checks.push({familySearch:search,roots:actual.length})
   }
   const records=buildReceiptRecords(sales,tickets)
-  for(const [search,type,from,to] of [['','all','',''],['needle child','repair','',''],['CHILDINV-1002','all','2026-10-25','2026-10-25'],['CHILDINV-1002','all','2025-01-01','2025-01-01'],['Brand Model','repair','',''],['','retail','','']]){
+  for(const [search,type,from,to] of [['','all','',''],['needle child','repair','',''],['CHILDINV-1002','all','2026-10-25','2026-10-25'],['CHILDINV-1002','all','2025-01-01','2025-01-01'],['Brand Model','repair','',''],['','retail','',''],['UNDATED-SALE','all','','2026-10-25'],['UNDATED-CHILD','all','','2026-10-25']]){
     const expected=filterReceiptRecords(records,{receiptSearch:search,receiptType:type,receiptDateFrom:from,receiptDateTo:to})
     let actual=[],page
     const args=offset=>`'${search}','${type}',${from?"'"+from+"T00:00:00Z'":'null'},${to?"'"+to+"T00:00:00Z'::timestamptz+interval '1 day'":'null'},${offset},50`

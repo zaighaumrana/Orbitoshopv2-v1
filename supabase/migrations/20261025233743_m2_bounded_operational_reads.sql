@@ -47,12 +47,12 @@ begin
   ), filtered as materialized (
     select * from scope where p_status='all' or status=p_status
   ), page as (
-    select * from filtered order by created_at desc nulls last,id desc limit p_limit offset p_offset
+    select * from filtered order by coalesce(created_at,'epoch'::timestamptz) desc,id desc limit p_limit offset p_offset
   ) select jsonb_build_object('contract',1,'offset',p_offset,'size',p_limit,
     'count',(select count(*) from filtered),
     'statusCounts',(select coalesce(jsonb_object_agg(status,n),'{}'::jsonb) from
       (select coalesce(status,'Unknown') status,count(*) n from scope group by coalesce(status,'Unknown')) c),
-    'rows',(select coalesce(jsonb_agg(to_jsonb(p) order by p.created_at desc nulls last,p.id desc),'[]'::jsonb) from page p)) into result;
+    'rows',(select coalesce(jsonb_agg(to_jsonb(p) order by coalesce(p.created_at,'epoch'::timestamptz) desc,p.id desc),'[]'::jsonb) from page p)) into result;
   return result;
 end $$;
 
@@ -125,24 +125,26 @@ begin
       coalesce(nullif(t.final_total,0),t.estimated_quote,0),coalesce(t.placed_at at time zone 'UTC',t.created_at)
     from public.tickets t left join public.tickets p on p.id=t.parent_ticket_id
     where repairs and nullif(t.invoice_number,'') is not null
+  -- Match legacy dateValue(unknown)=0 for ordering only. Returned dates remain
+  -- unchanged; a to-only date filter includes an undated record as before.
   ), typed as materialized (select * from headers where p_type='all' or type=p_type),
   exact as materialized (select * from typed where query<>'' and kind='ticket' and lower(btrim("invoiceNumber"))=query),
-  eligible_exact as materialized (select * from exact where (p_from is null or "createdAt">=p_from) and (p_to is null or "createdAt"<p_to)),
+  eligible_exact as materialized (select * from exact where (p_from is null or "createdAt">=p_from) and (p_to is null or "createdAt"<p_to or "createdAt" is null)),
   filtered as materialized (
     select * from typed h where
       case when exists(select 1 from exact) then h.kind='ticket' and exists(select 1 from eligible_exact e where e."rootTicketId"=h."rootTicketId")
-      else (p_from is null or h."createdAt">=p_from) and (p_to is null or h."createdAt"<p_to)
+      else (p_from is null or h."createdAt">=p_from) and (p_to is null or h."createdAt"<p_to or h."createdAt" is null)
         and (query='' or strpos(lower(concat_ws(' ',nullif(h."invoiceNumber",''),nullif(h."ticketNumber",''),nullif(h."parentInvoiceNumber",''),nullif(h."parentTicketNumber",''),
           nullif(h."customerName",''),nullif(h."customerPhone",''),nullif(h.device,''),nullif(h."paymentMethod",''),nullif(h."employeeName",''),nullif(h.label,''))),query)>0)
       end
-  ), page as (select * from filtered order by "createdAt" desc nulls last,kind asc,id desc limit p_limit offset p_offset)
+  ), page as (select * from filtered order by coalesce("createdAt",'epoch'::timestamptz) desc,kind asc,id desc limit p_limit offset p_offset)
   select jsonb_build_object('contract',1,'offset',p_offset,'size',p_limit,'count',(select count(*) from filtered),
     -- Exact invoice search selects a family. Caller reads that family completely
     -- and uses the existing pure helper for its parent/child natural sort; never
     -- claim a paged family is complete or replace localeCompare with SQL collation.
     'mode',case when exists(select 1 from exact) then 'family' else 'page' end,
     'matches',(select coalesce(jsonb_agg(jsonb_build_object('id',id,'rootTicketId',"rootTicketId") order by id),'[]'::jsonb) from eligible_exact),
-    'rows',case when exists(select 1 from exact) then '[]'::jsonb else (select coalesce(jsonb_agg(to_jsonb(p) order by p."createdAt" desc nulls last,p.kind asc,p.id desc),'[]'::jsonb) from page p) end) into result;
+    'rows',case when exists(select 1 from exact) then '[]'::jsonb else (select coalesce(jsonb_agg(to_jsonb(p) order by coalesce(p."createdAt",'epoch'::timestamptz) desc,p.kind asc,p.id desc),'[]'::jsonb) from page p) end) into result;
   -- Case-insensitive legacy duplicates must never make a response unbounded.
   if jsonb_array_length(result->'matches')>50 then raise exception 'Ambiguous invoice selection exceeds safe family limit' using errcode='54000';end if;
   return result;
