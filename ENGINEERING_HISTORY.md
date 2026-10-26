@@ -1302,3 +1302,41 @@ Current v4→v6 controlled upgrade is supported; v5 is explicitly superseded, an
 protocol/source/gateway gates still govern every transition. New Shop SQL remains
 local; Platform source/selectors/manifests/database require explicit owner approval.
 No final new release fingerprint, Platform edit, push, PR, merge or deployment.
+
+## 2026-10-26 — M2 additive bounded reads and measured consent-policy initplans
+Branch: feature/shop-modernization-m2
+
+Expanded owner scope permits local Shop SQL and Docker validation; the latest
+instruction requires repository migrations delivered by existing provisioning,
+with no direct hosted SQL. Platform investigation remains read-only pending
+explicit approval. Added forward migration20261025233743 and mapped its ninth
+requirement into both existing installer plans. Two invoker/RLS read RPCs select
+distinct roots by any-member search and unified bounded receipt headers with
+global off-page retail deduplication. Exact invoice search returns family identity;
+complete selected-family reads and the inherited helper retain child/date/order
+semantics. An additive config field advertises availability, not permission.
+No monetary batch API, financial write, Edge function or old migration is changed.
+
+EXPLAIN on102,003 tickets/101,003 sales showed the existing stable restrictive
+Support predicate evaluated per row. A transactionally rolled-back prototype
+retaining the same predicate as a statement initplan reduced exploratory median
+receipt SQL6341.955→1976.851ms and family page3601.988→434.142ms(three warm samples).
+The migration preserves restrictive policy roles/USING/WITH CHECK, updates only
+tickets/sales and bounds DDL lock waiting to5s. No speculative index is added.
+Network payload is bounded; exact counts/substrings still scan eligible history.
+These are local synthetic SQL measurements, not hosted/browser performance claims.
+
+Final source evidence: existing modernization archive, M2 evidence run
+20261026T024629Z-M2-012-44d79fa-sql-initplan-final. Fresh Managed/BYO and populated
+v4→v6→forward SQL envelope fixtures all pass39migrations. Complete helper oracles,
+direct RLS wrong-session/revoked/expired/deleted/binding/client negatives, inert
+replay, source conflict, intentional insert+ledger rollback and lock-timeout then
+same-step retry pass. Synthetic Auth fixtures do not prove hosted Auth/provider or
+Edge deployment. Earlier failed and pre-optimization runs remain archived.
+
+Existing v4/v6 packages, customer pins, active v6 selectors and both development
+branches remain unchanged. Final new immutable package/fingerprint, paired release
+catalog/manifests/selectors and parity approval are pending explicit Platform
+integration authorization. Two integrated unit release gates correctly reject the
+old manifest against this new backend source; they have not been relaxed. No
+hosted write, push, PR, merge or deployment is performed by this backend slice.
