@@ -1523,3 +1523,29 @@ checks PASS. No browser, broad suites, benchmarks or Docker/SQL. Owner authorize
 normal commits/pushes and automatic Pages builds; Draft/Open PRs remain unmerged.
 No SQL/Edge/package/executor/authorization change or actual customer upgrade occurs.
 Small M2 evidence records exact files, commits, results and owner acceptance steps.
+
+## 2026-10-28 — Specific controlled-upgrade input diagnostics
+Branch: feature/shop-modernization-m2
+
+Replaced the combined upgrade argument failure with a focused parser that identifies
+missing/invalid mode, exact project, client ID, source SHA, journal path and review/
+apply selection. Missing option values, duplicates and conflicting flags fail closed
+with nonzero exit. Unsupported historical source remains denied with evidence-review
+recovery. The executor, release preflight, authorization, clearance, journals, original
+request and provider fences are unchanged; no SQL/Edge/package source changed.
+
+Technical guides now describe the repaired in-app fresh-wizard-style instructions:
+complete self-contained PowerShell blocks, default/original private-folder restoration,
+unique reports, actual contract/identity/plan checks and explicit terminal PASS/STOP.
+A clean older M2 checkout gets guarded fetch/--ff-only recovery; dirty/wrong/divergent
+source stops. Developer parity remains outside customer stages. The actual trial
+checkout and private files were untouched.
+
+Focused checks cover one actual read-only assessment using synthetic native/provider
+responses, fresh-terminal copied inventory/assessment blocks, and specific invalid-
+input/nonzero-exit behavior. No provider write or journal replacement occurs. Platform
+checks cover customer commands, local guide navigation and copy-control rendering.
+Only the failed multiline-stdin test harness was repaired and rerun through an isolated
+script file. No browser, broad suite, benchmark or Docker/SQL work was done. Existing
+Draft PR3 push and automatic Pages build are owner-authorized; no skip/empty trigger,
+merge, actual upgrade or hosted Supabase change is performed.

@@ -218,3 +218,43 @@ Platform unavailability blocks upgrades without suspending a healthy Shop. Data,
 queues, consent, owner, pairing and credentials remain intact. The BYO journal stays
 customer-local; Platform retains the authorized receipt, original checkpoint/review
 history and audit. Source promotion/frontend publication does not rewrite them.
+
+## 28 October 2026 — Complete copy blocks and original-wizard teaching structure
+
+The in-app Customer CLI instructions now uses the fresh BYO wizard’s teaching
+structure: objective, Where, Before you start, numbered tasks, command purpose,
+success/failure checks, When to continue and recovery. Ten stages are browsed with
+Back/Next or the stage selector. Browsing is local operator navigation, never
+backend evidence or an automatic acknowledgment of command success.
+
+Use Copy whole block. Every operational block runs in its own PowerShell scope
+and restores the exact client/project/source/target and required paths. Inspection
+and assessment check the native exit code, require the new report file, parse its
+actual schema and compare its identities/binding before printing a final PASS.
+Nonzero exit, missing report or mismatch throws STOP. Inventory PASS means report
+collection/identity checked, not independently verified installed release. Assessment
+PASS names the generated file and planned SQL/function counts. A reconciled v6→v7
+plan expects one SQL/zero functions; unexpected changes require review before approval.
+
+Optional browser-only Shop-folder and final private-folder inputs generate
+noninteractive path assignments. Otherwise each block prompts independently. Paste
+only a full directory path (spaces/parentheses allowed), without cd/Set-Location;
+quotes are unnecessary. The default final folder is under the current user profile:
+RetraSell-BYO-Private/client-<ID>-support-v7. Accept it only if it matches your original
+work, or restore the exact original final folder. Windows permissions must restrict
+access to the customer administrator and required system administrators. Reports get
+unique names; the original journal is never created or overwritten by assessment.
+A custom existing journal must be restored at its prompt, not replaced to bypass
+uncertainty. Clearance remains a separate private file for the exact original request.
+
+Missing preflight script in an older clean M2 checkout: stage 3 now checks the
+remote, exact M2 branch and clean status, fetches origin, rejects divergent/local-
+ahead history and fast-forwards with --ff-only, then checks the scripts again.
+Dirty/wrong/divergent work stops for owner review. No reset, forced switch, deletion
+or journal replacement is part of recovery. The owner’s separate real trial checkout
+and private files were not changed by this implementation.
+
+Customer stages contain only customer release-preflight. Internal sibling Platform
+parity/override instructions remain in the separate developer section above; private
+Platform source is not a customer prerequisite. Native Scoop/PATH tooling, exact
+Master approval, original request/clearance/journal and provider fences are unchanged.

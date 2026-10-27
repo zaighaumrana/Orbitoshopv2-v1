@@ -20,3 +20,14 @@ clearance are superseded and refused. Do not use those commands or setup-tool
 recovery flags. The primary guide includes exact-source assessment, approval,
 customer apply and original-job recovery. New empty-project provisioning uses
 [BYO_GUIDED_SETUP.md](BYO_GUIDED_SETUP.md).
+
+The current in-app guide uses the original fresh wizard’s Where/prerequisite/task/
+success/recovery model. Copy each complete PowerShell block: it restores context in
+new terminals, checks exit status and validates the actual report before PASS.
+STOP means failed or blocked, never successful assessment. The stage selector and
+Back/Next only browse instructions; they do not record backend verification.
+
+For older clean M2 checkouts with a missing script, use the guide’s guarded fetch +
+--ff-only recovery. Dirty, wrong-branch or divergent work must stop for owner review.
+Restore original private folders/journals; reports use new unique names. Developer
+paired parity stays separate from customer preflight.

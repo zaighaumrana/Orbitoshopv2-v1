@@ -198,3 +198,16 @@ refresh; printing/thermal accounting remains independent of Paper enablement.
 Historical Oct20–21 evidence remains preserved outside Git. Former Client4 success
 was owner-reported; it does not prove installation in the new Client1 project.
 No customer checkout/private file is modified by this development pass.
+
+### Existing-Shop upgrade guide correction — 28 October 2026
+
+The original twelve-stage fresh wizard remains unchanged. Existing-Shop Controlled
+Backend Upgrade now follows its teaching structure but uses only current v7 upgrade
+commands. Each copied operational block restores its own identity, reviewed source,
+private paths and terminal context; exit status plus the real report contract must
+pass before a terminal PASS result. It never reuses fresh installation or owner
+bootstrap for an upgrade. The default private folder is user-profile local; restore
+an existing custom folder/journal instead of generating replacement history.
+Customer source preflight is sufficient; developer paired-repository parity is not
+part of the customer stages. Technical upgrade reference:
+[CONTROLLED_BACKEND_UPGRADES.md](CONTROLLED_BACKEND_UPGRADES.md).
