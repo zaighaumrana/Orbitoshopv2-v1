@@ -21,8 +21,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: zaighaumrana/orbito
-          # Local-only owner-reviewed integration; remote publication is not authorized.
-          ref: cedde3838e039b2ec9aebc163153e01253ede1ca
+          # Owner-approved v7 policy and ordinary paired-source release gate.
+          ref: 932c63c0091f175a704954f0817572a07f2156fe
           path: orbito
           fetch-depth: 0
           persist-credentials: false
@@ -30,9 +30,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Review unpromoted support-v7 candidate and both installation plans
-        working-directory: orbito
-        run: node scripts/release-parity.mjs --candidate support-v7
-      - name: Enforce approved active release gate (promotion remains required)
+      - name: Enforce approved support-v7 release and both installation plans
         working-directory: orbito
         run: node scripts/release-parity.mjs
