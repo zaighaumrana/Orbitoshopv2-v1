@@ -12,7 +12,9 @@ import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
 import {buildRelease} from './build-platform-release.mjs';
 import {planMigrations,migrationEnvelope} from './byo-support-release.mjs';
-import {outsideRepos,nativeCliCandidates,checkedCli} from './setup-byo.mjs';
+import {outsideRepos,findNativeCli} from './setup-byo.mjs';
+import {customerReleasePreflight,ReleasePreflightError} from './release-preflight.mjs';
+import {ConfigurationError} from './byo-public-config.mjs';
 import {validShopProject,validClientId} from './byo-identity.mjs';
 export class UpgradeError extends Error {}
 const root=resolve(import.meta.dirname,'..'),literal=s=>"'"+String(s).replaceAll("'","''")+"'";
@@ -51,9 +53,9 @@ export async function upgradeBackend(argv,deps={}){
  const ref=o['--project-ref'],client=Number(o['--client-id']);
  if(o['--mode']!=='byo')throw new UpgradeError('Managed upgrades require the live Master Platform approval and bounded execution workflow.');
  if(!validShopProject(ref)||!validClientId(String(client))||!o['--journal']||!o['--from-sha']||Boolean(o['--apply'])===Boolean(o['--review']))throw new UpgradeError('Specify exact BYO project/client, source, private journal and review OR apply.');
- const manifest=JSON.parse(readFileSync(join(root,'scripts/byo-release-manifest.json'),'utf8')),release=buildRelease(root,{support:true}),plan=installationPlan(release,o['--mode']);
+ const {manifest,release,catalog}=customerReleasePreflight(root),plan=installationPlan(release,o['--mode']);
  if(manifest.sha256!==release.sha256||manifest.review_status!=='approved-shared')throw new UpgradeError('Completed source differs from the approved shared release. No upgrade allowed.');
- const catalog=JSON.parse(readFileSync(join(root,'scripts/backend-release-catalog.json'),'utf8')),source=catalog[o['--from-sha']];
+ const source=catalog[o['--from-sha']];
  if(!source?.supported)throw new UpgradeError('Unapproved or superseded source release; manual provenance review required.');
  const path=outsideRepos(o['--journal']),old=existsSync(path)?JSON.parse(readFileSync(path,'utf8')):null;
  const identity={mode:o['--mode'],project:ref,client,source:o['--from-sha'],target:release.sha256};
@@ -74,10 +76,10 @@ export async function upgradeBackend(argv,deps={}){
   writeFileSync(lock,'Upgrade process owns this lock. Confirm it stopped before removing a stale lock.\n',{flag:'wx',mode:0o600});locked=true;
   let query,deploy,listFunctions;
   if(o['--mode']==='byo'){
-   const cli=o['--cli']||nativeCliCandidates()[0];if(!cli||/\.(cmd|bat|ps1)$/i.test(cli))throw new UpgradeError('Native customer Supabase CLI required.');
-   const invoke=deps.invoke||(a=>{const r=spawnSync(cli,a,{cwd:root,encoding:'utf8',windowsHide:true,shell:false,timeout:60000,maxBuffer:8e6});if(r.error||r.status!==0)throw new UpgradeError('Customer CLI operation failed; provider output suppressed.');return r.stdout});
-   checkedCli(cli,(_cli,args)=>invoke(args));
-   if(!JSON.parse(invoke(['projects','list','--output','json'])).some(p=>p.id===ref))throw new UpgradeError('Customer account cannot see the exact project.');
+   let cli;
+   const invoke=deps.invoke||(a=>{const r=spawnSync(cli,a,{cwd:root,encoding:'utf8',windowsHide:true,shell:false,timeout:60000,maxBuffer:8e6});if(r.error||r.status!==0)throw new UpgradeError(a[0]==='projects'?'Supabase account/project access is unavailable. Run supabase login with the customer account and confirm the exact project in supabase projects list --output json.':'Customer CLI operation failed. Keep the original journal; verify native CLI capabilities, account access and the recorded step. Provider output is suppressed.');return r.stdout});
+   cli=findNativeCli(o['--cli'],(candidate,args)=>deps.invoke?deps.invoke(args):(()=>{const r=spawnSync(candidate,args,{cwd:root,encoding:'utf8',windowsHide:true,shell:false,timeout:30000,maxBuffer:2e6});if(r.error||r.status!==0)throw new UpgradeError('Native CLI capability check failed.');return r.stdout})());
+   if(!JSON.parse(invoke(['projects','list','--output','json'])).some(p=>p.id===ref))throw new UpgradeError('Customer account cannot see the exact project. Sign in with the correct customer account or obtain project access; never substitute the Managed or Platform project.');
    query=deps.query||(async sql=>{const dir=mkdtempSync(join(tmpdir(),'retrasell-upgrade-')),file=join(dir,'query.sql');try{writeFileSync(file,sql,{mode:0o600});const data=JSON.parse(invoke(['db','query','--linked','--project-ref',ref,'--file',file,'--output-format','json']));return Array.isArray(data)?data:data.rows}finally{unlinkSync(file);rmdirSync(dir)}});
    listFunctions=async()=>JSON.parse(invoke(['functions','list','--project-ref',ref,'--output','json']));
    deploy=async fn=>invoke(['functions','deploy',fn.name,'--project-ref',ref,'--use-api',...(fn.verify_jwt?[]:['--no-verify-jwt'])]);
@@ -112,4 +114,4 @@ export async function upgradeBackend(argv,deps={}){
   }
  }finally{terminal.close();if(locked)unlinkSync(lock)}
 }
-if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))upgradeBackend(process.argv.slice(2)).catch(error=>{console.error(error instanceof UpgradeError?error.message:'Upgrade stopped. Retain the original private journal. Review exact identity/history, gateway configuration or the recorded unknown step; no provider output or credentials are disclosed.');process.exitCode=1});
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))upgradeBackend(process.argv.slice(2)).catch(error=>{console.error(error instanceof UpgradeError||error instanceof ReleasePreflightError||error instanceof ConfigurationError?error.message:'Upgrade stopped. Retain the original private journal. Review exact identity/history, gateway configuration or the recorded unknown step; no provider output or credentials are disclosed.');process.exitCode=1});

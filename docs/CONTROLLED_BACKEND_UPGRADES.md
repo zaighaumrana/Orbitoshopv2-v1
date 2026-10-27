@@ -1,11 +1,16 @@
 # Controlled backend upgrades — support-v7
 
-27 October 2026, Asia/Karachi. This is the primary procedure for existing Shops.
+28 October 2026: the primary operator experience is now Platform → existing BYO
+client → Controlled Backend Upgrade → Customer CLI instructions. Its ten inline
+stages supply current client commands, expected results and recovery. This document
+is the technical fallback; private Platform source is not a customer prerequisite.
+
+Release reference, updated 28 October 2026, Asia/Karachi. This is the technical fallback.
 Source approves support-v7: **39 migrations, seven functions**, fingerprint
 `c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada`, backend source
 `50b94931ecf743166136b2c562cbb6d2fbaebdc7`. V6 remains supported; v5 is unsupported.
 Source promotion does not activate the hosted catalog or upgrade any Shop. The
-owner must deploy pending Platform migrations/functions before using this procedure;
+owner must confirm compatible Platform migrations/functions before using this procedure;
 each actual upgrade needs separate authorization.
 
 New empty-project BYO provisioning uses [BYO_GUIDED_SETUP.md](BYO_GUIDED_SETUP.md).
@@ -17,14 +22,13 @@ administrative credentials.
 
 ## 1. Customer authentication and exact target
 
-Use Node 24, the reviewed checkouts and a compatible native Supabase CLI (reviewed
+Use Node 24, the reviewed Shop checkout and a compatible native Supabase CLI (reviewed
 version 2.120.0). Replace placeholders locally. Create a private non-synced folder
 outside both repositories first; restrict its Windows ACL to the customer admin
 and required system administrators. Check the ACL; file mode 0600 is insufficient.
 
 ```powershell
 Set-Location 'C:\Users\CUSTOMER\Source\Orbitoshopv2-v1'
-$Cli = 'C:\Tools\supabase.exe'
 $ShopRef = 'REPLACE_WITH_EXACT_20_LETTER_SHOP_REF'
 $ClientId = 123 # Replace with the actual Platform client ID
 $PlatformRef = 'ukbhyerxshteyetwomqy'
@@ -32,26 +36,58 @@ $Private = 'C:\Private\RetraSell'
 $Journal = Join-Path $Private 'support-v7-upgrade.json'
 $Assessment = Join-Path $Private 'support-v7-assessment.json'
 node --version
-& $Cli --version
-node scripts/setup-byo.mjs --login --cli $Cli
-& $Cli projects list --output json
-npm run release:check
+supabase --version
+supabase login
+supabase projects list --output json
+node scripts/release-preflight.mjs --expected-sha c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada
 ```
 
 Expected: customer-owned account login, exact Shop project visibility and PASS
-release parity. Parity needs the matching reviewed Platform sibling `orbito`
-checkout (or `RETRASELL_PLATFORM_SOURCE`). Independently check the Dashboard and
+customer release preflight. It validates approved customer metadata, exact source
+fingerprint/manifests and committed backend ancestry without private Platform source. Independently check the Dashboard and
 Platform client/project/source UUID/binding. Platform must never be the Shop.
 Owner context only: existing BYO client #1 is `ampwuqwokkbhkizcetsd`, Managed client
 #2 is `yqiefgcdvnfmdhuhitdq`. Do not reuse these for another customer. Wrong account,
-inaccessible target or failed parity: stop. Platform never collects customer PATs,
+inaccessible target or failed preflight: stop. Platform never collects customer PATs,
 service keys or database passwords.
+
+### Windows native tooling and internal parity
+
+Check git --version, node --version, scoop --version and supabase --version first.
+Use Node 24+. Do not reinstall working tools. In non-admin PowerShell, only if Scoop
+is missing and organizational policy permits:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+scoop install git
+scoop install nodejs-lts
+scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+scoop install supabase
+supabase --version
+```
+
+Install only missing packages. Reopen PowerShell after installation; Get-Command
+supabase diagnoses PATH. The scripts discover compatible native executables from
+PATH (including Scoop shims); an explicit native --cli override remains optional.
+Capability checks fail closed for incompatible CLI versions; update with Scoop.
+No package runner or hardcoded executable path is required.
+
+INTERNAL OPERATORS ONLY: npm run release:check imports the authoritative checker
+from a matching sibling orbito checkout or RETRASELL_PLATFORM_SOURCE override. Use
+reviewed feature/shop-modernization-m2 Shop and feature/shop-modernization-m2-release
+Platform source (or their explicitly reviewed compatible commits). Inspect both
+remotes, branches, revisions and overrides first. The old verified-customer-support
+Platform branch selects v6/38 migrations against M2 Shop's 39 and must be blocked.
+Restore the compatible pairing while preserving local changes; never remove SQL,
+edit metadata, regenerate v7 or force-reset to bypass parity. Ordinary customers
+use release-preflight.mjs above and do not need Platform repository access.
 
 ## 2. Establish actual installed source
 
 ```powershell
 $Inventory = Join-Path $Private 'backend-inventory.json'
-node scripts/inspect-backend.mjs --project-ref $ShopRef --client-id $ClientId --cli $Cli --report $Inventory
+node scripts/inspect-backend.mjs --project-ref $ShopRef --client-id $ClientId  --report $Inventory
 ```
 
 Expected: `read_only: true`, exact identity, migration/function/gateway/capability
@@ -79,7 +115,7 @@ reviewed evidence retain separate trust classifications.
 ## 3. Read-only upgrade assessment
 
 ```powershell
-node scripts/upgrade-backend.mjs --mode byo --project-ref $ShopRef --client-id $ClientId --from-sha $FromSha --journal $Journal --report $Assessment --cli $Cli --review
+node scripts/upgrade-backend.mjs --mode byo --project-ref $ShopRef --client-id $ClientId --from-sha $FromSha --journal $Journal --report $Assessment  --review
 ```
 
 Expected JSON contract `retrasell-byo-upgrade-assessment-v1`, exact identity/source/
@@ -132,7 +168,7 @@ reapproval of the **same original request and plan**.
 Only after separate authorization for the exact Shop:
 
 ```powershell
-node scripts/upgrade-backend.mjs --mode byo --project-ref $ShopRef --client-id $ClientId --from-sha $FromSha --journal $Journal --approval-file $Approval --platform-project-ref $PlatformRef --cli $Cli --apply
+node scripts/upgrade-backend.mjs --mode byo --project-ref $ShopRef --client-id $ClientId --from-sha $FromSha --journal $Journal --approval-file $Approval --platform-project-ref $PlatformRef  --apply
 ```
 
 Type the exact `UPGRADE <ShopRef> <target-SHA256>` confirmation displayed. Customer
@@ -150,7 +186,7 @@ exact ledger, function/gateway presence, owner/binding and SQL runtime.
 
 ```powershell
 $After = Join-Path $Private 'backend-inventory-after-v7.json'
-node scripts/inspect-backend.mjs --project-ref $ShopRef --client-id $ClientId --cli $Cli --report $After
+node scripts/inspect-backend.mjs --project-ref $ShopRef --client-id $ClientId  --report $After
 ```
 
 Use a new output path. Expect 39 exact migrations, seven functions with matching

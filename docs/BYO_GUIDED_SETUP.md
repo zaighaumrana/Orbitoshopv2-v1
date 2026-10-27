@@ -22,18 +22,30 @@ a database reset as recovery.
 
 ## Prepare customer-side files and tooling
 
-Use Node.js 22.12+ (or Node.js 24) and a native Supabase CLI v2 with the checked capabilities. The
-reviewed CLI is 2.120.0. These checks contain no credentials:
+Use Node.js 22.12+ (or Node.js 24) and a native Supabase CLI v2 with the checked capabilities. The scripts verify the required native CLI capabilities. These checks contain no credentials:
 
 ```powershell
 node --version
 npm --version
-npx --yes supabase@2.120.0 --version
+supabase --version
 node scripts/setup-byo.mjs --login
 ```
 
-The last command starts interactive login to the authorized customer account only.
-The coordinator discovers native executables in PATH/npm cache and checks version,
+The last command starts interactive login to the authorized customer account only. Install native
+Supabase on Windows using the official Scoop bucket:
+
+```powershell
+scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+scoop install supabase
+supabase --version
+```
+
+If Scoop is absent, follow the current official Scoop installation instructions
+from the in-app upgrade guide. Reopen PowerShell for PATH changes. No package runner
+or mandatory executable path is required. Customer upgrade preflight uses
+`scripts/release-preflight.mjs` without private Platform source; internal paired
+release validation still requires compatible reviewed Shop/Platform checkouts.
+The coordinator prioritizes native executables in PATH (including Scoop shims) and checks version,
 db query, API function deployment and env-file capabilities. Project visibility is
 checked before installation; visibility alone does not prove write authority.
 An explicit native executable can be supplied using `--cli`.

@@ -1496,3 +1496,30 @@ source, pushed identities/results are retained in M2 evidence. Both PRs remain D
 Open; no merge, hosted Supabase write/function deployment or Shop upgrade is performed.
 Hosted activation and customer installation remain owner actions. Full source evidence
 limits, F22 deferral and other M2 acceptance obligations remain explicitly separate.
+
+## 2026-10-28 — Customer BYO release preflight and native CLI guidance
+Branch: feature/shop-modernization-m2
+
+Added customer-only local source preflight using the existing approved manifest,
+public customer catalog, canonical source hash, exact provenance, executable plan
+and committed backend ancestry. The expected SHA from authorized Platform can be
+supplied explicitly. It reads no private Platform code or provider state. Inspection
+and upgrade review/apply invoke it before provider access. The internal paired
+checker remains authoritative; an early compatibility check explains stale v6/38
+Platform versus M2/39 Shop, including sibling/override recovery, instead of a raw
+assertion. V7/historical package bytes and fingerprints remain unchanged.
+
+Native CLI discovery supports Windows PATH/Path and tries compatible executables,
+including Scoop shims, retaining explicit native override compatibility. Normal
+instructions use supabase directly with official Scoop installation; no package
+runner is introduced. Project/account/private-folder errors give safe recovery.
+Controlled-upgrade and BYO references now defer to the primary in-app guide and
+distinguish external customer preflight from internal paired source validation.
+
+Three focused preflight/native/identity groups, paired current/stale cases, one
+existing clearance transport group and ordinary source parity PASS. Platform's
+three guide and four navigation groups, 15 PowerShell blocks, flags/import/syntax
+checks PASS. No browser, broad suites, benchmarks or Docker/SQL. Owner authorizes
+normal commits/pushes and automatic Pages builds; Draft/Open PRs remain unmerged.
+No SQL/Edge/package/executor/authorization change or actual customer upgrade occurs.
+Small M2 evidence records exact files, commits, results and owner acceptance steps.
