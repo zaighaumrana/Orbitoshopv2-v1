@@ -3,8 +3,8 @@
 Current milestone: both fresh provisioning paths select the final shared release
 recorded in `scripts/byo-release-manifest.json` (approved-shared). Earlier v2/v3
 references below describe their checkpoints. Existing Shops must use
-[the dedicated additive upgrade](Existing-shop-upgrade.md), which updates all
-required functions before optional enrollment. Existing-mode installation now
+[controlled backend upgrades](CONTROLLED_BACKEND_UPGRADES.md), which apply only
+missing SQL and changed approved function packages. Existing-mode installation now
 stops rather than applying SQL without the matching functions. Preserve interrupted
 jobs' original release checkout and journals; never repin them to this release.
 
@@ -14,12 +14,11 @@ acknowledgments are not installation receipts. The customer-side journal remains
 authoritative for local operations; Platform cannot read it. This document replaces
 the older branch/manual deployment sequence in `BYO_SETUP.md`.
 
-This source checkpoint does not authorize customer installation or hosted changes.
-The managed pointer remains Support-v2; the separate unchanged Support-v3 candidate
-contains 36 migrations and 7 functions, fingerprint
-`f3fb64e51f1d07c536c626acd33b0e05b98b4fe5a22c3a7c3ff1a02a6a9e5bfd`.
-Approve the exact package and target separately before installation. Never repin
-an unresolved operation or use a database reset as recovery.
+The current source-approved fresh release is support-v7 (39 migrations, seven
+functions), fingerprint c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada.
+Hosted activation and customer installation are separate owner operations. Support-v6
+remains a supported historical source. Never repin an unresolved operation or use
+a database reset as recovery.
 
 ## Prepare customer-side files and tooling
 
@@ -88,9 +87,9 @@ node scripts/setup-byo.mjs --journal "PRIVATE_FOLDER\journal.json" --client-id 1
 ```
 
 Explicitly review **fresh** versus **existing**. Fresh requires an empty eligible
-project or the exact resumable installation prefix. Existing requires original
-pairing/binding and at least the exact approved migration prefix; it preserves
-ownership, base runtime secrets/functions and installs approved forward changes.
+project or the exact resumable installation prefix. Existing mode is not an upgrade path: an older initialized Shop is stopped and
+redirected to the controlled-upgrade procedure. Original pairing/binding and
+provenance remain required; do not select fresh to bypass this protection.
 Existing-Shop Paper sender updates require separate targeted rollout approval.
 
 Preflight checks pairing/client/project, manifest fingerprint, CLI/account and

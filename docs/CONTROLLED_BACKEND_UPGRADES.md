@@ -1,89 +1,184 @@
-# Customer-controlled backend upgrade — 2026-10-23
+# Controlled backend upgrades — support-v7
 
-Current fresh source is immutable support-v6, 38 migrations /7 functions, SHA-256
-64fcec36fa7a5e2565db2a6d3aa6ddbd8e6c1170eefd4a07a57ae6ba0c066a31.
-V4 remains supported; v5 is superseded and never installed. Historical pins do not
-prove current deployed source. No new packaged Shop backend is needed for this
-control-plane/tooling change; v6 bytes and fingerprints stay unchanged.
+27 October 2026, Asia/Karachi. This is the primary procedure for existing Shops.
+Source approves support-v7: **39 migrations, seven functions**, fingerprint
+`c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada`, backend source
+`50b94931ecf743166136b2c562cbb6d2fbaebdc7`. V6 remains supported; v5 is unsupported.
+Source promotion does not activate the hosted catalog or upgrade any Shop. The
+owner must deploy pending Platform migrations/functions before using this procedure;
+each actual upgrade needs separate authorization.
 
-Use Node24, the final reviewed checkouts and a compatible native Supabase CLI.
-Authenticate only to the customer's own account. No Platform form takes a customer
-service key, PAT or database password. Run `npm run release:check` before approval.
-Existing terminal Managed mode is refused; Managed uses the live Master Platform
-review/approval/bounded executor. This replaces the historical ungated procedure.
+New empty-project BYO provisioning uses [BYO_GUIDED_SETUP.md](BYO_GUIDED_SETUP.md).
+Existing Shops use this controlled procedure: never repeat fresh setup, owner
+bootstrap, pairing or credential creation to upgrade. Managed upgrades use the
+live Master Platform review/approval/bounded executor. The old terminal
+`--mode managed` path is refused. Do not give customer scripts Platform PATs or
+administrative credentials.
 
-## Read-only assessment
+## 1. Customer authentication and exact target
 
-```powershell
-node scripts/setup-byo.mjs --login
-node scripts/upgrade-backend.mjs --mode byo --project-ref EXACT_SHOP_REF --client-id CLIENT_ID --from-sha ACTUAL_APPROVED_SOURCE_SHA --journal C:/Private/RetraSell/upgrade.json --report C:/Private/RetraSell/assessment.json --cli C:/Path/supabase.exe --review
-```
-
-Private parent directory must already exist outside both repositories. Assessment
-report creation is exclusive: an existing report is not overwritten. Review reads
-only fixed project/identity, migration hash, function gateway and runtime evidence;
-no provider write is performed. It verifies exact ordered source SQL provenance,
-owner readiness, source/binding and protocol compatibility, and computes only missing
-SQL/changed packages. Missing/drifted gateways or unknown source require explicit
-repair/adoption. Local assessment does not prove independent provider source bytes.
-
-Give only the nonsecret projected assessment to the Master. They import it into
-the exact BYO client upgrade panel, review source limitations, clear original pending
-Platform operations, approve exact request/plan/hash and any actual maintenance/
-notification requirements. Platform labels this customer-reported evidence.
-Download the private two-hour clearance for the customer administrator. It is
-hash-only on Platform and grants no Shop administrative authority. Preserve it in
-a separate private file; never Git, browser storage, query strings or logs.
-
-## Explicit customer application
+Use Node 24, the reviewed checkouts and a compatible native Supabase CLI (reviewed
+version 2.120.0). Replace placeholders locally. Create a private non-synced folder
+outside both repositories first; restrict its Windows ACL to the customer admin
+and required system administrators. Check the ACL; file mode 0600 is insufficient.
 
 ```powershell
-node scripts/upgrade-backend.mjs --mode byo --project-ref EXACT_SHOP_REF --client-id CLIENT_ID --from-sha ACTUAL_APPROVED_SOURCE_SHA --journal C:/Private/RetraSell/upgrade.json --approval-file C:/Private/RetraSell/approval.json --platform-project-ref EXACT_PLATFORM_REF --cli C:/Path/supabase.exe --apply
+Set-Location 'C:\Users\CUSTOMER\Source\Orbitoshopv2-v1'
+$Cli = 'C:\Tools\supabase.exe'
+$ShopRef = 'REPLACE_WITH_EXACT_20_LETTER_SHOP_REF'
+$ClientId = 123 # Replace with the actual Platform client ID
+$PlatformRef = 'ukbhyerxshteyetwomqy'
+$Private = 'C:\Private\RetraSell'
+$Journal = Join-Path $Private 'support-v7-upgrade.json'
+$Assessment = Join-Path $Private 'support-v7-assessment.json'
+node --version
+& $Cli --version
+node scripts/setup-byo.mjs --login --cli $Cli
+& $Cli projects list --output json
+npm run release:check
 ```
 
-Type the exact UPGRADE project/target confirmation. The tool requires that separate
-customer approval and actual customer CLI project access. It validates the clearance
-contract/digest/public key and exact Platform/customer identities, then claims
-the SAME durable Platform request. It cannot begin with only a self-reported local
-"operations cleared" flag. Any unresolved Platform provisioning/configuration,
-owner/bootstrap or unknown provider write blocks execution. A private original
-journal/local exclusive process lock complements Platform's concurrent executor
-fence. Each provider write is preceded by live clearance and exact Shop checks.
+Expected: customer-owned account login, exact Shop project visibility and PASS
+release parity. Parity needs the matching reviewed Platform sibling `orbito`
+checkout (or `RETRASELL_PLATFORM_SOURCE`). Independently check the Dashboard and
+Platform client/project/source UUID/binding. Platform must never be the Shop.
+Owner context only: existing BYO client #1 is `ampwuqwokkbhkizcetsd`, Managed client
+#2 is `yqiefgcdvnfmdhuhitdq`. Do not reuse these for another customer. Wrong account,
+inaccessible target or failed parity: stop. Platform never collects customer PATs,
+service keys or database passwords.
 
-The customer CLI accepts both Supabase publishable keys and legacy anon JWTs in
-the original clearance; no JSON editing or key substitution is needed. It rejects
-privileged/malformed keys and checks the key against the exact explicitly supplied
-Platform project's read-only Auth settings endpoint before sending any clearance
-token. Publishable keys are opaque, not decoded JWTs. Redirects, network failures,
-invalid keys and unexpected responses stop conservatively and preserve the original
-clearance/journal. Successful key verification does not authorize an upgrade: the
-original live claim must still pass expiry, revocation, session and pending-operation
-gates and return the exact request/client/project/source/target/binding/plan digest.
-No backend redeployment, new release or repeat of a completed upgrade is required.
+## 2. Establish actual installed source
 
-SQL uses approved atomic migration envelopes and exact ledger read-back; functions
-deploy only changed approved sources with original JWT settings. Unchanged packages,
-owner, pairing, secrets, customer data and original provisioning pins remain intact.
-Two-step serial checkpoints use the same shared Managed executor/requirements.
+```powershell
+$Inventory = Join-Path $Private 'backend-inventory.json'
+node scripts/inspect-backend.mjs --project-ref $ShopRef --client-id $ClientId --cli $Cli --report $Inventory
+```
 
-Preserve the original journal after any failure. Running/unknown outcomes are never
-blindly repeated, even if a function exists. Master must inspect actual original
-provider outcome, wait the safety interval and record an audited reference/decision
-on the original Platform job. Lost claim reply, stopped process, expiry or revoked
-Master session similarly require original status/reapproval. A refreshed clearance
-must refer to the SAME plan/request. Verify a stale process stopped before removing
-its local lock. No new UUID conceals uncertainty.
+Expected: `read_only: true`, exact identity, migration/function/gateway/capability
+findings and explicit limitations. Do not guess from the original v4 provisioning
+pin or a completed v6 upgrade receipt. Compare current ordered version/name/SHA256
+provenance and all seven function packages/JWT gateways with the immutable release
+using authorized provider/source evidence. V5/v6 SQL histories are identical: ledger
+count/hashes alone cannot distinguish them. This CLI does not independently recover
+package sources. Ambiguity or `verified_release: null` remains unverified; reconcile
+with the Master and authoritative evidence before declaring `--from-sha`. Drift or
+unknown provenance requires separately authorized repair/adoption. Runtime health
+alone is insufficient.
 
-Final ledger/function/gateway/owner/SQL runtime checks record components installed,
-with source review pending. Customer reports never automatically mark full deployed
-source verified. Master can explicitly accept reviewed component evidence while the
-full-source limitation remains visible/audited. Hosted browser/Auth/CAPTCHA/Support,
-billing, usage and POS acceptance remain separate. Platform unavailable blocks an
-upgrade without suspending a healthy Shop. Existing queues/consent/journals survive.
+Only for a **verified/reconciled v6 source**, use:
 
-These new endpoints require the new Platform forward migration then platform-upgrade
-deployment and compatible UI. Existing Platform v26/inventory v1 are not reinstalled.
-No hosted customer upgrade or fresh installation was performed in this pass.
-Fresh hosted Managed/BYO acceptance is pending by owner choice; inaccessible BYO
-administrator/provider verification remains BLOCKED. Keep both existing PRs Draft,
-Open, unmerged against development; no production promotion.
+```powershell
+$FromSha = '64fcec36fa7a5e2565db2a6d3aa6ddbd8e6c1170eefd4a07a57ae6ba0c066a31'
+```
+
+Do not use this value just because the example uses v6. Full Managed verification
+also can remain pending: provider downloads may omit packaged files and historical
+packages lack a complete canonical SQL/security baseline. Scoped and customer-
+reviewed evidence retain separate trust classifications.
+
+## 3. Read-only upgrade assessment
+
+```powershell
+node scripts/upgrade-backend.mjs --mode byo --project-ref $ShopRef --client-id $ClientId --from-sha $FromSha --journal $Journal --report $Assessment --cli $Cli --review
+```
+
+Expected JSON contract `retrasell-byo-upgrade-assessment-v1`, exact identity/source/
+target, observation and plan. Output creation is exclusive; an existing report is
+not overwritten. Review checks exact SQL provenance, owner readiness, binding,
+gateways and protocol compatibility without provider writes. Review does not create
+an execution journal. Preserve any original execution journal. For a new assessment
+use a new report filename and retain earlier evidence. Rejected identity, ownership,
+gateway, source or compatibility means stop and reconcile.
+
+Verified v6 → v7 expects **one migration** `migration:20261025233743` and **zero
+changed Edge Function packages**. It requires no fresh install, repeated owner
+bootstrap, pairing or credential replacement. The approved plan and live evidence
+remain authoritative; unexpected steps mean stop and reconcile before approval.
+Older supported sources have different additive plans.
+
+Send only the permitted assessment JSON to Master Admin through the agreed private
+channel. It contains projected identity/evidence, not credentials. Do not upload
+private journals, pairing/runtime files, CLI tokens or clearance files to Platform,
+GitHub or public documentation. Assessment evidence is customer-reported, not
+independently obtained deployed-source proof.
+
+## 4. Master authorization and separate clearance
+
+Master opens the exact BYO client upgrade panel and loads existing status first.
+Select the evidenced supported source, import the assessment, explicitly acknowledge
+fresh evidence, and reconcile original pending operations. Review plan/digest,
+source limitations, customer acknowledgment and any actual maintenance/notification
+conditions. Approval confirms the exact project and target; it does not install.
+
+Use the panel's customer-clearance download. The real filename is
+`retrasell-upgrade-<request-UUID>.json`; clearance expires after two hours, grants no
+Supabase administrative access and is stored hash-only on Platform. Transfer it
+securely to the authorized customer admin's restricted private folder; remove
+redundant Downloads copies. Keep it separate from the journal.
+
+```powershell
+# Replace the placeholder with the actual downloaded request UUID.
+$Approval = Join-Path $Private 'retrasell-upgrade-REPLACE_WITH_REQUEST_UUID.json'
+```
+
+Never edit clearance, substitute keys or put it in Git, browser storage, query
+strings or logs. The tool accepts the original Platform publishable or legacy anon
+public key and verifies it against that project's Auth settings before sending
+clearance authority. Expired/revoked clearance needs Master status review and
+reapproval of the **same original request and plan**.
+
+## 5. Customer apply and verification
+
+Only after separate authorization for the exact Shop:
+
+```powershell
+node scripts/upgrade-backend.mjs --mode byo --project-ref $ShopRef --client-id $ClientId --from-sha $FromSha --journal $Journal --approval-file $Approval --platform-project-ref $PlatformRef --cli $Cli --apply
+```
+
+Type the exact `UPGRADE <ShopRef> <target-SHA256>` confirmation displayed. Customer
+CLI account access supplies Shop authority. The tool claims the same durable
+Platform request, matches plan digest/client/project/source/target/source UUID/
+binding, and checks live clearance plus pending-operation fences before writes.
+The private exclusive lock/journal complements Platform's executor fence. SQL uses
+atomic approved migration envelopes and exact ledger read-back; only changed
+approved function sources deploy, preserving JWT gateways.
+
+Expected final output includes `Original upgrade <UUID>: verification_required`
+and `Components recorded; deployed-source review and hosted acceptance remain pending.`
+The bounded executor may resume `paused` checkpoints internally. Final checks cover
+exact ledger, function/gateway presence, owner/binding and SQL runtime.
+
+```powershell
+$After = Join-Path $Private 'backend-inventory-after-v7.json'
+node scripts/inspect-backend.mjs --project-ref $ShopRef --client-id $ClientId --cli $Cli --report $After
+```
+
+Use a new output path. Expect 39 exact migrations, seven functions with matching
+gateways and `bounded-operational-reads`. `platform-bridge` uses `verify_jwt=false`;
+all other six use `true`. Compare actual deployed source separately when available;
+missing source stays pending and provider bundle hashes do not prove package-source
+hashes. Master reviews final original checkpoints and can explicitly accept reviewed
+components with full-source limits still visible/audited. A receipt is not proof of
+current independent verification. Hosted Auth/CAPTCHA/Support, billing/usage and POS
+acceptance remain separate owner steps.
+
+## 6. Failure and original-operation recovery
+
+Keep original request, journal, clearance, source/target and checkout. Do not start
+fresh setup or create another UUID/journal to bypass uncertainty. Load the original
+Platform status. Master inspects the actual provider outcome and checkpoint, waits
+any safety interval and records an audited reference/reason through the existing
+reconcile/reapproval flow. Elapsed time or function presence never proves success.
+
+After reconciliation and renewed clearance for the **same** request/plan, rerun the
+same apply command with the original journal. Passed checkpoints remain passed;
+unknown/running steps block blind replay. Lost claim replies, expiry or revoked
+Master sessions need original-status review too. Remove a stale `.lock` only after
+verifying the original process stopped. This upgrade CLI has no `--status`,
+`--confirm-provider-complete` or `--provider-reference` option; recovery decisions
+belong to the original Platform job. Setup-tool flags do not apply here.
+
+Platform unavailability blocks upgrades without suspending a healthy Shop. Data,
+queues, consent, owner, pairing and credentials remain intact. The BYO journal stays
+customer-local; Platform retains the authorized receipt, original checkpoint/review
+history and audit. Source promotion/frontend publication does not rewrite them.

@@ -1469,3 +1469,30 @@ final corrected c4 fingerprint, old-backend exact-lookup compatibility and retai
 promotion gates. These test/documentation changes do not invalidate packaged
 backend bytes or prior business/security tests. Final profile closure remains
 pending; no remote operation or deployment occurred.
+
+## 2026-10-27 — Approved support-v7 source selector and controlled-upgrade guide
+Branch: feature/shop-modernization-m2
+
+Source now selects the immutable support-v7 c4d210d0... fingerprint, backend source
+50b94931ecf743166136b2c562cbb6d2fbaebdc7, 39 migrations/seven unchanged Edge packages.
+Shop catalog agrees with Platform: v7 single fresh-approved, v6 historically supported,
+v5 unsupported. Historical packages, source SQL, JWT settings, pins and original
+jobs remain unchanged. Shared classifier incorporates PR6's independent drift/evidence
+and version-aware capability logic exactly; customer scripts gain no provider access.
+The authoritative CONTROLLED_BACKEND_UPGRADES guide covers exact installed-source
+assessment, Master approval/separate clearance, authorized customer apply, final
+evidence and original-request/journal recovery. Old ungated terminal Managed and
+uncleared BYO instructions are superseded. V6→v7 expects one SQL/zero changed functions.
+
+Normal cross-repo parity, immutable/source integrity, focused release/upgrade/clearance
+contracts and PR6 evidence/capability checks pass. Seven PowerShell blocks parse and
+upgrade flags match the real parser. A single isolated Platform PG17 policy fixture
+passes with original history preserved. Initial stale fixture assumptions were fixed;
+no production verification gate changed. No browser, benchmarks or full suite ran.
+
+Owner authorizes existing branches to be pushed and configured automatic Pages builds,
+without skip markers, ending in an empty deployment-trigger commit. Exact paired CI
+source, pushed identities/results are retained in M2 evidence. Both PRs remain Draft/
+Open; no merge, hosted Supabase write/function deployment or Shop upgrade is performed.
+Hosted activation and customer installation remain owner actions. Full source evidence
+limits, F22 deferral and other M2 acceptance obligations remain explicitly separate.

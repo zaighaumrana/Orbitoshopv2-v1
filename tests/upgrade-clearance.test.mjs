@@ -69,7 +69,7 @@ async function customer(options,check){
    return Response.json({job:kind==='check'?{}:ledger});
   };
   const invoke=a=>{if(a[0]==='--version')return '2.120.0';if(a.includes('--help'))return '--linked --project-ref --file --output-format --use-api --env-file';if(a[0]==='projects')return JSON.stringify([{id:identity.project_ref}]);if(a[0]==='functions'&&a[1]==='list')return JSON.stringify(target.functions.map(f=>({name:f.name,verify_jwt:f.verify_jwt})));assert.equal(a[0],'functions');assert.equal(a[1],'deploy');stats.writes++;return '{}';};
-  const query=async q=>{if(q.startsWith('begin;')){stats.writes++;history=target.migrations;return [];}assert.ok(q.startsWith('select '));if(q.includes('schema_migrations'))return history;if(q.includes('from public.shop_config'))return [observation.shop];return [{runtime:{owner_account:'active',checks:{database:true}}}];};
+  const query=async q=>{if(q.startsWith('begin;')){stats.writes++;history=target.migrations.slice(0,history.length+1);return [];}assert.ok(q.startsWith('select '));if(q.includes('schema_migrations'))return history;if(q.includes('from public.shop_config'))return [observation.shop];return [{runtime:{owner_account:'active',checks:{database:true}}}];};
   const run=()=>upgradeBackend(['--mode','byo','--project-ref',identity.project_ref,'--client-id','100','--from-sha',source.sha256,'--journal',journal,'--approval-file',approvalFile,'--platform-project-ref',platformRef,'--cli','C:/fixture/supabase.exe','--apply'],{fetch,invoke,query,confirm:async()=>`UPGRADE ${identity.project_ref} ${target.sha256}`,report:()=>{}});
   await check({run,stats,journal,original,dir});assert.equal(existsSync(journal+'.lock'),false);
  }finally{assert.equal(dirname(resolve(dir)),resolve(tmpdir()));assert.ok(basename(dir).startsWith('retrasell-clearance-'));rmSync(dir,{recursive:true,force:true});}
@@ -88,9 +88,9 @@ test('altered URL, fingerprints, plan, binding and original request are rejected
  for(const c of cases)await customer(c,async({run,stats,journal,original})=>{await assert.rejects(run(),c.pattern);assert.equal(stats.writes,0);assert.equal(stats.commands,0);if(original)assert.equal(readFileSync(journal,'utf8'),original);});
 });
 
-test('both clearance formats complete the mocked original three-step flow; expired, revoked and unauthorized clearance fail closed',async()=>{
+test('both clearance formats complete the mocked original approved flow; expired, revoked and unauthorized clearance fail closed',async()=>{
  for(const key of [modern,jwt()])await customer({key},async({run,stats,journal})=>{
-  const result=await run();assert.equal(result.state,'verification_required');assert.equal(result.verification.full_source_verified,false);assert.equal(result.verification.evidence_strength,'customer-reported');assert.equal(Object.keys(result.steps).length,3);assert.equal(stats.writes,3);assert.equal(stats.claims,2);assert.equal(JSON.parse(readFileSync(journal,'utf8')).request_id,request);
+  const result=await run();assert.equal(result.state,'verification_required');assert.equal(result.verification.full_source_verified,false);assert.equal(result.verification.evidence_strength,'customer-reported');assert.equal(Object.keys(result.steps).length,plan.steps.length);assert.equal(stats.writes,plan.steps.length);assert.equal(stats.claims,2);assert.equal(JSON.parse(readFileSync(journal,'utf8')).request_id,request);
  });
  for(const denied of [401,403,409])await customer({denied},async({run,stats,journal})=>{
   await assert.rejects(run(),error=>/clearance or pending-operation gate/.test(error.message)&&!error.message.includes('private provider detail'));assert.equal(stats.writes,0);assert.equal(stats.commands,0);const j=JSON.parse(readFileSync(journal,'utf8'));assert.equal(j.request_id,request);assert.equal(j.state,'claiming');
