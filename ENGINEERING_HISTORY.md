@@ -1549,3 +1549,31 @@ Only the failed multiline-stdin test harness was repaired and rerun through an i
 script file. No browser, broad suite, benchmark or Docker/SQL work was done. Existing
 Draft PR3 push and automatic Pages build are owner-authorized; no skip/empty trigger,
 merge, actual upgrade or hosted Supabase change is performed.
+
+## 2026-10-28 — Final M2 local pre-merge cleanup
+
+Owner reports 7/7 live Managed/BYO disposable-Shop functional checks accepted and
+both support-v7 controlled upgrades complete/recorded. This cleanup does not rerun
+or independently certify those operations, performance or deployed source.
+
+Removed operational temporary-branch dependencies from supported guides, source
+recovery/help, setup gating, links and CI triggers. Historical commit/source hashes,
+immutable releases and dated PR/engineering evidence are preserved. Broken audit
+links now use verified immutable merged snapshots. Root AGENTS uses durable
+main/development and pre-merge dependency-hygiene rules. Paired CI retains compatible
+immutable peer pins across either merge order and branch retirement; customer
+preflight still needs no private Platform checkout. The safe customer-reference
+handoff order is Shop PR3 then Platform PR6, using merge commits to preserve the
+approved backend source ancestry. No branch deletion is authorized.
+
+Focused UI/history, generated PowerShell syntax/reference, source-preflight, setup
+validation, paired v7 parity and narrow workflow checks pass. No broad/browser,
+performance, Docker or hosted Supabase work. V7 remains c4d210d0… / 39 migrations /
+7 functions / 9 requirements. Changes stay LOCAL/UNCOMMITTED pending explicit owner
+commit-and-push approval; merging requires another separate approval. Full results,
+exact files and acceptance attribution are in the single M2 final cleanup report.
+Publication authorization update: the owner explicitly approved Gate 1 for normal
+commits/pushes of the reviewed cleanup on both existing M2 branches, with automatic
+Pages builds. Exact commit/CI/deployment outcomes are recorded in the existing final
+cleanup report. STOP before merge; separate owner authorization is still required.
+No local/remote branches may be deleted. No additional feature/backend work authorized.

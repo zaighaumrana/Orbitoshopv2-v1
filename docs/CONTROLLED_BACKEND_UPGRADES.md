@@ -75,8 +75,8 @@ No package runner or hardcoded executable path is required.
 
 INTERNAL OPERATORS ONLY: npm run release:check imports the authoritative checker
 from a matching sibling orbito checkout or RETRASELL_PLATFORM_SOURCE override. Use
-reviewed feature/shop-modernization-m2 Shop and feature/shop-modernization-m2-release
-Platform source (or their explicitly reviewed compatible commits). Inspect both
+reviewed compatible development checkouts (or the explicitly reviewed immutable
+Shop/Platform commits recorded in the paired CI workflows). Inspect both
 remotes, branches, revisions and overrides first. The old verified-customer-support
 Platform branch selects v6/38 migrations against M2 Shop's 39 and must be blocked.
 Restore the compatible pairing while preserving local changes; never remove SQL,
@@ -258,3 +258,21 @@ Customer stages contain only customer release-preflight. Internal sibling Platfo
 parity/override instructions remain in the separate developer section above; private
 Platform source is not a customer prerequisite. Native Scoop/PATH tooling, exact
 Master approval, original request/clearance/journal and provider fences are unchanged.
+
+## Final M2 source and merge handoff — 28 October 2026
+
+Customer checkout guidance uses reviewed development or an explicitly approved
+immutable source revision; branch names alone never prove release integrity. The
+lower-level fresh setup helper uses existing customerReleasePreflight rather than
+an obsolete temporary-branch allowlist. Customer upgrade help links to development;
+private Platform source remains required only for internal paired CI, not customers.
+
+Paired workflows preserve existing immutable peer SHAs and run on PRs targeting
+development and pushes to development. Merge Shop PR #3 before Platform PR #6 using
+merge commits, retaining approved backend source ancestry; never squash away
+50b94931ecf743166136b2c562cbb6d2fbaebdc7. Before that Shop merge, keep the reviewed
+existing checkout/immutable tooling revision because development lacks M2 tools.
+Owner approval to commit/push and later separate approval to merge remain mandatory.
+No branch deletion is authorized. Existing support-v7 fingerprint and all historical
+packages/records remain unchanged. See the milestone final cleanup report and
+Platform docs/PR6_RELEASE_REPORTING_FIX.md for the complete transition handoff.
