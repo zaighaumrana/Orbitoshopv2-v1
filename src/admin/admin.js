@@ -1,3 +1,5 @@
+import {capturePrintChoice} from '../print/presentation.js'
+import {renderOperationalScreen} from '../ui-render.js'
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
 import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
 import { createSupportClient } from '../platform/support.js'
@@ -309,21 +311,23 @@ let _eventsAttached = false
 
 function render() {
   if (!adminNavigationIsCurrent() || !window.location.pathname.startsWith('/admin') || state.role !== SESSION.employee?.role) return
-  dstack('ADMIN.render', `*** #app REWRITE *** adminModule=${adminState.adminModule}`)
+  dstack('ADMIN.render', `Bounded shell/body/modal patch adminModule=${adminState.adminModule}`)
   const tenant = currentTenant()
   if (!can(adminState.adminModule, state.role)) adminState.adminModule = 'dashboard'
-  const _modalScroll = document.querySelector('.modal')?.scrollTop || 0
 
-  document.getElementById('app').innerHTML = `
+  renderOperationalScreen(`
     <div class="app-shell client-shell">
       <main class="main">
         <header class="topbar">
+          <div class="rs-identities">
+            <a class="rs-product" href="/" aria-label="RetraSell POS"><img class="rs-logo-light" src="/brand/logos/retrasell-horizontal-primary.svg" alt="RetraSell"><img class="rs-logo-dark" src="/brand/logos/retrasell-horizontal-reversed.svg" alt="RetraSell"></a>
           <div class="brand top-brand">
             <div class="logo">${tenant.logo ? `<img alt="" src="${escapeHTML(safeImageURL(tenant.logo))}">` : escapeHTML(tenant.name.slice(0,2).toUpperCase())}</div>
             <div>
               <strong>${escapeHTML(tenant.name)}</strong>
               <span class="muted" style="font-size:12px">${escapeHTML(state.role)} · Back Office</span>
             </div>
+          </div>
           </div>
           <div class="top-actions">
             <select class="tenant-switcher compact-select" data-action="admin-module">
@@ -355,17 +359,13 @@ function render() {
         <section class="content">${pageContent()}</section>
       </main>
     </div>
-    ${renderModal()}`
+    ${renderModal()}`, {screen:'admin',view:adminState.adminModule+':'+(adminState.settingsTab||''),modal:state.modal})
 
   normalizeModalControls(document.getElementById('app'))
 
   if (!_eventsAttached) {
     attachEvents()
     _eventsAttached = true
-  }
-  if (_modalScroll) {
-    const m = document.querySelector('.modal')
-    if (m) m.scrollTop = _modalScroll
   }
   if(restoreScroll!==null){const scroll=restoreScroll;restoreScroll=null;requestAnimationFrame(()=>{if(adminNavigationIsCurrent())window.scrollTo(0,scroll)})}
   saveNavigation()
@@ -601,7 +601,7 @@ function settingsTabContent() {
       ${fld('Business Name','name',t.name)}
       ${fld('Description','businessDescription',CFG.shop_description||'')}
       ${fld('Primary Color','primaryColor',t.primaryColor,'color')}
-      ${fld('Secondary Color','secondaryColor',t.secondaryColor,'color')}
+      ${fld('Secondary Color','secondaryColor',t.secondaryColor,'color')}<p class="muted rs-brand-note">Saved colors identify your business. The app derives readable accents for each theme; product actions, status colors and focus indicators stay RetraSell.</p>
       <label class="field"><span>Logo Upload</span><input name="logo" type="file" accept="image/*"></label>
       <div class="modal-actions" style="grid-column:1/-1"><button class="primary-button">Save Branding</button></div>
     </form>`
@@ -738,7 +738,7 @@ function renderModal() {
         ${fld('Full Name','name')}
         ${fld('Email','email','','email')}
         <label class="field"><span>Password</span>
-          <div style="display:flex;gap:6px">
+          <div class="rs-compound">
             <input name="password" type="password" style="flex:1">
             <button type="button" class="secondary-button" data-action="gen-employee-password" style="white-space:nowrap">Generate</button>
           </div>
@@ -816,6 +816,7 @@ function attachEvents() {
   })
   // Click delegation
   listenOwned(app,'click',ownsAdmin,async (e,eventCurrent)=>{
+    const printChoice=capturePrintChoice(e.target,e.type,e)
     if(e.target.closest('[data-action="retry-admin-udhar"]')||(state.modal?.type==='udharList'&&state.modal.readStatus&&e.target.closest('[data-action="retry-resources"]'))){await openAdminUdhar();return}
     if(e.target.closest('[data-action="retry-resources"]')){await load();return}
     if (!can(adminState.adminModule, state.role) || !modalEntitled(state.modal?.type)) return
@@ -896,7 +897,7 @@ function attachEvents() {
       dlog('ADMIN.click', `PRINT-TICKET-SLIP branch firing -- state.modal.ticket=${JSON.stringify(state.modal?.ticket?.ticket_number)}`)
       if (state.modal?.ticket) {
         const { buildTicketSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
-        printThermal(buildTicketSlip(state.modal.ticket))
+        printThermal(buildTicketSlip(state.modal.ticket), printChoice)
       }
       return
     }
@@ -904,7 +905,7 @@ function attachEvents() {
       const summary = (await viewAwait(eventCurrent,()=>(getRepairFamilySummary(Number(el.dataset.ticketId))),()=>state.modal)).data
       if (!summary) { showBlockingError('Repair summary is unavailable.'); return }
       const { buildRepairSummary, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
-      printThermal(buildRepairSummary(summary)); return
+      printThermal(buildRepairSummary(summary), printChoice); return
     }
 
     if (el.dataset.kpiTarget) {
@@ -1061,7 +1062,7 @@ function attachEvents() {
       if (!res.ok) { showBlockingError(res.error); return }
       if (res.ticket) {
         const {buildSubInvoiceSlip,printThermal} = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
-        printThermal(buildSubInvoiceSlip(res.ticket,tk))
+        printThermal(buildSubInvoiceSlip(res.ticket,tk), printChoice)
       }
       if (state.modal === modal) state.modal = null
       await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
@@ -1089,7 +1090,7 @@ function attachEvents() {
         const root = state.data.tickets.find(t=>!t.parent_ticket_id && String(t.id)===String(result.proposal.root_ticket_id))
         if (root) {
           const { buildSubInvoiceSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
-          printThermal(buildSubInvoiceSlip(result.ticket, root))
+          printThermal(buildSubInvoiceSlip(result.ticket, root), printChoice)
         }
       }
       showTransactionSuccess(`Additional work ${decision.toLowerCase()}.`)
@@ -1261,7 +1262,7 @@ function attachEvents() {
         labour:sale.labour_cost||0, discount:sale.discount||0, tax:sale.tax||0,
         total:sale.total_bill||0, payment:sale.payment_method||'—',
       }
-      printThermal(buildReceiptSlip(reprSale, true)); return
+      printThermal(buildReceiptSlip(reprSale, true), printChoice); return
     }
 
     if (el.dataset.action === 'print-repair-invoice') {
@@ -1271,9 +1272,9 @@ function attachEvents() {
       if (ticket.parent_ticket_id) {
         const parent = state.data.tickets.find(item => String(item.id) === String(ticket.parent_ticket_id))
         if (!parent) { showBlockingError('Parent repair record not found.'); return }
-        printThermal(buildSubInvoiceSlip(ticket, parent))
+        printThermal(buildSubInvoiceSlip(ticket, parent), printChoice)
       } else {
-        printThermal(buildTicketSlip(ticket))
+        printThermal(buildTicketSlip(ticket), printChoice)
       }
       return
     }
@@ -1482,6 +1483,7 @@ function attachEvents() {
 
   // Submit
   listenOwned(app,'submit',ownsAdmin,async (e,eventCurrent)=>{
+    const printChoice=capturePrintChoice(e.target,e.type,e)
     if (!can(adminState.adminModule, state.role) || !modalEntitled(state.modal?.type)) { e.preventDefault(); return }
     if (!window.location.pathname.startsWith('/admin')) return
     e.preventDefault()

@@ -1,3 +1,5 @@
+import {capturePrintChoice} from '../print/presentation.js'
+import {renderOperationalScreen} from '../ui-render.js'
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
 import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
 import { escapeHTML, safeImageURL } from '../html.js'
@@ -135,17 +137,18 @@ async function openWorkshopEditor(id) {
 function render() {
   if(!ownsWorkshop())return
   if (window.location.pathname !== '/workshop' || !can('workshop', state.role) || state.role !== SESSION.employee?.role) return
-  dstack('WORKSHOP.render', '*** #app REWRITE ***')
+  dstack('WORKSHOP.render', 'Bounded shell/body/modal patch')
   if (!SESSION.employee) { navigate('/login'); return }
 
   const tenant = currentTenant()
   const isAdmin = SESSION.isAdmin || state.role === 'Business Owner'
-  const _modalScroll = document.querySelector('.modal')?.scrollTop || 0
 
-  document.getElementById('app').innerHTML = `
+  renderOperationalScreen(`
     <div class="app-shell client-shell">
       <main class="main">
         <header class="topbar">
+          <div class="rs-identities">
+            <a class="rs-product" href="/" aria-label="RetraSell POS"><img class="rs-logo-light" src="/brand/logos/retrasell-horizontal-primary.svg" alt="RetraSell"><img class="rs-logo-dark" src="/brand/logos/retrasell-horizontal-reversed.svg" alt="RetraSell"></a>
           <div class="brand top-brand">
             <div class="logo">
               ${tenant.logo
@@ -158,6 +161,7 @@ function render() {
                 ${escapeHTML(state.role)} · Workshop
               </span>
             </div>
+          </div>
           </div>
           <div class="top-actions">
             <span class="chip">
@@ -186,17 +190,13 @@ function render() {
         <section class="content">${workshopView()}</section>
       </main>
     </div>
-    ${renderModal()}`
+    ${renderModal()}`, {screen:'workshop',view:'workshop',modal:state.modal})
 
   normalizeModalControls(document.getElementById('app'))
 
   if (!_eventsAttached) {
     attachEvents()
     _eventsAttached = true
-  }
-  if (_modalScroll) {
-    const m = document.querySelector('.modal')
-    if (m) m.scrollTop = _modalScroll
   }
 }
 
@@ -531,6 +531,7 @@ function attachEvents() {
 
   /* ── Click ── */
   listenOwned(app,'click',ownsWorkshop,async (e,eventCurrent)=>{
+    const printChoice=capturePrintChoice(e.target,e.type,e)
     if(state.modal?.readStatus&&e.target.closest('[data-action="retry-resources"]')){await openWorkshopEditor(state.modal.id);return}
     if(e.target.closest('[data-action="retry-resources"]')){await load();return}
     if (!can('workshop', state.role) || !modalEntitled(state.modal?.type)) return
@@ -746,7 +747,7 @@ function attachEvents() {
       if (!res.ok) { showBlockingError(res.error); return }
       if (res.ticket) {
         const {buildSubInvoiceSlip,printThermal} = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
-        printThermal(buildSubInvoiceSlip(res.ticket,tk))
+        printThermal(buildSubInvoiceSlip(res.ticket,tk), printChoice)
       }
       if (state.modal === modal) state.modal = null
       await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
@@ -757,6 +758,7 @@ function attachEvents() {
 
   /* ── Submit ── */
   listenOwned(app,'submit',ownsWorkshop,async (e,eventCurrent)=>{
+    const printChoice=capturePrintChoice(e.target,e.type,e)
     if (!can('workshop', state.role) || !modalEntitled(state.modal?.type)) { e.preventDefault(); return }
     if (!window.location.pathname.startsWith('/workshop')) return
     e.preventDefault()

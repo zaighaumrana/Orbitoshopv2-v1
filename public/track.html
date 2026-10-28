@@ -329,17 +329,21 @@
       button.track-btn { width: 100%; }
     }
   </style>
+<link rel="stylesheet" href="/brand/retrasell-shop.css">
+<link rel="icon" href="/brand/favicons/retrasell-favicon-gradient-32.png">
+<script src="/brand/merchant-accent.js"></script>
 </head>
-<body>
+<body class="rs-tracker">
 
 <div class="container">
 
   <!-- Shop branding — filled by JS -->
   <div class="logo-wrap" id="shop-brand">
-    <div class="shop-name" id="shop-name">RetailOS</div>
+    <div class="shop-name" id="shop-name">Your Shop</div>
     <div class="tagline">Repair Status Tracker</div>
   </div>
 
+  <p class="rs-tracker-product"><img src="/brand/logos/retrasell-icon-primary.svg" alt=""> Repair tracking by RetraSell</p>
   <!-- Search -->
   <div class="card search-card">
     <h2>Track Your Repair</h2>
@@ -458,11 +462,12 @@
     }
 
     if (data.primary_color) {
-      document.documentElement.style.setProperty('--primary', data.primary_color)
+      const accent = globalThis.RetraSellBrand.derive(data.primary_color, 'light')
+      for (const [name,value] of Object.entries(accent)) document.body.style.setProperty('--merchant-'+name,value)
     }
 
-    document.getElementById('shop-name').textContent = data.shop_name || 'RetailOS'
-    document.title = `Track Repair — ${data.shop_name || 'RetailOS'}`
+    document.getElementById('shop-name').textContent = data.shop_name || 'Your Shop'
+    document.title = `Track Repair — ${data.shop_name || 'Your Shop'}`
 
     if (data.shop_logo) {
       const img = document.createElement('img')

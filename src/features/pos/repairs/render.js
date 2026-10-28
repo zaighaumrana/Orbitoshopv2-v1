@@ -115,7 +115,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
             data-pick-comp="${escapeHTML(c.name)}">${escapeHTML(c.name)}</button>`).join('')}
       </div>
 
-      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:end">
+      <div class="rs-compound" style="margin-bottom:12px;align-items:end">
         <label class="field" style="flex:1"><span>Custom component name</span>
           <input id="intake-custom-comp-name" class="search" placeholder="Custom component name">
         </label>
@@ -125,7 +125,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
       ${draft.components.length ? `
         <div style="display:grid;gap:8px;margin-bottom:12px">
           ${draft.components.map((c,i) => `
-            <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;
+            <div class="rs-component-row" style="
                         padding:8px;background:var(--surface-2);border-radius:8px">
               <div>
                 <strong style="font-size:13px">${escapeHTML(c.name)}</strong><br>

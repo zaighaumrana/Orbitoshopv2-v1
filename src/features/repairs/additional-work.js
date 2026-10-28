@@ -25,7 +25,7 @@ export function createSubInvoiceModalHTML(modal, {technician = false, workshop =
         <div style="display:grid;gap:8px;margin-bottom:14px">
           <strong style="font-size:13px">Additional Components</strong>
           ${draft.length ? draft.map((c,i) => `
-            <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
+            <div class="rs-component-row">
               <div>
                 <span style="font-size:13px"><strong>${escapeHTML(c.name)}</strong></span>
                 <span class="badge warn" style="font-size:11px;margin-left:6px">${escapeHTML(c.tag || '')}</span>
@@ -46,7 +46,7 @@ export function createSubInvoiceModalHTML(modal, {technician = false, workshop =
             ${compDefs.map(c => `<button type="button" class="secondary-button" style="font-size:12px;padding:5px 12px"
               data-add-draft-comp-name="${escapeHTML(c.name)}">${escapeHTML(c.name)}</button>`).join('')}
           </div>
-          <div style="display:flex;gap:8px">
+          <div class="rs-compound">
             <input id="custom-comp-name" class="search" placeholder="Custom component name" style="flex:1">
             <button type="button" class="secondary-button" data-action="add-custom-draft-comp">+ Add</button>
           </div>

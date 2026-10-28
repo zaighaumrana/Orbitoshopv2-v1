@@ -96,10 +96,10 @@ export function catalogTabContent(adminState) {
 }
 
 export function qiVariantRowHTML() {
-  return `<div data-variant-row style="display:flex;gap:8px;margin-bottom:8px">
-    <input class="search" name="variantName[]" placeholder="Brand/Variant name (optional)" style="flex:2;min-width:0">
-    <input type="number" step="any" min="0" name="variantPrice[]" placeholder="Price" class="search" style="flex:1;min-width:0">
-    <button type="button" class="secondary-button" data-action="remove-variant-row" style="color:var(--danger)">×</button>
+  return `<div data-variant-row class="quick-variant-row">
+    <label class="field"><span>Variant name (optional)</span><input class="search" name="variantName[]" placeholder="Brand/Variant name"></label>
+    <label class="field"><span>Price</span><input type="number" step="any" min="0" name="variantPrice[]" placeholder="Price" class="search"></label>
+    <button type="button" class="secondary-button" aria-label="Remove this variant" data-action="remove-variant-row" style="color:var(--danger)">×</button>
   </div>`
 }
 
@@ -112,7 +112,7 @@ export function addQuickItemModalHTML() {
     <p class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px">
       Variants (brand/name optional, price required)
     </p>
-    <div id="qi-variant-rows">${qiVariantRowHTML()}</div>
+    <div id="qi-variant-rows" data-ui-preserve-children>${qiVariantRowHTML()}</div>
     <button type="button" class="secondary-button" data-action="add-variant-row">+ Add Another Variant</button>
     ${modalActions()}
   </form></div>`
