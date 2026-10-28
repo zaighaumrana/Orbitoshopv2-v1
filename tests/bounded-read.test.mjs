@@ -1,11 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readPage,readComplete,readPreview,searchColumns} from '../src/bounded-read.js';
+import {readPage,readComplete,readPreview,searchColumns,pageControls} from '../src/bounded-read.js';
 
 function fixture(length,cap=1000){
  const rows=Array.from({length},(_,id)=>({id,name:'same timestamp/name'}));const calls=[];
  return {rows,calls,query:()=>({range:async(from,to)=>{calls.push([from,to]);return {data:rows.slice(from,Math.min(to+1,from+cap)),count:rows.length,error:null}}})};
 }
+
+test('numbered pagers keep previous/count/next order and original boundary actions',()=>{
+ assert.equal(pageControls(null),'');
+ const empty=pageControls({data:[],offset:0,count:0,hasMore:false},'data-admin-page');
+ assert.match(empty,/data-admin-page="previous" disabled/);assert.match(empty,/data-admin-page="next" disabled/);assert.match(empty,/0–0 of 0 matching records/);
+ const first=pageControls({data:[1,2],offset:0,count:3,hasMore:true},'data-stock-page');
+ assert.ok(first.indexOf('>Previous<')<first.indexOf('rs-pagination-summary')&&first.indexOf('rs-pagination-summary')<first.indexOf('>Next<'));
+ assert.match(first,/data-stock-page="previous" disabled/);assert.doesNotMatch(first,/data-stock-page="next" disabled/);assert.match(first,/1–2 of 3 matching records/);
+ const last=pageControls({data:[3],offset:2,count:3,hasMore:false},'data-collection-page');
+ assert.doesNotMatch(last,/data-collection-page="previous" disabled/);assert.match(last,/data-collection-page="next" disabled/);assert.match(last,/3–3 of 3 matching records/);
+});
 test('existing-query paging reaches cap boundaries and old selected rows without gaps/duplicates',async()=>{
  for(const count of [999,1000,1001,10000]){
   const f=fixture(count),all=await readComplete(f.query,{size:100,maxRows:10000});assert.equal(all.data.length,count);assert.equal(all.data.at(-1).id,count-1);assert.ok(f.calls.every(([a,b])=>b-a<100));

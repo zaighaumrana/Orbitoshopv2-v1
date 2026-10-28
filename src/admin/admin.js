@@ -571,7 +571,7 @@ function settings() {
 
 function catalog() {
   const isAllowed = state.role === 'Business Owner' || SESSION.isAdmin || state.role === 'Manager'
-  return catalogPage({ tit, adminState, isAllowed })+tlb('Search this catalog…')
+  return catalogPage({ tit, tlb, adminState, isAllowed })
 }
 
 function settingsTabContent() {

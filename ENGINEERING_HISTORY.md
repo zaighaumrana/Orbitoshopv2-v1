@@ -1670,3 +1670,50 @@ operation. Backend/support-v7 unchanged. Existing retrabyo preview missing-varia
 failure is separate provider configuration, not repaired here. Physical printer,
 actual device keyboard, independent audit and final owner acceptance remain pending.
 Do not publish until explicit owner authorization; production follows this branch.
+
+
+## 2026-10-29 — live-review Support styling and Catalog action placement (local)
+Branch: feature/shop-modernization-m3
+
+### Purpose and changes
+Owner screenshots showed that centering Support still differed from Billing/Settings.
+Superseded the bounded-center presentation with full-workspace standard cards and
+inherited workspace spacing. Moved the request heading into its form card and grouped
+history/detail/refresh/pagination in a card; card headings use the shared h2 style.
+The shared stylesheet changed only in the Support wrapper. Owner also requested
+Catalog search above content in both tabs and Add Quick Item above the item list.
+Passed the existing search-toolbar helper into the Catalog renderer and moved the
+unchanged add action into its card header. Existing IDs, callbacks, fields, retry,
+consent, access rules, filter state, paging and business operations are preserved.
+
+### Validation and boundaries
+Focused local Support/Billing style comparison at desktop/light and mobile/dark;
+owner/manager/pending control signatures equal the published ancestor. Four real-entry
+Catalog geometries pass; existing filters/clear/Add dialog work without business writes.
+Selected escaping and protected-source/artwork checks, JS/CSS syntax and one build pass.
+An initial fixture omitted client-shell; retained as invalid, corrected before accepting
+desktop evidence. No broad suites, hosted Supabase, Platform, release or print changes.
+No push/build trigger/deployment; these follow-up edits await publication authorization.
+Independent review and owner final acceptance remain pending. Evidence is in the
+existing M3 archive's 20261029-support-style and 20261029-catalog-placement folders.
+
+
+## 2026-10-29 — consistent numbered pagination throughout Shop (local)
+Branch: feature/shop-modernization-m3
+
+Owner identified the same count-left/Previous-middle layout in multiple sections.
+The shared pageControls used generic toolbar flex spacing and count-first markup.
+Reordered only its presentation to Previous/count/Next and added authenticated,
+shared three-column styling with equal side tracks, centered/wrapping summaries
+and edge-aligned buttons. Support's separate pager opts into the same class.
+Admin lists, POS lists/repair collection, Workshop and EMS callers inherit the fix.
+No offsets, size/count calculations, read queries, callbacks, guards or disabled
+conditions changed. Receipt detail's unnumbered document navigation is unchanged.
+
+A selected boundary/action/order unit check and real-template browser geometry at
+1280/320px pass: both pager types preserve left/center/right alignment, balanced
+vertical positioning and no overflow. Existing Support control/consent comparisons
+pass, as do syntax, protected-source/artwork boundary and the updated build.
+No broad suites, hosted writes, Platform/backend/print changes, push or deployment.
+This adds to the unpublished Support/Catalog refinements; owner publication,
+independent review and final acceptance remain separate gates.

@@ -105,8 +105,26 @@ from finance/status/operations. Body content can scroll while existing completio
 actions remain visible. Narrow screens stack the sections.
 
 The merchant tile uses containment, generous padding and a quiet white image bed
-without the former accent border. Support's existing single bounded width rule now
-centers the complete region; submission, history, guidance and owner approvals remain
-inside that wrapper. No Support behavior or permission changed. These corrections
-remain local until separately authorized for publication, because the M3 branch now
-feeds production. The approved empty build-trigger commit is an expected ancestor.
+without the former accent border. The first Support correction centered the bounded
+region. Owner live review then superseded that presentation: Support now follows
+Billing/Settings with full-workspace cards, shared spacing and card headings. The
+request heading is inside its card; history/details/refresh/pagination share a card;
+guidance and owner approval remain separate standard cards. Behavior is unchanged.
+Catalog search sits between its tabs and content, using the existing toolbar; Add
+Quick Item sits in its card header above the items. Search state, paging, IDs and
+handlers are unchanged. The five original corrections were published at 1c744bb;
+these subsequent Support/Catalog refinements remain local pending publication
+authorization because the M3 branch feeds production.
+
+
+## Shared numbered pagination — 29 October owner follow-up
+
+The shared pageControls renderer now emits Previous, count, Next in that order,
+with a dedicated rs-pagination class. Authenticated Shop styles use equal side
+columns so the count remains mathematically centered, with Previous at the left
+edge and Next at the right. Support history uses the same layout class. Counts,
+data-action attributes, offsets, page sizes, disabled/hasMore decisions and query
+behavior are unchanged. Coverage includes paged Admin sections (Repairs, Catalog,
+Inventory, Receipts and Employees), EMS history/slips, POS stock/quick items/repair
+collection and Workshop. Receipt detail's unnumbered adjacent-document navigation
+is separate from list pagination and stays unchanged. These follow-ups remain local.

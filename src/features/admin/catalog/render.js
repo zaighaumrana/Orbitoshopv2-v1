@@ -21,7 +21,7 @@ import { escapeHTML } from "../../../html.js"
 ═══════════════════════════════════════════════════════════════════ */
 import { state, CFG, money, moneyHTML, fld, modalActions } from '../../../shared.js'
 
-export function catalogPage({ tit, adminState, isAllowed }) {
+export function catalogPage({ tit, tlb, adminState, isAllowed }) {
   if (!isAllowed)
     return `<div class="card"><p class="muted">Catalog is available to Managers and the Business Owner only.</p></div>`
   const tabs = { quickitems:'Quick Items', ...(CFG.repair_module_enabled ? { components:'Components' } : {}) }
@@ -33,6 +33,7 @@ export function catalogPage({ tit, adminState, isAllowed }) {
         `<button class="settings-tab ${adminState.catalogTab===k?'active':''}" data-catalog-tab="${k}">${l}</button>`
       ).join('')}
     </div>
+    ${tlb('Search this catalog…')}
     ${catalogTabContent(adminState)}`
 }
 
@@ -63,7 +64,7 @@ export function catalogTabContent(adminState) {
     const items = state.data.quickItems || []
     return `
       <div class="card" style="display:grid;gap:16px">
-        <div><h2>Quick Sale Items</h2></div>
+        <div class="toolbar"><h2>Quick Sale Items</h2><button class="primary-button" data-action="open-add-quick-item">+ Add Quick Item</button></div>
         ${items.map((item,i) => `
           <div style="padding:12px;background:var(--surface-2);border-radius:8px;display:grid;gap:8px">
             <div style="display:flex;justify-content:space-between;align-items:center">
@@ -90,7 +91,6 @@ export function catalogTabContent(adminState) {
               <button type="button" class="secondary-button" data-add-qprice="${i}">+ Add</button>
             </div>
           </div>`).join('')}
-        <button class="primary-button" data-action="open-add-quick-item">+ Add Quick Item</button>
       </div>`
   }
 }

@@ -49,7 +49,7 @@ export async function runOwnerAcceptance({page,origin,output}){
  for(const [width,theme]of [[1280,'light'],[390,'dark']]){
   await page.setViewportSize({width,height:900});await page.goto(origin+'/admin/customer-support?fixtureAuth=signed&fixtureRole=Business%20Owner');await page.locator('.support-page').waitFor();
   await page.evaluate(async theme=>{const {state,applyBranding}=await import('/src/shared.js');state.theme=theme;applyBranding();},theme);
-  const r=await page.locator('.support-page').evaluate(node=>{const r=node.getBoundingClientRect(),p=node.parentElement.getBoundingClientRect(),style=getComputedStyle(node.parentElement);return {left:r.left,right:r.right,width:r.width,workspaceLeft:p.left+parseFloat(style.paddingLeft),workspaceRight:p.right-parseFloat(style.paddingRight),scroll:document.documentElement.scrollWidth,viewport:innerWidth};});assert.ok(Math.abs((r.left-r.workspaceLeft)-(r.workspaceRight-r.right))<1);assert.ok(r.width<=1100&&r.scroll<=width+1);result.support.push({theme,...r});
+  const r=await page.locator('.support-page').evaluate(node=>{const r=node.getBoundingClientRect(),p=node.parentElement.getBoundingClientRect(),style=getComputedStyle(node.parentElement);return {left:r.left,right:r.right,width:r.width,workspaceLeft:p.left+parseFloat(style.paddingLeft),workspaceRight:p.right-parseFloat(style.paddingRight),scroll:document.documentElement.scrollWidth,viewport:innerWidth};});assert.ok(Math.abs(r.left-r.workspaceLeft)<1&&Math.abs(r.right-r.workspaceRight)<1,'Support uses the same workspace edges as other Admin sections');assert.ok(r.scroll<=width+1);result.support.push({theme,...r});
  }
  const variants=['absent','square','wide','transparent','white-background','large'];
  for(const [i,name]of variants.entries()){

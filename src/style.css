@@ -921,7 +921,7 @@ body .app-dialog { width: min(480px, 100%); border-radius: 8px; max-height: 92vh
 }
 
 /* Help & Support only; shared tokens/components retain their existing defaults. */
-.support-page { display: grid; align-content: start; align-self: start; gap: var(--space-4); width: 100%; max-width: 1100px; margin-inline:auto; min-width: 0; line-height: 1.5; overflow-wrap: anywhere; }
+.support-page { display: grid; align-content: start; align-self: start; gap: inherit; width: 100%; min-width: 0; line-height: 1.5; overflow-wrap: anywhere; }
 .support-page .support-heading, .support-page .support-section { display: grid; align-content: start; gap: var(--space-3); min-width: 0; }
 .support-page .support-heading { gap: var(--space-1); }
 .support-page h4, .support-page p { margin: 0; }

@@ -62,5 +62,5 @@ export function searchColumns(query,columns,value) {
 
 export function pageControls(page,attribute='data-read-page') {
   if(!page)return ''
-  return `<div class="toolbar" role="group" aria-label="List pages"><span class="muted">${page.data.length? page.offset+1:0}–${page.offset+page.data.length} of ${page.count} matching records</span><button type="button" class="secondary-button" ${attribute}="previous" ${page.offset?'':'disabled'}>Previous</button><button type="button" class="secondary-button" ${attribute}="next" ${page.hasMore?'':'disabled'}>Next</button></div>`
+  return `<div class="rs-pagination" role="group" aria-label="List pages"><button type="button" class="secondary-button" ${attribute}="previous" ${page.offset?'':'disabled'}>Previous</button><span class="muted rs-pagination-summary">${page.data.length? page.offset+1:0}–${page.offset+page.data.length} of ${page.count} matching records</span><button type="button" class="secondary-button" ${attribute}="next" ${page.hasMore?'':'disabled'}>Next</button></div>`
 }
