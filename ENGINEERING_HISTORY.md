@@ -1630,3 +1630,43 @@ F22 retains its existing bounded deferral. F18 has a local implemented correctio
 ### Git
 Reviewable local checkpoints use [CF-Pages-Skip]. Publication and Draft PR require
 separate owner approval; all later PRs target development. No branch deletion.
+
+
+## 2026-10-29 — M3 owner visual acceptance corrections (local)
+Branch: feature/shop-modernization-m3
+
+### Purpose and decisions
+Implement M3-OA-01–05 from owner visual review. Safely fast-forwarded the clean feature
+branch to approved empty ancestor 9f74a8fff4d37424c31d8ba9bd942523e659a8b6.
+D05's optional/default-off presentation is expressly superseded: every supported
+printed document now receives the small approved local RetraSell logo and plain
+Powered by RetraSell footer automatically. Original D05 rationale remains historical.
+This removes only print attribution choice; Support consent/PIN/financial approval
+and authorization remain unchanged.
+
+### Changed
+Removed retired checkbox/event-choice logic from POS/Admin/EMS/Workshop and shared
+normalization. The idempotent shared footer covers six builders, receipt/ticket
+previews, shift output and direct queued printing, before existing image readiness,
+height measurement and copies. Merchant terms, amounts, IDs, barcodes and reprint
+markers remain. Refined merchant logo containment/padding and removed accent borders.
+New Repair uses wide information/issue panels with the owner's full-width bottom
+finance tile: labour/quote, centered payments, balance. Existing Admin repair detail
+separates repair/history from finance/status/operations. Existing fields, draft state
+and actions are retained; narrow layouts stack and actions stay reachable. Centered
+Support with its single existing maximum-width rule; no Support logic changes.
+
+### Validation
+Only the focused M3 owner fixture, automatic print/unit comparisons, short existing
+repair draft checks, source/artwork and JS/CSS syntax checks, plus one application
+build. Exact results, four dialog geometries, Support alignment, logo variants, one
+matched login comparison and real print-renderer height/copy evidence are recorded
+in the M3 owner-acceptance archive. No broad M1/M2 matrix or benchmarks.
+
+### Impact and gates
+Local implementation/commits only, with [CF-Pages-Skip]. No push, CI dispatch, build
+trigger at Cloudflare, manual deployment, Platform modification or hosted Supabase
+operation. Backend/support-v7 unchanged. Existing retrabyo preview missing-variable
+failure is separate provider configuration, not repaired here. Physical printer,
+actual device keyboard, independent audit and final owner acceptance remain pending.
+Do not publish until explicit owner authorization; production follows this branch.

@@ -1,4 +1,3 @@
-import {normalizePrintControls} from './print/presentation.js'
 import { escapeHTML } from "./html.js"
 import { SHORT_BRAND_NAME } from './config/brand.js'
 import { helpLink } from './legal/links.js'
@@ -1077,7 +1076,6 @@ document.addEventListener('keydown', handlePinPromptKeyboard)
 
 /** Add the global explicit close control after each module render. */
 export function normalizeModalControls(root = document) {
-  normalizePrintControls(root)
   root.querySelectorAll('.modal-backdrop > .modal').forEach(modal => {
     const pin=modal.classList.contains('pin-prompt')
     ownDialog(modal,{

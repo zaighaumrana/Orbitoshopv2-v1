@@ -1,3 +1,4 @@
+import {runOwnerAcceptance} from './helpers/m3-owner-acceptance.mjs';
 // One loopback-only M3 harness. Real Shop entry/renderers; synthetic SDK/Turnstile.
 // Baseline login is captured BEFORE changes; no hosted identity or business writes.
 import {createServer} from 'vite';
@@ -21,6 +22,7 @@ const renderOnly=process.argv.includes('--render-only');
 const measureOnly=process.argv.includes('--measure-only');
 const surfaceOnly=process.argv.includes('--surface-only');
 const zoom=process.argv.includes('--zoom-only');
+const ownerAcceptance=process.argv.includes('--owner-acceptance');
 const output=baseline?rootOutput:join(rootOutput,process.env.M3_RUN_LABEL||new Date().toISOString().replaceAll(/[:.]/g,'-'));
 await mkdir(output,{recursive:true});
 const result={source:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),provenance:'author-run loopback Chrome; synthetic SDK/Turnstile; external requests blocked',login:[],geometry:[],screens:[],errors:[],external:[]};
@@ -56,7 +58,7 @@ try{
  });
  page=await context.newPage();page.setDefaultTimeout(12000);page.on('pageerror',error=>result.errors.push(error.message));
  const properties=['fontFamily','fontSize','fontWeight','lineHeight','color','backgroundColor','backgroundImage','borderColor','borderRadius','padding','margin','width','height','display','gap','position','transform','boxShadow','animationName','animationDuration','animationDelay','transitionProperty','transitionDuration'];
- const cases=zoom?[{width:1280,height:900,theme:'light',motion:'no-preference'}]:[...['light','dark'].flatMap(theme=>[320,390,768,1280,1440].map(width=>({width,height:900,theme,motion:'no-preference'}))),{width:1280,height:500,theme:'light',motion:'no-preference'},{width:390,height:700,theme:'dark',motion:'reduce'}];
+ const cases=(zoom||ownerAcceptance)?[{width:1280,height:900,theme:'light',motion:'no-preference'}]:[...['light','dark'].flatMap(theme=>[320,390,768,1280,1440].map(width=>({width,height:900,theme,motion:'no-preference'}))),{width:1280,height:500,theme:'light',motion:'no-preference'},{width:390,height:700,theme:'dark',motion:'reduce'}];
  for(const entry of renderOnly||measureOnly?[]:cases){
   if(!zoom)await page.setViewportSize({width:entry.width,height:entry.height});await page.emulateMedia({reducedMotion:entry.motion});
   await page.addInitScript(theme=>localStorage.setItem('retailos-theme',theme),entry.theme);
@@ -103,7 +105,7 @@ try{
   await page.goto(origin+'/pos?fixtureAuth=signed&fixtureRole=Business%20Owner');await page.locator('[data-inv-pos-add="1"]:enabled').click();await page.locator('[data-cash-tendered]').fill('200');await page.locator('[data-qty][data-delta="1"]').click();assert.equal(await page.locator('[data-cash-tendered]').inputValue(),'200');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   result.zoomResult='PASS: actual Chrome 200% page zoom, unchanged login, bounded Quick Item, Tab/Shift+Tab wrap, Escape policy and POS tender/cart reflow';
  }
- if(!baseline&&!measureOnly&&!zoom){
+ if(!baseline&&!measureOnly&&!zoom&&!ownerAcceptance){
   const setTheme=async theme=>page.evaluate(async theme=>{const {state,applyBranding}=await import('/src/shared.js');state.theme=theme;applyBranding();},theme);
   if(!surfaceOnly){
   await page.setViewportSize({width:1280,height:900});await page.emulateMedia({reducedMotion:'no-preference'});
@@ -204,8 +206,7 @@ try{
   await page.goto(origin+'/admin/receipts?fixtureAuth=signed&fixtureRole=Business%20Owner&boundedReads=1');
   await page.locator('[data-action="open-receipt-modal"]').filter({hasText:'INV-1'}).click();await page.getByText('Persisted exact line',{exact:true}).waitFor();
   for(const width of [320,768,1440]){await page.setViewportSize({width,height:700});await geometry('receipt-'+width);}
-  assert.equal(await page.locator('.modal [data-print-attribution]').isChecked(),false);await page.locator('.modal [data-print-attribution]').check();
-  const choice=await page.evaluate(async()=>{const {capturePrintChoice}=await import('/src/print/presentation.js');return capturePrintChoice(document.querySelector('.modal [data-action="reprint-receipt"]'));});assert.equal(choice.attribution,true);assert.equal(await page.locator('.modal [data-print-attribution]').isChecked(),false);
+  assert.equal(await page.locator('[data-print-attribution]').count(),0);
   await close();
   await page.evaluate(async()=>{const {state}=await import('/src/shared.js');state.data.udharAccounts=[{kind:'retail',sourceId:1,customerName:'Long credit customer '.repeat(10),customerPhone:'03000000000',reference:'INV-1',createdAt:'2026-10-20',outstanding:125,effectiveObligation:125,status:'Outstanding'}];state.modal={type:'udharList',readStatus:'ready'};document.querySelector('[data-action="theme"]').click();});
   for(const width of [390,1280]){await page.setViewportSize({width,height:700});await geometry('credit-compound-'+width);}
@@ -237,6 +238,7 @@ try{
   const tracking=[];await context.route('https://synthetic.invalid/functions/v1/public-track',route=>{tracking.push({url:route.request().url(),body:route.request().postDataJSON()});return route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,ticket:{status:'Pending',invoice_number:'INV-TRACK',ticket_number:'TK-TRACK',customer_name:'Customer',device_brand:'Phone',device_model:'Model',created_at:'2026-10-20',components_noted:[]}})});});
   await page.goto(origin+'/track.html?t=INV-TRACK&project_ref=foreign&supabase_url=https://foreign.invalid');await page.getByText('Synthetic Merchant',{exact:true}).waitFor();await page.locator('#phone-input').fill('03000000000');await page.locator('#track-btn').click();await page.locator('#result-card').waitFor({state:'visible'});assert.deepEqual(tracking[0],{url:'https://synthetic.invalid/functions/v1/public-track',body:{identifier:'INV-TRACK',phone:'03000000000'}});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:join(output,'merchant-tracking.png'),fullPage:true});result.trackerResult='PASS: actual standalone tracker, merchant first, safe yellow accent; exact configured public target and request unaffected by foreign URL parameters';
  }
+ if(ownerAcceptance&&!baseline)result.ownerAcceptance=await runOwnerAcceptance({page,origin,output});
  assert.deepEqual(result.errors,[]);await context.close();
 }catch(error){result.failure={message:error.message,stack:error.stack};if(page){await page.screenshot({path:join(output,'failure.png'),fullPage:true}).catch(()=>{});result.failure.layout=await page.evaluate(()=>[...document.querySelectorAll('body *')].filter(x=>x.getBoundingClientRect().right>innerWidth+2&&getComputedStyle(x).position!=='fixed').slice(0,14).map(x=>({tag:x.tagName,class:x.className,id:x.id,width:x.getBoundingClientRect().width,style:x.getAttribute('style')}))).catch(()=>null);}process.exitCode=1;}
 finally{await browser?.close();await server.close();await writeFile(join(output,baseline?'login-baseline.json':'m3-browser-result.json'),JSON.stringify(result,null,2)+'\n');}

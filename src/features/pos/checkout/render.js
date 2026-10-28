@@ -1,3 +1,4 @@
+import {withPrintAttribution} from '../../../print/presentation.js'
 import { escapeHTML, safeImageURL } from "../../../html.js"
 /* ═══════════════════════════════════════════════════════════════════
    features/pos/checkout/render.js
@@ -9,7 +10,7 @@ import { money, moneyHTML, currentTenant } from '../../../shared.js'
 export function receiptPreview(sale) {
   if (!sale) return ''
   const t = currentTenant()
-  return `<div class="receipt-preview">
+  return `<div class="receipt-preview">${withPrintAttribution(`
     <center>${t.logo?`<img src="${escapeHTML(safeImageURL(t.logo))}" style="max-width:120px;max-height:44px;object-fit:contain;margin-bottom:6px"><br>`:''}
     <strong>${escapeHTML(t.name)}</strong><br>${escapeHTML(t.address||'')}<br>${escapeHTML(t.phone||'')}</center>
     <hr>
@@ -24,5 +25,5 @@ export function receiptPreview(sale) {
     ${sale.payment==='Cash'&&sale.cashTendered>0?`<br>Cash Received: <strong>${moneyHTML(sale.cashTendered)}</strong><br>Change Given: <strong>${moneyHTML(sale.changeGiven||0)}</strong>`:''}
     <hr>
     <center>${escapeHTML(t.receiptFooter||'')}</center>
-  </div>`
+  `)}</div>`
 }

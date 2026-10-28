@@ -44,7 +44,7 @@ export function ownDialog(modal,{close,busy=()=>false,escape=true,dirty=false}={
  layer={modal,close,busy,escape,dirty:false,opener:document.activeElement};records.set(modal,layer);layers.push(layer);
  modal.dataset.uiDialog=String(++sequence);modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.tabIndex=-1;
  nameDialog(modal);
- if(dirty){const remember=event=>{if(event.target.hasAttribute('data-print-attribution'))return;layer.dirty=true;modal.querySelector('[data-draft-warning]')?.remove();};modal.addEventListener('input',remember);modal.addEventListener('change',remember);}
+ if(dirty){const remember=event=>{layer.dirty=true;modal.querySelector('[data-draft-warning]')?.remove();};modal.addEventListener('input',remember);modal.addEventListener('change',remember);}
  refresh();queueMicrotask(()=>{if(top()===layer)(modal.querySelector('[autofocus],input:not([type="hidden"]):not([disabled]),textarea:not([disabled]),select:not([disabled])')||focusable(modal).find(el=>!el.matches('[data-modal-close]'))||modal).focus({preventScroll:true});});
 }
 export function mayDismiss(modal){

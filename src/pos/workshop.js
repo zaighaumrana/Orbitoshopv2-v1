@@ -1,4 +1,3 @@
-import {capturePrintChoice} from '../print/presentation.js'
 import {renderOperationalScreen} from '../ui-render.js'
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
 import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
@@ -531,7 +530,7 @@ function attachEvents() {
 
   /* ── Click ── */
   listenOwned(app,'click',ownsWorkshop,async (e,eventCurrent)=>{
-    const printChoice=capturePrintChoice(e.target,e.type,e)
+
     if(state.modal?.readStatus&&e.target.closest('[data-action="retry-resources"]')){await openWorkshopEditor(state.modal.id);return}
     if(e.target.closest('[data-action="retry-resources"]')){await load();return}
     if (!can('workshop', state.role) || !modalEntitled(state.modal?.type)) return
@@ -747,7 +746,7 @@ function attachEvents() {
       if (!res.ok) { showBlockingError(res.error); return }
       if (res.ticket) {
         const {buildSubInvoiceSlip,printThermal} = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
-        printThermal(buildSubInvoiceSlip(res.ticket,tk), printChoice)
+        printThermal(buildSubInvoiceSlip(res.ticket,tk))
       }
       if (state.modal === modal) state.modal = null
       await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
@@ -758,7 +757,7 @@ function attachEvents() {
 
   /* ── Submit ── */
   listenOwned(app,'submit',ownsWorkshop,async (e,eventCurrent)=>{
-    const printChoice=capturePrintChoice(e.target,e.type,e)
+
     if (!can('workshop', state.role) || !modalEntitled(state.modal?.type)) { e.preventDefault(); return }
     if (!window.location.pathname.startsWith('/workshop')) return
     e.preventDefault()

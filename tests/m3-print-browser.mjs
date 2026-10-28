@@ -8,18 +8,18 @@ import {join} from 'node:path';
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
 const {chromium}=await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE_PATH).href);
-const baseline=process.argv.includes('--baseline'),out=process.env.M3_EVIDENCE_DIR;
+const baseline=process.argv.includes('--baseline'),ownerAcceptance=process.argv.includes('--owner-acceptance'),out=process.env.M3_EVIDENCE_DIR;
 if(!out)throw Error('M3_EVIDENCE_DIR required');
 await mkdir(out,{recursive:true});
 const original=execFileSync('git',['show','2dffa1ea:src/print/print.js'],{encoding:'utf8'});
 const asset=await readFile(process.env.M3_BARCODE_FILE);
 const result={baseline,source:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),dependencySHA256:createHash('sha256').update(asset).digest('hex'),provenance:'author-run real renderer; exact version bytes fulfilled locally; synthetic metering sink; headless print capture; no physical print',scenarios:[]};
-const server=await createServer({configFile:false,envDir:false,server:{host:'127.0.0.1',port:0},plugins:[{name:'print-fixture',enforce:'pre',configureServer(server){server.middlewares.use('/m3-print-fixture',(_req,res)=>{res.setHeader('Content-Type','text/html');res.end('<!doctype html><body></body>');});},resolveId:id=>id.startsWith('virtual:m3-')?'\0'+id:null,load:id=>id==='\0virtual:m3-shared'?'export const CFG=window.printCFG;export const money=x=>"PKR "+Number(x).toFixed(2);':id==='\0virtual:m3-debug'?'export const dlog=()=>{};export const dstack=()=>{};':id==='\0virtual:m3-thermal'?`export {measureThermal} from '/src/platform/thermal.js';export const queueThermalIntent=async intent=>{window.printIntents.push(intent);};`:null,transform(code,id){if(!id.replaceAll('\\','/').endsWith('/src/print/print.js'))return null;return (baseline?original:code).replaceAll("'../shared.js'","'virtual:m3-shared'").replaceAll("'../debuglog.js'","'virtual:m3-debug'").replaceAll("'../platform/thermal.js'","'virtual:m3-thermal'");}}]});
+const server=await createServer({configFile:false,envDir:false,server:{host:'127.0.0.1',port:0},plugins:[{name:'print-fixture',enforce:'pre',configureServer(server){server.middlewares.use('/m3-print-fixture',(_req,res)=>{res.setHeader('Content-Type','text/html');res.end('<!doctype html><body></body>');});},resolveId:id=>id.startsWith('virtual:m3-')?'\0'+id:null,load:id=>id==='\0virtual:m3-shared'?'export const CFG=window.printCFG;export const money=x=>"PKR "+Number(x).toFixed(2);':id==='\0virtual:m3-debug'?'export const dlog=()=>{};export const dstack=()=>{};':id==='\0virtual:m3-thermal'?`export {measureThermal} from '/src/platform/thermal.js';export const queueThermalIntent=async intent=>{window.printIntents.push(intent);window.measuredHeights.push(document.querySelector('#thermal-frame').contentDocument.body.getBoundingClientRect().height);};`:null,transform(code,id){if(!id.replaceAll('\\','/').endsWith('/src/print/print.js'))return null;return (baseline?original:code).replaceAll("'../shared.js'","'virtual:m3-shared'").replaceAll("'../debuglog.js'","'virtual:m3-debug'").replaceAll("'../platform/thermal.js'","'virtual:m3-thermal'");}}]});
 let browser;
 try{
  await server.listen();const origin='http://127.0.0.1:'+server.httpServer.address().port;
  browser=await chromium.launch({headless:true,args:['--disable-gpu'],executablePath:process.env.CHROMIUM_EXECUTABLE_PATH});result.browser=browser.version();
- for(const mode of ['normal','blocked','slow']){
+ for(const mode of ownerAcceptance?['normal']:['normal','blocked','slow']){
   const context=await browser.newContext();
   await context.route('**/*',async route=>{
    const url=route.request().url();
@@ -32,30 +32,30 @@ try{
   });
   const page=await context.newPage();await page.goto(origin+'/m3-print-fixture');
   await page.evaluate(()=>{
-   document.body.replaceChildren();window.printIntents=[];window.printed=[];window.printCFG={shop_name:'Synthetic Merchant',shop_address:'Address',shop_phone:'123',currency:'PKR',terms_text:'Merchant terms'};
+   document.body.replaceChildren();window.printIntents=[];window.measuredHeights=[];window.printed=[];window.printCFG={shop_name:'Synthetic Merchant',shop_address:'Address',shop_phone:'123',currency:'PKR',terms_text:'Merchant terms'};
    const append=Node.prototype.appendChild;
-   Node.prototype.appendChild=function(node){const value=append.call(this,node);if(node.tagName==='IFRAME'){node.contentWindow.focus=()=>{};node.contentWindow.print=()=>window.printed.push({at:performance.now(),text:node.contentDocument.body.textContent,barcodes:[...node.contentDocument.querySelectorAll('.bc')].map(x=>({value:x.dataset.val,bars:x.querySelectorAll('rect').length})),height:node.contentDocument.body.getBoundingClientRect().height,copies:node.contentDocument.querySelectorAll('section').length||1});}return value;};
+   Node.prototype.appendChild=function(node){const value=append.call(this,node);if(node.tagName==='IFRAME'){node.contentWindow.focus=()=>{};node.contentWindow.print=()=>window.printed.push({at:performance.now(),text:node.contentDocument.body.textContent,barcodes:[...node.contentDocument.querySelectorAll('.bc')].map(x=>({value:x.dataset.val,bars:x.querySelectorAll('rect').length})),footerCount:node.contentDocument.querySelectorAll('[data-product-attribution]').length,logos:[...node.contentDocument.querySelectorAll('[data-product-attribution] img')].map(img=>({src:img.getAttribute('src'),loaded:img.complete&&img.naturalWidth>0,width:img.getBoundingClientRect().width,height:img.getBoundingClientRect().height})),height:node.contentDocument.body.getBoundingClientRect().height,copies:node.contentDocument.querySelectorAll('section').length||1});}return value;};
   });
-  const observation=await page.evaluate(async baseline=>{
+  const observation=await page.evaluate(async({baseline,ownerAcceptance})=>{
    const p=await import('/src/print/print.js'),start=performance.now();
    const sale={receiptNo:'INV-SYNTHETIC-1',items:[{name:'Synthetic item',qty:2,soldPrice:100}],total:200,subtotal:200,tax:0,payment:'Cash',date:'2026-10-28T09:00:00Z'};
    const first=p.printThermal(p.buildReceiptSlip(sale,true),{copies:2});
    const second=p.printThermal(p.buildTicketSlip({ticket_number:'TK-SYNTHETIC-2',invoice_number:'INV-SYNTHETIC-2',customer_name:'Customer',final_total:125,created_at:'2026-10-28T09:00:00Z',components_noted:[]}));
    await Promise.all([first,second]);
    let attribution=null;
-   if(!baseline){
+   if(!baseline&&!ownerAcceptance){
     const before=window.printIntents.length;
     await p.printThermal(p.buildReceiptSlip(sale,true),{copies:2,attribution:true});
     attribution={intent:window.printIntents[before],printed:window.printed.at(-1)};
    }
-   return {elapsed:performance.now()-start,intents:window.printIntents.slice(0,2),printed:window.printed.slice(0,2),attribution};
-  },baseline);
+   return {elapsed:performance.now()-start,measuredHeights:window.measuredHeights.slice(0,2),intents:window.printIntents.slice(0,2),printed:window.printed.slice(0,2),attribution};
+  },{baseline,ownerAcceptance});
   assert.equal(observation.intents.length,2);assert.equal(observation.printed.length,2);
   assert.deepEqual(observation.intents.map(x=>x.document_reference),['INV-SYNTHETIC-1','INV-SYNTHETIC-2']);
   assert.equal(observation.intents[0].copies,2);assert.equal(observation.printed[0].copies,2);
   if(mode!=='blocked'||!baseline){assert.ok(observation.printed.every(x=>x.barcodes.every(b=>b.bars>0)));assert.ok(observation.intents.every(x=>x.measurement_status==='estimated'));}
   else assert.ok(observation.intents.every(x=>x.measurement_status==='unavailable'));
-  if(!baseline){assert.ok(observation.attribution.printed.text.includes('Powered by RetraSell'));assert.ok(observation.attribution.intent.estimated_mm>observation.intents[0].estimated_mm);}
+  if(!baseline&&ownerAcceptance){assert.equal(observation.printed[0].footerCount,2);assert.equal(observation.printed[1].footerCount,1);assert.ok(observation.printed.every(d=>d.logos.every(img=>img.loaded&&img.width===84&&img.height===18)));const {measureThermal}=await import('../src/platform/thermal.js');assert.equal(observation.intents[0].estimated_mm,measureThermal(observation.measuredHeights[0],2).estimated_mm);assert.ok(observation.intents.every(i=>i.measurement_status==='estimated'));}else if(!baseline){assert.ok(observation.attribution.printed.text.includes('Powered by RetraSell'));assert.equal(observation.attribution.intent.estimated_mm,observation.intents[0].estimated_mm);}
   result.scenarios.push({mode,...observation});await context.close();
  }
 }catch(error){result.failure=error.message;process.exitCode=1;}

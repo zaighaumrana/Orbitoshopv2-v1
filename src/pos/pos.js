@@ -1,4 +1,4 @@
-import {capturePrintChoice} from '../print/presentation.js'
+import {withPrintAttribution} from '../print/presentation.js'
 import {renderOperationalScreen} from '../ui-render.js'
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
 import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
@@ -506,7 +506,7 @@ function buildShiftStats() {
   const custCount  = new Set(shiftSales.map(s=>s.customer_name).filter(Boolean)).size
   const shiftTkts  = state.data.shiftTickets
   return `
-    <div class="shift-print">
+    <div class="shift-print">${withPrintAttribution(`
       <center><strong>${escapeHTML(tenant.name)}</strong><br>Shift Summary — ${todayStr}<br>${escapeHTML(empName||'All Staff')}</center>
       <hr style="border:none;border-top:1px dashed #bbb;margin:8px 0">
       <div class="stat-row"><span>Products sold</span><span>${itemsSold}</span></div>
@@ -525,7 +525,7 @@ function buildShiftStats() {
       ${state.data.shiftUnmapped?`<p class="muted">${state.data.shiftUnmapped} legacy records in this period have no canonical actor mapping and are not assigned by display name.</p>`:''}
       <hr style="border:none;border-top:1px dashed #bbb;margin:8px 0">
       <center style="color:#888;font-size:11px">Printed ${new Date().toLocaleString()}</center>
-    </div>`
+    `)}</div>`
 }
 
 /* ── Component tag picker (sub-modal) ── */
@@ -1162,7 +1162,7 @@ function attachEvents() {
 
   /* ── Click ── */
   listenOwned(app,'click',ownsPOS,async (e,eventCurrent)=>{
-    const printChoice=capturePrintChoice(e.target,e.type,e)
+
     if(e.target.closest('[data-action="retry-pos-detail"]')||(state.modal?.readStatus&&e.target.closest('[data-action="retry-resources"]'))){await openDeferredPOS(state.modal.type);return}
     if(e.target.closest('[data-action="retry-resources"]')){await load();return}
     if (!can('pos', state.role) || !modalEntitled(state.modal?.type)) return
@@ -1365,7 +1365,7 @@ function attachEvents() {
       if (!res.ok) { showBlockingError(res.error); return }
       if (res.ticket) {
         const {buildSubInvoiceSlip,printThermal} = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
-        printThermal(buildSubInvoiceSlip(res.ticket,tk), printChoice)
+        printThermal(buildSubInvoiceSlip(res.ticket,tk))
       }
       if (state.modal === modal) state.modal = null
       await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
@@ -1410,11 +1410,11 @@ function attachEvents() {
 
     /* ── Shift stats ── */
     if (el.dataset.action === 'shift-stats')  { await openDeferredPOS('shiftStats');return }
-    if (el.dataset.action === 'print-shift')  { if(state.modal?.readStatus!=='ready')return; const { printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal); printThermal(buildShiftStats(), printChoice); return }
+    if (el.dataset.action === 'print-shift')  { if(state.modal?.readStatus!=='ready')return; const { printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal); printThermal(buildShiftStats()); return }
     if (el.dataset.action === 'print-receipt') {
       if (state.modal?.sale) {
         const { buildReceiptSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
-        printThermal(buildReceiptSlip(state.modal.sale), printChoice)
+        printThermal(buildReceiptSlip(state.modal.sale))
       }
       return
     }
@@ -1422,7 +1422,7 @@ function attachEvents() {
       dlog('POS.click', `PRINT-TICKET-SLIP branch firing -- state.modal.ticket=${JSON.stringify(state.modal?.ticket?.ticket_number)}`)
       if (state.modal?.ticket) {
         const { buildTicketSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
-        printThermal(buildTicketSlip(state.modal.ticket), printChoice)
+        printThermal(buildTicketSlip(state.modal.ticket))
       }
       return
     }
@@ -1496,7 +1496,7 @@ function attachEvents() {
       const summaryResult = await viewAwait(eventCurrent,()=>(getRepairFamilySummary(Number(el.dataset.ticketId))),()=>state.modal)
       if (!summaryResult.ok) { showBlockingError('Summary error: ' + summaryResult.error); return }
       const { buildRepairSummary, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
-      printThermal(buildRepairSummary(summaryResult.data), printChoice); return
+      printThermal(buildRepairSummary(summaryResult.data)); return
     }
 
     if (el.dataset.action === 'deliver-repair-udhar') {
@@ -1763,7 +1763,7 @@ function attachEvents() {
 
   /* ── Submit ── */
   listenOwned(app,'submit',ownsPOS,async (e,eventCurrent)=>{
-    const printChoice=capturePrintChoice(e.target,e.type,e)
+
     if (!can('pos', state.role) || !modalEntitled(state.modal?.type)) { e.preventDefault(); return }
     if (!window.location.pathname.startsWith('/pos')) return
     e.preventDefault()
@@ -1863,7 +1863,7 @@ function attachEvents() {
           invoiceNumber:context?.sale?.invoiceNumber||`#${saleId}`,
           items:preview.lines.map(line => ({ name:line.name, qty:line.quantity, sold_price:line.sold_price })),
           refund, method:refund>0?data.refundMethod:'No cash refund',
-        }), printChoice)
+        }))
         state.modal = null; await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
         showTransactionSuccess(`Return completed. Refund: ${money(refund)}`)
       }, render); return

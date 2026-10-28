@@ -19,8 +19,8 @@ accessible names (including loading-to-detail transitions), entry/return focus,
 Tab containment, inert background, topmost keyboard ownership and visual-viewport
 height. Specialized confirmation/PIN policies stay in their existing handlers.
 Busy work blocks dismissal. Dirty business forms require a second explicit
-Close/Cancel; Escape/backdrop cannot discard them. Ephemeral print choices are not
-business drafts. Login dialogs keep their established independent behavior.
+Close/Cancel; Escape/backdrop cannot discard them. Login dialogs keep their
+established independent behavior.
 
 `ui-lifecycle.js` counts overlapping modal promises, so a short unrelated event
 cannot clear an earlier operation's busy state. It does not approve commands or
@@ -46,15 +46,22 @@ unchanged and online-only; no financial offline cache or app-ID change was added
 
 ## Printing
 
-`print/presentation.js` supplies default-off, per-action attribution. The six actual
-builders accept a final `{attribution:true}` presentation option; existing arguments
-and default strings are unchanged. Actual POS/Admin/EMS callers capture the selected
-document's choice before asynchronous work, share one snapshot across delegates and
-reset it for the next attempt. No preference, payload field or `terms_text` encoding
-is persisted. The core printer also accepts `{attribution:true}` and avoids an exact
-duplicate `Powered by RetraSell` line. Salary slips use the same presentation helper.
+Owner correction M3-OA-01 (29 October 2026) supersedes D05's original optional,
+default-off attribution decision. The historical decision/rationale remains in the
+program decision archive. `print/presentation.js` now automatically supplies one
+restrained footer with the unchanged official local horizontal logo and `Powered by
+RetraSell`. There are no attribution checkboxes, event choices, prompts or persisted
+preferences. Support consent, financial approval and PIN confirmation are unrelated
+and remain intact.
 
-The line is rendered before height measurement and existing copies multiplication.
+All six actual builders, POS receipt/ticket previews and the shift document share
+this mechanism. The print queue also enforces it for direct callers. A marker makes
+repeated builder/preview/queue presentation idempotent. An exact old plain footer
+line is moved into the final branded footer once; other merchant terms and every
+transaction field remain unchanged. The local SVG loads from the Shop's own static
+assets and is decoded with existing image readiness before measuring the document.
+
+The logo and line are rendered before height measurement and existing copies multiplication.
 Financial amounts, barcodes, reprint markers, queue order and thermal versions are
 unchanged. The measured blocked-CDN weakness justified copying the exact existing
 JsBarcode **3.11.6**, not upgrading it:
@@ -86,3 +93,20 @@ Independent audit and owner acceptance remain unperformed. Real mobile keyboard,
 physical printer and installed OS-icon/cache observations require owner evidence.
 F22's accepted bounded deferral remains; F18 has an implemented evidence-led fix,
 not a self-approved deferral. No backend, Platform source, release or hosted change.
+
+## 29 October owner visual corrections
+
+The New Repair form and ready Admin ticket detail use one responsive wide workspace
+class. The information/issue panels share the top row on desktop. Per owner steering,
+New Repair has a full-width finance tile at the bottom: labour/quote on the left,
+payments in the center, balance on the right. The same fields, constraints, draft
+calculations and actions are retained. Admin detail groups repair/history separately
+from finance/status/operations. Body content can scroll while existing completion
+actions remain visible. Narrow screens stack the sections.
+
+The merchant tile uses containment, generous padding and a quiet white image bed
+without the former accent border. Support's existing single bounded width rule now
+centers the complete region; submission, history, guidance and owner approvals remain
+inside that wrapper. No Support behavior or permission changed. These corrections
+remain local until separately authorized for publication, because the M3 branch now
+feeds production. The approved empty build-trigger commit is an expected ancestor.

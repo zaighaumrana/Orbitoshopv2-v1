@@ -1,4 +1,3 @@
-import {capturePrintChoice} from '../print/presentation.js'
 import {renderOperationalScreen} from '../ui-render.js'
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
 import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
@@ -816,7 +815,7 @@ function attachEvents() {
   })
   // Click delegation
   listenOwned(app,'click',ownsAdmin,async (e,eventCurrent)=>{
-    const printChoice=capturePrintChoice(e.target,e.type,e)
+
     if(e.target.closest('[data-action="retry-admin-udhar"]')||(state.modal?.type==='udharList'&&state.modal.readStatus&&e.target.closest('[data-action="retry-resources"]'))){await openAdminUdhar();return}
     if(e.target.closest('[data-action="retry-resources"]')){await load();return}
     if (!can(adminState.adminModule, state.role) || !modalEntitled(state.modal?.type)) return
@@ -897,7 +896,7 @@ function attachEvents() {
       dlog('ADMIN.click', `PRINT-TICKET-SLIP branch firing -- state.modal.ticket=${JSON.stringify(state.modal?.ticket?.ticket_number)}`)
       if (state.modal?.ticket) {
         const { buildTicketSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
-        printThermal(buildTicketSlip(state.modal.ticket), printChoice)
+        printThermal(buildTicketSlip(state.modal.ticket))
       }
       return
     }
@@ -905,7 +904,7 @@ function attachEvents() {
       const summary = (await viewAwait(eventCurrent,()=>(getRepairFamilySummary(Number(el.dataset.ticketId))),()=>state.modal)).data
       if (!summary) { showBlockingError('Repair summary is unavailable.'); return }
       const { buildRepairSummary, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
-      printThermal(buildRepairSummary(summary), printChoice); return
+      printThermal(buildRepairSummary(summary)); return
     }
 
     if (el.dataset.kpiTarget) {
@@ -1062,7 +1061,7 @@ function attachEvents() {
       if (!res.ok) { showBlockingError(res.error); return }
       if (res.ticket) {
         const {buildSubInvoiceSlip,printThermal} = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
-        printThermal(buildSubInvoiceSlip(res.ticket,tk), printChoice)
+        printThermal(buildSubInvoiceSlip(res.ticket,tk))
       }
       if (state.modal === modal) state.modal = null
       await viewAwait(eventCurrent,()=>(load()),()=>state.modal)
@@ -1090,7 +1089,7 @@ function attachEvents() {
         const root = state.data.tickets.find(t=>!t.parent_ticket_id && String(t.id)===String(result.proposal.root_ticket_id))
         if (root) {
           const { buildSubInvoiceSlip, printThermal } = await viewAwait(eventCurrent,()=>(import('../print/print.js')),()=>state.modal)
-          printThermal(buildSubInvoiceSlip(result.ticket, root), printChoice)
+          printThermal(buildSubInvoiceSlip(result.ticket, root))
         }
       }
       showTransactionSuccess(`Additional work ${decision.toLowerCase()}.`)
@@ -1262,7 +1261,7 @@ function attachEvents() {
         labour:sale.labour_cost||0, discount:sale.discount||0, tax:sale.tax||0,
         total:sale.total_bill||0, payment:sale.payment_method||'—',
       }
-      printThermal(buildReceiptSlip(reprSale, true), printChoice); return
+      printThermal(buildReceiptSlip(reprSale, true)); return
     }
 
     if (el.dataset.action === 'print-repair-invoice') {
@@ -1272,9 +1271,9 @@ function attachEvents() {
       if (ticket.parent_ticket_id) {
         const parent = state.data.tickets.find(item => String(item.id) === String(ticket.parent_ticket_id))
         if (!parent) { showBlockingError('Parent repair record not found.'); return }
-        printThermal(buildSubInvoiceSlip(ticket, parent), printChoice)
+        printThermal(buildSubInvoiceSlip(ticket, parent))
       } else {
-        printThermal(buildTicketSlip(ticket), printChoice)
+        printThermal(buildTicketSlip(ticket))
       }
       return
     }
@@ -1483,7 +1482,7 @@ function attachEvents() {
 
   // Submit
   listenOwned(app,'submit',ownsAdmin,async (e,eventCurrent)=>{
-    const printChoice=capturePrintChoice(e.target,e.type,e)
+
     if (!can(adminState.adminModule, state.role) || !modalEntitled(state.modal?.type)) { e.preventDefault(); return }
     if (!window.location.pathname.startsWith('/admin')) return
     e.preventDefault()

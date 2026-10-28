@@ -1,4 +1,4 @@
-import {withPrintAttribution,capturePrintChoice} from '../../../print/presentation.js'
+import {withPrintAttribution} from '../../../print/presentation.js'
 import { escapeHTML } from "../../../html.js"
 /* ═══════════════════════════════════════════════════════════════════
    features/admin/ems/index.js
@@ -505,7 +505,7 @@ function countWorkingDays(year, month) {
 /* ════════════════════════════════════════════════════════════════
    SALARY SLIP PRINT
 ════════════════════════════════════════════════════════════════ */
-export function buildSalarySlipHTML(slip, employeeName, shopName, options = {}) {
+export function buildSalarySlipHTML(slip, employeeName, shopName) {
   const months = ['January','February','March','April','May','June',
     'July','August','September','October','November','December']
   return withPrintAttribution(`
@@ -527,7 +527,7 @@ export function buildSalarySlipHTML(slip, employeeName, shopName, options = {}) 
     ${slip.deductions > 0 ? `<div class="row"><span>Deductions</span><span>${moneyHTML(slip.deductions)}</span></div>` : ''}
     <div class="row b lg"><span>NET SALARY</span><span>${moneyHTML(slip.net_salary)}</span></div>
     <div class="ln"></div>
-    <div class="c sm">Generated ${new Date(slip.generated_at).toLocaleDateString()}</div>`, options)
+    <div class="c sm">Generated ${new Date(slip.generated_at).toLocaleDateString()}</div>`)
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -542,7 +542,7 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess, isCurrent=captu
   SESSION = sess
 
   listenOwned(app,'click',ownsEMS,async (e,eventCurrent) => {
-    const printChoice=capturePrintChoice(e.target,e.type,e)
+
     const controller=emsController,{getEMSData,reloadFn,sess}=controller,current=()=>eventCurrent()&&emsController===controller
     if (window.location.pathname !== '/admin/ems' || !can('ems', state.role)) return
     const el = e.target.closest(
@@ -587,7 +587,7 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess, isCurrent=captu
       if(selected.error||!slip){showBlockingError('Complete selected salary slip unavailable. Retry reads.');return}
       const { printThermal } = await import('../../../print/print.js')
       if(!current())return
-      printThermal(buildSalarySlipHTML(slip, slip.employees?.name || '—', CFG.shop_name), printChoice)
+      printThermal(buildSalarySlipHTML(slip, slip.employees?.name || '—', CFG.shop_name))
       return
     }
   },error=>showBlockingError(error.message))
@@ -604,7 +604,7 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess, isCurrent=captu
   },error=>showBlockingError(error.message))
 
   listenOwned(app,'submit',ownsEMS,async (e,eventCurrent) => {
-    const printChoice=capturePrintChoice(e.target,e.type,e)
+
     const controller=emsController,{reloadFn,sess}=controller,current=()=>eventCurrent()&&emsController===controller
     if (window.location.pathname !== '/admin/ems' || !can('ems', state.role)) return
     const form = e.target
