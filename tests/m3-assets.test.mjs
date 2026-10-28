@@ -10,7 +10,7 @@ test('official artwork, local Inter and license are exact Platform reference byt
   const path='public/brand/'+group+'/'+file,reference=execFileSync('git',['-C','../orbito','show','864cdbc1c09184a72e33afe67aa4a4f516e78e68:'+path]);
   assert.equal(sha(readFileSync(path)),sha(reference),path);
  }
- for(const path of ['src/auth.js','src/features/login/login.css','src/features/login/background.js','src/features/login/ghost-fibers.js','src/style.css','public/sw.js']){ const normalize=text=>text.replaceAll('\r\n','\n').replace(/\.support-page\s*\{[^}]*\}/g,'');assert.equal(normalize(readFileSync(path,'utf8')),normalize(execFileSync('git',['show','2dffa1ea:'+path],{encoding:'utf8'})),path+' unchanged outside scoped Support centering (checkout line endings normalized)'); }
+ for(const path of ['src/auth.js','src/features/login/login.css','src/features/login/background.js','src/features/login/ghost-fibers.js','src/style.css','public/sw.js']){ const normalize=text=>text.replaceAll('\r\n','\n').replace(/\.support-page\s*\{[^}]*\}/g,'').replace(/\/\* Bundle these layout contracts[\s\S]*?(?=\/\* Help & Support only)/,'').replace(/^ *\.support-page \.support-pagination \{[^}]*\}\n/gm,'');assert.equal(normalize(readFileSync(path,'utf8')),normalize(execFileSync('git',['show','2dffa1ea:'+path],{encoding:'utf8'})),path+' unchanged outside scoped Support and authenticated pager/preview layout (checkout line endings normalized)'); }
  assert.equal(sha(readFileSync('public/vendor/JsBarcode-3.11.6.all.min.js')),'52e032534c3f98976ad95cb8c20baf80ed0cc83d42590602a8cf1db16e2e22ed');
  assert.match(readFileSync('public/vendor/JsBarcode-LICENSE.txt','utf8'),/MIT|Permission is hereby granted/);
 });

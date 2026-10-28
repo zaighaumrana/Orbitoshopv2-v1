@@ -1717,3 +1717,24 @@ pass, as do syntax, protected-source/artwork boundary and the updated build.
 No broad suites, hosted writes, Platform/backend/print changes, push or deployment.
 This adds to the unpublished Support/Catalog refinements; owner publication,
 independent review and final acceptance remain separate gates.
+
+
+## 2026-10-29 — live pager asset skew and intrinsic receipt-preview width (local)
+Branch: feature/shop-modernization-m3; baseline: 340994565f113e888abd9dfbf72d28eb7a44511f
+
+Owner live findings M3-LV-01/02 were confirmed through read-only DOM/CSSOM inspection
+of the existing POS tab. Pager markup was current but the fixed-URL branding CSS had
+no pager rules (display:block); no cache layer was guessed or provider cache altered.
+Receipt backdrop's implicit auto track shrank the dialog to 280px and paper to 238px.
+Moved shared pager CSS into the content-hashed app stylesheet and removed retired
+Support flex overrides. Added a scoped explicit backdrop track and 600px receipt/
+ticket preview dialog with a scrollable body and fixed actions; paper max stays 380px.
+Print builders, amounts, IDs, barcode/thermal logic, paging state/handlers and all
+backend/Platform sources stay unchanged.
+
+Focused actual-entry tests load built CSS while deliberately serving the observed
+older branding asset: 12 pager contexts at desktop/mobile, both preview types and
+byte-exact receipt/ticket print comparison pass. Syntax and one build pass. The first
+run used an older-backend fixture without a pager; retained and corrected to v7 mode.
+No broad tests, hosted operations, commit, push or deployment. Local evidence records
+measurements and limits; publication, independent review and owner acceptance pending.

@@ -128,3 +128,22 @@ behavior are unchanged. Coverage includes paged Admin sections (Repairs, Catalog
 Inventory, Receipts and Employees), EMS history/slips, POS stock/quick items/repair
 collection and Workshop. Receipt detail's unnumbered adjacent-document navigation
 is separate from list pagination and stays unchanged. These follow-ups remain local.
+
+
+## Live pagination/preview follow-up — 29 October 2026
+
+Live CSSOM showed current rs-pagination markup with an older fixed-URL branding
+stylesheet lacking those rules. The authoritative pager contract is now in src/style.css,
+so Vite hashes it with the app rather than depending on a refreshed public CSS URL.
+Retired Support flex overrides were removed. Counts and handlers are unchanged.
+Only receipt/ticket preview dialogs gain a named class, explicit backdrop grid track,
+600px desktop width and scrollable paper body with visible actions. Existing 380px
+screen-paper maximum and all actual print dimensions/builders remain unchanged.
+
+Focused reproduction: build once, set M3_BUILT_STYLE to its dist/assets/style-*.css,
+then run tests/m3-browser.mjs --live-layout-only with the existing loopback browser
+settings. This mode serves deliberately stale public branding CSS, actual Shop entry/
+handlers, synthetic SDK and a read-only baseline print module. It checks list-region
+geometry across all numbered-pager callers, one receipt/ticket preview at desktop/
+mobile and exact printable HTML. It does not submit a sale, print physically or access
+hosted Supabase. Source and evidence remain local until publication authorization.

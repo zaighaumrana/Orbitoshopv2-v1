@@ -111,13 +111,6 @@ body:has(.app-shell.rs-shop,.rs-onboarding){background:#F5F7FC}
 .rs-shop .rs-credit-controls>input{flex:1 1 130px;min-width:0}
 .rs-shop .rs-credit-controls>select{flex:1 1 120px;min-width:0}
 
-/* All numbered Shop list pagers: equal sides keep the count truly centered. */
-.rs-shop .rs-pagination{display:grid;grid-template-columns:minmax(90px,1fr) minmax(0,auto) minmax(90px,1fr);align-items:center;gap:8px;width:100%;min-width:0;font-size:13px}
-.rs-shop .rs-pagination>.rs-pagination-summary{min-width:0;text-align:center;overflow-wrap:anywhere}
-.rs-shop .rs-pagination>button{width:auto;max-width:100%;min-width:0;flex:none}
-.rs-shop .rs-pagination>button:first-child{justify-self:start}
-.rs-shop .rs-pagination>button:last-child{justify-self:end}
-
 @media(max-width:767px){.rs-shop .rs-responsive-form{grid-template-columns:minmax(0,1fr)!important}}
 
 

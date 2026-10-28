@@ -920,6 +920,17 @@ body .app-dialog { width: min(480px, 100%); border-radius: 8px; max-height: 92vh
   }
 }
 
+/* Bundle these layout contracts with the app: fixed public CSS URLs can be stale. */
+.rs-shop .rs-pagination { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(0, auto) minmax(90px, 1fr); align-items: center; gap: 8px; width: 100%; min-width: 0; font-size: 13px; }
+.rs-shop .rs-pagination > .rs-pagination-summary { min-width: 0; text-align: center; overflow-wrap: anywhere; }
+.rs-shop .rs-pagination > button { width: auto; max-width: 100%; min-width: 0; flex: none; }
+.rs-shop .rs-pagination > button:first-child { justify-self: start; }
+.rs-shop .rs-pagination > button:last-child { justify-self: end; }
+.rs-shop .modal-backdrop:has(> .rs-receipt-preview-dialog) { grid-template-columns: minmax(0, 1fr); }
+.rs-shop .modal.rs-receipt-preview-dialog { width: min(600px, 100%); grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; }
+.rs-shop .rs-receipt-preview-body { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.rs-shop .rs-receipt-preview-body .receipt-preview { overflow-wrap: anywhere; }
+
 /* Help & Support only; shared tokens/components retain their existing defaults. */
 .support-page { display: grid; align-content: start; align-self: start; gap: inherit; width: 100%; min-width: 0; line-height: 1.5; overflow-wrap: anywhere; }
 .support-page .support-heading, .support-page .support-section { display: grid; align-content: start; gap: var(--space-3); min-width: 0; }
@@ -944,7 +955,6 @@ body .app-dialog { width: min(480px, 100%); border-radius: 8px; max-height: 92vh
 .support-page .badge.warn { color: color-mix(in srgb, var(--warning) 55%, var(--text)); }
 .support-page .support-ticket[aria-pressed="true"] { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 6%, var(--surface)); }
 .support-page .support-ticket:hover:not(:disabled) { border-color: var(--primary); background: var(--surface-2); }
-.support-page .support-pagination { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: var(--space-3); font-size: 13px; }
 .support-page .support-notice { padding: var(--space-3); border: 1px solid var(--border); border-left: 3px solid var(--primary); border-radius: 8px; background: var(--surface-2); }
 .support-page .support-notice-error { border-left-color: var(--danger); }
 .support-page .support-notice-success { border-left-color: var(--success); }
@@ -960,7 +970,6 @@ body .app-dialog { width: min(480px, 100%); border-radius: 8px; max-height: 92vh
 .support-page button:disabled { opacity: 0.6; cursor: default; }
 @media (max-width: 600px) {
   .support-page .support-fields { grid-template-columns: minmax(0, 1fr); }
-  .support-page .support-pagination { justify-content: space-between; gap: var(--space-2); }
   .support-page .support-ticket { gap: var(--space-2); }
 }
 

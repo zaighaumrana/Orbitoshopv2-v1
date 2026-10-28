@@ -780,9 +780,9 @@ function renderModal() {
     </div></div>`
 
   if (type === 'receipt') return `<div class="modal-backdrop">
-    <div class="modal">
+    <div class="modal rs-receipt-preview-dialog">
       <h2>${state.modal.isTicketSlip ? 'Repair Ticket Created' : 'Receipt'}</h2>
-      ${state.modal.isTicketSlip ? ticketSlipPreview(state.modal.ticket) : receiptPreview(state.modal.sale)}
+      <div class="rs-receipt-preview-body">${state.modal.isTicketSlip ? ticketSlipPreview(state.modal.ticket) : receiptPreview(state.modal.sale)}</div>
       <div class="modal-actions">
         <button class="secondary-button" data-close>Close</button>
         <button class="primary-button" data-action="${state.modal.isTicketSlip ? 'print-ticket-slip' : 'print-receipt'}">Print Receipt</button>
