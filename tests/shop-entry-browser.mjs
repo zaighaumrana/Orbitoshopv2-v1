@@ -3,6 +3,7 @@
 import {createServer} from 'vite';
 import {pathToFileURL} from 'node:url';
 import assert from 'node:assert/strict';
+import {resourceFixture} from './helpers/resource-fixture.mjs';
 const {chromium}=await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE_PATH).href);
 const server=await createServer({configFile:false,envFile:false,root:process.cwd(),server:{host:'127.0.0.1',port:0},define:{'import.meta.env.VITE_SUPABASE_URL':JSON.stringify('https://synthetic.invalid'),'import.meta.env.VITE_SUPABASE_ANON':JSON.stringify('synthetic-public'),'import.meta.env.VITE_TURNSTILE_SITE_KEY':JSON.stringify('synthetic-site')},plugins:[{name:'entry-sdk',enforce:'pre',resolveId:id=>id==='@supabase/supabase-js'?'\0entry-sdk':null,load:id=>id==='\0entry-sdk'?'export const createClient=()=>window.fixtureSDK;':null}]});
 function fixture(){
@@ -35,6 +36,7 @@ try{
  await server.listen();const origin='http://127.0.0.1:'+server.httpServer.address().port;
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH});
  const context=await browser.newContext();await context.route('**/*',r=>r.request().url().startsWith(origin+'/')?r.continue():r.request().url()==='https://challenges.cloudflare.com/turnstile/v0/api.js'?r.fulfill({contentType:'application/javascript',body:'/* synthetic Turnstile fixture */'}):(external.push(r.request().url()),r.abort()));await context.addInitScript(fixture);
+ await context.addInitScript(resourceFixture);
  const page=await context.newPage();page.setDefaultTimeout(15000);page.on('pageerror',e=>errors.push(e.message));
  for(const role of ['Business Owner','Manager']){
   await page.goto(origin+'/admin/customer-support?fixtureRole='+encodeURIComponent(role));await page.getByRole('heading',{name:'New support request'}).waitFor();
@@ -46,7 +48,7 @@ try{
  await page.goto(origin+'/admin/settings?fixtureRole=Business%20Owner&tab=contact');await page.locator('[data-settings-tab="contact"].active').waitFor();await page.reload();await page.locator('[data-settings-tab="contact"].active').waitFor();
  await page.locator('[data-settings-tab="receipt"]').click();await page.locator('[data-settings-tab="receipt"].active').waitFor();await page.goBack();await page.locator('[data-settings-tab="contact"].active').waitFor();await page.goForward();await page.locator('[data-settings-tab="receipt"].active').waitFor();
  await page.evaluate(async()=>{window.fixtureHoldConfig=true;const {navigate}=await import('/src/router.js');navigate('/admin/settings?tab=contact')});await page.waitForFunction(()=>typeof window.fixtureReleaseConfig==='function');
- await page.evaluate(async()=>{const {navigate}=await import('/src/router.js');navigate('/admin/customer-support')});await page.getByRole('heading',{name:'New support request'}).waitFor();await page.evaluate(()=>window.fixtureReleaseConfig());await page.waitForTimeout(50);assert.equal(await page.locator('select[data-action="admin-module"]').inputValue(),'customer-support');
+ await page.evaluate(async()=>{const {navigate}=await import('/src/router.js');navigate('/admin/customer-support')});await page.waitForURL('**/admin/customer-support');await page.evaluate(()=>window.fixtureReleaseConfig());await page.getByRole('heading',{name:'New support request'}).waitFor();await page.waitForTimeout(50);assert.equal(await page.locator('select[data-action="admin-module"]').inputValue(),'customer-support');
  for(const role of ['Cashier','Technician','Orbito Support']){
   await page.goto(origin+'/admin/customer-support?fixtureRole='+encodeURIComponent(role));await page.waitForFunction(()=>location.pathname!=='/admin/customer-support');assert.equal(await page.locator('select[data-action="admin-module"] option[value="customer-support"]').count(),0);assert.equal(await page.evaluate(()=>window.fixtureCalls.filter(c=>c.function==='support-tickets').length),0);
  }
@@ -99,7 +101,7 @@ try{
  const stableListeners=await page.evaluate(()=>({...window.fixtureListenerCounts}));
  for(let i=0;i<100;i++)await page.evaluate(async target=>await (await import('/src/router.js')).navigate(target),['/pos','/workshop','/admin/dashboard','/admin/ems'][i%4]);
  assert.deepEqual(await page.evaluate(()=>window.fixtureListenerCounts),stableListeners,'100 transitions retain stable app/document listener counts');
- const beforeEMS=await page.evaluate(()=>window.fixtureCalls.filter(c=>c.table==='employees').length);await page.locator('[data-ems-tab="leaves"]').click();await page.waitForFunction(n=>window.fixtureCalls.filter(c=>c.table==='employees').length===n+1,beforeEMS);assert.equal(await page.evaluate(()=>window.fixtureCalls.filter(c=>c.table==='employees').length),beforeEMS+1);
+ const beforeEMS=await page.evaluate(()=>window.fixtureCalls.filter(c=>c.table==='leaves').length);await page.locator('[data-ems-tab="leaves"]').click();await page.waitForFunction(n=>window.fixtureCalls.filter(c=>c.table==='leaves').length===n+1,beforeEMS);assert.equal(await page.evaluate(()=>window.fixtureCalls.filter(c=>c.table==='leaves').length),beforeEMS+1);
  await page.evaluate(async()=>await (await import('/src/router.js')).navigate('/pos'));await page.locator('[data-action="payment"]').selectOption('Split Payment');assert.equal(await page.locator('[data-split="cash"]').count(),1);
  await page.locator('[data-modal="repair"]').click();await page.locator('#intake-custom-comp-name').fill('Single Enter component');await page.locator('#intake-custom-comp-name').press('Enter');await page.locator('[data-tag-pick="Broken"]').click();assert.equal(await page.evaluate(async()=>(await import('/src/features/pos/repairs/state.js')).getDraft().components.length),1);
  await page.locator('[data-draft-labour]').fill('7.50');assert.equal(await page.evaluate(async()=>(await import('/src/features/pos/repairs/state.js')).getDraft().labour),7.5);

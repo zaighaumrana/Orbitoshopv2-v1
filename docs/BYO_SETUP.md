@@ -1,3 +1,5 @@
+> Historical manual setup record. For supported fresh BYO provisioning use [BYO_GUIDED_SETUP.md](BYO_GUIDED_SETUP.md), the in-app fresh BYO wizard and the approved release preflight. The dated branch/manual deployment steps below are not current customer instructions; use reviewed development or an explicitly approved immutable source revision.
+
 # Legacy cross-account BYO Shop setup reference
 
 **Historical procedure:** use [BYO_GUIDED_SETUP.md](BYO_GUIDED_SETUP.md) for new

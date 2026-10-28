@@ -142,6 +142,15 @@
       "managed": "approved migrations + pinned function packages; canonical runtime checks",
       "byo": "same approved migrations + native CLI packages; customer-controlled runtime checks",
       "verification": "exact source/hash/order/gateway gate; restricted structural capability probe where available"
+    },
+    {
+      "id": "bounded-operational-reads",
+      "purpose": "Complete distinct repair-family search and bounded unified receipt headers; existing stable restrictive consent checks use statement initplans",
+      "migrations": ["20261025233743"],
+      "functions": [],
+      "managed": "Existing pinned migration plan and atomic migration/source ledger envelope",
+      "byo": "Same pinned SQL through the customer-authorized atomic migration/source ledger envelope",
+      "verification": "Invoker/ACL/RLS structural probe plus local independent-oracle, role/consent and fresh/upgrade tests; exact release hash remains separately verified"
     }
   ],
   "runtime": {
@@ -174,7 +183,9 @@
         "public.support_ticket_actor_context()",
         "public.support_consent(text,uuid,uuid,text,text,uuid)",
         "public.support_delivery_claim(uuid)",
-        "public.support_delivery_finish(uuid,uuid,text,uuid,text)"
+        "public.support_delivery_finish(uuid,uuid,text,uuid,text)",
+        "public.get_repair_family_page(text,text,text,integer,integer)",
+        "public.get_receipt_archive_page(text,text,timestamptz,timestamptz,integer,integer)"
       ],
       "tables": [
         "app_private.bridge_events",
@@ -240,7 +251,8 @@
         "20261020135016",
         "20261020135251",
         "20261022155952",
-        "20261023012311"
+        "20261023012311",
+        "20261025233743"
       ],
       "core_functions": [
         "account-admin",
@@ -261,7 +273,8 @@
         "support-identity",
         "support-consent",
         "owner-bootstrap",
-        "support-durable-submissions"
+        "support-durable-submissions",
+        "bounded-operational-reads"
       ],
       "configuration": [
         "runtime",
@@ -310,7 +323,8 @@
         "20261020135016",
         "20261020135251",
         "20261022155952",
-        "20261023012311"
+        "20261023012311",
+        "20261025233743"
       ],
       "core_functions": [
         "account-admin",
@@ -331,7 +345,8 @@
         "support-identity",
         "support-consent",
         "owner-bootstrap",
-        "support-durable-submissions"
+        "support-durable-submissions",
+        "bounded-operational-reads"
       ],
       "configuration": [
         "runtime",

@@ -14,7 +14,8 @@ import { state, money, moneyHTML } from '../../../shared.js'
 import { localDateTime } from '../../../datetime.js'
 import { buildReceiptRecords, filterReceiptRecords } from './receipts.js'
 
-function receiptArchive(adminState) {
+export function receiptArchive(adminState) {
+  if(adminState._receiptPage)return adminState._receiptPage.data
   return filterReceiptRecords(
     buildReceiptRecords(state.data.sales || [], state.data.tickets || []),
     adminState,
@@ -58,8 +59,9 @@ export function receiptsPage({ tit, adminState }) {
       </label>
       <button class="secondary-button" data-action="clear-receipt-filter">Clear</button>
     </div>
+    ${adminState._receiptLookupOnly?'<p class="muted">Enter an exact invoice number to find its complete receipt or repair family.</p>':''}
     <p class="muted" style="font-size:13px;margin-bottom:8px">
-      ${filtered.length} receipt${filtered.length !== 1 ? 's' : ''} / invoice${filtered.length !== 1 ? 's' : ''} found
+      ${adminState._receiptLookupOnly&&!adminState._receiptPage?'Exact invoice lookup':adminState._receiptPage?.mode==='exact-lookup'?`${filtered.length} exact lookup results`:adminState._receiptPage?`${filtered.length} on this ${adminState._receiptPage.mode==='family'?'complete family selection':'page'} · ${adminState._receiptPage.count} matching receipts / invoices`:`${filtered.length} receipts / invoices found`}
     </p>
     <div class="card" style="display:grid;gap:0">
       ${filtered.length ? filtered.map((record, idx) => `
@@ -88,7 +90,7 @@ export function receiptsPage({ tit, adminState }) {
             ${record.kind === 'ticket' ? `<button class="secondary-button" style="font-size:12px" data-action="print-repair-summary" data-ticket-id="${record.rootTicketId}">Print Summary</button>` : ''}
           </div>
         </div>`).join('') :
-      `<div class="empty" style="padding:24px;text-align:center">No receipts found.</div>`}
+      `<div class="empty" style="padding:24px;text-align:center">${adminState._receiptLookupOnly&&!adminState._receiptPage?'Enter the invoice number above.':'No receipts found.'}</div>`}
     </div>`
 }
 
@@ -124,6 +126,8 @@ export function udharListModalHTML() {
 }
 
 export function receiptDetailModalHTML(adminState) {
+  if(state.modal?.readStatus==='loading')return '<div class="modal-backdrop"><div class="modal"><h2>Receipt details</h2><p role="status">Loading selected receipt…</p><button class="secondary-button" data-close>Close</button></div></div>'
+  if(state.modal?.readStatus==='unavailable')return '<div class="modal-backdrop"><div class="modal"><h2>Receipt details unavailable</h2><button class="secondary-button" data-close>Close</button><button class="primary-button" data-action="retry-receipt-detail">Retry</button></div></div>'
   const filtered = receiptArchive(adminState)
   const idx  = adminState.receiptModalIdx ?? 0
   const record = filtered[idx]

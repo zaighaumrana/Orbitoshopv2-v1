@@ -12,10 +12,10 @@ import { escapeHTML } from "../../../html.js"
    before this split.
 ═══════════════════════════════════════════════════════════════════ */
 import { state, money, moneyHTML } from '../../../shared.js'
+import {pageControls} from '../../../bounded-read.js'
 
 export function inventoryPanel(posState) {
   const invItems = (state.data.inventory||[]).filter(i=>Number(i.qty||0)>0)
-  if (!invItems.length) return ''
   const f = (posState.invSearch||'').toLowerCase()
   const filtered = f ? invItems.filter(i=>(i.name||'').toLowerCase().includes(f)||(i.category||'').toLowerCase().includes(f)) : invItems
   return `
@@ -26,11 +26,14 @@ export function inventoryPanel(posState) {
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         ${filtered.slice(0,24).map(i=>`
           <button class="secondary-button" style="font-size:13px;padding:8px 14px;border-radius:8px;text-align:left"
+            ${state.resources.inventory?.status==='ready'?'':'disabled'}
             data-inv-pos-add="${i.id}" data-inv-pos-name="${escapeHTML(i.name)}" data-inv-pos-price="${i.price}">
             <div style="font-weight:600">${escapeHTML(i.name)}</div>
             <div style="font-size:11px;color:var(--muted)">${moneyHTML(i.price)} · ${i.qty} left</div>
           </button>`).join('')}
       </div>
+      <p class="muted" role="status" data-stock-search-status>${state.resources.inventory?.status==='loading'?'Searching current stock…':!filtered.length?'No sellable items on this page.':''}</p>
+      ${pageControls(posState.inventoryPage,'data-stock-page')}
     </div>`
 }
 

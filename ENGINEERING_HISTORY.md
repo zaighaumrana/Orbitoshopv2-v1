@@ -1159,3 +1159,421 @@ close named M1 acceptance oracles rather than adding duplicate test permutations
 Application source is unchanged by this coverage commit. Final exact-candidate
 results and source archive follow in the permanent evidence register; no independent
 review, owner acceptance, merge, deployment or backend operation is implied.
+
+## 2026-10-26 — M2 local baseline and resource contracts
+Branch: feature/shop-modernization-m2
+
+Owner authorized local M2 development atop the verified unmerged M1 tip 4186b518.
+Its empty Cloudflare refresh commit has the same application tree as 1ca15ba3.
+Both development refs and historical checkpoint tags remain unchanged. M1 PR #2 is
+still draft/unmerged with no independent review or owner acceptance recorded;
+M2 publication waits for that dependency or a specific owner decision.
+
+Defined fourteen screen resource/ownership/error/detail contracts and a comparable
+actual-Chromium, synthetic-Auth, delayed-loopback HTTP performance harness. Baseline
+is captured before modifying application loading. Harness development failures and
+early invalid markers are retained outside source and excluded from comparisons.
+Independent full-fixture family/receipt gap tests reproduce why independently
+truncated arrays cannot establish complete search/dedup/family counts. The narrow
+backend scope memo is proposed only; no SQL/function/release/Platform edit is made.
+Disposable Shop identity was verified read-only; available SQL settings did not
+expose its API cap, so the fixture cap is explicitly synthetic. No hosted write,
+provider setting change, agent deployment, push, merge or Platform operation.
+
+## 2026-10-26 — M2 POS critical path and demonstrated shift scope
+Branch: feature/shop-modernization-m2
+
+POS now waits only for bounded projected stock and quick-item selectors after live
+configuration. Intake components, complete collection compatibility read, canonical
+Udhar and shift report are owned on-demand modal reads with local retry/error.
+Return search projects matching invoice identities server-side, verifies complete
+matching pages and then uses the existing canonical return context; no entrance
+sales/return history. Remote stock typing is debounced and generation-owned; cart
+and financial commands remain immediate with original UUID/PIN/ACK ownership.
+Stock refresh after retail ACK is limited to affected visible stock; repair payment
+re-reads its canonical family summary rather than refreshing unrelated histories.
+
+D02 is reproduced against the actual M1 renderer: UTC-prefix/display-name matching
+includes the wrong local day and same-name/unmapped actors. Shift operational rows
+now use the same existing local-midnight half-open report period and canonical
+Auth UUID; legacy unmapped rows are explicitly identified, never guessed by name.
+EMS day policy is unchanged. Complete selected-period reads reject cap/count drift.
+
+First real-browser loopback smoke has six cold/three warm data-service reads
+including config versus twelve/nine at M1; final paired distribution is pending.
+Focused checkout/draft/paging/day-actor cases pass9/9. Large repair collection is
+explicitly unavailable when the existing member array is incomplete; Track B family
+and receipt completeness remain blocked rather than silently showing a partial
+archive. No backend/release/hosted write/Platform/provider change or deployment.
+
+## 2026-10-26 — M2 scoped Admin resources and complete flat pages
+Branch: feature/shop-modernization-m2
+
+Dashboard uses eight projected recent sales, canonical global/day financial reports
+and independent exact root/employee counts. Reports uses its canonical global scope
+and fifteen projected recent summaries, with complete selected sale fetched before
+reprint. Unused ticket/return/Udhar/today reads are removed; complete Udhar detail is
+owned on demand. Inventory imports only for its consumer; Catalog loads only its
+active entitled tab; owner Legal status loads only in Legal settings.
+
+Projected Inventory/Employees/Catalog search runs on the authorized server scope
+with deterministic primary/id order and finite pages, adaptive smaller API caps,
+owned query responses and exact selected editor records. Matching count is distinct
+from page rows; low-stock alerts explicitly describe their page. Recent previews
+reach their finite8/15 bound even below a small cap. POS search keeps its input
+usable while old results are disabled and rejects a late prior query. Incomplete
+legacy family/receipt histories now show unavailable rather than false completeness;
+the approved replacement read contracts remain a separate authorization gate.
+
+Actual application browser with a seven-row synthetic API cap reaches stock and
+employees beyond1,000 records, verifies canonical report scope, complete reprint
+selection, tab scoping and stale search protection. Focused paging and ownership
+tests pass. Final exact-source distribution/audit remain pending. No packaged
+backend, hosted write, Platform source, provider setting or deployment change.
+
+## 2026-10-26 — M2 Workshop expansion and config equivalence
+Branch: feature/shop-modernization-m2
+
+D03 removes every per-root monetary startup RPC. Workshop pages active roots with
+stable timestamp/id ordering and completely retrieves their required children;
+status queries/page totals are distinct from explicitly page-scoped presentation
+filters. Components and exact editor data load on edit. Owner/eligible Support
+financial expansion calls only the existing selected canonical summary, with local
+loading/error/retry and route/selection/authority fences. Technician receives no
+summary action; Manager remains denied Workshop. Canonical summary shape is checked
+before displaying amounts. No batch financial API or backend change.
+
+Configuration shares concurrent equivalent requests only inside its public/app and
+native authority scope. A private one-use proof passes the just-verified initial
+app config into the first screen; later navigation reads fresh config. Reset and
+config mutation invalidate pending work/proofs. No TTL/completed permission cache,
+public/auth conflation, logo Storage migration or changed saved merchant data.
+
+Actual-loader and browser fixtures prove zero startup monetary calls for0/10/100
+roots, all100 roots reachable under a seven-row API cap, selected-only expansion,
+departed response suppression and Support revocation/Technician/Manager negatives.
+Config tests include concurrent reads, native replacement, failure, one-use proof,
+mutation and a max-size embedded payload. Hosted ACLs are not inferred from mocks.
+No Platform source, packaged backend, hosted write, deployment or merge.
+
+## 2026-10-26 — M2 active EMS resources and complete selected payroll period
+Branch: feature/shop-modernization-m2
+
+EMS reads only its active attendance/leave/salary/slip dependencies and a separately
+verified current-attendance banner. Directory/history/slip pages have deterministic
+ordering and explicit matching counts; server history search reaches older data.
+Presentation filters rerender the current bounded page without Supabase reloads.
+Salary config is complete for its selected employee page; salary generation uses
+its own complete approved employee/month attendance and overlapping approved leaves,
+never directory or attendance-page rows. The overlap restriction is equivalent to
+the prior period-clamped calculation; unrelated leaves contribute zero. Existing
+UTC EMS day, Sundays/pay formula, account authority and pending-action fence remain.
+Selected salary reprint reads the complete persisted slip. Failed live attendance
+is unavailable independently; incomplete payroll reads prevent a salary write.
+
+Actual-browser tab/search tests pass with a seven-row cap and older history beyond
+1,000 rows. Actual generator tests verify complete selected-period pages, independent
+expected pay and no write after incomplete attendance. Existing EMS callback/revisit,
+duplicate payroll and departed-result tests remain, with the local-filter oracle
+updated to require zero resource reloads. No SQL/function/release, Platform, hosted
+write, provider change, deployment or merge is performed by this frontend slice.
+
+## 2026-10-26 — M2 browser continuity and expanded SQL investigation scope
+Branch: feature/shop-modernization-m2
+
+Added an extension of the existing native-entry fixture for projected/search/count/
+range/detail query behavior. Actual browser acceptance passes old inventory/staff/
+attendance discovery beyond1,000 rows with a seven-row API cap, exact report/reprint
+detail, deferred POS actions, active Catalog/Legal/EMS resources, zero Workshop money
+at0/10/100 roots, all100 roots paged without duplicates, selected-only summaries and
+stale/revoked/denied cases. The existing M1 entry suite also passes privacy, routing,
+read failures, route recovery,100 transitions/listener stability, Enter and PIN.
+Its held-config test now releases the equivalent shared in-flight read before
+awaiting its successor; the old route still cannot publish. Failed prior fixtures
+and browser attempts remain in the permanent archive.
+
+Owner additionally authorized Docker/local Shop SQL development and a read-only
+study of both development release/provisioning/upgrade implementations. A new
+network-isolated, no-port disposable Supabase PostgreSQL17 container is used; no
+existing container or provider is changed. Real Managed/BYO SQL envelopes install
+all38 immutable v6 migrations in isolated fixtures after supplying synthetic Auth
+prerequisites. This is local SQL evidence, not hosted provisioning/Auth acceptance.
+Current v4→v6 controlled upgrade is supported; v5 is explicitly superseded, and
+protocol/source/gateway gates still govern every transition. New Shop SQL remains
+local; Platform source/selectors/manifests/database require explicit owner approval.
+No final new release fingerprint, Platform edit, push, PR, merge or deployment.
+
+## 2026-10-26 — M2 additive bounded reads and measured consent-policy initplans
+Branch: feature/shop-modernization-m2
+
+Expanded owner scope permits local Shop SQL and Docker validation; the latest
+instruction requires repository migrations delivered by existing provisioning,
+with no direct hosted SQL. Platform investigation remains read-only pending
+explicit approval. Added forward migration20261025233743 and mapped its ninth
+requirement into both existing installer plans. Two invoker/RLS read RPCs select
+distinct roots by any-member search and unified bounded receipt headers with
+global off-page retail deduplication. Exact invoice search returns family identity;
+complete selected-family reads and the inherited helper retain child/date/order
+semantics. An additive config field advertises availability, not permission.
+No monetary batch API, financial write, Edge function or old migration is changed.
+
+EXPLAIN on102,003 tickets/101,003 sales showed the existing stable restrictive
+Support predicate evaluated per row. A transactionally rolled-back prototype
+retaining the same predicate as a statement initplan reduced exploratory median
+receipt SQL6341.955→1976.851ms and family page3601.988→434.142ms(three warm samples).
+The migration preserves restrictive policy roles/USING/WITH CHECK, updates only
+tickets/sales and bounds DDL lock waiting to5s. No speculative index is added.
+Network payload is bounded; exact counts/substrings still scan eligible history.
+These are local synthetic SQL measurements, not hosted/browser performance claims.
+
+Final source evidence: existing modernization archive, M2 evidence run
+20261026T024629Z-M2-012-44d79fa-sql-initplan-final. Fresh Managed/BYO and populated
+v4→v6→forward SQL envelope fixtures all pass39migrations. Complete helper oracles,
+direct RLS wrong-session/revoked/expired/deleted/binding/client negatives, inert
+replay, source conflict, intentional insert+ledger rollback and lock-timeout then
+same-step retry pass. Synthetic Auth fixtures do not prove hosted Auth/provider or
+Edge deployment. Earlier failed and pre-optimization runs remain archived.
+
+Existing v4/v6 packages, customer pins, active v6 selectors and both development
+branches remain unchanged. Final new immutable package/fingerprint, paired release
+catalog/manifests/selectors and parity approval are pending explicit Platform
+integration authorization. Two integrated unit release gates correctly reject the
+old manifest against this new backend source; they have not been relaxed. No
+hosted write, push, PR, merge or deployment is performed by this backend slice.
+
+## 2026-10-26 — M2 capability-gated family and receipt screens
+Branch: feature/shop-modernization-m2
+
+Frontend reads new family/archive APIs only when authenticated bootstrap advertises
+version1. Missing/public/failed/replacement config clears availability; older shops
+retain verified legacy behavior and no newly introduced RPC call. Selected roots
+retain server page order and complete selected children; unsafe numeric identities,
+count drift, duplicate rows, missing roots and departed owners fail closed.
+Admin repairs/Workshop/POS collection search checks parent and child history on an
+upgraded backend. Receipt headers use stable bounded pages; exact child search
+loads the complete cross-date family with the inherited helper and natural sort.
+Opening a normal receipt fetches the full selected sale/ticket, with owned loading,
+error/retry and parent reads. Counts distinguish matching families, pending tickets
+on the current collection page and archive rows. Filtered POS previews say matching
+rather than recent. No command identity, financial authority or role is widened.
+
+Final frontend local evidence: existing M2 archive run
+20261026T153456Z-M2-013-6776983-dialog-browser. Resource browser, M1 entry/100
+transitions/listener/Enter/PIN/privacy/recovery browser and local Vite build all exit0;
+33focused read/config/ownership/legal/period/EMS cases pass. Earlier startup timeout,
+ambiguous main/dialog selectors and predecessor-route test race remain archived;
+fixture synchronization/selectors were corrected without weakening assertions.
+The integrated86-case run retains2 release-source blockers pending approved paired
+integration. Its outdated legal function-signature fixture is repaired and passes.
+
+Backend source remains677698391ae1a77d259022b2453d20dc76e79cd9. A focused local
+Platform release-integration decision is pending in the permanent archive. Final
+paired performance profiles, package/parity, independent audit and M1 publication
+dependency remain open; this slice is not a complete/release-ready M2 milestone.
+No Platform source edit, hosted write, push, PR, merge or deployment is performed.
+
+## 2026-10-26 — M2 undated receipt oracle correction before release freeze
+Branch: feature/shop-modernization-m2
+
+A schema-permitted legacy receipt with a NULL stored date exposed a mismatch in
+an additional independent oracle: the inherited helper includes it for a to-only
+filter, while the initial unpromoted candidate excluded it. The unreleased M2
+draft read migration now preserves that behavior and uses the inherited epoch-zero
+ordering for unknown dates without altering the returned stored date or time policy.
+Nullable parent/child invoices and pre-epoch records are included in the oracle.
+
+All four real Managed/BYO SQL envelope fixtures pass again, including populated
+upgrades, direct/current RLS denial, replay, source conflict, transaction failure and
+lock-timeout/retry. Evidence run:
+20261026T171054Z-M2-012-941cf69-corrected-date-source. The failed preceding oracle
+is retained in20261026T170312Z-M2-009-6776983-null-oracle-run.
+
+The earlier6f817827 local v7 candidate had never been committed, pushed or installed
+by this task. It was verified untracked/unapproved/unsupported and moved, with both
+absolute paths checked inside the workspace, into the failed-oracle evidence as
+superseded-support-v7-6f817827.json. Its fingerprint is invalidated; it is not a final
+release. A replacement is generated only from this newly committed, verified source.
+Older immutable releases, all existing pins and both active v6 selectors stay intact.
+No hosted write or remote Platform operation occurred. The prior local fixture
+container disappeared during the environment restart; its replacement is owned
+container808955b36125974f5ad171aab504c46733017e2dcccf556a6f2d8c4ee13afdd3,
+networknone/ports{}, with synthetic data only.
+
+## 2026-10-26 — M2 older-Shop operation and final paired profile harness
+Branch: feature/shop-modernization-m2
+
+Older supported backends with large histories now retain bounded root pages and
+explicit exact ticket/invoice lookup through existing authenticated APIs. Complete
+small histories retain free-text behavior; a capped member array is never advertised
+as complete. Exact old-invoice lookup fetches the full parent/children and excludes
+repair-linked duplicate retail rows even when the linked repair was outside the
+first page. Old shops need no new RPC for these operations. Broader global text
+search and unified archive pages remain availability-gated for the new backend.
+Page/global/status labels are distinct; the effective cap is preserved when moving
+back from a short final page. Superseded capped-reader code is removed. Workshop
+filters render known statuses only, rather than interpolating arbitrary stored
+status names; unknown text stays escaped and metadata counts are validated.
+
+Actual old/new browser compatibility passes in
+20261026T161730Z-M2-013-941cf69-legacy-compatibility, including full exact receipt/
+family lookup beyond1000 members. Final-short-page cap7 navigation passes in
+20261026T162717Z-M2-013-941cf69-legacy-paging.34focused cases, M1 entry/100-transition/
+listener/Enter/PIN/privacy browser and compile pass in the intervening compatibility
+run; additional actual-render stored-status and benchmark-fixture checks pass.
+Final compile after the pagination/label cleanup exits0. These are local synthetic
+I/O checks, not hosted business or physical-print acceptance.
+
+The matched harness is source-snapshot based, uses schema-correct fixtures and
+real loopback HTTP, fixed response delay and browserCPU4. It supports measured
+search, a max-size merchant logo payload and100-transition GC/DOM observation.
+One unreported warmup and actual cold/warm contexts remain. A fixture unit verifies
+literal punctuation search, exact counts and stable multi-column ordering. Both
+immutable M1 and current-source one-sample smoke profiles pass; these are not final
+20-sample distributions. Initial fixture/header corrections and failed text-edit
+source are retained, as are all original pre-implementation baseline distributions.
+
+The local v7 customer catalog and existing parity wrapper support explicit candidate
+review, without changing the ordinary approved-active gate or v6 BYO selector.
+Backend source is50b94931ecf743166136b2c562cbb6d2fbaebdc7; verified replacement
+fingerprint is c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada.
+The earlier6f candidate is superseded and never a final approved package. Platform
+integration is local-only under the owner's explicit approval; no remote Platform
+operation, application deployment, push, PR or merge has occurred.
+
+## 2026-10-26 — Pair local M2 release review sources without promotion
+Branch: feature/shop-modernization-m2
+
+The owner-authorized local Platform candidate is committed at
+cedde3838e039b2ec9aebc163153e01253ede1ca. Pinned the paired review workflow to that
+exact source and added explicit support-v7 candidate review while retaining the
+ordinary approved-active release gate. That latter gate intentionally blocks
+promotion until the actual Managed selector and BYO manifest are separately
+reviewed. No workflow ran remotely and no Platform operation was published.
+Final backend source remains 50b94931ecf743166136b2c562cbb6d2fbaebdc7 with fingerprint
+c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada.
+This workflow/history-only change does not alter the backend package or browser
+behavior. Exact local candidate parity and immutable-source proofs are archived
+with M2 review evidence; no database, merge or deployment change occurred.
+
+## 2026-10-26 — Preserve benchmark timeout diagnostics and final release decision
+Branch: feature/shop-modernization-m2
+
+Added failure-only DOM/resource/read/route diagnostics to the browser measurement
+harness after one cold Reports sample timed out without a page error. The failed
+20-sample batch is preserved (Reports19valid, all other screens20); a separate
+30-sample Reports candidate run passes without reproduction. This is an unresolved
+benchmark anomaly, not silently discarded evidence or an established production
+root cause. Diagnostics do not change the timed path or application/backend code.
+Updated the backend decision with the owner-approved local Platform integration,
+final corrected c4 fingerprint, old-backend exact-lookup compatibility and retained
+promotion gates. These test/documentation changes do not invalidate packaged
+backend bytes or prior business/security tests. Final profile closure remains
+pending; no remote operation or deployment occurred.
+
+## 2026-10-27 — Approved support-v7 source selector and controlled-upgrade guide
+Branch: feature/shop-modernization-m2
+
+Source now selects the immutable support-v7 c4d210d0... fingerprint, backend source
+50b94931ecf743166136b2c562cbb6d2fbaebdc7, 39 migrations/seven unchanged Edge packages.
+Shop catalog agrees with Platform: v7 single fresh-approved, v6 historically supported,
+v5 unsupported. Historical packages, source SQL, JWT settings, pins and original
+jobs remain unchanged. Shared classifier incorporates PR6's independent drift/evidence
+and version-aware capability logic exactly; customer scripts gain no provider access.
+The authoritative CONTROLLED_BACKEND_UPGRADES guide covers exact installed-source
+assessment, Master approval/separate clearance, authorized customer apply, final
+evidence and original-request/journal recovery. Old ungated terminal Managed and
+uncleared BYO instructions are superseded. V6→v7 expects one SQL/zero changed functions.
+
+Normal cross-repo parity, immutable/source integrity, focused release/upgrade/clearance
+contracts and PR6 evidence/capability checks pass. Seven PowerShell blocks parse and
+upgrade flags match the real parser. A single isolated Platform PG17 policy fixture
+passes with original history preserved. Initial stale fixture assumptions were fixed;
+no production verification gate changed. No browser, benchmarks or full suite ran.
+
+Owner authorizes existing branches to be pushed and configured automatic Pages builds,
+without skip markers, ending in an empty deployment-trigger commit. Exact paired CI
+source, pushed identities/results are retained in M2 evidence. Both PRs remain Draft/
+Open; no merge, hosted Supabase write/function deployment or Shop upgrade is performed.
+Hosted activation and customer installation remain owner actions. Full source evidence
+limits, F22 deferral and other M2 acceptance obligations remain explicitly separate.
+
+## 2026-10-28 — Customer BYO release preflight and native CLI guidance
+Branch: feature/shop-modernization-m2
+
+Added customer-only local source preflight using the existing approved manifest,
+public customer catalog, canonical source hash, exact provenance, executable plan
+and committed backend ancestry. The expected SHA from authorized Platform can be
+supplied explicitly. It reads no private Platform code or provider state. Inspection
+and upgrade review/apply invoke it before provider access. The internal paired
+checker remains authoritative; an early compatibility check explains stale v6/38
+Platform versus M2/39 Shop, including sibling/override recovery, instead of a raw
+assertion. V7/historical package bytes and fingerprints remain unchanged.
+
+Native CLI discovery supports Windows PATH/Path and tries compatible executables,
+including Scoop shims, retaining explicit native override compatibility. Normal
+instructions use supabase directly with official Scoop installation; no package
+runner is introduced. Project/account/private-folder errors give safe recovery.
+Controlled-upgrade and BYO references now defer to the primary in-app guide and
+distinguish external customer preflight from internal paired source validation.
+
+Three focused preflight/native/identity groups, paired current/stale cases, one
+existing clearance transport group and ordinary source parity PASS. Platform's
+three guide and four navigation groups, 15 PowerShell blocks, flags/import/syntax
+checks PASS. No browser, broad suites, benchmarks or Docker/SQL. Owner authorizes
+normal commits/pushes and automatic Pages builds; Draft/Open PRs remain unmerged.
+No SQL/Edge/package/executor/authorization change or actual customer upgrade occurs.
+Small M2 evidence records exact files, commits, results and owner acceptance steps.
+
+## 2026-10-28 — Specific controlled-upgrade input diagnostics
+Branch: feature/shop-modernization-m2
+
+Replaced the combined upgrade argument failure with a focused parser that identifies
+missing/invalid mode, exact project, client ID, source SHA, journal path and review/
+apply selection. Missing option values, duplicates and conflicting flags fail closed
+with nonzero exit. Unsupported historical source remains denied with evidence-review
+recovery. The executor, release preflight, authorization, clearance, journals, original
+request and provider fences are unchanged; no SQL/Edge/package source changed.
+
+Technical guides now describe the repaired in-app fresh-wizard-style instructions:
+complete self-contained PowerShell blocks, default/original private-folder restoration,
+unique reports, actual contract/identity/plan checks and explicit terminal PASS/STOP.
+A clean older M2 checkout gets guarded fetch/--ff-only recovery; dirty/wrong/divergent
+source stops. Developer parity remains outside customer stages. The actual trial
+checkout and private files were untouched.
+
+Focused checks cover one actual read-only assessment using synthetic native/provider
+responses, fresh-terminal copied inventory/assessment blocks, and specific invalid-
+input/nonzero-exit behavior. No provider write or journal replacement occurs. Platform
+checks cover customer commands, local guide navigation and copy-control rendering.
+Only the failed multiline-stdin test harness was repaired and rerun through an isolated
+script file. No browser, broad suite, benchmark or Docker/SQL work was done. Existing
+Draft PR3 push and automatic Pages build are owner-authorized; no skip/empty trigger,
+merge, actual upgrade or hosted Supabase change is performed.
+
+## 2026-10-28 — Final M2 local pre-merge cleanup
+
+Owner reports 7/7 live Managed/BYO disposable-Shop functional checks accepted and
+both support-v7 controlled upgrades complete/recorded. This cleanup does not rerun
+or independently certify those operations, performance or deployed source.
+
+Removed operational temporary-branch dependencies from supported guides, source
+recovery/help, setup gating, links and CI triggers. Historical commit/source hashes,
+immutable releases and dated PR/engineering evidence are preserved. Broken audit
+links now use verified immutable merged snapshots. Root AGENTS uses durable
+main/development and pre-merge dependency-hygiene rules. Paired CI retains compatible
+immutable peer pins across either merge order and branch retirement; customer
+preflight still needs no private Platform checkout. The safe customer-reference
+handoff order is Shop PR3 then Platform PR6, using merge commits to preserve the
+approved backend source ancestry. No branch deletion is authorized.
+
+Focused UI/history, generated PowerShell syntax/reference, source-preflight, setup
+validation, paired v7 parity and narrow workflow checks pass. No broad/browser,
+performance, Docker or hosted Supabase work. V7 remains c4d210d0… / 39 migrations /
+7 functions / 9 requirements. Changes stay LOCAL/UNCOMMITTED pending explicit owner
+commit-and-push approval; merging requires another separate approval. Full results,
+exact files and acceptance attribution are in the single M2 final cleanup report.
+Publication authorization update: the owner explicitly approved Gate 1 for normal
+commits/pushes of the reviewed cleanup on both existing M2 branches, with automatic
+Pages builds. Exact commit/CI/deployment outcomes are recorded in the existing final
+cleanup report. STOP before merge; separate owner authorization is still required.
+No local/remote branches may be deleted. No additional feature/backend work authorized.

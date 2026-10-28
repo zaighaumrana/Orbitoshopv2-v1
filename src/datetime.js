@@ -15,3 +15,15 @@ export function localDateKey(value) {
   if (Number.isNaN(date.getTime())) return ''
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
 }
+
+// The existing financial report uses browser-local midnight and a half-open
+// ISO interval. Share that same scope; this adds no timezone setting/policy.
+export function localReportPeriod(now=new Date()) {
+  const start=new Date(now);start.setHours(0,0,0,0)
+  const end=new Date(start);end.setDate(end.getDate()+1)
+  return {from:start.toISOString(),to:end.toISOString(),label:localDateKey(start)}
+}
+export function actorPeriodRows(rows,period,actor) {
+  const from=databaseDate(period.from).getTime(),to=databaseDate(period.to).getTime()
+  return rows.filter(row=>row.created_by_auth_user_id===actor&&databaseDate(row.created_at).getTime()>=from&&databaseDate(row.created_at).getTime()<to)
+}

@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {ConfigurationError,validatePublicConfig,validateTurnstileSecret} from './byo-public-config.mjs';
 import {validClientId,validShopProject} from './byo-identity.mjs';
+import {customerReleasePreflight} from './release-preflight.mjs';
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 
 const REQUIRED=['migrations','database_privileges','rpc_privileges','sequence_privileges','private_config','storage','database_reachable','bridge_configuration','edge_functions','runtime_configuration','authentication'];
@@ -64,7 +65,9 @@ export async function runSetup(args,deps={}){
   if(result.error || result.status!==0)fail('Local CLI operation failed. Check authorised project access, CLI installation and migrations. Raw CLI output is suppressed to protect credentials.');
   return result.stdout;
  });
- if(!['feature/onboarding-v2','development','feature/verified-customer-support-shop'].includes(invoke('git',['branch','--show-current']).trim()))fail('Run from a reviewed Shop development/release branch.');
+ // Approved metadata and committed backend provenance are authoritative, not a
+ // temporary branch name. This also supports an owner-reviewed immutable checkout.
+ customerReleasePreflight(ROOT);
  const file=deps.privateFile||privateFile,pairPath=file(opt['pairing-file'],root),runtimePath=file(opt['runtime-file'],root);
  if(pairPath===runtimePath)fail('Keep pairing and application runtime files separate.');
  const read=deps.read||((path)=>readFileSync(path,'utf8'));
@@ -79,7 +82,7 @@ export async function runSetup(args,deps={}){
  const secretHelp=invoke(cli,['secrets','set','--help']);
  if(!deploymentHelp.includes('--use-api')||!secretHelp.includes('--env-file'))fail('Installed Supabase CLI lacks the required setup flags. Update it from the official source.');const projects=JSON.parse(invoke(cli,['projects','list','--output','json']));
  if(!Array.isArray(projects)||!projects.some(p=>p.id===opt['project-ref']))fail('Current Supabase CLI account cannot access the selected Shop project. Obtain temporary authorised project access or use screen sharing.');
- report('PASS: branch, target, separate secret files and project visibility in the current CLI account.');
+ report('PASS: approved source provenance, target, separate secret files and project visibility in the current CLI account.');
  if(!opt.apply){report('VALIDATION ONLY: no hosted changes made. After approved full migration release, rerun with --apply.');return;}
  const backend=buildRelease(ROOT,{support:true}),plan=installationPlan(backend,'byo');
  const manifest=JSON.parse(readFileSync(resolve(ROOT,'scripts/byo-release-manifest.json'),'utf8'));

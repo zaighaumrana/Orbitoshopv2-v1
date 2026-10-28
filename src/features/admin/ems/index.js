@@ -28,8 +28,9 @@ import {
 import { navigate } from '../../../router.js'
 import { dlog, dstack } from '../../../debuglog.js'
 import {onPrivateReset,authorityIdentity} from '../../../ui-authority.js'
-import {settleRead,readStates} from '../../../read-state.js'
+import {settleRead} from '../../../read-state.js'
 import {captureView,ViewExpired,listenOwned,viewAwait} from '../../../ui-lifecycle.js'
+import {readPage,readComplete,pageControls,searchColumns} from '../../../bounded-read.js'
 
 let SESSION         = {}
 let _eventsAttached = false
@@ -44,6 +45,9 @@ const emsState = {
   selectedEmployee: null,
   selectedMonth:    new Date().getMonth() + 1,
   selectedYear:     new Date().getFullYear(),
+  offset:0,
+  search:'',
+  slipOffset:0,
 }
 const initialEMS={...emsState}
 onPrivateReset(()=>{SESSION={};emsController=null;Object.assign(emsState,initialEMS)})
@@ -54,37 +58,41 @@ onPrivateReset(()=>{SESSION={};emsController=null;Object.assign(emsState,initial
    If gate is needed it renders the clock-in screen.
    If not needed it calls onProceed() immediately.
 ════════════════════════════════════════════════════════════════ */
-export async function loadEMSData() {
+export async function loadEMSData(options={}) {
   const current=captureView()
   const today = new Date().toISOString().slice(0, 10)
-  const [employees, attendance, leaves, salaryConfigs, slips] = await Promise.all([
-    sb.from('employees').select('id, name, role, status, email').order('name'),
-    sb.from('attendance').select('*, employees(name, role)')
-      .order('clock_in', { ascending: false }).limit(200),
-    sb.from('leaves').select('*, employees!leaves_employee_id_fkey(name, role)')
-      .order('created_at', { ascending: false }),
-    sb.from('salary_config').select('*, employees(name, role)'),
-    sb.from('salary_slips').select('*, employees(name)').order('year', { ascending: false }).order('month', { ascending: false }),
-  ].map(settleRead))
-  if(!current())throw new ViewExpired()
-
-  // Who is live clocked in right now
-  const live = await settleRead(sb.from('attendance')
-    .select('*, employees(name, role)')
-    .eq('date', today)
-    .is('clock_out', null))
-  if(!current())throw new ViewExpired()
-  const reads=readStates({employees,attendance,leaves,salaryConfigs,slips,liveNow:live})
-  if(Object.values(reads.resources).some(r=>r.status!=='ready'))throw Error('EMS data unavailable. Retry reads; no empty history or payroll result is implied.')
-
-  return {
-    employees:     employees.data    || [],
-    attendance:    attendance.data   || [],
-    leaves:        leaves.data       || [],
-    salaryConfigs: salaryConfigs.data|| [],
-    slips:         slips.data        || [],
-    liveNow:       live.data,
-  }
+  const tab=emsState.tab,offset=emsState.offset,search=emsState.search,slipOffset=emsState.slipOffset
+  const owned=()=>current()&&tab===emsState.tab&&offset===emsState.offset&&search===emsState.search&&slipOffset===emsState.slipOffset
+  const data={employees:[],attendance:[],leaves:[],salaryConfigs:[],slips:[],liveNow:options.previous?.liveNow??null,page:null,tab}
+  const live=options.tabOnly?Promise.resolve({data:data.liveNow}):settleRead(readComplete(()=>sb.from('attendance')
+    .select('id,employee_id,date,clock_in,clock_out,employees(name,role)',{count:'exact'})
+    .eq('date',today).is('clock_out',null).order('id'),{current:owned}))
+  if(!options.liveOnly){
+    const query=()=>{
+      if(tab==='salary'||tab==='slips')return searchColumns(sb.from('employees').select('id,name,role,status,email',{count:'exact'}).eq('status','Active'),['name','email'],search).order('name').order('id')
+      let builder=sb.from(tab==='attendance'?'attendance':'leaves')
+        .select(tab==='attendance'?`id,employee_id,date,clock_in,clock_out,employees${search?'!inner':''}(name,role)`:`*,employees:employees!leaves_employee_id_fkey${search?'!inner':''}(name,role)`,{count:'exact'})
+      if(search)builder=builder.ilike('employees.name','%'+search.replace(/[\\%_]/g,'\\$&')+'%')
+      return builder.order(tab==='attendance'?'clock_in':'created_at',{ascending:false}).order('id',{ascending:false})
+    }
+    const page=await readPage(query,{offset,size:offset?options.previous?.page?.size||25:25,current:owned})
+    if(!owned())throw new ViewExpired()
+    data.page=page
+    if(tab==='attendance')data.attendance=page.data
+    if(tab==='leaves')data.leaves=page.data
+    if(tab==='salary'||tab==='slips'){
+      data.employees=page.data
+      if(tab==='salary'&&page.data.length)data.salaryConfigs=(await readComplete(()=>sb.from('salary_config').select('*,employees(name,role)',{count:'exact'}).in('employee_id',page.data.map(e=>e.id)).order('id'),{current:owned})).data
+      if(tab==='slips'){
+        const slips=await readPage(()=>sb.from('salary_slips').select('*,employees(name)',{count:'exact'}).order('year',{ascending:false}).order('month',{ascending:false}).order('id',{ascending:false}),{offset:slipOffset,size:slipOffset?options.previous?.slipPage?.size||25:25,current:owned})
+        data.slips=slips.data;data.slipPage=slips
+      }
+    }
+  }else Object.assign(data,options.previous)
+  const result=await live
+  if(!owned())throw new ViewExpired()
+  data.liveNow=result.error?null:result.data
+  return data
 }
 
 export function emsView(emsData, sess) {
@@ -107,6 +115,10 @@ export function emsView(emsData, sess) {
             data-ems-tab="${k}">${l}</button>`).join('')}
       </div>
 
+      <div class="toolbar"><label>Search all ${emsState.tab==='salary'||emsState.tab==='slips'?'active employees':'matching history'} by employee name<input class="search" data-ems-server-search value="${escapeHTML(emsState.search)}"></label><button class="secondary-button" data-ems-run-search>Search</button></div>
+      ${pageControls(emsData.page,'data-ems-page')}
+      <p class="muted">History and directory pages are separate from complete payroll-period reads. Presentation filters below apply to this page.</p>
+
       <!-- Tab content -->
       ${emsState.tab === 'attendance' ? attendanceTab(emsData) : ''}
       ${emsState.tab === 'leaves'     ? leavesTab(emsData)     : ''}
@@ -117,6 +129,7 @@ export function emsView(emsData, sess) {
 
 /* ── Live banner ── */
 function liveBanner(liveNow) {
+  if(!Array.isArray(liveNow))return `<div role="alert">Current attendance indicator unavailable.<button class="secondary-button" data-ems-retry-live>Retry current attendance</button></div>`
   if (!liveNow.length) return `
     <div style="padding:12px 16px;background:var(--surface-2);
                 border-radius:10px;font-size:13px;color:var(--muted)">
@@ -169,12 +182,12 @@ function attendanceTab(emsData) {
 
   return `
     <div style="display:grid;gap:12px">
-      <input class="search" placeholder="Search employee…"
+      <input class="search" placeholder="Filter this page by employee…"
         data-ems-attendance-filter value="${escapeHTML(emsState.attendanceFilter)}"
         style="max-width:300px">
 
       ${Object.keys(byDate).length === 0
-        ? `<div class="empty">No attendance records yet.</div>`
+        ? `<div class="empty">No attendance matches on this page.</div>`
         : Object.entries(byDate).map(([date, rows]) => `
         <div class="card" style="padding:0;overflow:hidden">
           <div style="padding:10px 14px;background:var(--surface-2);
@@ -362,6 +375,7 @@ function slipsTab(emsData) {
       </div>
 
       <!-- Existing slips -->
+      ${pageControls(emsData.slipPage,'data-ems-slip-page')}
       ${emsData.slips.length ? `
         <div class="card" style="padding:0;overflow:hidden">
           <div style="padding:10px 14px;background:var(--surface-2);
@@ -417,22 +431,22 @@ export async function generateSalarySlip(employeeId, month, year, generatedBy) {
 
   // Get attendance for this month
   const monthStr = `${year}-${String(month).padStart(2,'0')}`
-  const { data: attendance,error:attendanceError } = await sb.from('attendance')
-    .select('*')
+  const { data: attendance,error:attendanceError } = await settleRead(readComplete(()=>sb.from('attendance')
+    .select('*',{count:'exact'})
     .eq('employee_id', employeeId)
     .gte('date', `${escapeHTML(monthStr)}-01`)
-    .lte('date', `${escapeHTML(monthStr)}-${daysInMonth}`)
+    .lte('date', `${escapeHTML(monthStr)}-${daysInMonth}`).order('id'),{current}))
   if(!current())throw new ViewExpired()
   if(attendanceError||!Array.isArray(attendance))return {ok:false,error:'Required attendance is unavailable; salary was not generated.'}
 
   const daysPresent = (attendance || []).filter(r => r.clock_out).length
 
   // Get approved leaves for this month
-  const { data: leaves,error:leavesError } = await sb.from('leaves')
-    .select('*')
+  const { data: leaves,error:leavesError } = await settleRead(readComplete(()=>sb.from('leaves')
+    .select('*',{count:'exact'})
     .eq('employee_id', employeeId)
     .eq('status', 'Approved')
-    .or(`from_date.gte.${escapeHTML(monthStr)}-01,to_date.lte.${escapeHTML(monthStr)}-${daysInMonth}`)
+    .lte('from_date',`${monthStr}-${daysInMonth}`).gte('to_date',`${monthStr}-01`).order('id'),{current}))
   if(!current())throw new ViewExpired()
   if(leavesError||!Array.isArray(leaves))return {ok:false,error:'Required leave history is unavailable; salary was not generated.'}
 
@@ -519,8 +533,8 @@ export function buildSalarySlipHTML(slip, employeeName, shopName) {
    EMS EVENT HANDLERS
    Call attachEMSEvents(app, emsData, reloadFn, sess) from admin.js
 ════════════════════════════════════════════════════════════════ */
-export function attachEMSEvents(app, getEMSData, reloadFn, sess, isCurrent=captureView()) {
-  emsController={getEMSData,reloadFn,sess,isCurrent,busy:pendingEMSActions}
+export function attachEMSEvents(app, getEMSData, reloadFn, sess, isCurrent=captureView(),renderFn=()=>{}) {
+  emsController={getEMSData,reloadFn,renderFn,sess,isCurrent,busy:pendingEMSActions}
   SESSION = sess
   if (_eventsAttached) return
   _eventsAttached = true
@@ -530,18 +544,23 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess, isCurrent=captu
     const controller=emsController,{getEMSData,reloadFn,sess}=controller,current=()=>eventCurrent()&&emsController===controller
     if (window.location.pathname !== '/admin/ems' || !can('ems', state.role)) return
     const el = e.target.closest(
-      '[data-ems-tab],[data-ems-leave-filter],[data-ems-leave-action],[data-print-slip]'
+      '[data-ems-tab],[data-ems-leave-filter],[data-ems-leave-action],[data-print-slip],[data-ems-page],[data-ems-slip-page],[data-ems-run-search],[data-ems-retry-live]'
     )
     if (!el) return
+    if(el.dataset.emsRetryLive!==undefined){await viewAwait(current,()=>reloadFn({liveOnly:true}));return}
+    if(el.dataset.emsRunSearch!==undefined){emsState.offset=0;await viewAwait(current,()=>reloadFn({tabOnly:true}));return}
+    if(el.dataset.emsPage){const page=getEMSData().page;if(page){emsState.offset=el.dataset.emsPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size);await viewAwait(current,()=>reloadFn({tabOnly:true}))}return}
+    if(el.dataset.emsSlipPage){const page=getEMSData().slipPage;if(page){emsState.slipOffset=el.dataset.emsSlipPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size);await viewAwait(current,()=>reloadFn({tabOnly:true}))}return}
 
     if (el.dataset.emsTab) {
       emsState.tab = el.dataset.emsTab
+      emsState.offset=0;emsState.search='';emsState.slipOffset=0
       await viewAwait(current,()=>reloadFn()); return
     }
 
     if (el.dataset.emsLeaveFilter) {
       emsState.leaveFilter = el.dataset.emsLeaveFilter
-      await viewAwait(current,()=>reloadFn()); return
+      controller.renderFn();return
     }
 
     if (el.dataset.emsLeaveAction) {
@@ -560,8 +579,10 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess, isCurrent=captu
     if (el.dataset.printSlip) {
       const slipId   = Number(el.dataset.printSlip)
       const emsData  = getEMSData()
-      const slip     = emsData.slips.find(s => s.id === slipId)
-      if (!slip) return
+      const selected=await sb.from('salary_slips').select('*,employees(name)').eq('id',slipId).single()
+      if(!current())return
+      const slip=selected.data
+      if(selected.error||!slip){showBlockingError('Complete selected salary slip unavailable. Retry reads.');return}
       const { printThermal } = await import('../../../print/print.js')
       if(!current())return
       printThermal(buildSalarySlipHTML(slip, slip.employees?.name || '—', CFG.shop_name))
@@ -574,8 +595,10 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess, isCurrent=captu
     if (window.location.pathname !== '/admin/ems' || !can('ems', state.role)) return
     const t = e.target
     if (t.dataset.emsAttendanceFilter !== undefined) {
-      emsState.attendanceFilter = t.value;await viewAwait(()=>eventCurrent()&&emsController===controller,()=>controller.reloadFn())
+      emsState.attendanceFilter=t.value
+      if(eventCurrent()&&emsController===controller)controller.renderFn()
     }
+    if(t.dataset.emsServerSearch!==undefined)emsState.search=t.value
   },error=>showBlockingError(error.message))
 
   listenOwned(app,'submit',ownsEMS,async (e,eventCurrent) => {

@@ -20,11 +20,12 @@ function providerWriteState(j){
  return ['Preflight','Ready for installation'].includes(j.state)?'none':'possible';
 }
 export function outsideRepos(path){
+ if(!existsSync(dirname(resolve(path))))throw new ConfigurationError('Private output folder is unavailable. Create a restricted folder outside both repositories, then reuse the original journal and filenames.');
  const absolute=resolve(path),physical=existsSync(absolute)?realpathSync(absolute):join(realpathSync(dirname(absolute)),absolute.split(/[\\/]/).at(-1));
  for(const repo of [root,resolve(root,'../orbito')]){const rel=relative(existsSync(repo)?realpathSync(repo):repo,physical);if(!isAbsolute(rel)&&rel!=='..'&&!rel.startsWith('..'+sep))throw Error('Keep setup files outside both repositories.');}return absolute;
 }
 export function nativeCliCandidates(env=process.env,home=homedir()){
- const executable=process.platform==='win32'?'supabase.exe':'supabase',candidates=(env.PATH||'').split(sep==='\\'?';':':').filter(Boolean).map(p=>join(p,executable));
+ const executable=process.platform==='win32'?'supabase.exe':'supabase',candidates=(env.PATH||env.Path||'').split(sep==='\\'?';':':').filter(Boolean).map(p=>join(p,executable));
  const cache=env.npm_config_cache|| (process.platform==='win32'?join(env.LOCALAPPDATA||join(home,'AppData','Local'),'npm-cache'):join(home,'.npm'));
  const npx=join(cache,'_npx');
  if(existsSync(npx))for(const entry of readdirSync(npx,{withFileTypes:true}).filter(e=>e.isDirectory())){
@@ -40,6 +41,11 @@ export function checkedCli(cli,invoke){
  for(const [args,flags] of [[['db','query','--help'],['--linked','--project-ref','--file','--output-format']],[['functions','deploy','--help'],['--use-api']],[['secrets','set','--help'],['--env-file']]]){
   const help=invoke(cli,args);if(flags.some(f=>!help.includes(f)))throw Error('CLI lacks required capabilities.');
  }return version;
+}
+export function findNativeCli(override,invoke,candidates=nativeCliCandidates()){
+ if(override){try{checkedCli(override,invoke);return override;}catch(error){if(error instanceof ConfigurationError)throw error;throw new ConfigurationError('The explicit native CLI lacks required supported capabilities. Update it through the official Scoop bucket and run supabase --version; do not use a shell wrapper.');}}
+ for(const candidate of candidates){try{checkedCli(candidate,invoke);return candidate;}catch{}}
+ throw new ConfigurationError('Native Supabase CLI with required capabilities was not found. Install via the official Scoop bucket, reopen PowerShell, then run supabase --version. If installed, repair PATH or use --cli with the native executable. Do not use a shell wrapper.');
 }
 export function guardedInvoke(journal,save,invoke,report=()=>{}){
  return argv=>{
@@ -69,7 +75,7 @@ export async function setupByo(args,deps={}){
  try{
   if(opt['--login']){
    let selected=opt['--cli'];if(selected)checkedCli(selected,invoke);else for(const candidate of nativeCliCandidates()){try{checkedCli(candidate,invoke);selected=candidate;break;}catch{}}
-   if(!selected)throw new ConfigurationError('Compatible native Supabase CLI v2 not found. Run npx --yes supabase@2.120.0 --version to install the reviewed tooling, then retry --login.');
+   if(!selected)throw new ConfigurationError('Native Supabase CLI is unavailable. Install with Scoop from the official Supabase bucket, reopen PowerShell and run supabase --version; repair PATH before retrying login.');
    report('Sign in only with the customer-owned Supabase account. No account token is sent to Platform or saved in the setup journal.');
    if(deps.invoke)invoke(selected,['login']);else{const result=spawnSync(selected,['login'],{cwd:root,stdio:'inherit',shell:false,windowsHide:true});if(result.error||result.status!==0)throw new ConfigurationError('Customer CLI login did not complete. Retry --login in an interactive terminal.');}
    return;

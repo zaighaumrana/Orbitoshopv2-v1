@@ -28,27 +28,33 @@ import { findRepairFamilies, groupRepairFamilies, matchedRepairChild, repairFami
 import { navigate } from '../router.js'
 import { dlog, dstack, callerInfo } from '../debuglog.js'
 import {captureAuthority,onPrivateReset} from '../ui-authority.js'
+import {readPage,readComplete,pageControls} from '../bounded-read.js'
+import {hasReadContract,repairFamilyPage} from '../backend-reads.js'
 
 /* ── Workshop state ── */
 const wsState = {
   familySummaries: new Map(),
   filter:      '',
   statusFilter: 'all',  // 'all' | 'Pending' | 'In Progress' | 'Ready'
+  page:null,
+  expandedFinance:null,
+  financeRequest:0,
 }
 
 let SESSION        = {}
 let _eventsAttached = false
 let workshopNavigationIsCurrent=()=>false,workshopLoadGeneration=0
+let workshopSearchTimer=null
 const ownsWorkshop=()=>workshopNavigationIsCurrent()&&window.location.pathname==='/workshop'&&state.role===SESSION.employee?.role&&can('workshop',state.role)
-onPrivateReset(() => {workshopLoadGeneration++;workshopNavigationIsCurrent=()=>false;SESSION={};wsState.familySummaries=new Map();wsState.filter='';wsState.statusFilter='all'})
+onPrivateReset(() => {workshopLoadGeneration++;clearTimeout(workshopSearchTimer);workshopNavigationIsCurrent=()=>false;SESSION={};wsState.familySummaries=new Map();wsState.filter='';wsState.statusFilter='all';wsState.page=null;wsState.expandedFinance=null;wsState.financeRequest++})
 
 /* ── Load ── */
-async function load() {
+async function load(verifiedConfig,offset=0) {
   const generation=++workshopLoadGeneration,view=captureView(),navigation=workshopNavigationIsCurrent
   const current=()=>generation===workshopLoadGeneration&&view()&&navigation()
   const loadSession = SESSION
   dlog('WORKSHOP.load', 'ENTRY')
-  const configReady=await loadConfig()
+  const configReady=await loadConfig(false,verifiedConfig)
   if(!current())return
   if(!configReady){state.resources={config:{status:'unavailable'}};render();return}
   if (window.location.pathname !== '/workshop' || state.role !== SESSION.employee?.role) return
@@ -57,43 +63,72 @@ async function load() {
     document.getElementById('app').textContent = 'Workshop is unavailable for this client. Contact your administrator.'
     return
   }
-  const [tickets, repairComponents] = await Promise.all([
-    sb.from('tickets')
-      .select('*')
+  const completeSearch=hasReadContract('repair_families')
+  const tickets=await settleRead(completeSearch?repairFamilyPage({search:wsState.filter,context:'workshop',status:wsState.statusFilter,offset,current}):readPage(()=>{
+    let query=sb.from('tickets')
+      .select('*',{count:'exact'})
       .is('parent_ticket_id', null)
       .not('status', 'in', '("Delivered","Declined","Cancelled")')
-      .order('created_at', { ascending: false }),
-    sb.from('repair_components').select('*').order('sort_order'),
-  ].map(settleRead))
+    if(wsState.statusFilter!=='all')query=query.eq('status',wsState.statusFilter)
+    return query.order('created_at',{ascending:false}).order('id',{ascending:false})
+  },{offset,size:offset?wsState.page?.size||25:25,current}))
   if(!current())return
   // Child lifecycle may differ from its active root. Fetch those children
   // without loading unrelated closed families or consulting financial RPCs.
   const roots = tickets.error?[]:tickets.data || []
-  const children = roots.length ? await settleRead(sb.from('tickets').select('*')
+  const children = !completeSearch&&roots.length ? await settleRead(readComplete(()=>sb.from('tickets').select('*',{count:'exact'})
     .in('parent_ticket_id', roots.map(ticket => ticket.id))
-    .order('created_at', {ascending:true})) : {data:[]}
+    .order('created_at', {ascending:true}).order('id'),{current})) : {data:[]}
   if(!current())return
   if (SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== '/workshop' || !can('workshop', state.role)) return
-  const reads=readStates({tickets,children,repairComponents})
+  const reads=readStates({tickets,children})
   state.resources=reads.resources
   if(!resourceReady(reads.resources,'tickets','children')){
     state.resources.tickets.status='incomplete';state.data.tickets=null;wsState.familySummaries=new Map();render();return
   }
   state.data.tickets = [...roots, ...reads.values.children]
-  state.data.repairComponents = reads.values.repairComponents
+  state.data.repairComponents = []
+  wsState.page=tickets.error?null:tickets
   wsState.familySummaries = new Map()
-  if (['Business Owner','Manager','Cashier','Orbito Support'].includes(SESSION.employee?.role)) {
-    const roots = groupRepairFamilies(state.data.tickets)
-    await Promise.all(roots.map(async ({root}) => {
-      const result = await getRepairFamilySummary(root.id)
-      if(!current())return
-      if (result.ok) wsState.familySummaries.set(String(root.id), result.data)
-    }))
-  }
+  wsState.expandedFinance=null;wsState.financeRequest++
   if(!current())return
   applyBranding()
   dlog('WORKSHOP.load', 'DATA READY -- calling render()')
   render()
+}
+
+async function expandFamilyMoney(id) {
+  if(!ownsWorkshop()||!['Business Owner','Orbito Support'].includes(state.role))return
+  const key=String(id),view=captureView(),revision=++wsState.financeRequest
+  wsState.expandedFinance=key
+  const current=()=>view()&&ownsWorkshop()&&revision===wsState.financeRequest&&wsState.expandedFinance===key&&['Business Owner','Orbito Support'].includes(state.role)
+  wsState.familySummaries.set(key,{status:'loading'});render()
+  const result=await settleRead(getRepairFamilySummary(id))
+  if(!current())return
+  wsState.familySummaries.set(key,result.ok?{status:'ready',data:result.data}:{status:'unavailable'})
+  render()
+}
+function familyMoney(id) {
+  if(!['Business Owner','Orbito Support'].includes(state.role))return '<span class="muted">Financial summary unavailable for this role.</span>'
+  const key=String(id),expanded=wsState.expandedFinance===key,summary=wsState.familySummaries.get(key)
+  return `<button class="secondary-button" data-family-finance="${id}" aria-expanded="${expanded}">${expanded?'Close financial details':'View financial details'}</button>${!expanded?'':summary?.status==='ready'?`<span>Total billed: <strong>${moneyHTML(summary.data.effectiveObligation)}</strong></span><span>Paid: <strong>${moneyHTML(summary.data.netPayments)}</strong></span><span>Outstanding: <strong>${moneyHTML(summary.data.outstanding)}</strong></span>`:summary?.status==='loading'?'<span role="status">Loading selected family totals…</span>':`<span role="alert">Selected family totals unavailable.</span><button class="secondary-button" data-retry-family-finance="${id}">Retry financial details</button>`}`
+}
+
+async function openWorkshopEditor(id) {
+  const view=captureView(),modal={type:'edit-components',id,readStatus:'loading'},current=()=>view()&&ownsWorkshop()&&state.modal===modal
+  state.modal=modal;render()
+  try {
+    const [root,children,components]=await Promise.all([
+      sb.from('tickets').select('*').eq('id',id).single(),
+      getSubInvoices(id),
+      readComplete(()=>sb.from('repair_components').select('id,name,sort_order',{count:'exact'}).order('sort_order').order('id'),{current}),
+    ])
+    if(!current())return
+    if(root.error||!root.data)throw Error('Selected repair unavailable.')
+    state.data.tickets=state.data.tickets.filter(t=>String(t.id)!==String(id)&&String(t.parent_ticket_id)!==String(id)).concat(root.data,children)
+    state.data.repairComponents=components.data;modal.subInvoices=children;modal.readStatus='ready'
+  }catch{if(!current())return;modal.readStatus='unavailable'}
+  if(current())render()
 }
 
 /* ── Render ── */
@@ -168,14 +203,14 @@ function render() {
 /* ── Workshop View ── */
 function workshopView() {
   if(!resourceReady(state.resources,'config'))return resourceNotice('Shop configuration')
-  if(!resourceReady(state.resources,'tickets','children'))return resourceNotice('Complete repair queue')
+  if(!resourceReady(state.resources,'tickets','children'))return `<input class="search" data-ws-filter value="${escapeHTML(wsState.filter)}" placeholder="Search name, phone, device, IMEI, ticket #…">${resourceNotice('Complete repair queue',state.resources?.tickets?.status==='loading'?'loading':'unavailable')}`
   const all    = state.data.tickets || []
   const roots = groupRepairFamilies(all).map(family => family.root)
   const filtered = findRepairFamilies(all, wsState.filter)
     .filter(family => wsState.statusFilter === 'all' || family.root.status === wsState.statusFilter)
     .map(family => ({ ...family.root, _matchedChild:matchedRepairChild(family), _work:repairFamilyWork(family) }))
 
-  const counts = {
+  const counts = wsState.page?.statusCounts ? {Pending:wsState.page.statusCounts.Pending||0,'In Progress':wsState.page.statusCounts['In Progress']||0,Ready:wsState.page.statusCounts.Ready||0} : {
     Pending:     roots.filter(t => t.status === 'Pending').length,
     'In Progress': roots.filter(t => t.status === 'In Progress').length,
     Ready:       roots.filter(t => t.status === 'Ready').length,
@@ -198,7 +233,7 @@ function workshopView() {
         <div>
           <h1 style="margin:0;font-size:20px">Workshop — Repair Queue</h1>
           <p class="muted" style="font-size:13px;margin:4px 0 0">
-            ${filtered.length} ticket${filtered.length !== 1 ? 's' : ''}
+            ${filtered.length} ticket${filtered.length !== 1 ? 's' : ''} on this page · ${wsState.page?.count??'Unavailable'} matching active roots
             · ${new Date().toLocaleDateString()}
           </p>
         </div>
@@ -215,7 +250,7 @@ function workshopView() {
             ? 'primary-button' : 'secondary-button'}"
             style="font-size:12px;padding:5px 12px"
             data-status-filter="all">
-            All: ${roots.length}
+            ${wsState.page?.statusCounts?'All matching: '+Object.values(wsState.page.statusCounts).reduce((sum,n)=>sum+n,0):'All on page: '+roots.length}
           </button>
         </div>
       </div>
@@ -224,6 +259,8 @@ function workshopView() {
       <input class="search" placeholder="Search name, phone, device, IMEI, ticket #…"
         data-ws-filter value="${escapeHTML(wsState.filter)}"
         style="font-size:14px;padding:10px 14px">
+        <p class="muted">${hasReadContract('repair_families')?'Search checks every parent and child in the active queue. Status counts cover all matching families.':'Search filters this operational page. Status and Next/Previous retrieve matching active roots.'} Each displayed family includes its complete required work.</p>
+        ${pageControls(wsState.page&&{...wsState.page,data:wsState.page.rootIds||wsState.page.data},'data-workshop-page')}
 
       <!-- Ticket Cards -->
       ${filtered.length ? filtered.map(t => `
@@ -276,12 +313,7 @@ function workshopView() {
 
           <!-- Labour + Quote -->
           <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:13px">
-            ${SESSION.employee?.role === 'Technician' ? '<span class="muted">Financial summary unavailable for this role.</span>' :
-              wsState.familySummaries.has(String(t.id)) ? `
-                <span>${wsState.familySummaries.get(String(t.id)).invoices?.length > 1 ? 'Family total billed' : 'Total billed'}: <strong>${moneyHTML(wsState.familySummaries.get(String(t.id)).effectiveObligation)}</strong></span>
-                <span>Paid: <strong>${moneyHTML(wsState.familySummaries.get(String(t.id)).netPayments)}</strong></span>
-                <span>Outstanding: <strong>${moneyHTML(wsState.familySummaries.get(String(t.id)).outstanding)}</strong></span>` :
-                '<span class="muted">Financial summary unavailable. Reload to retry.</span>'}
+            ${familyMoney(t.id)}
           </div>
 
           <!-- Technician note -->
@@ -329,6 +361,7 @@ function renderModal() {
   if (!state.modal) return ''
   if (!modalEntitled(state.modal.type)) { state.modal = null; return '' }
   const { type, id } = state.modal
+  if(state.modal.readStatus&&state.modal.readStatus!=='ready')return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Selected repair work',state.modal.readStatus==='loading'?'loading':'unavailable')}<button class="secondary-button" data-action="retry-workshop-editor" data-ticket-id="${id}">Retry detail</button><button class="secondary-button" data-close>Close</button></div></div>`
 
   if (type === 'leave-request') return leaveRequestHTML()
 
@@ -498,6 +531,7 @@ function attachEvents() {
 
   /* ── Click ── */
   listenOwned(app,'click',ownsWorkshop,async (e,eventCurrent)=>{
+    if(state.modal?.readStatus&&e.target.closest('[data-action="retry-resources"]')){await openWorkshopEditor(state.modal.id);return}
     if(e.target.closest('[data-action="retry-resources"]')){await load();return}
     if (!can('workshop', state.role) || !modalEntitled(state.modal?.type)) return
     // Route guard: see the matching comment in admin.js's attachEvents()
@@ -513,6 +547,10 @@ function attachEvents() {
       '[data-draft-comp-remove],[data-mark-not-needed],[data-pp-key]'
     )
     if (!el) return
+    if(el.dataset.workshopPage){const page=wsState.page;if(page)await load(undefined,el.dataset.workshopPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
+    if(el.dataset.familyFinance){const id=el.dataset.familyFinance;if(wsState.expandedFinance===String(id)){wsState.financeRequest++;wsState.expandedFinance=null;wsState.familySummaries.delete(String(id));render()}else await expandFamilyMoney(id);return}
+    if(el.dataset.retryFamilyFinance){await expandFamilyMoney(el.dataset.retryFamilyFinance);return}
+    if(el.dataset.action==='retry-workshop-editor'){await openWorkshopEditor(el.dataset.ticketId);return}
     dlog('WORKSHOP.click', `el MATCHED selector -- action=${el.dataset.action} close=${el.dataset.close} tag=${el.tagName}`)
 
     /* PIN numpad */
@@ -530,7 +568,7 @@ function attachEvents() {
     /* Status filter tabs */
     if (el.dataset.statusFilter !== undefined) {
       wsState.statusFilter = el.dataset.statusFilter
-      render(); return
+      await load();return
     }
 
     /* Top-bar navigation */
@@ -595,13 +633,7 @@ function attachEvents() {
     /* Open component editor (read-only view of the locked ticket) */
     if (el.dataset.action === 'edit-components') {
       const ticketId = el.dataset.ticketId
-      state.modal = { type: 'edit-components', id: ticketId, subInvoices: [] }
-      render()
-      const subs = await viewAwait(eventCurrent,()=>(getSubInvoices(ticketId)),()=>state.modal)
-      if (state.modal?.type === 'edit-components' && String(state.modal.id) === String(ticketId)) {
-        state.modal.subInvoices = subs
-        render()
-      }
+      await openWorkshopEditor(ticketId)
       return
     }
 
@@ -758,7 +790,14 @@ function attachEvents() {
     const t = e.target
     rememberAdditionalWorkInput(t, state.modal)
     if (t.dataset.wsFilter !== undefined) {
-      wsState.filter = t.value; render(); return
+        wsState.filter = t.value
+        if(hasReadContract('repair_families')){
+          clearTimeout(workshopSearchTimer);workshopLoadGeneration++
+          state.resources.tickets={status:'loading'};render()
+          const current=captureView()
+          workshopSearchTimer=setTimeout(()=>{if(current()&&ownsWorkshop())void load()},180)
+        }else render()
+        return
     }
     if (t.dataset.draftCompPrice !== undefined || t.dataset.draftLabour !== undefined) {
       updateDraftTotal()
@@ -795,12 +834,12 @@ function _addComponentToDraft(name, tag, customText) {
 /* ═══════════════════════════════════════════════════════════════════
    PUBLIC ENTRY POINT
 ═══════════════════════════════════════════════════════════════════ */
-export async function initWorkshop(sess,isCurrent=()=>true) {
+export async function initWorkshop(sess,isCurrent=()=>true,verifiedConfig) {
   const authority=captureAuthority();workshopNavigationIsCurrent=()=>isCurrent()&&authority()
   dlog('WORKSHOP.initWorkshop', `ENTRY isAdmin=${sess.isAdmin} caller=[${callerInfo()}]`)
   SESSION          = sess
   state.role       = sess.employee?.role || null
   wsState.filter   = ''
   wsState.statusFilter = 'all'
-  await load()
+  await load(verifiedConfig)
 }
