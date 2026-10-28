@@ -1577,3 +1577,56 @@ commits/pushes of the reviewed cleanup on both existing M2 branches, with automa
 Pages builds. Exact commit/CI/deployment outcomes are recorded in the existing final
 cleanup report. STOP before merge; separate owner authorization is still required.
 No local/remote branches may be deleted. No additional feature/backend work authorized.
+## 2026-10-28 — M3 stable rendering, dialogs, dual branding and print presentation
+Branch: feature/shop-modernization-m3
+
+### Purpose
+Implement the owner-approved final frontend modernization candidate from Shop
+2dffa1eaf0ddd63d0e8369ccf6f889e4d31e028d. Platform development
+864cdbc1c09184a72e33afe67aa4a4f516e78e68 is read-only design reference.
+
+### Changed
+Existing Admin/POS/Workshop templates now reconcile stable shell/content/dialog
+boundaries, keyed cart/receipt rows and revision-checked family/receipt models.
+Shared dialog ownership supplies bounded responsive geometry, accessible names,
+focus containment/restoration, inert background and dirty/busy protection while
+retaining specialized confirmation/PIN and M1 authority/request guards. Quick Item
+variants, compound password/repair/credit controls and receipt actions reflow.
+
+Official original artwork, PWA/favicon assets and licensed local Inter use scoped
+Platform tokens. A distinct font alias and unchanged legacy login rules protect
+login appearance and animation. Product identity stays fixed; saved merchant colors
+remain raw while readable accents, names and logos stay in business contexts.
+Onboarding, inline operational modules and the project-scoped tracker share the
+system. Tracker phone input styling is consistent with its exact-reference input.
+
+Printing has an optional, default-off plain attribution for the current action,
+including actual POS/Admin/EMS callers and six builders. No preference is stored.
+An exact duplicate line is avoided; actual height is measured before unchanged
+copies multiplication. A measured blocked-CDN barcode failure justified vendoring
+exact JsBarcode 3.11.6 with MIT notice, preserving readiness, CODE128 and queue rules.
+
+### Validation
+Focused model/assets, unchanged-source, checkout/draft/thermal/ownership checks;
+actual-entry loopback dialog/cart/search/receipt/role/inline/tracker fixtures;
+matched login computed appearance and advancing shader observations; real 200%
+Chrome page zoom; one small matched cart sample; original versus candidate queued
+print readiness and default-output comparison. Commands/results and source hashes
+are in the existing M3 evidence register and implementation report. Build and v7
+parity checked locally. Earlier failed fixture/layout cases are retained with fixes.
+
+### Deployment / DB impact
+Local only. No push, PR, deployment, merge, Platform modification, hosted Supabase
+operation, migration, Edge Function or release generation. Approved v7 fingerprint
+c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada
+remains 39 migrations / 7 functions / 9 requirements. Worker remains online-only.
+
+### Deferred / deliberately unchanged
+D01-D06, canonical roles, money/time semantics, request UUIDs and unknown outcomes
+remain. Independent audit/owner acceptance, physical printer, actual mobile keyboard
+and installed OS-app icon evidence are pending; no self-certified acceptance.
+F22 retains its existing bounded deferral. F18 has a local implemented correction.
+
+### Git
+Reviewable local checkpoints use [CF-Pages-Skip]. Publication and Draft PR require
+separate owner approval; all later PRs target development. No branch deletion.
