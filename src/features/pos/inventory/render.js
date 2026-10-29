@@ -1,3 +1,4 @@
+import {iconHTML,itemCategory} from '../../../catalog/icons.js'
 import { escapeHTML } from "../../../html.js"
 /* ═══════════════════════════════════════════════════════════════════
    features/pos/inventory/render.js
@@ -16,25 +17,24 @@ import {pageControls} from '../../../bounded-read.js'
 
 export function inventoryPanel(posState) {
   const invItems = (state.data.inventory||[]).filter(i=>Number(i.qty||0)>0)
-  const f = (posState.invSearch||'').toLowerCase()
-  const filtered = f ? invItems.filter(i=>(i.name||'').toLowerCase().includes(f)||(i.category||'').toLowerCase().includes(f)) : invItems
+  const filtered = invItems // Filtering, including SKU, is authoritative in the bounded backend query.
   return `
-    <div class="card">
-      <h2 style="margin-bottom:10px">Stock Items</h2>
-      <input placeholder="Search stock…" value="${escapeHTML(posState.invSearch||'')}" data-inv-search
+    <section class="card rs-inventory-panel" aria-label="Inventory">
+      <h2 style="margin-bottom:10px">Inventory</h2>
+      <input aria-label="Search inventory" placeholder="Search stock…" value="${escapeHTML(posState.invSearch||'')}" data-inv-search
         style="width:100%;margin-bottom:10px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);font-size:14px">
-      <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <div class="rs-product-list">
         ${filtered.slice(0,24).map(i=>`
-          <button class="secondary-button" style="font-size:13px;padding:8px 14px;border-radius:8px;text-align:left"
+          <button class="secondary-button rs-product-item"
             ${state.resources.inventory?.status==='ready'?'':'disabled'}
             data-inv-pos-add="${i.id}" data-inv-pos-name="${escapeHTML(i.name)}" data-inv-pos-price="${i.price}">
-            <div style="font-weight:600">${escapeHTML(i.name)}</div>
-            <div style="font-size:11px;color:var(--muted)">${moneyHTML(i.price)} · ${i.qty} left</div>
+            ${iconHTML(i.icon_id,itemCategory(i.icon_id))}<span><div style="font-weight:600">${escapeHTML(i.name)}</div>
+            <div style="font-size:11px;color:var(--muted)">${moneyHTML(i.price)} · ${i.qty} left</div></span>
           </button>`).join('')}
       </div>
       <p class="muted" role="status" data-stock-search-status>${state.resources.inventory?.status==='loading'?'Searching current stock…':!filtered.length?'No sellable items on this page.':''}</p>
-      ${pageControls(posState.inventoryPage,'data-stock-page')}
-    </div>`
+      ${pageControls(posState.inventoryPage,'data-stock-page').replace('rs-pagination"','rs-pagination rs-compact-pagination"').replace('>Previous<',' aria-label="Previous stock page">‹<').replace('>Next<',' aria-label="Next stock page">›<')}
+    </section>`
 }
 
 export function handleInvPosAdd(el, posState) {
@@ -42,5 +42,5 @@ export function handleInvPosAdd(el, posState) {
   const key=`inv-${id}`
   const ex=posState.cart.find(i=>i.productId===key)
   if (ex) ex.qty+=1
-  else posState.cart.push({ productId:key, name, qty:1, originalPrice:price, soldPrice:price, discount:0, reason:'', isInventory:true, inventoryId:id })
+  else posState.cart.push({ productId:key, name, qty:1, originalPrice:price, soldPrice:price, discount:0, reason:'', isInventory:true, icon_id:(state.data.inventory||[]).find(i=>i.id===id)?.icon_id, inventoryId:id })
 }

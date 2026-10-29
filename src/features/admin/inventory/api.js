@@ -1,3 +1,4 @@
+import {catalogAvailable} from '../../../catalog/data.js'
 /* ═══════════════════════════════════════════════════════════════════
    features/admin/inventory/api.js
    Admin-exclusive inventory management operations -- verified by
@@ -64,6 +65,7 @@ export async function submitInvEdit(data) {
     name:data.name, sku:data.sku, category:data.category,
     price:Number(data.price), cost:Number(data.cost),
     min_qty:Number(data.min_qty),
+    ...(catalogAvailable()?{icon_id:data.icon_id||null}:{}),
   }).eq('id', Number(data.id))
   if (error) { dlog('admin.inventory.submitInvEdit', `FAILED: ${error.message}`); showBlockingError('Error: '+error.message); return { ok:false } }
   dlog('admin.inventory.submitInvEdit', 'SUCCEEDED')

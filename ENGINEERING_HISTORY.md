@@ -1760,3 +1760,18 @@ then the focused check passed. Two builds total (initial plus corrective); synta
 No broad suites, hosted operations, backend/Platform or protected-login changes.
 Local Skip-marked commit only; no push. Status: locally corrected, pending independent
 re-review. IR-02/03 and physical/device evidence remain separately tracked.
+
+
+## 2026-10-29 — POS operator workspace and catalog backend candidate
+Branch: feature/pos-operator-overhaul; baseline 784c2ce7ef3d584294b26ad3b48ce8cce253b2b7
+
+### Purpose and changed
+Reorganized POS beneath the existing header/actions into adjacent Catalog/Inventory, a horizontal expandable open-repair queue, and a right Cart. Compact paging retains server bounds/counts; Catalog search has revision guards. Stock SKU matching now stays authoritative in its backend query. Stable cart keys, inputs and all financial/PIN/receipt command behavior remain. The root-only lazy queue uses Pending/In Progress/Ready without accounting-balance inclusion; complete selected families enter existing guarded collection.
+
+Catalog retains Quick Items and Components, adding semantic icon assignment and nested Device Brands. Additive migration 20261029173151 adds nullable icon IDs and isolated Shop brand records, normalized uniqueness, non-destructive defaults, canonical role/module/lifecycle RLS and restrictive Support consent. Existing guarded bootstrap/probe boundaries are extended without a new definer API. The queue gains a matching partial index and bounded DDL timeout. Repair intake uses searchable native choices plus unchanged manual text; failed choices do not block manual entry. Existing tickets/ledger rows are never rewritten.
+
+### Decisions and validation
+The supplied 36-entry registry remains a proposal: exact bytes imported, empty trusted artwork map, safe category/terminal fallbacks, no SVG fabrication or external loading. Backend capability gating preserves older Shop projections/forms. Focused real-entry synthetic browser checks pass for 320–1440px geometry, lazy queue/status exclusion, stable cart/input, paging/search, icon persistence and brand administration/manual draft retention. SQL uses disposable native PostgreSQL with actual Managed/BYO envelopes, denied roles, valid/revoked Support consent, atomic rollback/replay and historical preservation; exact results/failures are in the external pos overhaul archive. Eight focused registry/draft/checkout unit checks pass. Legacy upgrade tests that require approved source cannot execute their transport paths from this unpromoted candidate; this guard remains intentional and is separately rehearsed/documented.
+
+### Impact and gates
+No hosted mutation, migration, Edge deployment, customer upgrade, release promotion or merge. Preserve support-v7 c4d210d0… / 39 migrations / 7 functions / 9 requirements and older packages. Final candidate generation follows this committed backend source through the official builder/validator; no active customer selector changes. Artwork approval/intake, independent review, owner visual acceptance, hosted BYO verification in the different account and physical printer remain separate gates. Both PRs stay Draft/Open. Every feature commit/push uses the verified [CF-Pages-Skip] prefix.

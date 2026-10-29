@@ -988,3 +988,27 @@ input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* POS operator workspace: scoped to authenticated POS; financial/event nodes retained. */
+.rs-shop .rs-pos-workspace{grid-template-columns:minmax(0,1fr) minmax(300px,360px);align-items:start;gap:16px}
+.rs-shop .rs-product-workspace{display:grid;gap:16px;min-width:0}
+.rs-shop .rs-product-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start;min-width:0}
+.rs-shop .rs-product-panels.rs-catalog-expanded{grid-template-columns:minmax(0,1fr)}
+.rs-shop .rs-product-panels>.card{min-width:0;margin:0}
+.rs-shop .rs-product-list{display:grid;gap:8px;margin:12px 0;max-height:54vh;overflow-y:auto;padding:3px}
+.rs-shop .rs-product-item{display:flex;align-items:center;gap:10px;text-align:left;width:100%;padding:12px;white-space:normal;min-width:0}
+.rs-shop .rs-product-item>span:last-child{min-width:0;overflow-wrap:anywhere}
+.rs-shop .rs-product-item small,.rs-shop .rs-repair-card small{display:block;color:var(--muted);margin-top:4px}
+.rs-shop .rs-item-icon{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:none;vertical-align:middle;margin-right:4px}
+.rs-shop .rs-icon-placeholder{border-radius:6px;background:var(--surface-2);color:var(--muted)}
+.rs-shop .rs-product-item .rs-item-icon{width:32px;height:32px}
+.rs-shop .rs-custom-item{margin-top:14px}.rs-shop .rs-custom-item summary{cursor:pointer;margin-bottom:10px}
+.rs-shop .rs-compact-pagination{font-size:11px;gap:4px}.rs-shop .rs-compact-pagination button{padding:4px 10px;font-size:18px;min-height:36px}
+.rs-shop .rs-pos-workspace .cart{position:sticky;top:16px;min-width:0}
+.rs-shop .rs-cart-line{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:10px;padding:12px;border:0;border-radius:10px;background:var(--surface-2);margin-bottom:8px;align-items:start}
+.rs-shop .rs-cart-description{min-width:0;overflow-wrap:anywhere}.rs-shop .rs-cart-line .qty-controls{grid-column:2;justify-self:start}.rs-shop .rs-cart-line>button{grid-column:3;grid-row:2}.rs-shop .rs-line-total{grid-column:3;grid-row:1;white-space:nowrap}.rs-shop .rs-cart-line .cart-ticket-actions{grid-column:2/-1;display:flex;flex-wrap:wrap;gap:6px}
+.rs-shop .rs-queue-toggle{width:100%;text-align:left;font-weight:600}.rs-shop .rs-repair-queue{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin-top:12px}.rs-shop .rs-repair-card{display:flex;gap:8px;text-align:left;white-space:normal;overflow-wrap:anywhere}
+.rs-shop .rs-brand-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px;border-radius:10px;background:var(--surface-2)}
+.rs-shop .rs-brand-row .field{flex:1;min-width:150px}
+@media(max-width:1100px){.rs-shop .rs-pos-workspace{grid-template-columns:minmax(0,1fr) 300px}.rs-shop .rs-product-panels{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:760px){.rs-shop .rs-pos-workspace{grid-template-columns:minmax(0,1fr)}.rs-shop .rs-pos-workspace .cart{position:static}.rs-shop .rs-product-list{max-height:400px}.rs-shop .rs-custom-item>div{grid-template-columns:minmax(0,1fr) auto!important}.rs-shop .rs-custom-item button{grid-column:1/-1}}

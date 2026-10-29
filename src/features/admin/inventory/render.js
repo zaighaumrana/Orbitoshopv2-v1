@@ -1,3 +1,5 @@
+import {catalogAvailable} from '../../../catalog/data.js'
+import {iconSelector} from '../../../catalog/icons.js'
 import { escapeHTML } from "../../../html.js"
 /* ═══════════════════════════════════════════════════════════════════
    features/admin/inventory/render.js
@@ -70,6 +72,7 @@ export function inventoryModalHTML(type, id) {
         ${fld('Selling Price','price',item.price,'number')}
         ${fld('Cost Price','cost',item.cost,'number')}
         ${fld('Min Stock Alert','min_qty',item.min_qty,'number')}
+        ${catalogAvailable()?iconSelector('icon_id',item.icon_id||''):''}
       </div>
       <p class="muted">Current quantity: <strong>${item.qty}</strong>. Use Adjust Stock for an audited quantity change.</p>
       ${modalActions()}

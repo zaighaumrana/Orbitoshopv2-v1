@@ -146,11 +146,24 @@
     {
       "id": "bounded-operational-reads",
       "purpose": "Complete distinct repair-family search and bounded unified receipt headers; existing stable restrictive consent checks use statement initplans",
-      "migrations": ["20261025233743"],
+      "migrations": [
+        "20261025233743"
+      ],
       "functions": [],
       "managed": "Existing pinned migration plan and atomic migration/source ledger envelope",
       "byo": "Same pinned SQL through the customer-authorized atomic migration/source ledger envelope",
       "verification": "Invoker/ACL/RLS structural probe plus local independent-oracle, role/consent and fresh/upgrade tests; exact release hash remains separately verified"
+    },
+    {
+      "id": "catalog-icons-and-brands",
+      "purpose": "Nullable safe semantic item icons and isolated role/consent protected repair brand choices without rewriting historical tickets",
+      "migrations": [
+        "20261029173151"
+      ],
+      "functions": [],
+      "managed": "Same atomic forward migration and source ledger through the existing approved Managed plan",
+      "byo": "Same atomic forward migration and source ledger through the existing customer-owned CLI journal",
+      "verification": "Native local PostgreSQL four-path migration and denied-role probes; structural catalog capability; exact candidate parity"
     }
   ],
   "runtime": {
@@ -192,7 +205,8 @@
         "app_private.bridge_outbox",
         "app_private.config_requests",
         "app_private.support_consents",
-        "app_private.support_submissions"
+        "app_private.support_submissions",
+        "public.device_brands"
       ],
       "triggers": [
         "bridge_events_immutable"
@@ -202,7 +216,8 @@
         "private RLS",
         "service-only receipt acknowledgment",
         "owner-only consent",
-        "separate source/call/ticket credentials"
+        "separate source/call/ticket credentials",
+        "device_brands canonical role/module/lifecycle RLS plus restrictive support consent"
       ]
     },
     "managed_support_handoff_configuration": [
@@ -252,7 +267,8 @@
         "20261020135251",
         "20261022155952",
         "20261023012311",
-        "20261025233743"
+        "20261025233743",
+        "20261029173151"
       ],
       "core_functions": [
         "account-admin",
@@ -274,7 +290,8 @@
         "support-consent",
         "owner-bootstrap",
         "support-durable-submissions",
-        "bounded-operational-reads"
+        "bounded-operational-reads",
+        "catalog-icons-and-brands"
       ],
       "configuration": [
         "runtime",
@@ -324,7 +341,8 @@
         "20261020135251",
         "20261022155952",
         "20261023012311",
-        "20261025233743"
+        "20261025233743",
+        "20261029173151"
       ],
       "core_functions": [
         "account-admin",
@@ -346,7 +364,8 @@
         "support-consent",
         "owner-bootstrap",
         "support-durable-submissions",
-        "bounded-operational-reads"
+        "bounded-operational-reads",
+        "catalog-icons-and-brands"
       ],
       "configuration": [
         "runtime",

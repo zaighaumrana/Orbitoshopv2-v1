@@ -1,3 +1,5 @@
+import {catalogAvailable} from '../catalog/data.js'
+import {iconAllowed} from '../catalog/icons.js'
 import {renderOperationalScreen} from '../ui-render.js'
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
 import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
@@ -36,7 +38,7 @@ import {hasReadContract,repairFamilyPage,receiptArchivePage,legacyFamilyPage,leg
 import { reportsPage } from './pages/reports.js'
 import { billingUsagePage } from './pages/billing-usage.js'
 import { createPlatformBridge } from '../platform/bridge.js'
-import { catalogPage, qiVariantRowHTML, addQuickItemModalHTML } from '../features/admin/catalog/render.js'
+import { catalogPage, qiVariantRowHTML, addQuickItemModalHTML, catalogIconModalHTML, deviceBrandModalHTML } from '../features/admin/catalog/render.js'
 import { receiptsPage, receiptArchive, udharListModalHTML, receiptDetailModalHTML } from '../features/admin/checkout/render.js'
 import { settleUdhar } from '../features/checkout/udhar/api.js'
 import {
@@ -64,6 +66,7 @@ const adminState = {
   adminModule:      'dashboard',
   settingsTab:      'branding',
   catalogTab:       'quickitems',
+  componentTab:'quicktap',
   receiptsExpanded: null,
   filter:           '',
   receiptDateFrom:  '',
@@ -163,7 +166,8 @@ async function load(verifiedConfig) {
     returns: false,
     inventory: mod === 'inventory' && CFG.inventory_module_enabled,
     quickItems: mod === 'catalog'&&adminState.catalogTab==='quickitems',
-    repairComponents: CFG.repair_module_enabled && mod === 'catalog' && adminState.catalogTab==='components',
+    repairComponents: CFG.repair_module_enabled && mod === 'catalog' && adminState.catalogTab==='components' && adminState.componentTab!=='brands',
+    deviceBrands: CFG.repair_module_enabled && mod==='catalog' && adminState.catalogTab==='components' && adminState.componentTab==='brands',
   }
   const skip = { data: [] }
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
@@ -174,10 +178,10 @@ async function load(verifiedConfig) {
     sb.from('employees').select('id',{count:'exact',head:true}),
     sb.from('employees').select('id',{count:'exact',head:true}).eq('status','Active'),
   ].map(settleRead)):null
-  const [tickets, sales, employees, udharAccounts, financial, financialToday, returns_, inv, quickItems, repairComponents, archive] = await Promise.all([
+  const [tickets, sales, employees, udharAccounts, financial, financialToday, returns_, inv, quickItems, repairComponents, deviceBrands, archive] = await Promise.all([
     needs.tickets ? pagedFamilies?repairFamilyPage({search:adminState.filter,current}):legacyFamilyPage({search:adminState.filter,current}) : skip,
     needs.sales ? mod==='receipts'?verifiedLegacyMembers('sales',current):readPreview(()=>sb.from('sales').select(mod==='dashboard'?'id,invoice_number,customer_name,payment_method,total_bill,created_at':'id,invoice_number,customer_name,payment_method,total_bill,created_at,items_sold').order('created_at',{ascending:false}).order('id',{ascending:false}),mod==='dashboard'?8:15,current) : skip,
-    needs.employees ? adminPage(mod,adminState.catalogTab,adminState.filter,0,current) : skip,
+    needs.employees ? adminPage(mod,adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab,adminState.filter,0,current) : skip,
     needs.udhar ? sb.rpc('get_unified_udhar_accounts') : skip,
     needs.financial ? sb.rpc('get_financial_report', {
       p_from: null, p_to: null, p_actor_only: false,
@@ -186,21 +190,22 @@ async function load(verifiedConfig) {
       p_from: todayStart.toISOString(), p_to: todayEnd.toISOString(), p_actor_only: false,
     }) : { data: {} },
     needs.returns ? sb.from('returns').select('*').order('id', { ascending: false }) : skip,
-    needs.inventory ? adminPage(mod,adminState.catalogTab,adminState.filter,0,current) : skip,
-    needs.quickItems ? adminPage(mod,adminState.catalogTab,adminState.filter,0,current) : skip,
-    needs.repairComponents ? adminPage(mod,adminState.catalogTab,adminState.filter,0,current) : skip,
+    needs.inventory ? adminPage(mod,adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab,adminState.filter,0,current) : skip,
+    needs.quickItems ? adminPage(mod,adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab,adminState.filter,0,current) : skip,
+    needs.repairComponents ? adminPage(mod,adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab,adminState.filter,0,current) : skip,
+    needs.deviceBrands ? adminPage(mod,'brands',adminState.filter,0,current):skip,
     needs.archive?receiptArchivePage(adminState,{current}):skip,
   ].map(settleRead))
   if (!current()) return
-  const reads=readStates({tickets,sales,employees,udharAccounts,financial,financialToday,returns:returns_,inventory:inv,quickItems,repairComponents,archive},['financial','financialToday'])
+  const reads=readStates({tickets,sales,employees,udharAccounts,financial,financialToday,returns:returns_,inventory:inv,quickItems,repairComponents,deviceBrands,archive},['financial','financialToday'])
   const legacyErrors=[tickets,sales].filter(r=>r.error)
   if(mod==='receipts'&&!pagedReceipts&&legacyErrors.length&&legacyErrors.every(r=>r.error.code==='HISTORY_REQUIRES_LOOKUP')){
     adminState._receiptLookupOnly=true
     for(const key of ['tickets','sales']){reads.values[key]=[];reads.resources[key]={status:'ready'}}
   }
   state.data=reads.values;state.resources=reads.resources
-  const resource=flatResource(mod,adminState.catalogTab)
-  if(resource)adminState._page={inventory:inv,employees,quickItems,repairComponents}[resource]
+  const resource=flatResource(mod,adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab)
+  if(resource)adminState._page={inventory:inv,employees,quickItems,repairComponents,deviceBrands}[resource]
   if(mod==='repairs'&&tickets.rootIds&&!tickets.error)adminState._page={...tickets,data:tickets.rootIds}
   if(pagedReceipts&&!archive.error)adminState._page=adminState._receiptPage=archive
   if(mod==='dashboard'){
@@ -242,7 +247,7 @@ function pagedAdminResource(){
   if(adminState.adminModule==='repairs'&&adminState._page?.mode==='exact-identifiers')return 'tickets'
   if(adminState.adminModule==='repairs'&&CFG.repair_module_enabled&&hasReadContract('repair_families'))return 'tickets'
   if(adminState.adminModule==='receipts'&&hasReadContract('receipt_archive'))return 'archive'
-  return flatResource(adminState.adminModule,adminState.catalogTab)
+  return flatResource(adminState.adminModule,adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab)
 }
 function queueAdminSearch(){
   const key=pagedAdminResource()
@@ -254,13 +259,13 @@ function queueAdminSearch(){
   flatTimer=setTimeout(()=>{if(ownsAdmin())void loadFlatPage(0,revision)},180)
 }
 async function loadFlatPage(offset=0,revision=++flatGeneration) {
-  const view=captureView(),mod=adminState.adminModule,tab=adminState.catalogTab,query=adminState.filter
+  const view=captureView(),mod=adminState.adminModule,tab=adminState.catalogTab,subtab=adminState.componentTab,query=adminState.filter
   const receiptQuery=JSON.stringify([adminState.receiptSearch,adminState.receiptType,adminState.receiptDateFrom,adminState.receiptDateTo])
-  const key=pagedAdminResource(),current=()=>view()&&ownsAdmin()&&revision===flatGeneration&&adminState.filter===query&&adminState.catalogTab===tab&&receiptQuery===JSON.stringify([adminState.receiptSearch,adminState.receiptType,adminState.receiptDateFrom,adminState.receiptDateTo])
+  const key=pagedAdminResource(),current=()=>view()&&ownsAdmin()&&revision===flatGeneration&&adminState.filter===query&&adminState.catalogTab===tab&&adminState.componentTab===subtab&&receiptQuery===JSON.stringify([adminState.receiptSearch,adminState.receiptType,adminState.receiptDateFrom,adminState.receiptDateTo])
   if(!key||!current())return
   state.resources[key]={status:'loading'}
   document.querySelector('.content')?.setAttribute('aria-busy','true')
-  const result=await settleRead(key==='tickets'?(hasReadContract('repair_families')?repairFamilyPage({search:query,offset,current}):legacyFamilyPage({search:query,offset,size:offset?adminState._page?.size||25:25,current,exactOnly:true})):key==='archiveLookup'?legacyReceiptLookup(adminState,{current}):key==='archive'?receiptArchivePage(adminState,{offset,current}):adminPage(mod,tab,query,offset,current,offset?adminState._page?.size||25:25))
+  const result=await settleRead(key==='tickets'?(hasReadContract('repair_families')?repairFamilyPage({search:query,offset,current}):legacyFamilyPage({search:query,offset,size:offset?adminState._page?.size||25:25,current,exactOnly:true})):key==='archiveLookup'?legacyReceiptLookup(adminState,{current}):key==='archive'?receiptArchivePage(adminState,{offset,current}):adminPage(mod,subtab==='brands'&&tab==='components'?'brands':tab,query,offset,current,offset?adminState._page?.size||25:25))
   if(!current())return
   state.data[key]=result.error?null:result.data
   state.resources[key]={status:result.error?'unavailable':'ready'}
@@ -675,6 +680,8 @@ function renderModal() {
   if (!state.modal) return ''
   if (!modalEntitled(state.modal.type)) { state.modal = null; return '' }
   const { type, id } = state.modal
+  if(type==='catalog-icon')return catalogIconModalHTML(state.modal)
+  if(type==='device-brand')return deviceBrandModalHTML(state.modal)
   if(!['myAccount','pinPrompt'].includes(type)&&Object.values(state.resources||{}).some(r=>r.status!=='ready'&&r.status!=='disabled'))return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Required detail')}<button type="button" data-close>Close</button></div></div>`
 
   if (type === 'pinPrompt') return `<div class="modal-backdrop">${pinPromptHTML(state.modal.purpose)}</div>`
@@ -839,7 +846,7 @@ function attachEvents() {
     if(el.dataset.adminPage){const page=adminState._page;if(page)await loadFlatPage(el.dataset.adminPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
     const pagedResource=pagedAdminResource()
     if(pagedResource&&!resourceReady(state.resources,pagedResource)&&(el.dataset.viewTicket||el.dataset.ticketId||el.dataset.saleId||el.dataset.receiptIdx!==undefined))return
-    const activeFlat=flatResource(adminState.adminModule,adminState.catalogTab)
+    const activeFlat=flatResource(adminState.adminModule,adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab)
     if(activeFlat&&!resourceReady(state.resources,activeFlat)&&(el.dataset.invEdit||el.dataset.invAdjust||el.dataset.invDelete||el.dataset.empId||el.dataset.removeQitem!==undefined||el.dataset.addQprice!==undefined||el.dataset.removeQprice!==undefined||el.dataset.removeQuick!==undefined))return
     if(el.dataset.action==='support-consent-revoke'){
       if(SESSION.employee?.role!=='Business Owner'||customerSupport.view.busy)return
@@ -923,6 +930,20 @@ function attachEvents() {
       const { navigate } = await viewAwait(eventCurrent,()=>(import('../router.js')),()=>state.modal)
       navigate(`/admin/settings?tab=${el.dataset.settingsTab}`)
       return
+    }
+    if(el.dataset.componentTab){adminState.componentTab=el.dataset.componentTab==='brands'?'brands':'quicktap';adminState.filter='';await load();return}
+    if(['new-device-brand','edit-device-brand','edit-catalog-icon'].includes(el.dataset.action)){
+      if(!can('catalog',state.role)||!catalogAvailable()||!resourceReady(state.resources,pagedAdminResource()))return
+      if(el.dataset.action==='edit-catalog-icon'){
+        const kind=el.dataset.iconKind,record=(state.data[kind==='component'?'repairComponents':'quickItems']||[]).find(r=>String(r.id)===el.dataset.recordId)
+        if(!record)return
+        state.modal={type:'catalog-icon',kind,record}
+      }else{
+        const record=el.dataset.action==='edit-device-brand'?(state.data.deviceBrands||[]).find(r=>r.id===el.dataset.recordId):null
+        if(el.dataset.action==='edit-device-brand'&&!record)return
+        state.modal={type:'device-brand',record}
+      }
+      render();return
     }
     if (el.dataset.catalogTab) {
       if (el.dataset.catalogTab === 'components' && !CFG.repair_module_enabled) return
@@ -1312,7 +1333,7 @@ function attachEvents() {
     if (el.dataset.action === 'add-quick-comp') {
       const val = document.getElementById('new-comp-input')?.value?.trim(); if (!val) return
       const { error } = await viewAwait(eventCurrent,()=>(sb.from('repair_components').insert({
-        name: val, sort_order: (state.data.repairComponents||[]).length + 1
+        name: val, ...(catalogAvailable()?{icon_id:document.querySelector('[name="newComponentIcon"]')?.value||null}:{}), sort_order: (state.data.repairComponents||[]).length + 1
       })),()=>state.modal)
       if (error) { showBlockingError('Error: '+error.message); return }
       const input = document.getElementById('new-comp-input')
@@ -1507,6 +1528,22 @@ function attachEvents() {
       finally{if(eventCurrent()&&SESSION===session){v.busy=false;if(window.location.pathname===path)render()}}
       return
     }
+    if(type==='device-brand'||type==='catalog-icon'){
+      if(!can('catalog',state.role)||!catalogAvailable())return
+      const modal=state.modal,allowed=type==='device-brand'?['brand','generic']:modal.kind==='component'?['repair','generic']:['accessory','repair','service','generic']
+      const icon=data.icon_id||null
+      if(icon!==modal.record?.icon_id&&!iconAllowed(icon,allowed)){showBlockingError('Choose an approved icon.');return}
+      let query
+      if(type==='device-brand'){
+        const name=data.display_name?.trim(),order=Number(data.sort_order)
+        if(!name||name.length>100||!Number.isInteger(order)||order<0||order>10000){showBlockingError('Enter a brand name and valid order.');return}
+        const values={display_name:name,icon_id:icon,enabled:data.enabled==='true',sort_order:order}
+        query=()=>modal.record?.id?sb.from('device_brands').update(values).eq('id',modal.record.id).select('id').single():sb.from('device_brands').insert(values).select('id').single()
+      }else query=()=>sb.from(modal.kind==='component'?'repair_components':'quick_items').update({icon_id:icon}).eq('id',modal.record.id).select('id').single()
+      const result=await viewAwait(eventCurrent,query,()=>state.modal)
+      if(result.error){showBlockingError(result.error.code==='23505'?'This brand name already exists.':result.error.message);return}
+      state.modal=null;await viewAwait(eventCurrent,()=>load(),()=>state.modal);return
+    }
     if (type === 'add-quick-item') {
       const itemName = data.itemName?.trim()
       if (!itemName) { showBlockingError('Item name is required.'); return }
@@ -1514,7 +1551,7 @@ function attachEvents() {
       const prices = [...form.querySelectorAll('[name="variantPrice[]"]')].map(i => Number(i.value) || 0)
       const variants = names.map((name, i) => ({ name, price: prices[i] })).filter(v => v.price > 0)
       const { error } = await viewAwait(eventCurrent,()=>(sb.from('quick_items').insert({
-        name: itemName, prices: variants,
+        name: itemName, prices: variants, ...(catalogAvailable()?{icon_id:data.icon_id||null}:{}),
         sort_order: (state.data.quickItems||[]).length + 1
       })),()=>state.modal)
       if (error) { showBlockingError('Error: ' + error.message); return }
