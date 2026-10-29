@@ -1,2 +1,5 @@
 supabase/functions/support-tickets/*.ts text eol=lf
 supabase/migrations/*customer_support_actor.sql text eol=lf
+
+src/catalog/assets/** -text
+src/catalog/production-manifest.json -text

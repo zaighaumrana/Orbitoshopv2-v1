@@ -1775,3 +1775,11 @@ The supplied 36-entry registry remains a proposal: exact bytes imported, empty t
 
 ### Impact and gates
 No hosted mutation, migration, Edge deployment, customer upgrade, release promotion or merge. Preserve support-v7 c4d210d0… / 39 migrations / 7 functions / 9 requirements and older packages. Final candidate generation follows this committed backend source through the official builder/validator; no active customer selector changes. Artwork approval/intake, independent review, owner visual acceptance, hosted BYO verification in the different account and physical printer remain separate gates. Both PRs stay Draft/Open. Every feature commit/push uses the verified [CF-Pages-Skip] prefix.
+
+
+## 2026-10-30 — approved SVG V1.0.1 intake and local integration
+Branch: feature/pos-operator-overhaul
+
+Owner delivered final artwork and authorized integration. Independently verified the latest 45-entry ZIP CRC/path inventory, original registry digest 0924786e… and all 36 SVG bytes against both source manifests. Strict XML allow-list and local source equality pass. Copied only production SVGs/manifest; Codex 1 workspace unchanged. Frozen trusted literal renderers replace temporary placeholders, preserve stable IDs/aliases/fallbacks and inherit currentColor through decorative nonfocusable inline SVG wrappers with adjacent text. Raw production bytes retain Git attributes; no runtime dependency, parser or external icon loading.
+
+Four focused resolver/manifest groups and actual Shop light/dark 24/32px rendering for all 36 assets pass; local Catalog/Cart/queue captures and one post-intake build pass. Full known-brand name artwork is revision 1.0.1. Exact hashes, screenshots, checks and exceptions are in the existing pos overhaul evidence. Registry approval/artwork intake gates are now complete; independent review, owner app acceptance, hosted verification and separately authorized promotion/merge/deployment remain. No backend-affecting changes: support-v8 fingerprint af64c402… (40/7/10), source 5a9fca79… and active support-v7 remain unchanged.

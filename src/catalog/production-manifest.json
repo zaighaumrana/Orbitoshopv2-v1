@@ -1,0 +1,355 @@
+{
+  "deliveryVersion": "1.0.1",
+  "registryVersion": "1.0.0",
+  "schemaVersion": 1,
+  "approvedRegistryFile": "01-Registry-Proposal/RETRASELL-ASSET-REGISTRY-V1.json",
+  "approvedRegistrySHA256": "0924786e5b9c6eaedbd86a5cb33425bf4023b34b66675cf1419516a43a3e37c5",
+  "approvalSource": "Owner Phase 2 production instruction, 2026-10-29 Asia/Karachi",
+  "completionStatus": "completed",
+  "assetAvailability": "all_36_delivered",
+  "originalRegistryUnchanged": true,
+  "assetCount": 36,
+  "categoryCounts": {
+    "accessory": 11,
+    "repair": 11,
+    "brand": 12,
+    "service": 1,
+    "generic": 1
+  },
+  "assets": [
+    {
+      "id": "accessory.cover",
+      "registryPath": "accessory/cover.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/accessory/cover.svg",
+      "bytes": 303,
+      "sha256": "90a7162c9a3b3a7b085a0df30b5f7e2ec8bbbee66202f7c111c44759fb40e30d",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "accessory.tempered_glass",
+      "registryPath": "accessory/tempered_glass.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/accessory/tempered_glass.svg",
+      "bytes": 275,
+      "sha256": "cfb7b99777cc61b52e76c671bc29e6db4439f4da3472d2c52ecc4bd2ed3c6562",
+      "drawingElements": 2,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "accessory.charger",
+      "registryPath": "accessory/charger.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/accessory/charger.svg",
+      "bytes": 265,
+      "sha256": "c274af259a5c19c732ca188b720f1308735bdc59ae39e1dda7f6853693eea18d",
+      "drawingElements": 2,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "accessory.cable",
+      "registryPath": "accessory/cable.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/accessory/cable.svg",
+      "bytes": 348,
+      "sha256": "bf797e697d62b2692ed35da77bb391020d6223541aeb79738f3df2dc6b435040",
+      "drawingElements": 4,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "accessory.power_bank",
+      "registryPath": "accessory/power_bank.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/accessory/power_bank.svg",
+      "bytes": 302,
+      "sha256": "0d307271fde2883630bcb908622a230e6453f2d6f227ddef6a0e3e55b2229126",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "accessory.earbuds",
+      "registryPath": "accessory/earbuds.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/accessory/earbuds.svg",
+      "bytes": 320,
+      "sha256": "12081752daa9706eb623e53f9d3014c13c8b05133ac7e2ac0064f9e61f620ac6",
+      "drawingElements": 2,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "accessory.neckband",
+      "registryPath": "accessory/neckband.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/accessory/neckband.svg",
+      "bytes": 323,
+      "sha256": "2de773c3d8f9c74f2a6856eb9f429938b9cfd12c731f45f402ba0524fafc53b1",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "accessory.phone_stand",
+      "registryPath": "accessory/phone_stand.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/accessory/phone_stand.svg",
+      "bytes": 235,
+      "sha256": "30307c92ac6000bfa44cf326f3350b1fa17936d13342152760f36da8a4a70cc4",
+      "drawingElements": 1,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "accessory.memory_card",
+      "registryPath": "accessory/memory_card.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/accessory/memory_card.svg",
+      "bytes": 280,
+      "sha256": "77e9bf32eec0e3705f3ae185d00a7fb56c872fe27d817beb013fb459fa03efcb",
+      "drawingElements": 2,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "accessory.smartwatch",
+      "registryPath": "accessory/smartwatch.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/accessory/smartwatch.svg",
+      "bytes": 298,
+      "sha256": "fdb83a4bfe42cd976ab6ca3d9a155078d85686168090f59ccb43150f9ea962d3",
+      "drawingElements": 2,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "accessory.generic",
+      "registryPath": "accessory/generic.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/accessory/generic.svg",
+      "bytes": 236,
+      "sha256": "2d1f4b998131ab9a9ee43dd79f8ac38abfe9f8f9f3307339474a11c47d40d96c",
+      "drawingElements": 1,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "repair.display",
+      "registryPath": "repair/display.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/repair/display.svg",
+      "bytes": 300,
+      "sha256": "a1cac0a8f7347c248bed1ff6253864433f70cefe09cae097b51050902b16cb0e",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "repair.battery",
+      "registryPath": "repair/battery.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/repair/battery.svg",
+      "bytes": 268,
+      "sha256": "500146fe99cc7c97020c3ab4fa882dbc9f015d3bf9dd33364ccf730d43c70bf4",
+      "drawingElements": 2,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "repair.charging_port",
+      "registryPath": "repair/charging_port.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/repair/charging_port.svg",
+      "bytes": 296,
+      "sha256": "b21672bd5d3946c2a8977e01a9e93c27e6206e20fa76cbd0a09c6a99ff79bae0",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "repair.speaker",
+      "registryPath": "repair/speaker.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/repair/speaker.svg",
+      "bytes": 270,
+      "sha256": "e0cbcfbe8a05147a68be5ac8d3dfed58f9402f760f64aac666e7c80ebe124640",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "repair.microphone",
+      "registryPath": "repair/microphone.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/repair/microphone.svg",
+      "bytes": 286,
+      "sha256": "aa4b1991a958970363de2ba24992c43da34e6b634439b8ad6f5dcac0933aace1",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "repair.camera",
+      "registryPath": "repair/camera.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/repair/camera.svg",
+      "bytes": 275,
+      "sha256": "0cf1abfadc2c1e0469661a1752c2d662cca7b578ab0085cbeedcc34095ebec3c",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "repair.fingerprint",
+      "registryPath": "repair/fingerprint.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/repair/fingerprint.svg",
+      "bytes": 292,
+      "sha256": "de2f06c80eed8e2887260a5bd082dbb8a1271745c8f5d02920ab244eb32133f1",
+      "drawingElements": 2,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "repair.motherboard",
+      "registryPath": "repair/motherboard.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/repair/motherboard.svg",
+      "bytes": 289,
+      "sha256": "b7dd7886abc2213d8beea115b6a3274a9a56262c7eb23195fa16c13b72f8a741",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "repair.back_glass",
+      "registryPath": "repair/back_glass.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/repair/back_glass.svg",
+      "bytes": 292,
+      "sha256": "efafb148a295248f21dd0ac778b9e4385cc8f163ba68d4a2c8ac1c42dc95ab77",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "repair.housing",
+      "registryPath": "repair/housing.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/repair/housing.svg",
+      "bytes": 302,
+      "sha256": "388b6fec79f2cf3d93a9a7e7763073b7f3951366fcf7af4cf4c22c7b63b190f1",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "repair.generic",
+      "registryPath": "repair/generic.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/repair/generic.svg",
+      "bytes": 289,
+      "sha256": "9a398eb4a2fdb5befc92671576481a7b8fb5a6f9bec4876ec5e741718fe5a368",
+      "drawingElements": 2,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "brand.apple",
+      "registryPath": "brand/apple.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/brand/apple.svg",
+      "bytes": 572,
+      "sha256": "b3e89b05933603411a0080ff7fa2fa08b7e1be3d745e1e87f56d2d690ae7cef7",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "brand.samsung",
+      "registryPath": "brand/samsung.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/brand/samsung.svg",
+      "bytes": 785,
+      "sha256": "488428d532b49434e4a6aa8dfa63d871750ffe29638bbff49340eaf5f4f39d6e",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "brand.xiaomi",
+      "registryPath": "brand/xiaomi.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/brand/xiaomi.svg",
+      "bytes": 643,
+      "sha256": "486b614201ce35f8af5effa389cad099faaef5306583a91b2972812e02db2b37",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "brand.redmi",
+      "registryPath": "brand/redmi.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/brand/redmi.svg",
+      "bytes": 619,
+      "sha256": "59bc7da0d8a45e04b0b04558dfc0a2d1bd356bb10559c0592595d3936d9e25d6",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "brand.poco",
+      "registryPath": "brand/poco.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/brand/poco.svg",
+      "bytes": 602,
+      "sha256": "3e44929224f36a2d572aed1809cdb7cfb121db9ca614248d308e9f3a547054ac",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "brand.infinix",
+      "registryPath": "brand/infinix.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/brand/infinix.svg",
+      "bytes": 626,
+      "sha256": "35d37813d65944212952a223f430a6027da44a0974ae70d4655385fccbf1db0c",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "brand.tecno",
+      "registryPath": "brand/tecno.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/brand/tecno.svg",
+      "bytes": 595,
+      "sha256": "8ba144967fae53ff6da992c6ce5aaf6cffb5a7a253342bdc0ea0aaf231de017a",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "brand.itel",
+      "registryPath": "brand/itel.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/brand/itel.svg",
+      "bytes": 466,
+      "sha256": "528ae548cd3039c21d2fe6bb880e5c5c0ac5e7e964bffb35b03df93edf782890",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "brand.vivo",
+      "registryPath": "brand/vivo.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/brand/vivo.svg",
+      "bytes": 495,
+      "sha256": "c895781018277a2063d42f4ac04878a444c598caa714bce5e7bde9a1d9568afa",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "brand.oppo",
+      "registryPath": "brand/oppo.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/brand/oppo.svg",
+      "bytes": 609,
+      "sha256": "9c5eff79c5855f62f26f5fed6200e3cf74f8757fe995d4d0803536c4cf1d6f1d",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "brand.realme",
+      "registryPath": "brand/realme.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/brand/realme.svg",
+      "bytes": 614,
+      "sha256": "a1bf15bf7b89a6251704ff255da9262aaafd1ee43d4bb0348a360ca8c7436b7a",
+      "drawingElements": 3,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "brand.generic_phone",
+      "registryPath": "brand/generic_phone.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/brand/generic_phone.svg",
+      "bytes": 252,
+      "sha256": "dac4b9286d5c95de8543c730003b0cc15d88a33bc7665c6342d0376b04a67236",
+      "drawingElements": 2,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "service.generic",
+      "registryPath": "service/generic.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/service/generic.svg",
+      "bytes": 282,
+      "sha256": "d572f3a083ace4e451defeca6c93b586ac5c9be73e09d4d9d8ab8fc4bd0af40a",
+      "drawingElements": 1,
+      "validationStatus": "passed"
+    },
+    {
+      "id": "generic.item",
+      "registryPath": "generic/item.svg",
+      "deliveredFile": "04-Approved-SVG-Assets/generic/item.svg",
+      "bytes": 248,
+      "sha256": "a53e6d1dffc96e8cdcdb4ee4d13d630cb644940344632c29ea41a9008e95f3cf",
+      "drawingElements": 1,
+      "validationStatus": "passed"
+    }
+  ],
+  "artworkRevision": "1.0.1 \u2014 owner-authorized full names inside 11 known-brand phones",
+  "validationSummary": {
+    "xmlAndSafety": "passed",
+    "registryIntegrity": "passed",
+    "deterministicRegeneration": "passed",
+    "individualRasterChecks": 144,
+    "lightDarkBrowserRendering": "passed",
+    "visualContactSheetReview": "passed",
+    "report": "07-Validation/SVG-VALIDATION-REPORT.md"
+  }
+}
