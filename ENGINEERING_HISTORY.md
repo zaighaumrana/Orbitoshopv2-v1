@@ -1738,3 +1738,25 @@ byte-exact receipt/ticket print comparison pass. Syntax and one build pass. The 
 run used an older-backend fixture without a pager; retained and corrected to v7 mode.
 No broad tests, hosted operations, commit, push or deployment. Local evidence records
 measurements and limits; publication, independent review and owner acceptance pending.
+
+
+## 2026-10-29 — M3-IR-01 native KPI and receipt-detail activators (local)
+Branch: feature/shop-modernization-m3; baseline: a77e751c55c017098eb9672defb58ad6eaba2ad1
+
+Independent audit M3-IR-01 identified unfocusable clickable DIVs. Replaced Dashboard
+KPI cards and only Receipt Archive's detail-opening region with type=button native
+controls; preserved existing target/index/action attributes, permission filtering,
+selection/loading guards and one delegated click path. Receipt controls have escaped
+record-specific accessible names. Print/Reprint/Summary remain sibling actions,
+not nested buttons. Scoped bundled-CSS resets preserve the original card/content
+appearance and mobile wrapping; existing 3px keyboard focus applies. No key handler
+or second navigation implementation was introduced.
+
+Focused actual-entry Dashboard and Receipt journeys exercise Tab, Enter, Space and
+pointer: one existing navigation/detail opening each, visible focus, zero submits,
+neighbor print actions or writes. Selected old/new style/geometry matches at1280/390.
+The first comparison caught a native-button font override; specificity was corrected,
+then the focused check passed. Two builds total (initial plus corrective); syntax pass.
+No broad suites, hosted operations, backend/Platform or protected-login changes.
+Local Skip-marked commit only; no push. Status: locally corrected, pending independent
+re-review. IR-02/03 and physical/device evidence remain separately tracked.

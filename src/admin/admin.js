@@ -417,11 +417,11 @@ function dashboard() {
       can('pos',state.role)?`<button class="primary-button" data-action="go-pos">Go to POS</button>`:'')}
     <div class="grid kpi-grid">
       ${kpis.filter(([, ,target]) => target === 'udharList' || can(target, state.role)).map(([l,v,target]) => `
-        <div class="card kpi" style="cursor:pointer" data-kpi-target="${target}">
+        <button type="button" class="card kpi rs-card-action" data-kpi-target="${target}">
           <span class="label">${l}</span>
           <span class="value">${typeof v === 'number' && !['Open Tickets','Employees'].includes(l)
             ? moneyHTML(v) : v}</span>
-        </div>`).join('')}
+        </button>`).join('')}
     </div>
     <div class="grid two-col">
       <div class="card">

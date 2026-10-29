@@ -67,7 +67,8 @@ export function receiptsPage({ tit, adminState }) {
       ${filtered.length ? filtered.map((record, idx) => `
         <div class="rs-receipt-row" data-ui-key="receipt:${escapeHTML(record.key)}" style="border-bottom:1px solid var(--border);padding:12px 4px;
                     display:flex;justify-content:space-between;align-items:center;gap:12px">
-          <div style="cursor:pointer;flex:1;min-width:0"
+          <button type="button" class="rs-card-action rs-receipt-open" style="flex:1;min-width:0"
+            aria-label="View ${escapeHTML(record.label)} details: ${escapeHTML(record.invoiceNumber)}, ${escapeHTML(record.customerName)}"
             data-action="open-receipt-modal" data-receipt-idx="${idx}">
             <strong>${escapeHTML(record.customerName)}</strong>
             <span class="badge ${record.type === 'repair' ? 'warn' : 'good'}" style="margin-left:6px">${escapeHTML(record.label)}</span><br>
@@ -76,7 +77,7 @@ export function receiptsPage({ tit, adminState }) {
               ${record.parentInvoiceNumber ? `<br>Parent: ${escapeHTML(record.parentInvoiceNumber)}${record.parentTicketNumber ? ` · ${escapeHTML(record.parentTicketNumber)}` : ''}` : ''}
               <br>${escapeHTML(record.paymentMethod)}${record.employeeName ? ` · ${escapeHTML(record.employeeName)}` : ''}
             </span>
-          </div>
+          </button>
           <div style="text-align:right;flex-shrink:0;display:flex;align-items:center;gap:10px">
             <div>
               <div><strong>${moneyHTML(record.total)}</strong></div>

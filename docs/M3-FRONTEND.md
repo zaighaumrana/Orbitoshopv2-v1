@@ -147,3 +147,19 @@ handlers, synthetic SDK and a read-only baseline print module. It checks list-re
 geometry across all numbered-pager callers, one receipt/ticket preview at desktop/
 mobile and exact printable HTML. It does not submit a sale, print physically or access
 hosted Supabase. Source and evidence remain local until publication authorization.
+
+
+## M3-IR-01 — semantic Dashboard and receipt activators
+
+Dashboard KPI cards and Receipt Archive detail regions use native type=button controls.
+They retain their original data-kpi-target/data-action/data-receipt-idx attributes and
+existing delegated handlers; native Enter/Space synthesize one click, without custom
+keyboard navigation logic. The receipt name identifies its type, invoice and customer;
+print actions stay separate sibling buttons. Shared scoped CSS resets preserve former
+DIV appearance and mobile wrapping, while the existing focus-visible outline applies.
+
+Focused check: tests/m3-browser.mjs --ir01-only with M3_BUILT_STYLE set to the current
+built app CSS and the existing loopback fixture environment. It tests only the two
+keyboard/pointer journeys, activation/submission/print counters and same-layout oracle.
+This is author evidence for the local correction, not independent closure of M3-IR-01.
+The original independent verdict remains authoritative pending delta re-review.

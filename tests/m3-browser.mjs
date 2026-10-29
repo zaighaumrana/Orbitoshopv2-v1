@@ -1,3 +1,4 @@
+import {runIR01} from './helpers/m3-ir01-accessibility.mjs';
 import {runLiveLayout} from './helpers/m3-live-layout.mjs';
 import {runOwnerAcceptance} from './helpers/m3-owner-acceptance.mjs';
 // One loopback-only M3 harness. Real Shop entry/renderers; synthetic SDK/Turnstile.
@@ -25,6 +26,7 @@ const surfaceOnly=process.argv.includes('--surface-only');
 const zoom=process.argv.includes('--zoom-only');
 const ownerAcceptance=process.argv.includes('--owner-acceptance');
 const liveLayoutOnly=process.argv.includes('--live-layout-only');
+const ir01Only=process.argv.includes('--ir01-only');
 const output=baseline?rootOutput:join(rootOutput,process.env.M3_RUN_LABEL||new Date().toISOString().replaceAll(/[:.]/g,'-'));
 await mkdir(output,{recursive:true});
 const result={source:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),provenance:'author-run loopback Chrome; synthetic SDK/Turnstile; external requests blocked',login:[],geometry:[],screens:[],errors:[],external:[]};
@@ -58,18 +60,18 @@ try{
   proto.getUniformLocation=function(program,name){const location=get.call(this,program,name);if(location)names.set(location,name);return location;};
   proto.uniform1f=function(location,value){const name=names.get(location);if(name==='uTime'){globalThis.m3Motion.frames++;globalThis.m3Motion.first??=value;globalThis.m3Motion.last=value;return set.call(this,location,1);}if(name)globalThis.m3Motion.parameters[name]=value;return set.call(this,location,value);};
  });
- if(liveLayoutOnly){
+ if(liveLayoutOnly||ir01Only){
   await context.addInitScript(()=>{window.fixtureRows.quick_items=[{id:1,name:'Synthetic quick item',prices:[{name:'Standard',price:200}]}];});
   const css=await readFile(process.env.M3_BUILT_STYLE,'utf8');
   const stale=execFileSync('git',['show','4b37a86e486bcdd0298155936e0acbe9a436e9b8:public/brand/retrasell-shop.css'],{encoding:'utf8'});
   await context.route('**/src/style.css*',r=>r.request().resourceType()==='stylesheet'?r.fulfill({contentType:'text/css',body:css}):r.continue());
-  await context.route('**/brand/retrasell-shop.css',r=>r.fulfill({contentType:'text/css',body:stale}));
-  result.compiledStylesheet=process.env.M3_BUILT_STYLE;result.stalePublicBrand='4b37a86 (matches missing live pager rules)';
+  if(liveLayoutOnly)await context.route('**/brand/retrasell-shop.css',r=>r.fulfill({contentType:'text/css',body:stale}));
+  result.compiledStylesheet=process.env.M3_BUILT_STYLE;if(liveLayoutOnly)result.stalePublicBrand='4b37a86 (matches missing live pager rules)';
  }
  page=await context.newPage();page.setDefaultTimeout(12000);page.on('pageerror',error=>result.errors.push(error.message));
  const properties=['fontFamily','fontSize','fontWeight','lineHeight','color','backgroundColor','backgroundImage','borderColor','borderRadius','padding','margin','width','height','display','gap','position','transform','boxShadow','animationName','animationDuration','animationDelay','transitionProperty','transitionDuration'];
  const cases=(zoom||ownerAcceptance)?[{width:1280,height:900,theme:'light',motion:'no-preference'}]:[...['light','dark'].flatMap(theme=>[320,390,768,1280,1440].map(width=>({width,height:900,theme,motion:'no-preference'}))),{width:1280,height:500,theme:'light',motion:'no-preference'},{width:390,height:700,theme:'dark',motion:'reduce'}];
- for(const entry of renderOnly||measureOnly||liveLayoutOnly?[]:cases){
+ for(const entry of renderOnly||measureOnly||liveLayoutOnly||ir01Only?[]:cases){
   if(!zoom)await page.setViewportSize({width:entry.width,height:entry.height});await page.emulateMedia({reducedMotion:entry.motion});
   await page.addInitScript(theme=>localStorage.setItem('retailos-theme',theme),entry.theme);
   await page.goto(origin+'/login?fixtureAuth=none');await page.locator('#login-form').waitFor();await page.evaluate(()=>document.fonts.ready);
@@ -85,7 +87,7 @@ try{
   await page.screenshot({path:join(output,key+'.png'),fullPage:true});
   result.login.push({key,...entry,...observation});
  }
- if(!baseline&&!renderOnly&&!measureOnly&&!liveLayoutOnly){
+ if(!baseline&&!renderOnly&&!measureOnly&&!liveLayoutOnly&&!ir01Only){
   const previous=JSON.parse(await readFile(process.env.M3_BASELINE_FILE,'utf8'));
   assert.equal(result.browser,previous.browser,'Matched browser required');
   for(let i=0;i<result.login.length;i++){
@@ -115,7 +117,7 @@ try{
   await page.goto(origin+'/pos?fixtureAuth=signed&fixtureRole=Business%20Owner');await page.locator('[data-inv-pos-add="1"]:enabled').click();await page.locator('[data-cash-tendered]').fill('200');await page.locator('[data-qty][data-delta="1"]').click();assert.equal(await page.locator('[data-cash-tendered]').inputValue(),'200');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   result.zoomResult='PASS: actual Chrome 200% page zoom, unchanged login, bounded Quick Item, Tab/Shift+Tab wrap, Escape policy and POS tender/cart reflow';
  }
- if(!baseline&&!measureOnly&&!zoom&&!ownerAcceptance&&!liveLayoutOnly){
+ if(!baseline&&!measureOnly&&!zoom&&!ownerAcceptance&&!liveLayoutOnly&&!ir01Only){
   const setTheme=async theme=>page.evaluate(async theme=>{const {state,applyBranding}=await import('/src/shared.js');state.theme=theme;applyBranding();},theme);
   if(!surfaceOnly){
   await page.setViewportSize({width:1280,height:900});await page.emulateMedia({reducedMotion:'no-preference'});
@@ -248,6 +250,7 @@ try{
   const tracking=[];await context.route('https://synthetic.invalid/functions/v1/public-track',route=>{tracking.push({url:route.request().url(),body:route.request().postDataJSON()});return route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,ticket:{status:'Pending',invoice_number:'INV-TRACK',ticket_number:'TK-TRACK',customer_name:'Customer',device_brand:'Phone',device_model:'Model',created_at:'2026-10-20',components_noted:[]}})});});
   await page.goto(origin+'/track.html?t=INV-TRACK&project_ref=foreign&supabase_url=https://foreign.invalid');await page.getByText('Synthetic Merchant',{exact:true}).waitFor();await page.locator('#phone-input').fill('03000000000');await page.locator('#track-btn').click();await page.locator('#result-card').waitFor({state:'visible'});assert.deepEqual(tracking[0],{url:'https://synthetic.invalid/functions/v1/public-track',body:{identifier:'INV-TRACK',phone:'03000000000'}});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:join(output,'merchant-tracking.png'),fullPage:true});result.trackerResult='PASS: actual standalone tracker, merchant first, safe yellow accent; exact configured public target and request unaffected by foreign URL parameters';
  }
+ if(ir01Only){result.ir01={journeys:[]};await runIR01({page,origin,output,result:result.ir01});}
  if(liveLayoutOnly){result.liveLayout={pagination:[],previews:[]};await runLiveLayout({page,origin,output,result:result.liveLayout});}
  if(ownerAcceptance&&!baseline)result.ownerAcceptance=await runOwnerAcceptance({page,origin,output});
  assert.deepEqual(result.errors,[]);await context.close();

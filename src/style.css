@@ -921,6 +921,11 @@ body .app-dialog { width: min(480px, 100%); border-radius: 8px; max-height: 92vh
 }
 
 /* Bundle these layout contracts with the app: fixed public CSS URLs can be stale. */
+.rs-shop button.rs-card-action { appearance: none; font: inherit; color: var(--text); letter-spacing: normal; text-align: left; }
+.rs-shop .rs-receipt-open { display: block; background: transparent; border: 0; padding: 0; }
+@media (max-width: 767px) {
+  .rs-shop .rs-receipt-row > .rs-receipt-open { flex: 1 1 100% !important; min-width: 0; max-width: 100%; }
+}
 .rs-shop .rs-pagination { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(0, auto) minmax(90px, 1fr); align-items: center; gap: 8px; width: 100%; min-width: 0; font-size: 13px; }
 .rs-shop .rs-pagination > .rs-pagination-summary { min-width: 0; text-align: center; overflow-wrap: anywhere; }
 .rs-shop .rs-pagination > button { width: auto; max-width: 100%; min-width: 0; flex: none; }
