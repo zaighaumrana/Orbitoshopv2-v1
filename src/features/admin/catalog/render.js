@@ -1,3 +1,4 @@
+import {quickPrice} from '../../../catalog/prices.js'
 import {iconHTML,iconSelector,itemCategory} from '../../../catalog/icons.js'
 import {catalogAvailable} from '../../../catalog/data.js'
 import { escapeHTML } from "../../../html.js"
@@ -79,11 +80,11 @@ export function catalogTabContent(adminState) {
                 style="color:var(--danger);background:none;border:none;font-size:18px;cursor:pointer">×</button>
             </div>
             <div style="font-size:13px;color:var(--muted)">
-              Prices: ${(item.prices||[]).map((p,pi) => {
-                const pv = (typeof p === 'object' && p !== null) ? p : { name:'', price:p }
+              Prices: ${(Array.isArray(item.prices)?item.prices:[]).map((p,pi) => {
+                const pv = quickPrice(p)
                 return `
                 <span style="display:inline-flex;align-items:center;gap:4px;margin-right:6px">
-                  ${pv.name ? `<strong>${escapeHTML(pv.name)}</strong>:` : ''} ${moneyHTML(pv.price)}
+                  ${pv?.name ? `<strong>${escapeHTML(pv.name)}</strong>:` : ''} ${pv?moneyHTML(pv.price):'Price unavailable'}
                   <button type="button" data-remove-qprice="${i}-${pi}"
                     style="color:var(--danger);background:none;border:none;font-size:14px;cursor:pointer;padding:0">×</button>
                 </span>`

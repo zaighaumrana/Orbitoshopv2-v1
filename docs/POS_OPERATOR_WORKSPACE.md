@@ -1,4 +1,4 @@
-# POS operator workspace candidate — 29 October 2026
+# POS operator workspace candidate — current 30 October 2026
 
 Feature: Catalog and Inventory occupy adjacent desktop panels; the independently paged open/undelivered repair queue expands below them. Cart stays right. At <=1100px product panels stack beside Cart; <=760px Cart follows the product/repair workspace. No horizontal overflow was observed at 320, 390, 768, 1024, 1280 or 1440px in loopback Chrome.
 
@@ -12,7 +12,7 @@ Brand reads use current Client access, current canonical roles, Repair entitleme
 
 ## Asset boundary and compatibility
 
-src/catalog/registry-v1.json is the exact supplied proposal, schema 1 / version 1.0.0, 36 IDs. Owner approval and final registry digest are pending. The trusted artwork map is intentionally empty; metadata never imports missing files or constructs a URL. Category defaults terminate at generic.item; visited IDs stop corrupt cycles. Placeholders keep checkout and tickets usable. Selectors label artwork pending. Final SVGs must be supplied/approved separately and verified before adding literal build-time imports.
+src/catalog/registry-v1.json is the exact supplied proposal, schema 1 / version 1.0.0, 36 IDs. The contract and V1.0.1 artwork are owner-approved and all 36 verified local renderers are integrated. The registry retains its historical proposal fields unchanged; the production manifest records current availability. Category defaults terminate at generic.item; visited IDs stop corrupt cycles. A neutral placeholder is only the terminal missing-renderer recovery. No artwork intake gate remains; owner application acceptance and independent delta review remain separate.
 
 Old backend bootstraps omit catalog_icons: existing bounded projections omit new columns, management offers upgrade guidance, and repair intake uses known proposal choices plus manual text. A failed brand read permits manual entry with an explicit unavailable message; it never creates records or masquerades as an empty configured list. Active configured brands and exact approved aliases form native searchable datalist choices. Arbitrary typed text round-trips unchanged, with generic display fallback. Inactive records remain readable for historical labels. Unknown stored icon assignments remain on unrelated edits.
 
@@ -30,3 +30,14 @@ This supersedes earlier pending-artwork/registry-approval statements. The owner 
 The application uses a source-generated frozen literal map of only these verified local SVG geometries. Database IDs select known entries; no runtime SVG parser, path construction, remote fetch, new runtime dependency or raw database SVG injection. Inline wrappers inherit currentColor, are aria-hidden/nonfocusable, and retain adjacent names. Category fallbacks and terminal neutral placeholder remain tested with empty/missing renderer maps. Approved raw assets and production manifest are preserved byte-for-byte under explicit Git attributes.
 
 Focused intake/resolver/hash tests, actual Shop 36-icon 24/32px light/dark wrappers (144 instances), Catalog/Cart/queue visuals and the post-artwork normal build pass. Evidence: tests/svg-intake.json, svg-resolution.log, svg-visual-results.json, svg-all36-light.png, svg-all36-dark.png, pos-svg-light.png, pos-svg-dark.png, shop-build-svg.log. Backend source/release candidate unchanged. Remaining milestone gates are independent review, owner visual/functional acceptance, separately authorized release promotion/merge/deployment and hosted four-case verification (including the separate BYO account); physical printer/device evidence retains prior bounded deferral. No final-artwork intake remains outstanding.
+
+
+## 30 October 2026 — independent audit correction boundary
+
+POS-AUD-01: src/catalog/prices.js safely decodes actual finite nonnegative numeric prices from legacy numbers or variant objects. Missing/null/non-array/invalid values are unavailable, never coerced to zero. An explicitly stored numeric zero remains valid. POS preview and activation share this boundary; Admin displays unavailable entries without changing their original removal indices. Customer data is not rewritten.
+
+POS-AUD-02: quickAccepted records the accepted query/revision. Input immediately clears it and marks the resource loading; rendering, activation and paging require current readiness plus exact query/revision. One cancellable debounce timer coalesces input. Existing captured view/session/load ownership rejects late responses; entry-load completion cannot overwrite a newer search. Cart rendering/removal remains independent, focus/caret/composition nodes retain the existing reconciler. Inventory uses its pre-existing separate selector controller; this correction does not refactor its behavior.
+
+POS-AUD-03: Quick Item activation now uses the accepted Catalog record instead of data-attribute price JSON. The picker captures item ID, name, normalized prices, assigned icon_id and current view. A checked selection retains the same trusted icon identity and existing Cart key/quantity/variant/price fields through normal renders, without rereading Catalog or changing financial calculations. No icon-resolver/artwork change.
+
+Targeted reproduction: tests/pos-audit-corrections-browser.mjs (POS_EVIDENCE_DIR, PLAYWRIGHT_MODULE_PATH and CHROMIUM_EXECUTABLE_PATH). It reuses the existing actual-entry synthetic SDK helpers, holds Catalog responses and exercises the three regressions plus one combined journey, older responses/failure/clear/debounce, view/session departure, entry-load race and modal Cart rerender. tests/pos-prices.test.mjs covers malformed containers and no coercion. These are author local corrections, pending independent delta re-review; initial independent NOT READY verdict is preserved. No push or hosted operation is authorized.

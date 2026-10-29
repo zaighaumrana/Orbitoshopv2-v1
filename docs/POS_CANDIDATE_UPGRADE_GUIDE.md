@@ -12,7 +12,7 @@ Run from Shop; Platform operators can run node scripts/release-parity.mjs --cand
 
 ## Approval and promotion prerequisites
 
-Owner must accept registry IDs/digest and artwork/rights intake, independent code/security review, local acceptance evidence and proposed release capability mapping. Keep both PRs Draft until separately authorized otherwise. Promotion needs a separate exact-source review of both catalogs, active-shop-release.json, BYO manifest and release registry, then the established promotion process. This task does not change any active selector, hosted catalog or customer pin. Candidate source intentionally fails ordinary customer release-preflight; that is a STOP, not an installation failure to bypass.
+The owner-approved registry and all 36 V1.0.1 SVGs have completed intake. Remaining gates include independent code/security delta review, owner application acceptance, local acceptance evidence and proposed release capability mapping. Provenance does not establish independent legal clearance. Keep both PRs Draft until separately authorized otherwise. Promotion needs a separate exact-source review of both catalogs, active-shop-release.json, BYO manifest and release registry, then the established promotion process. This task does not change any active selector, hosted catalog or customer pin. Candidate source intentionally fails ordinary customer release-preflight; that is a STOP, not an installation failure to bypass.
 
 ## Current supported workflows
 

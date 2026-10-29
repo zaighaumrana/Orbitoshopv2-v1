@@ -1,3 +1,4 @@
+import {quickPrice,quickPrices} from '../catalog/prices.js'
 import {iconHTML,itemCategory,brandIcon} from '../catalog/icons.js'
 import {intakeBrands} from '../catalog/data.js'
 import {withPrintAttribution} from '../print/presentation.js'
@@ -72,6 +73,7 @@ const emptyPOS = () => ({
   checkoutRequestId: null,
   invSearch:       '',
   quickSearch: '',
+  quickAccepted:null,
   queueExpanded:false,queueStatus:'idle',queuePage:null,queueRows:[],queueGeneration:0,
   repairSearch:    '',
   collectionsReady:false,
@@ -95,15 +97,17 @@ onPrivateReset(() => {
   for(const operation of cartOperations.values())operation.detached=true
   posLoadGeneration++;posNavigationIsCurrent=()=>false
   posState=emptyPOS();SESSION={};placingOrder=false;checkoutInFlight=false;resetDraft()
-  selectorGeneration++;clearTimeout(selectorTimer)
+  selectorGeneration++;quickGeneration++;clearTimeout(selectorTimer);clearTimeout(quickTimer)
   collectionGeneration++;clearTimeout(collectionTimer)
 })
 
 /* ── Load ── */
 async function load(verifiedConfig) {
   const generation=++posLoadGeneration,view=captureView(),navigation=posNavigationIsCurrent
-  selectorGeneration++;quickGeneration++;clearTimeout(selectorTimer)
+  selectorGeneration++;quickGeneration++;clearTimeout(selectorTimer);clearTimeout(quickTimer)
   const current=()=>generation===posLoadGeneration&&view()&&navigation()
+  const quickRevision=quickGeneration,quickQuery=posState.quickSearch
+  posState.quickAccepted=null
   const loadSession = SESSION
   dlog('POS.load', 'ENTRY')
   const configReady=await loadConfig(false,verifiedConfig)
@@ -122,11 +126,18 @@ async function load(verifiedConfig) {
   render()
   const [inv, quickItems] = await Promise.all([
     CFG.inventory_module_enabled ? stockPage(posState.invSearch,0,current) : {data:[],count:0},
-    quickPage(posState.quickSearch,0,current),
+    quickPage(quickQuery,0,()=>current()&&quickRevision===quickGeneration&&quickQuery===posState.quickSearch),
   ].map(settleRead))
   if (!current() || SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== '/pos') return
   const reads=readStates({inventory:inv,quickItems})
-  posState.inventoryPage=inv.error?null:inv;posState.quickPage=quickItems.error?null:quickItems
+  posState.inventoryPage=inv.error?null:inv
+  if(quickRevision===quickGeneration&&quickQuery===posState.quickSearch){
+    posState.quickPage=quickItems.error?null:quickItems
+    posState.quickAccepted=quickItems.error?null:{query:quickQuery,revision:quickRevision}
+  }else{
+    // A search can settle while the entry inventory read is still pending.
+    reads.values.quickItems=state.data.quickItems;reads.resources.quickItems=state.resources.quickItems
+  }
   state.data={...reads.values,tickets:[],sales:[],udharAccounts:null,shiftFinancial:null,returns:[],repairComponents:[],employees:[]};state.resources=reads.resources
   applyBranding()
   dlog('POS.load', 'DATA READY (queries resolved) -- calling render()')
@@ -146,7 +157,7 @@ async function load(verifiedConfig) {
   }
 }
 
-let selectorGeneration=0,quickGeneration=0,selectorTimer=null
+let selectorGeneration=0,quickGeneration=0,selectorTimer=null,quickTimer=null
 async function refreshStock(offset=0,revision=++selectorGeneration) {
   const view=captureView(),generation=posLoadGeneration,query=posState.invSearch,current=()=>view()&&ownsPOS()&&generation===posLoadGeneration&&revision===selectorGeneration&&query===posState.invSearch
   if(!current())return
@@ -407,14 +418,18 @@ function posView() {
     </div>`
 }
 
+function quickResultsCurrent(){
+ return resourceReady(state.resources,'quickItems')&&posState.quickAccepted?.query===posState.quickSearch&&posState.quickAccepted?.revision===quickGeneration
+}
 function quickItemsPanel() {
-  const ready=resourceReady(state.resources,'quickItems')
+  const ready=quickResultsCurrent()
   return `<section class="card rs-catalog-panel" aria-label="Catalog"><h2>Catalog</h2>
     <label class="field"><span class="sr-only">Search catalog</span><input class="search" data-quick-search value="${escapeHTML(posState.quickSearch)}" placeholder="Search catalog…"></label>
     ${ready?`<div class="rs-product-list">${(state.data.quickItems||[]).map(item=>`
-     <button class="secondary-button rs-product-item" data-qitem-id="${item.id}" data-qitem-name="${escapeHTML(item.name)}" data-qitem-prices='${escapeHTML(JSON.stringify(item.prices))}'>
-       ${iconHTML(item.icon_id,itemCategory(item.icon_id))}<span><strong>${escapeHTML(item.name)}</strong><small>${(item.prices||[]).map(p=>typeof p==='object'?escapeHTML(p.name||'Standard')+' · '+moneyHTML(p.price):moneyHTML(p)).join(' / ')||'Choose price'}</small></span>
+     <button class="secondary-button rs-product-item" data-qitem-id="${item.id}" data-qitem-name="${escapeHTML(item.name)}" ${quickPrices(item.prices).length?'':'disabled'}>
+       ${iconHTML(item.icon_id,itemCategory(item.icon_id))}<span><strong>${escapeHTML(item.name)}</strong><small>${quickPrices(item.prices).map(p=>(p.name?escapeHTML(p.name)+' · ':'')+moneyHTML(p.price)).join(' / ')||'Price unavailable'}</small></span>
      </button>`).join('')}</div>${!(state.data.quickItems||[]).length?'<p class="muted">No catalog items match.</p>':''}${compactPages(posState.quickPage,'data-quick-page')}`:resourceNotice('Catalog',state.resources.quickItems?.status)}
+    <p class="muted" role="status" data-quick-search-status>${state.resources.quickItems?.status==='loading'?'Searching current catalog…':''}</p>
     <details class="rs-custom-item"><summary>Custom / one-off item</summary>${customItemEntry()}</details></section>`
 }
 function compactPages(page,attribute){
@@ -423,9 +438,10 @@ function compactPages(page,attribute){
 async function refreshQuick(offset=0,revision=++quickGeneration){
  const view=captureView(),query=posState.quickSearch,generation=posLoadGeneration,current=()=>view()&&ownsPOS()&&generation===posLoadGeneration&&revision===quickGeneration&&query===posState.quickSearch
  if(!current())return
- state.resources.quickItems={status:'loading'}
+ state.resources.quickItems={status:'loading'};posState.quickAccepted=null;render()
  const result=await settleRead(quickPage(query,offset,current))
  if(!current())return
+ posState.quickAccepted=result.error?null:{query,revision}
  state.data.quickItems=result.error?null:result.data;state.resources.quickItems={status:result.error?'unavailable':'ready'};posState.quickPage=result.error?null:result;render()
 }
 
@@ -1197,7 +1213,7 @@ function attachEvents() {
     )
     if (!el) return
     if(el.dataset.stockPage){const page=posState.inventoryPage;if(page)await refreshStock(el.dataset.stockPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
-    if(el.dataset.quickPage){const page=posState.quickPage;if(page)await refreshQuick(el.dataset.quickPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
+    if(el.dataset.quickPage){if(!quickResultsCurrent())return;const page=posState.quickPage;if(page)await refreshQuick(el.dataset.quickPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
     if(el.dataset.collectionPage){const page=posState.collectionPage;if(page&&state.modal?.readStatus==='ready')await openDeferredPOS('repair-collection',el.dataset.collectionPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
     if(el.dataset.action==='toggle-open-repairs'){posState.queueExpanded=!posState.queueExpanded;posState.queueGeneration++;if(posState.queueExpanded)await loadOpenQueue();else render();return}
     if(el.dataset.action==='retry-open-repairs'){await loadOpenQueue(posState.queuePage?.offset||0);return}
@@ -1566,22 +1582,27 @@ function attachEvents() {
 
     /* ── Quick items ── */
     if (el.dataset.qitemName) {
-      if(!resourceReady(state.resources,'quickItems'))return
-      const raw = JSON.parse(el.dataset.qitemPrices||'[]'), name = el.dataset.qitemName
-      const quickItemId = Number(el.dataset.qitemId)
-      const prices = raw.map(p => (typeof p === 'object' && p !== null) ? p : { name:'', price:p })
-      if (prices.length === 1) {
-        const pv = prices[0]
-        posState.cart.push({ productId:`qi-${quickItemId}-${Date.now()}`, name, variantName: pv.name||'', qty:1, originalPrice:pv.price, soldPrice:pv.price, discount:0, reason:'', isQuick:true, icon_id:(state.data.quickItems||[]).find(i=>i.id===quickItemId)?.icon_id, quickItemId })
+      if(el.disabled||!quickResultsCurrent())return
+      const item=(state.data.quickItems||[]).find(i=>String(i.id)===el.dataset.qitemId)
+      if(!item)return
+      const prices=quickPrices(item.prices)
+      if(!prices.length)return
+      const {name,icon_id}=item,quickItemId=item.id
+      if(prices.length===1){
+        const pv=prices[0]
+        posState.cart.push({productId:`qi-${quickItemId}-${Date.now()}`,name,variantName:pv.name,qty:1,originalPrice:pv.price,soldPrice:pv.price,discount:0,reason:'',isQuick:true,icon_id,quickItemId})
         render()
-      } else { state.modal = { type:'qitem-pick', name, prices, quickItemId }; render() }
+      }else{state.modal={type:'qitem-pick',name,prices,quickItemId,icon_id,current:captureView()};render()}
       return
     }
-    if (el.dataset.pickPrice !== undefined) {
-      const { name, prices, quickItemId } = state.modal
-      const pv = prices[Number(el.dataset.pickPrice)]
-      posState.cart.push({ productId:`qi-${quickItemId}-${Date.now()}`, name, variantName: pv.name||'', qty:1, originalPrice:pv.price, soldPrice:pv.price, discount:0, reason:'', isQuick:true, quickItemId })
-      state.modal = null; render(); return
+    if(el.dataset.pickPrice!==undefined){
+      const modal=state.modal,index=Number(el.dataset.pickPrice)
+      if(modal?.type!=='qitem-pick'||!modal.current()||!Number.isInteger(index)||index<0)return
+      const pv=quickPrice(modal.prices[index])
+      if(!pv)return
+      const {name,quickItemId,icon_id}=modal
+      posState.cart.push({productId:`qi-${quickItemId}-${Date.now()}`,name,variantName:pv.name,qty:1,originalPrice:pv.price,soldPrice:pv.price,discount:0,reason:'',isQuick:true,icon_id,quickItemId})
+      state.modal=null;render();return
     }
 
     /* ── Component tag picker ── */
@@ -1710,9 +1731,11 @@ function attachEvents() {
     if (t.dataset.split === 'digital') posState.splitDigital = Number(t.value)||0
     if (t.dataset.split === 'credit') posState.splitCredit = Number(t.value)||0
     if(t.dataset.quickSearch!==undefined){
-      posState.quickSearch=t.value;const revision=++quickGeneration
+      posState.quickSearch=t.value;const revision=++quickGeneration,view=captureView()
+      posState.quickAccepted=null;state.resources.quickItems={status:'loading'};clearTimeout(quickTimer)
+      const status=document.querySelector('[data-quick-search-status]');if(status)status.textContent='Searching current catalog…'
       document.querySelectorAll('[data-qitem-name]').forEach(button=>button.disabled=true)
-      setTimeout(()=>{if(ownsPOS()&&revision===quickGeneration)void refreshQuick(0,revision)},180)
+      quickTimer=setTimeout(()=>{if(view()&&ownsPOS()&&revision===quickGeneration)void refreshQuick(0,revision)},180)
     }
     if (t.dataset.invSearch !== undefined) {
       posState.invSearch=t.value;const revision=++selectorGeneration;clearTimeout(selectorTimer)
