@@ -211,3 +211,6 @@ an existing custom folder/journal instead of generating replacement history.
 Customer source preflight is sufficient; developer paired-repository parity is not
 part of the customer stages. Technical upgrade reference:
 [CONTROLLED_BACKEND_UPGRADES.md](CONTROLLED_BACKEND_UPGRADES.md).
+
+
+30 October 2026 candidate notice: support-v8 POS Catalog work is unpromoted. Use the approved source for this operational procedure; see [candidate gates and recovery](POS_CANDIDATE_UPGRADE_GUIDE.md). Do not install from the POS feature source or bypass its intentionally failing approved-release preflight.

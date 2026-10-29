@@ -276,3 +276,5 @@ Owner approval to commit/push and later separate approval to merge remain mandat
 No branch deletion is authorized. Existing support-v7 fingerprint and all historical
 packages/records remain unchanged. See the milestone final cleanup report and
 Platform docs/PR6_RELEASE_REPORTING_FIX.md for the complete transition handoff.
+
+30 October 2026 candidate notice: support-v8 POS Catalog work is unpromoted. Use the approved source for this operational procedure; see [candidate gates and recovery](POS_CANDIDATE_UPGRADE_GUIDE.md). Do not install from the POS feature source or bypass its intentionally failing approved-release preflight.
