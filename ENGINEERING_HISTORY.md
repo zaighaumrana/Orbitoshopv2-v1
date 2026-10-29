@@ -1577,3 +1577,186 @@ commits/pushes of the reviewed cleanup on both existing M2 branches, with automa
 Pages builds. Exact commit/CI/deployment outcomes are recorded in the existing final
 cleanup report. STOP before merge; separate owner authorization is still required.
 No local/remote branches may be deleted. No additional feature/backend work authorized.
+## 2026-10-28 — M3 stable rendering, dialogs, dual branding and print presentation
+Branch: feature/shop-modernization-m3
+
+### Purpose
+Implement the owner-approved final frontend modernization candidate from Shop
+2dffa1eaf0ddd63d0e8369ccf6f889e4d31e028d. Platform development
+864cdbc1c09184a72e33afe67aa4a4f516e78e68 is read-only design reference.
+
+### Changed
+Existing Admin/POS/Workshop templates now reconcile stable shell/content/dialog
+boundaries, keyed cart/receipt rows and revision-checked family/receipt models.
+Shared dialog ownership supplies bounded responsive geometry, accessible names,
+focus containment/restoration, inert background and dirty/busy protection while
+retaining specialized confirmation/PIN and M1 authority/request guards. Quick Item
+variants, compound password/repair/credit controls and receipt actions reflow.
+
+Official original artwork, PWA/favicon assets and licensed local Inter use scoped
+Platform tokens. A distinct font alias and unchanged legacy login rules protect
+login appearance and animation. Product identity stays fixed; saved merchant colors
+remain raw while readable accents, names and logos stay in business contexts.
+Onboarding, inline operational modules and the project-scoped tracker share the
+system. Tracker phone input styling is consistent with its exact-reference input.
+
+Printing has an optional, default-off plain attribution for the current action,
+including actual POS/Admin/EMS callers and six builders. No preference is stored.
+An exact duplicate line is avoided; actual height is measured before unchanged
+copies multiplication. A measured blocked-CDN barcode failure justified vendoring
+exact JsBarcode 3.11.6 with MIT notice, preserving readiness, CODE128 and queue rules.
+
+### Validation
+Focused model/assets, unchanged-source, checkout/draft/thermal/ownership checks;
+actual-entry loopback dialog/cart/search/receipt/role/inline/tracker fixtures;
+matched login computed appearance and advancing shader observations; real 200%
+Chrome page zoom; one small matched cart sample; original versus candidate queued
+print readiness and default-output comparison. Commands/results and source hashes
+are in the existing M3 evidence register and implementation report. Build and v7
+parity checked locally. Earlier failed fixture/layout cases are retained with fixes.
+
+### Deployment / DB impact
+Local only. No push, PR, deployment, merge, Platform modification, hosted Supabase
+operation, migration, Edge Function or release generation. Approved v7 fingerprint
+c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada
+remains 39 migrations / 7 functions / 9 requirements. Worker remains online-only.
+
+### Deferred / deliberately unchanged
+D01-D06, canonical roles, money/time semantics, request UUIDs and unknown outcomes
+remain. Independent audit/owner acceptance, physical printer, actual mobile keyboard
+and installed OS-app icon evidence are pending; no self-certified acceptance.
+F22 retains its existing bounded deferral. F18 has a local implemented correction.
+
+### Git
+Reviewable local checkpoints use [CF-Pages-Skip]. Publication and Draft PR require
+separate owner approval; all later PRs target development. No branch deletion.
+
+
+## 2026-10-29 — M3 owner visual acceptance corrections (local)
+Branch: feature/shop-modernization-m3
+
+### Purpose and decisions
+Implement M3-OA-01–05 from owner visual review. Safely fast-forwarded the clean feature
+branch to approved empty ancestor 9f74a8fff4d37424c31d8ba9bd942523e659a8b6.
+D05's optional/default-off presentation is expressly superseded: every supported
+printed document now receives the small approved local RetraSell logo and plain
+Powered by RetraSell footer automatically. Original D05 rationale remains historical.
+This removes only print attribution choice; Support consent/PIN/financial approval
+and authorization remain unchanged.
+
+### Changed
+Removed retired checkbox/event-choice logic from POS/Admin/EMS/Workshop and shared
+normalization. The idempotent shared footer covers six builders, receipt/ticket
+previews, shift output and direct queued printing, before existing image readiness,
+height measurement and copies. Merchant terms, amounts, IDs, barcodes and reprint
+markers remain. Refined merchant logo containment/padding and removed accent borders.
+New Repair uses wide information/issue panels with the owner's full-width bottom
+finance tile: labour/quote, centered payments, balance. Existing Admin repair detail
+separates repair/history from finance/status/operations. Existing fields, draft state
+and actions are retained; narrow layouts stack and actions stay reachable. Centered
+Support with its single existing maximum-width rule; no Support logic changes.
+
+### Validation
+Only the focused M3 owner fixture, automatic print/unit comparisons, short existing
+repair draft checks, source/artwork and JS/CSS syntax checks, plus one application
+build. Exact results, four dialog geometries, Support alignment, logo variants, one
+matched login comparison and real print-renderer height/copy evidence are recorded
+in the M3 owner-acceptance archive. No broad M1/M2 matrix or benchmarks.
+
+### Impact and gates
+Local implementation/commits only, with [CF-Pages-Skip]. No push, CI dispatch, build
+trigger at Cloudflare, manual deployment, Platform modification or hosted Supabase
+operation. Backend/support-v7 unchanged. Existing retrabyo preview missing-variable
+failure is separate provider configuration, not repaired here. Physical printer,
+actual device keyboard, independent audit and final owner acceptance remain pending.
+Do not publish until explicit owner authorization; production follows this branch.
+
+
+## 2026-10-29 — live-review Support styling and Catalog action placement (local)
+Branch: feature/shop-modernization-m3
+
+### Purpose and changes
+Owner screenshots showed that centering Support still differed from Billing/Settings.
+Superseded the bounded-center presentation with full-workspace standard cards and
+inherited workspace spacing. Moved the request heading into its form card and grouped
+history/detail/refresh/pagination in a card; card headings use the shared h2 style.
+The shared stylesheet changed only in the Support wrapper. Owner also requested
+Catalog search above content in both tabs and Add Quick Item above the item list.
+Passed the existing search-toolbar helper into the Catalog renderer and moved the
+unchanged add action into its card header. Existing IDs, callbacks, fields, retry,
+consent, access rules, filter state, paging and business operations are preserved.
+
+### Validation and boundaries
+Focused local Support/Billing style comparison at desktop/light and mobile/dark;
+owner/manager/pending control signatures equal the published ancestor. Four real-entry
+Catalog geometries pass; existing filters/clear/Add dialog work without business writes.
+Selected escaping and protected-source/artwork checks, JS/CSS syntax and one build pass.
+An initial fixture omitted client-shell; retained as invalid, corrected before accepting
+desktop evidence. No broad suites, hosted Supabase, Platform, release or print changes.
+No push/build trigger/deployment; these follow-up edits await publication authorization.
+Independent review and owner final acceptance remain pending. Evidence is in the
+existing M3 archive's 20261029-support-style and 20261029-catalog-placement folders.
+
+
+## 2026-10-29 — consistent numbered pagination throughout Shop (local)
+Branch: feature/shop-modernization-m3
+
+Owner identified the same count-left/Previous-middle layout in multiple sections.
+The shared pageControls used generic toolbar flex spacing and count-first markup.
+Reordered only its presentation to Previous/count/Next and added authenticated,
+shared three-column styling with equal side tracks, centered/wrapping summaries
+and edge-aligned buttons. Support's separate pager opts into the same class.
+Admin lists, POS lists/repair collection, Workshop and EMS callers inherit the fix.
+No offsets, size/count calculations, read queries, callbacks, guards or disabled
+conditions changed. Receipt detail's unnumbered document navigation is unchanged.
+
+A selected boundary/action/order unit check and real-template browser geometry at
+1280/320px pass: both pager types preserve left/center/right alignment, balanced
+vertical positioning and no overflow. Existing Support control/consent comparisons
+pass, as do syntax, protected-source/artwork boundary and the updated build.
+No broad suites, hosted writes, Platform/backend/print changes, push or deployment.
+This adds to the unpublished Support/Catalog refinements; owner publication,
+independent review and final acceptance remain separate gates.
+
+
+## 2026-10-29 — live pager asset skew and intrinsic receipt-preview width (local)
+Branch: feature/shop-modernization-m3; baseline: 340994565f113e888abd9dfbf72d28eb7a44511f
+
+Owner live findings M3-LV-01/02 were confirmed through read-only DOM/CSSOM inspection
+of the existing POS tab. Pager markup was current but the fixed-URL branding CSS had
+no pager rules (display:block); no cache layer was guessed or provider cache altered.
+Receipt backdrop's implicit auto track shrank the dialog to 280px and paper to 238px.
+Moved shared pager CSS into the content-hashed app stylesheet and removed retired
+Support flex overrides. Added a scoped explicit backdrop track and 600px receipt/
+ticket preview dialog with a scrollable body and fixed actions; paper max stays 380px.
+Print builders, amounts, IDs, barcode/thermal logic, paging state/handlers and all
+backend/Platform sources stay unchanged.
+
+Focused actual-entry tests load built CSS while deliberately serving the observed
+older branding asset: 12 pager contexts at desktop/mobile, both preview types and
+byte-exact receipt/ticket print comparison pass. Syntax and one build pass. The first
+run used an older-backend fixture without a pager; retained and corrected to v7 mode.
+No broad tests, hosted operations, commit, push or deployment. Local evidence records
+measurements and limits; publication, independent review and owner acceptance pending.
+
+
+## 2026-10-29 — M3-IR-01 native KPI and receipt-detail activators (local)
+Branch: feature/shop-modernization-m3; baseline: a77e751c55c017098eb9672defb58ad6eaba2ad1
+
+Independent audit M3-IR-01 identified unfocusable clickable DIVs. Replaced Dashboard
+KPI cards and only Receipt Archive's detail-opening region with type=button native
+controls; preserved existing target/index/action attributes, permission filtering,
+selection/loading guards and one delegated click path. Receipt controls have escaped
+record-specific accessible names. Print/Reprint/Summary remain sibling actions,
+not nested buttons. Scoped bundled-CSS resets preserve the original card/content
+appearance and mobile wrapping; existing 3px keyboard focus applies. No key handler
+or second navigation implementation was introduced.
+
+Focused actual-entry Dashboard and Receipt journeys exercise Tab, Enter, Space and
+pointer: one existing navigation/detail opening each, visible focus, zero submits,
+neighbor print actions or writes. Selected old/new style/geometry matches at1280/390.
+The first comparison caught a native-button font override; specificity was corrected,
+then the focused check passed. Two builds total (initial plus corrective); syntax pass.
+No broad suites, hosted operations, backend/Platform or protected-login changes.
+Local Skip-marked commit only; no push. Status: locally corrected, pending independent
+re-review. IR-02/03 and physical/device evidence remain separately tracked.

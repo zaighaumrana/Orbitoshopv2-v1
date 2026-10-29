@@ -1,3 +1,5 @@
+import {withPrintAttribution} from '../print/presentation.js'
+import {renderOperationalScreen} from '../ui-render.js'
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
 import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
 import { escapeHTML, safeImageURL } from "../html.js"
@@ -201,7 +203,7 @@ async function loadShift(current) {
 function render() {
   if(!ownsPOS())return
   if (window.location.pathname !== '/pos' || state.role !== SESSION.employee?.role) return
-  dstack('POS.render', `*** #app REWRITE ***`)
+  dstack('POS.render', `Bounded shell/body/modal patch`)
   if (!SESSION.employee) { navigate('/login'); return }
   if (CFG.suspended) {
     document.getElementById('app').innerHTML = `
@@ -214,18 +216,20 @@ function render() {
     return
   }
   const tenant = currentTenant()
-  const _modalScroll = document.querySelector('.modal')?.scrollTop || 0
 
-  document.getElementById('app').innerHTML = `
+  renderOperationalScreen(`
     <div class="app-shell client-shell">
       <main class="main">
         <header class="topbar">
+          <div class="rs-identities">
+            <a class="rs-product" href="/" aria-label="RetraSell POS"><img class="rs-logo-light" src="/brand/logos/retrasell-horizontal-primary.svg" alt="RetraSell"><img class="rs-logo-dark" src="/brand/logos/retrasell-horizontal-reversed.svg" alt="RetraSell"></a>
           <div class="brand top-brand">
             <div class="logo">${tenant.logo?`<img alt="" src="${escapeHTML(safeImageURL(tenant.logo))}">`: escapeHTML(tenant.name.slice(0,2).toUpperCase())}</div>
             <div>
               <strong>${escapeHTML(tenant.name)}</strong>
               <span class="muted" style="font-size:12px">Cashier · POS Counter</span>
             </div>
+          </div>
           </div>
           <div class="top-actions">
             <span class="chip"><strong style="font-size:12px">${escapeHTML(SESSION.employee.name)}</strong></span>
@@ -249,17 +253,13 @@ function render() {
         <section class="content">${posView()}</section>
       </main>
     </div>
-    ${renderModal()}`
+    ${renderModal()}`, {screen:'pos',view:'pos',modal:state.modal})
 
   normalizeModalControls(document.getElementById('app'))
 
   if (!_eventsAttached) {
     attachEvents()
     _eventsAttached = true
-  }
-  if (_modalScroll) {
-    const m = document.querySelector('.modal')
-    if (m) m.scrollTop = _modalScroll
   }
 }
 
@@ -300,7 +300,7 @@ function posView() {
       <aside class="card cart">
         <h2>Cart</h2>
         ${posState.cart.length ? posState.cart.map(item => `
-          <div class="cart-line">
+          <div class="cart-line" data-ui-key="cart:${escapeHTML(item.productId)}">
             <div>
               <strong>${escapeHTML(item.name)}</strong><br>
               ${item.variantName ? `<small class="muted">&nbsp;&nbsp;${escapeHTML(item.variantName)}</small><br>` : ''}
@@ -345,10 +345,10 @@ function posView() {
               style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;
                      background:var(--surface);color:var(--text);font-size:16px;width:100%">
             ${tendered>0?`
-            <div style="display:flex;justify-content:space-between;padding:9px 12px;border-radius:8px;font-weight:600;font-size:15px;
-                background:${change>=0?'color-mix(in srgb,#22c55e 12%,var(--surface))':'color-mix(in srgb,#ef4444 12%,var(--surface))'}">
+            <div id="change-display" style="display:flex;justify-content:space-between;padding:9px 12px;border-radius:8px;font-weight:600;font-size:15px;
+                background:${change>=0?'color-mix(in srgb,var(--success) 12%,var(--surface))':'color-mix(in srgb,var(--danger) 12%,var(--surface))'}">
               <span>${change>=0?'Change Due':'Short by'}</span>
-              <span style="color:${change>=0?'#22c55e':'#ef4444'}">${moneyHTML(Math.abs(change))}</span>
+              <span style="color:${change>=0?'var(--success)':'var(--danger)'}">${moneyHTML(Math.abs(change))}</span>
             </div>` : ''}
           </div>` : ''}
         ${posState.checkoutPayment === 'Udhar (Credit)' ? `
@@ -506,7 +506,7 @@ function buildShiftStats() {
   const custCount  = new Set(shiftSales.map(s=>s.customer_name).filter(Boolean)).size
   const shiftTkts  = state.data.shiftTickets
   return `
-    <div class="shift-print">
+    <div class="shift-print">${withPrintAttribution(`
       <center><strong>${escapeHTML(tenant.name)}</strong><br>Shift Summary — ${todayStr}<br>${escapeHTML(empName||'All Staff')}</center>
       <hr style="border:none;border-top:1px dashed #bbb;margin:8px 0">
       <div class="stat-row"><span>Products sold</span><span>${itemsSold}</span></div>
@@ -525,7 +525,7 @@ function buildShiftStats() {
       ${state.data.shiftUnmapped?`<p class="muted">${state.data.shiftUnmapped} legacy records in this period have no canonical actor mapping and are not assigned by display name.</p>`:''}
       <hr style="border:none;border-top:1px dashed #bbb;margin:8px 0">
       <center style="color:#888;font-size:11px">Printed ${new Date().toLocaleString()}</center>
-    </div>`
+    `)}</div>`
 }
 
 /* ── Component tag picker (sub-modal) ── */
@@ -780,9 +780,9 @@ function renderModal() {
     </div></div>`
 
   if (type === 'receipt') return `<div class="modal-backdrop">
-    <div class="modal">
+    <div class="modal rs-receipt-preview-dialog">
       <h2>${state.modal.isTicketSlip ? 'Repair Ticket Created' : 'Receipt'}</h2>
-      ${state.modal.isTicketSlip ? ticketSlipPreview(state.modal.ticket) : receiptPreview(state.modal.sale)}
+      <div class="rs-receipt-preview-body">${state.modal.isTicketSlip ? ticketSlipPreview(state.modal.ticket) : receiptPreview(state.modal.sale)}</div>
       <div class="modal-actions">
         <button class="secondary-button" data-close>Close</button>
         <button class="primary-button" data-action="${state.modal.isTicketSlip ? 'print-ticket-slip' : 'print-receipt'}">Print Receipt</button>
@@ -831,7 +831,7 @@ function renderModal() {
               <span>Balance: <strong>${moneyHTML(u.outstanding)}</strong></span>
               <span class="muted">Current total: ${moneyHTML(u.effectiveObligation)}</span>
             </div>
-            <div style="display:flex;gap:8px;align-items:center">
+            <div class="rs-credit-controls">
               <input type="number" step="any" min="0" max="${u.outstanding}" placeholder="Amount to settle" data-settle-amount="${u.kind}:${u.sourceId}"
                 style="flex:1;border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text)">
               <select data-settle-method="${u.kind}:${u.sourceId}"
@@ -1162,6 +1162,7 @@ function attachEvents() {
 
   /* ── Click ── */
   listenOwned(app,'click',ownsPOS,async (e,eventCurrent)=>{
+
     if(e.target.closest('[data-action="retry-pos-detail"]')||(state.modal?.readStatus&&e.target.closest('[data-action="retry-resources"]'))){await openDeferredPOS(state.modal.type);return}
     if(e.target.closest('[data-action="retry-resources"]')){await load();return}
     if (!can('pos', state.role) || !modalEntitled(state.modal?.type)) return
@@ -1689,8 +1690,8 @@ function attachEvents() {
       if (posState.cashTendered > 0) {
         const div = document.createElement('div')
         div.id = 'change-display'
-        div.style.cssText = `display:flex;justify-content:space-between;padding:9px 12px;border-radius:8px;font-weight:600;font-size:15px;margin-top:4px;background:${change>=0?'color-mix(in srgb,#22c55e 12%,var(--surface))':'color-mix(in srgb,#ef4444 12%,var(--surface))'}`
-        div.innerHTML = `<span>${change>=0?'Change Due':'Short by'}</span><span style="color:${change>=0?'#22c55e':'#ef4444'}">${moneyHTML(Math.abs(change))}</span>`
+        div.style.cssText = `display:flex;justify-content:space-between;padding:9px 12px;border-radius:8px;font-weight:600;font-size:15px;margin-top:4px;background:${change>=0?'color-mix(in srgb,var(--success) 12%,var(--surface))':'color-mix(in srgb,var(--danger) 12%,var(--surface))'}`
+        div.innerHTML = `<span>${change>=0?'Change Due':'Short by'}</span><span style="color:${change>=0?'var(--success)':'var(--danger)'}">${moneyHTML(Math.abs(change))}</span>`
         t.parentNode.insertBefore(div, t.nextSibling)
       }
     }
@@ -1762,6 +1763,7 @@ function attachEvents() {
 
   /* ── Submit ── */
   listenOwned(app,'submit',ownsPOS,async (e,eventCurrent)=>{
+
     if (!can('pos', state.role) || !modalEntitled(state.modal?.type)) { e.preventDefault(); return }
     if (!window.location.pathname.startsWith('/pos')) return
     e.preventDefault()

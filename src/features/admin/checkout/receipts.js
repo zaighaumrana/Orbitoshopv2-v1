@@ -1,4 +1,8 @@
 import { databaseDate, localDateKey } from '../../../datetime.js'
+const archiveModels=new WeakMap();
+const modelFields=['id','parent_ticket_id','ticket_id','invoice_number','ticket_number','customer_name','customer_phone','device_brand','device_model','payment_method','employee_name','advance_method','amount_paid','created_by','total_bill','final_total','estimated_quote','placed_at','created_at'];
+const snapshot=rows=>rows.map(row=>[row,...modelFields.map(key=>row[key])]);
+const unchanged=(rows,prior)=>prior?.length===rows.length&&rows.every((row,i)=>prior[i][0]===row&&modelFields.every((key,k)=>Object.is(prior[i][k+1],row[key])));
 
 function dateValue(value) {
   const time = databaseDate(value).getTime()
@@ -7,6 +11,8 @@ function dateValue(value) {
 
 /** Build one archive model from retail sales plus persisted repair invoices. */
 export function buildReceiptRecords(sales = [], tickets = []) {
+  const previous=archiveModels.get(sales)?.get(tickets)
+  if(previous&&unchanged(sales,previous.sales)&&unchanged(tickets,previous.tickets))return previous.records
   const ticketsById = new Map(tickets.map(ticket => [String(ticket.id), ticket]))
   const repairInvoices = new Set(tickets.map(ticket => ticket.invoice_number).filter(Boolean))
   const repairTicketIds = new Set(tickets.map(ticket => String(ticket.id)))
@@ -59,8 +65,11 @@ export function buildReceiptRecords(sales = [], tickets = []) {
       }
     })
 
-  return [...retailRecords, ...repairRecords]
+  const records=[...retailRecords, ...repairRecords]
     .sort((left, right) => dateValue(right.createdAt) - dateValue(left.createdAt))
+  let byTickets=archiveModels.get(sales);if(!byTickets){byTickets=new WeakMap();archiveModels.set(sales,byTickets)}
+  byTickets.set(tickets,{sales:snapshot(sales),tickets:snapshot(tickets),records})
+  return records
 }
 
 function matchesReceiptSearch(record, search) {

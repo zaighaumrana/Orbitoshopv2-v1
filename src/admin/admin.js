@@ -1,3 +1,4 @@
+import {renderOperationalScreen} from '../ui-render.js'
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
 import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
 import { createSupportClient } from '../platform/support.js'
@@ -309,21 +310,23 @@ let _eventsAttached = false
 
 function render() {
   if (!adminNavigationIsCurrent() || !window.location.pathname.startsWith('/admin') || state.role !== SESSION.employee?.role) return
-  dstack('ADMIN.render', `*** #app REWRITE *** adminModule=${adminState.adminModule}`)
+  dstack('ADMIN.render', `Bounded shell/body/modal patch adminModule=${adminState.adminModule}`)
   const tenant = currentTenant()
   if (!can(adminState.adminModule, state.role)) adminState.adminModule = 'dashboard'
-  const _modalScroll = document.querySelector('.modal')?.scrollTop || 0
 
-  document.getElementById('app').innerHTML = `
+  renderOperationalScreen(`
     <div class="app-shell client-shell">
       <main class="main">
         <header class="topbar">
+          <div class="rs-identities">
+            <a class="rs-product" href="/" aria-label="RetraSell POS"><img class="rs-logo-light" src="/brand/logos/retrasell-horizontal-primary.svg" alt="RetraSell"><img class="rs-logo-dark" src="/brand/logos/retrasell-horizontal-reversed.svg" alt="RetraSell"></a>
           <div class="brand top-brand">
             <div class="logo">${tenant.logo ? `<img alt="" src="${escapeHTML(safeImageURL(tenant.logo))}">` : escapeHTML(tenant.name.slice(0,2).toUpperCase())}</div>
             <div>
               <strong>${escapeHTML(tenant.name)}</strong>
               <span class="muted" style="font-size:12px">${escapeHTML(state.role)} · Back Office</span>
             </div>
+          </div>
           </div>
           <div class="top-actions">
             <select class="tenant-switcher compact-select" data-action="admin-module">
@@ -355,17 +358,13 @@ function render() {
         <section class="content">${pageContent()}</section>
       </main>
     </div>
-    ${renderModal()}`
+    ${renderModal()}`, {screen:'admin',view:adminState.adminModule+':'+(adminState.settingsTab||''),modal:state.modal})
 
   normalizeModalControls(document.getElementById('app'))
 
   if (!_eventsAttached) {
     attachEvents()
     _eventsAttached = true
-  }
-  if (_modalScroll) {
-    const m = document.querySelector('.modal')
-    if (m) m.scrollTop = _modalScroll
   }
   if(restoreScroll!==null){const scroll=restoreScroll;restoreScroll=null;requestAnimationFrame(()=>{if(adminNavigationIsCurrent())window.scrollTo(0,scroll)})}
   saveNavigation()
@@ -418,11 +417,11 @@ function dashboard() {
       can('pos',state.role)?`<button class="primary-button" data-action="go-pos">Go to POS</button>`:'')}
     <div class="grid kpi-grid">
       ${kpis.filter(([, ,target]) => target === 'udharList' || can(target, state.role)).map(([l,v,target]) => `
-        <div class="card kpi" style="cursor:pointer" data-kpi-target="${target}">
+        <button type="button" class="card kpi rs-card-action" data-kpi-target="${target}">
           <span class="label">${l}</span>
           <span class="value">${typeof v === 'number' && !['Open Tickets','Employees'].includes(l)
             ? moneyHTML(v) : v}</span>
-        </div>`).join('')}
+        </button>`).join('')}
     </div>
     <div class="grid two-col">
       <div class="card">
@@ -572,7 +571,7 @@ function settings() {
 
 function catalog() {
   const isAllowed = state.role === 'Business Owner' || SESSION.isAdmin || state.role === 'Manager'
-  return catalogPage({ tit, adminState, isAllowed })+tlb('Search this catalog…')
+  return catalogPage({ tit, tlb, adminState, isAllowed })
 }
 
 function settingsTabContent() {
@@ -601,7 +600,7 @@ function settingsTabContent() {
       ${fld('Business Name','name',t.name)}
       ${fld('Description','businessDescription',CFG.shop_description||'')}
       ${fld('Primary Color','primaryColor',t.primaryColor,'color')}
-      ${fld('Secondary Color','secondaryColor',t.secondaryColor,'color')}
+      ${fld('Secondary Color','secondaryColor',t.secondaryColor,'color')}<p class="muted rs-brand-note">Saved colors identify your business. The app derives readable accents for each theme; product actions, status colors and focus indicators stay RetraSell.</p>
       <label class="field"><span>Logo Upload</span><input name="logo" type="file" accept="image/*"></label>
       <div class="modal-actions" style="grid-column:1/-1"><button class="primary-button">Save Branding</button></div>
     </form>`
@@ -738,7 +737,7 @@ function renderModal() {
         ${fld('Full Name','name')}
         ${fld('Email','email','','email')}
         <label class="field"><span>Password</span>
-          <div style="display:flex;gap:6px">
+          <div class="rs-compound">
             <input name="password" type="password" style="flex:1">
             <button type="button" class="secondary-button" data-action="gen-employee-password" style="white-space:nowrap">Generate</button>
           </div>
@@ -816,6 +815,7 @@ function attachEvents() {
   })
   // Click delegation
   listenOwned(app,'click',ownsAdmin,async (e,eventCurrent)=>{
+
     if(e.target.closest('[data-action="retry-admin-udhar"]')||(state.modal?.type==='udharList'&&state.modal.readStatus&&e.target.closest('[data-action="retry-resources"]'))){await openAdminUdhar();return}
     if(e.target.closest('[data-action="retry-resources"]')){await load();return}
     if (!can(adminState.adminModule, state.role) || !modalEntitled(state.modal?.type)) return
@@ -1482,6 +1482,7 @@ function attachEvents() {
 
   // Submit
   listenOwned(app,'submit',ownsAdmin,async (e,eventCurrent)=>{
+
     if (!can(adminState.adminModule, state.role) || !modalEntitled(state.modal?.type)) { e.preventDefault(); return }
     if (!window.location.pathname.startsWith('/admin')) return
     e.preventDefault()

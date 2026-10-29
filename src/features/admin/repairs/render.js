@@ -67,9 +67,12 @@ export function ticketDetailModalHTML(id, modal) {
         ? `<div class="terminal-state good"><strong>Ready for collection</strong><span>Payment and delivery can be completed from POS.</span></div>`
         : `<p class="muted" style="font-size:12px">${status === 'In Progress' ? 'Repair work is in progress.' : 'Repair is waiting to be started.'}</p>`
 
-  return `<div class="modal-backdrop"><div class="modal modal-md">
-    <h2>${escapeHTML(root.ticketNumber || original.ticketNumber || 'Repair')} <span class="badge ${sc[status]||'warn'}" style="margin-left:8px">${escapeHTML(status)}</span></h2>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:14px;margin-bottom:14px;padding:12px;background:var(--surface-2);border-radius:8px">
+  return `<div class="modal-backdrop"><div class="modal rs-repair-workspace-dialog">
+    <header class="rs-repair-header">    <h2>${escapeHTML(root.ticketNumber || original.ticketNumber || 'Repair')} <span class="badge ${sc[status]||'warn'}" style="margin-left:8px">${escapeHTML(status)}</span></h2>
+</header>
+    <div class="rs-repair-workspace">
+      <section class="rs-repair-panel" aria-label="Repair information"><h3>Repair information</h3>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px;font-size:14px;margin-bottom:14px;padding:12px;background:var(--surface-2);border-radius:8px">
       <div><span class="muted">Customer</span><br><strong>${escapeHTML(root.customerName || '—')}</strong></div>
       <div><span class="muted">Phone</span><br><strong>${escapeHTML(root.customerPhone||'—')}</strong></div>
       <div><span class="muted">Device</span><br><strong>${escapeHTML(root.deviceBrand || '')} ${escapeHTML(root.deviceModel || '')}</strong></div>
@@ -103,6 +106,11 @@ export function ticketDetailModalHTML(id, modal) {
             </div>`).join('')}
         </div>
       </div>` : ''}
+    ${(summary.proposals||[]).length ? `<div style="margin-bottom:12px"><strong style="font-size:13px">Additional-work decisions</strong>
+        <div style="display:grid;gap:6px;margin-top:6px">${summary.proposals.map(p => `<div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:12px"><strong>${escapeHTML(p.description)}</strong> · ${moneyHTML(p.quotedAmount)} <span class="badge ${p.decision==='Approved'?'good':p.decision==='Declined'?'bad':'warn'}">${escapeHTML(p.decision)}</span>${p.decisionMethod?`<br><span class="muted">${escapeHTML(p.decisionMethod)}${p.decisionNote?' · '+escapeHTML(p.decisionNote):''}</span>`:''}${p.decision==='Pending'?`<div style="display:flex;gap:6px;margin-top:6px"><button class="secondary-button" data-action="decide-additional-work" data-proposal-id="${p.id}" data-decision="Approved">Approve</button><button class="secondary-button" data-action="decide-additional-work" data-proposal-id="${p.id}" data-decision="Declined">Decline</button></div>`:''}</div>`).join('')}</div>
+      </div>` : ''}
+      </section>
+      <section class="rs-repair-panel" aria-label="Financial and operations"><h3>Financial and operations</h3>
     <div style="display:grid;gap:6px;margin-bottom:12px;padding:12px;background:var(--surface-2);border-radius:8px">
       <div style="display:flex;justify-content:space-between"><span>Total billed</span><strong>${moneyHTML(summary.effectiveObligation)}</strong></div>
       <div style="display:flex;justify-content:space-between"><span>Payments received</span><strong>${moneyHTML(summary.paymentsReceived)}</strong></div>
@@ -110,9 +118,6 @@ export function ticketDetailModalHTML(id, modal) {
       <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:6px"><span>Outstanding</span><strong>${moneyHTML(summary.outstanding)}</strong></div>
       ${summary.udharApproved ? `<div style="display:flex;justify-content:space-between"><span>Udhar approved</span><strong>${moneyHTML(summary.udharOutstanding)}</strong></div>` : ''}
     </div>
-    ${(summary.proposals||[]).length ? `<div style="margin-bottom:12px"><strong style="font-size:13px">Additional-work decisions</strong>
-        <div style="display:grid;gap:6px;margin-top:6px">${summary.proposals.map(p => `<div style="padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:12px"><strong>${escapeHTML(p.description)}</strong> · ${moneyHTML(p.quotedAmount)} <span class="badge ${p.decision==='Approved'?'good':p.decision==='Declined'?'bad':'warn'}">${escapeHTML(p.decision)}</span>${p.decisionMethod?`<br><span class="muted">${escapeHTML(p.decisionMethod)}${p.decisionNote?' · '+escapeHTML(p.decisionNote):''}</span>`:''}${p.decision==='Pending'?`<div style="display:flex;gap:6px;margin-top:6px"><button class="secondary-button" data-action="decide-additional-work" data-proposal-id="${p.id}" data-decision="Approved">Approve</button><button class="secondary-button" data-action="decide-additional-work" data-proposal-id="${p.id}" data-decision="Declined">Decline</button></div>`:''}</div>`).join('')}</div>
-      </div>` : ''}
     ${stateMessage}
     ${!terminal ? `<div style="border-top:1px solid var(--border);padding-top:12px">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -124,7 +129,9 @@ export function ticketDetailModalHTML(id, modal) {
       <textarea id="td-note" placeholder="Add a note…"
         style="width:100%;margin-top:8px;min-height:60px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);box-sizing:border-box">${escapeHTML(cachedRoot?.update_note || '')}</textarea>
     </div>` : ''}
-    <div class="modal-actions">
+      </section>
+    </div>
+    <div class="modal-actions rs-repair-actions">
       <button class="secondary-button" data-close>Close</button>
       <button class="secondary-button" data-action="print-repair-summary" data-ticket-id="${rootId}">Print Summary</button>
       ${!terminal ? `<button class="secondary-button" data-action="open-create-sub-invoice" data-ticket-id="${rootId}">+ Additional Work</button><button class="secondary-button" data-action="open-repair-adjustment" data-ticket-id="${rootId}">Adjustment</button><button class="secondary-button" style="color:var(--danger)" data-action="open-repair-cancellation" data-ticket-id="${rootId}">Cancel Repair</button><button class="primary-button" data-action="save-ticket-detail" data-id="${rootId}">Save Update</button>` : ''}

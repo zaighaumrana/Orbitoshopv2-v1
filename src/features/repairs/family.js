@@ -1,5 +1,8 @@
 /* Pure repair-family lookup helpers. Search is evaluated against every
  * parent and child identifier before a family is included in a result set. */
+// Cache the relation model only while array members and parent identities match.
+// Search/status/financial values are still read from current row objects.
+const familyModels=new WeakMap();
 
 function searchableTicketText(ticket) {
   return [
@@ -15,6 +18,8 @@ function searchableTicketText(ticket) {
 }
 
 export function groupRepairFamilies(tickets = []) {
+  const previous=familyModels.get(tickets);
+  if(previous&&previous.rows.length===tickets.length&&tickets.every((row,i)=>previous.rows[i][0]===row&&previous.rows[i][1]===row.id&&previous.rows[i][2]===row.parent_ticket_id))return previous.model;
   const byId = new Map(tickets.map(ticket => [String(ticket.id), ticket]))
   const families = new Map()
 
@@ -29,7 +34,9 @@ export function groupRepairFamilies(tickets = []) {
     families.get(rootId).members.push(ticket)
   })
 
-  return [...families.values()].filter(family => !family.root.parent_ticket_id)
+  const model=[...families.values()].filter(family => !family.root.parent_ticket_id)
+  familyModels.set(tickets,{rows:tickets.map(row=>[row,row.id,row.parent_ticket_id]),model})
+  return model
 }
 
 export function findRepairFamilies(tickets = [], query = '') {

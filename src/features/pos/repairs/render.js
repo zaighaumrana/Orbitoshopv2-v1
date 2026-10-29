@@ -1,3 +1,4 @@
+import {withPrintAttribution} from '../../../print/presentation.js'
 import { escapeHTML, safeImageURL } from '../../../html.js'
 /* ═══════════════════════════════════════════════════════════════════
    features/pos/repairs/render.js
@@ -89,10 +90,11 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
   const hasItemized = draft.components.length > 0 || Number(draft.labour||0) > 0
 
   return `<div class="modal-backdrop">
-    <form class="modal modal-lg" data-form="repair">
-      <h2>${isEditing ? 'Modify Repair Ticket' : 'New Repair Ticket'}</h2>
-      ${isEditing ? `<p class="muted" style="font-size:13px">Changes update this cart draft only. The repair is not finalized until Place Order.</p>` : ''}
-
+    <form class="modal rs-repair-workspace-dialog" data-form="repair">
+      <header class="rs-repair-header"><h2>${isEditing ? 'Modify Repair Ticket' : 'New Repair Ticket'}</h2>
+      ${isEditing ? `<p class="muted" style="font-size:13px">Changes update this cart draft only. The repair is not finalized until Place Order.</p>` : ''}</header>
+      <div class="rs-repair-workspace">
+          <section class="rs-repair-panel" aria-label="Customer and device"><h3>Customer and device</h3>
       <div class="form-grid">
         <label class="field"><span>Customer Name *</span>
           <input name="customerName" required value="${dInfo.customerName||''}"></label>
@@ -108,6 +110,11 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
           <input name="imei" value="${dInfo.imei||''}"></label>
       </div>
 
+      <label class="field"><span>Technician / Intake Note</span>
+        <textarea name="technicianNote" style="min-height:56px">${dInfo.technicianNote||''}</textarea></label>
+
+          </section>
+          <section class="rs-repair-panel" aria-label="Issues and components"><h3>Issues and components</h3>
       <p class="muted" style="font-size:13px;margin:12px 0 6px">Tap to flag an issue:</p>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
         ${comps.map(c => `
@@ -115,7 +122,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
             data-pick-comp="${escapeHTML(c.name)}">${escapeHTML(c.name)}</button>`).join('')}
       </div>
 
-      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:end">
+      <div class="rs-compound" style="margin-bottom:12px;align-items:end">
         <label class="field" style="flex:1"><span>Custom component name</span>
           <input id="intake-custom-comp-name" class="search" placeholder="Custom component name">
         </label>
@@ -125,7 +132,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
       ${draft.components.length ? `
         <div style="display:grid;gap:8px;margin-bottom:12px">
           ${draft.components.map((c,i) => `
-            <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;
+            <div class="rs-component-row" style="
                         padding:8px;background:var(--surface-2);border-radius:8px">
               <div>
                 <strong style="font-size:13px">${escapeHTML(c.name)}</strong><br>
@@ -141,6 +148,9 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
             </div>`).join('')}
         </div>` : ''}
 
+          </section>
+        <section class="rs-repair-finance" aria-label="Quote, payments and balance">
+          <div class="rs-repair-finance-part"><h3>Labour and quote</h3>
       <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface-2);
                   border-radius:8px;margin-bottom:12px">
         <label style="flex:1;font-size:13px;font-weight:500">Labour Charge</label>
@@ -165,8 +175,10 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
                    font-size:16px;cursor:pointer">✏️</button>
         </div>`}
 
+          </div>
+          <div class="rs-repair-finance-part rs-repair-payments"><h3>Payments received</h3>
       <div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:8px">
-        <p style="font-size:13px;font-weight:600;margin-bottom:8px">Payments Received</p>
+
         ${draft.payments.length ? draft.payments.map((p,i) => `
           <div style="display:flex;justify-content:space-between;align-items:center;
                       padding:6px 10px;background:var(--surface-2);border-radius:6px;margin-bottom:6px;font-size:13px">
@@ -174,7 +186,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
             <button type="button" data-draft-payment-remove="${i}"
               style="color:var(--danger);background:none;border:none;font-size:16px;cursor:pointer">×</button>
           </div>`).join('') : `<p class="muted" style="font-size:13px">No payment recorded yet.</p>`}
-        <div style="display:flex;gap:8px;margin-top:8px">
+        <div class="rs-repair-payment-entry" style="margin-top:8px">
           <input type="number" step="any" min="0" placeholder="Amount" id="draft-pay-amount"
             style="flex:1;border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text)">
           <select id="draft-pay-method"
@@ -185,6 +197,8 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
         </div>
       </div>
 
+          </div>
+          <div class="rs-repair-finance-part"><h3>Balance</h3>
       <div style="display:grid;gap:6px;padding:12px;background:var(--surface-2);border-radius:8px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;font-size:14px">
           <span>Quote Total</span><strong data-draft-total>${moneyHTML(total)}</strong>
@@ -198,10 +212,10 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
         </div>
       </div>
 
-      <label class="field"><span>Technician / Intake Note</span>
-        <textarea name="technicianNote" style="min-height:56px">${dInfo.technicianNote||''}</textarea></label>
-
-      <div class="modal-actions" style="margin-top:12px">
+          </div>
+        </section>
+      </div>
+      <div class="modal-actions rs-repair-actions">
         <button type="button" class="secondary-button" data-close>Cancel</button>
         <button class="primary-button">${isEditing ? 'Save Ticket Changes' : 'Create & Add to Cart'}</button>
       </div>
@@ -234,7 +248,7 @@ export function ticketSlipPreview(ticket) {
   if (!ticket) return ''
   const t = currentTenant()
   const comps = ticket.components_noted || []
-  return `<div class="receipt-preview">
+  return `<div class="receipt-preview">${withPrintAttribution(`
     <center>${t.logo?`<img src="${escapeHTML(safeImageURL(t.logo))}" style="max-width:120px;max-height:44px;object-fit:contain;margin-bottom:6px"><br>`:''}
     <strong>${escapeHTML(t.name)}</strong><br>${escapeHTML(t.address||'')}<br>${escapeHTML(t.phone||'')}</center>
     <hr>
@@ -258,5 +272,5 @@ export function ticketSlipPreview(ticket) {
     ${Number(ticket.advance_payment)>0 ? `Advance Paid: <strong>${moneyHTML(ticket.advance_payment)}</strong>${ticket.advance_method?` (${escapeHTML(ticket.advance_method)})`:''}<br>` : ''}
     <hr>
     <center>${escapeHTML(t.receiptFooter||'')}</center>
-  </div>`
+  `)}</div>`
 }

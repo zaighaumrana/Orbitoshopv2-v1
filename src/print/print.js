@@ -1,3 +1,4 @@
+import {withPrintAttribution} from './presentation.js'
 import { escapeHTML, safeImageURL } from '../html.js'
 import { CFG, money as formatMoney } from '../shared.js'
 import { dlog, dstack } from '../debuglog.js'
@@ -7,7 +8,7 @@ const money = (...args) => escapeHTML(formatMoney(...args))
 const thermalMarker = (type, reference, reprint = false) => `<span hidden data-thermal-type="${escapeHTML(type)}" data-thermal-reference="${escapeHTML(reference)}" data-thermal-reprint="${reprint ? 'true' : 'false'}"></span>`
 let printQueue = Promise.resolve()
 export function printThermal(html, { copies = 1 } = {}) {
-  printQueue = printQueue.then(() => runThermalPrint(html, copies)).catch(() => {
+  printQueue = printQueue.then(() => runThermalPrint(withPrintAttribution(html), copies)).catch(() => {
     console.warn('Thermal print could not be opened.')
   })
   return printQueue
@@ -27,7 +28,7 @@ async function runThermalPrint(html, copies) {
   doc.open()
   doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Courier New',monospace;font-size:12px;color:#000;background:#fff;width:80mm;padding:4mm;line-height:1.6}.c{text-align:center}.b{font-weight:bold}.lg{font-size:15px;font-weight:bold}.sm{font-size:10px;color:#555}.row{display:flex;justify-content:space-between}.ln{border-top:1px dashed #000;margin:5px 0}.bw{text-align:center;margin:6px 0}@page{margin:0;size:80mm auto}</style>
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+  <script src="/vendor/JsBarcode-3.11.6.all.min.js"><\/script>
   </head><body>${html}
   </body></html>`)
   doc.close()
@@ -63,7 +64,7 @@ async function runThermalPrint(html, copies) {
 export function buildTicketSlip(ticket) {
   dlog('print.buildTicketSlip', `ENTRY ticket_number=${ticket?.ticket_number}`)
   const comps = ticket.components_noted || []
-  return `
+  return withPrintAttribution(`
     ${thermalMarker(ticket.parent_ticket_id ? 'repair_child' : 'repair_parent', ticket.invoice_number || ticket.ticket_number)}
     ${CFG.shop_logo ? `<div class="c"><img src="${escapeHTML(safeImageURL(CFG.shop_logo))}" style="max-width:140px;max-height:50px;object-fit:contain"></div>` : ''}
     <div class="c b lg">${escapeHTML(CFG.shop_name||'Repair Shop')}</div>
@@ -98,13 +99,13 @@ export function buildTicketSlip(ticket) {
     <div class="c sm">Track your repair online:</div>
     <div class="c b">orbitoshop.ahwad.com/track</div>
     <div class="c sm">Ticket: ${escapeHTML(ticket.ticket_number)}</div>
-    <div class="c sm">Thank you for your trust.</div>`
+    <div class="c sm">Thank you for your trust.</div>`)
 }
 
 export function buildReceiptSlip(sale, isReprint = false) {
   dlog('print.buildReceiptSlip', `ENTRY receiptNo=${sale?.receiptNo} isReprint=${isReprint}`)
   const items = sale.items || []
-  return `
+  return withPrintAttribution(`
     ${thermalMarker('retail_receipt', sale.receiptNo, isReprint)}
     ${isReprint ? `<div style="text-align:center;font-size:16px;font-weight:900;border:3px solid #000;padding:4px 8px;margin-bottom:6px;letter-spacing:2px">★ DUPLICATE / REPRINT ★</div>` : ''}
     ${CFG.shop_logo ? `<div class="c"><img src="${escapeHTML(safeImageURL(CFG.shop_logo))}" style="max-width:140px;max-height:50px;object-fit:contain"></div>` : ''}
@@ -135,12 +136,12 @@ export function buildReceiptSlip(sale, isReprint = false) {
     <div class="row"><span>Cash Received</span><span>${money(sale.cashTendered)}</span></div>
     <div class="row"><span>Change Given</span><span>${money(sale.changeGiven||0)}</span></div>` : ''}
     <div class="ln"></div>
-    <div class="c sm">${escapeHTML(CFG.terms_text||'Thank you for your business.')}</div>`
+    <div class="c sm">${escapeHTML(CFG.terms_text||'Thank you for your business.')}</div>`)
 }
 
 export function buildSubInvoiceSlip(sub, parentTicket) {
   const comps = sub.components_noted || []
-  return `
+  return withPrintAttribution(`
     ${thermalMarker('repair_child', sub.invoice_number)}
     ${CFG.shop_logo ? `<div class="c"><img src="${escapeHTML(safeImageURL(CFG.shop_logo))}" style="max-width:140px;max-height:50px;object-fit:contain"></div>` : ''}
     <div class="c b lg">${escapeHTML(CFG.shop_name||'Repair Shop')}</div>
@@ -165,11 +166,11 @@ export function buildSubInvoiceSlip(sub, parentTicket) {
     <div class="row b lg"><span>Balance Due</span><span>${money(sub.balance_due)}</span></div>
     <div class="ln"></div>
     ${sub.technician_note ? `<div class="sm">Note: ${escapeHTML(sub.technician_note)}</div><div class="ln"></div>` : ''}
-    <div class="c sm">${escapeHTML(CFG.terms_text||'Thank you for your business.')}</div>`
+    <div class="c sm">${escapeHTML(CFG.terms_text||'Thank you for your business.')}</div>`)
 }
 
 export function buildReturnSlip(data) {
-  return `
+  return withPrintAttribution(`
     ${thermalMarker('return_slip', data.invoiceNumber)}
     <div class="c b lg">${escapeHTML(CFG.shop_name||'Retail Shop')}</div>
     <div class="c sm">${escapeHTML(CFG.shop_address||'')}</div>
@@ -184,7 +185,7 @@ export function buildReturnSlip(data) {
     <div class="row b lg"><span>REFUND</span><span>${money(data.refund)}</span></div>
     <div class="row"><span>Method</span><span>${escapeHTML(data.method)}</span></div>
     <div class="ln"></div>
-    <div class="c sm">Please retain this slip for your records.</div>`
+    <div class="c sm">Please retain this slip for your records.</div>`)
 }
 
 export function buildRepairSummary(summary) {
@@ -193,7 +194,7 @@ export function buildRepairSummary(summary) {
   const adjustments = summary.adjustments || []
   const payments = summary.payments || []
   const refunds = summary.refunds || []
-  return `
+  return withPrintAttribution(`
     ${thermalMarker('repair_summary', root.invoiceNumber || root.ticketNumber)}
     ${CFG.shop_logo ? `<div class="c"><img src="${escapeHTML(safeImageURL(CFG.shop_logo))}" style="max-width:140px;max-height:50px;object-fit:contain"></div>` : ''}
     <div class="c b lg">${escapeHTML(CFG.shop_name||'Repair Shop')}</div>
@@ -233,5 +234,5 @@ export function buildRepairSummary(summary) {
     ${root.deliveredAt ? `<div class="row"><span>Delivered</span><span>${new Date(root.deliveredAt).toLocaleString()}</span></div>` : ''}
     ${root.cancelledAt ? `<div class="row"><span>Cancelled</span><span>${new Date(root.cancelledAt).toLocaleString()}</span></div>` : ''}
     <div class="ln"></div>
-    <div class="c sm">${escapeHTML(CFG.terms_text||'Thank you for your business.')}</div>`
+    <div class="c sm">${escapeHTML(CFG.terms_text||'Thank you for your business.')}</div>`)
 }

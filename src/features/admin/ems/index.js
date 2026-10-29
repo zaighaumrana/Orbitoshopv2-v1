@@ -1,3 +1,4 @@
+import {withPrintAttribution} from '../../../print/presentation.js'
 import { escapeHTML } from "../../../html.js"
 /* ═══════════════════════════════════════════════════════════════════
    features/admin/ems/index.js
@@ -307,7 +308,7 @@ function salaryTab(emsData) {
               </div>
               ${config ? `<span class="badge good">Configured</span>` : `<span class="badge warn">Not set</span>`}
             </div>
-            <form data-form="salary-config" data-emp-id="${emp.id}"
+            <form class="rs-responsive-form" data-form="salary-config" data-emp-id="${emp.id}"
               style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">
               <label class="field" style="margin:0">
                 <span style="font-size:12px">Salary Type</span>
@@ -345,7 +346,7 @@ function slipsTab(emsData) {
       <!-- Generate new slip -->
       <div class="card" style="display:grid;gap:12px">
         <h2 style="font-size:15px">Generate Salary Slip</h2>
-        <form data-form="generate-slip"
+        <form class="rs-responsive-form" data-form="generate-slip"
           style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end">
           <label class="field" style="margin:0">
             <span style="font-size:12px">Employee</span>
@@ -507,7 +508,7 @@ function countWorkingDays(year, month) {
 export function buildSalarySlipHTML(slip, employeeName, shopName) {
   const months = ['January','February','March','April','May','June',
     'July','August','September','October','November','December']
-  return `
+  return withPrintAttribution(`
     <div class="c b lg">${escapeHTML(shopName || 'RetailOS')}</div>
     <div class="ln"></div>
     <div class="c b">SALARY SLIP</div>
@@ -526,7 +527,7 @@ export function buildSalarySlipHTML(slip, employeeName, shopName) {
     ${slip.deductions > 0 ? `<div class="row"><span>Deductions</span><span>${moneyHTML(slip.deductions)}</span></div>` : ''}
     <div class="row b lg"><span>NET SALARY</span><span>${moneyHTML(slip.net_salary)}</span></div>
     <div class="ln"></div>
-    <div class="c sm">Generated ${new Date(slip.generated_at).toLocaleDateString()}</div>`
+    <div class="c sm">Generated ${new Date(slip.generated_at).toLocaleDateString()}</div>`)
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -541,6 +542,7 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess, isCurrent=captu
   SESSION = sess
 
   listenOwned(app,'click',ownsEMS,async (e,eventCurrent) => {
+
     const controller=emsController,{getEMSData,reloadFn,sess}=controller,current=()=>eventCurrent()&&emsController===controller
     if (window.location.pathname !== '/admin/ems' || !can('ems', state.role)) return
     const el = e.target.closest(
@@ -602,6 +604,7 @@ export function attachEMSEvents(app, getEMSData, reloadFn, sess, isCurrent=captu
   },error=>showBlockingError(error.message))
 
   listenOwned(app,'submit',ownsEMS,async (e,eventCurrent) => {
+
     const controller=emsController,{reloadFn,sess}=controller,current=()=>eventCurrent()&&emsController===controller
     if (window.location.pathname !== '/admin/ems' || !can('ems', state.role)) return
     const form = e.target

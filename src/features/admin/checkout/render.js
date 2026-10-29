@@ -65,9 +65,10 @@ export function receiptsPage({ tit, adminState }) {
     </p>
     <div class="card" style="display:grid;gap:0">
       ${filtered.length ? filtered.map((record, idx) => `
-        <div style="border-bottom:1px solid var(--border);padding:12px 4px;
+        <div class="rs-receipt-row" data-ui-key="receipt:${escapeHTML(record.key)}" style="border-bottom:1px solid var(--border);padding:12px 4px;
                     display:flex;justify-content:space-between;align-items:center;gap:12px">
-          <div style="cursor:pointer;flex:1;min-width:0"
+          <button type="button" class="rs-card-action rs-receipt-open" style="flex:1;min-width:0"
+            aria-label="View ${escapeHTML(record.label)} details: ${escapeHTML(record.invoiceNumber)}, ${escapeHTML(record.customerName)}"
             data-action="open-receipt-modal" data-receipt-idx="${idx}">
             <strong>${escapeHTML(record.customerName)}</strong>
             <span class="badge ${record.type === 'repair' ? 'warn' : 'good'}" style="margin-left:6px">${escapeHTML(record.label)}</span><br>
@@ -76,7 +77,7 @@ export function receiptsPage({ tit, adminState }) {
               ${record.parentInvoiceNumber ? `<br>Parent: ${escapeHTML(record.parentInvoiceNumber)}${record.parentTicketNumber ? ` · ${escapeHTML(record.parentTicketNumber)}` : ''}` : ''}
               <br>${escapeHTML(record.paymentMethod)}${record.employeeName ? ` · ${escapeHTML(record.employeeName)}` : ''}
             </span>
-          </div>
+          </button>
           <div style="text-align:right;flex-shrink:0;display:flex;align-items:center;gap:10px">
             <div>
               <div><strong>${moneyHTML(record.total)}</strong></div>
@@ -111,7 +112,7 @@ export function udharListModalHTML() {
               <span>Balance: <strong>${moneyHTML(u.outstanding)}</strong></span>
               <span class="muted">Current total: ${moneyHTML(u.effectiveObligation)}</span>
             </div>
-            <div style="display:flex;gap:8px;align-items:center">
+            <div class="rs-credit-controls">
               <input type="number" step="any" min="0" max="${u.outstanding}" placeholder="Amount to settle" data-settle-amount="${u.kind}:${u.sourceId}"
                 style="flex:1;border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text)">
               <select data-settle-method="${u.kind}:${u.sourceId}" style="border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text)">
@@ -140,12 +141,12 @@ export function receiptDetailModalHTML(adminState) {
   return `
     <div class="modal-backdrop" data-no-backdrop-close>
       <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="rs-receipt-actions" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <h2 style="margin:0">${s.invoice_number||`INV-${s.id}`}</h2>
           <button class="icon-button" data-close style="font-size:20px;line-height:1">×</button>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;
+        <div class="rs-receipt-meta" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;
                     padding:12px;background:var(--surface-2);border-radius:10px;
                     font-size:13px;margin-bottom:16px">
           <div><span class="muted">Date</span><br>
@@ -164,13 +165,13 @@ export function receiptDetailModalHTML(adminState) {
                      text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Items</p>
           ${items.length ? `
             <div style="display:grid;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden">
-              <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;
                           padding:8px 12px;background:var(--surface-2);
                           font-size:12px;font-weight:600;color:var(--muted)">
                 <span>Item</span><span>Qty</span><span>Total</span>
               </div>
               ${items.map(i => `
-                <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;
+                <div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;
                             padding:10px 12px;border-top:1px solid var(--border);font-size:13px">
                   <div>
                     <strong>${escapeHTML(i.name||'Item')}</strong>
@@ -212,13 +213,13 @@ export function receiptDetailModalHTML(adminState) {
             </div>` : ''}
         </div>
 
-        <div style="display:flex;justify-content:space-between;align-items:center;
+        <div class="rs-receipt-actions" style="display:flex;justify-content:space-between;align-items:center;
                     margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
-          <div style="display:flex;gap:8px">
+          <div class="rs-compound">
             <button class="secondary-button" ${!hasPrev?'disabled':''} data-action="receipt-prev">← Prev</button>
             <button class="secondary-button" ${!hasNext?'disabled':''} data-action="receipt-next">Next →</button>
           </div>
-          <div style="display:flex;gap:8px">
+          <div class="rs-compound">
             <button class="secondary-button" data-close>Close</button>
             <button class="primary-button"
               data-action="reprint-receipt" data-sale-id="${s.id}">Reprint</button>
@@ -239,7 +240,7 @@ function repairReceiptDetailHTML(record, index, totalRecords) {
   return `
     <div class="modal-backdrop" data-no-backdrop-close>
       <div class="modal modal-md" style="max-height:90vh;overflow-y:auto">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="rs-receipt-actions" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <div>
             <h2 style="margin:0">${escapeHTML(record.invoiceNumber)}</h2>
             <span class="badge warn" style="margin-top:6px">${escapeHTML(record.label)}</span>
@@ -247,7 +248,7 @@ function repairReceiptDetailHTML(record, index, totalRecords) {
           <button class="icon-button" data-close style="font-size:20px;line-height:1">×</button>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;padding:12px;background:var(--surface-2);border-radius:10px;font-size:13px;margin-bottom:16px">
+        <div class="rs-receipt-meta" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;padding:12px;background:var(--surface-2);border-radius:10px;font-size:13px;margin-bottom:16px">
           <div><span class="muted">Date</span><br><strong>${new Date(record.createdAt).toLocaleString()}</strong></div>
           <div><span class="muted">Status</span><br><strong>${escapeHTML(ticket.status || 'Pending')}</strong></div>
           <div><span class="muted">Customer</span><br><strong>${escapeHTML(record.customerName)}</strong></div>
@@ -278,12 +279,12 @@ function repairReceiptDetailHTML(record, index, totalRecords) {
           <div style="display:flex;justify-content:space-between"><span>Balance</span><span>${moneyHTML(balanceDue)}</span></div>
         </div>
 
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
-          <div style="display:flex;gap:8px">
+        <div class="rs-receipt-actions" style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+          <div class="rs-compound">
             <button class="secondary-button" ${!hasPrev ? 'disabled' : ''} data-action="receipt-prev">← Prev</button>
             <button class="secondary-button" ${!hasNext ? 'disabled' : ''} data-action="receipt-next">Next →</button>
           </div>
-          <div style="display:flex;gap:8px">
+          <div class="rs-compound">
             <button class="secondary-button" data-close>Close</button>
             <button class="primary-button" data-action="print-repair-invoice" data-ticket-id="${ticket.id}">Print Invoice</button>
           </div>

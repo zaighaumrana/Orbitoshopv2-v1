@@ -10,6 +10,7 @@ import { installThermalMeter } from './platform/thermal.js'
 import {nativeIdentity,setUIAuthority,invalidateUIAuthority,onPrivateReset,captureAuthority,authorityIdentity} from './ui-authority.js'
 import {observeCommand} from './ui-command-records.js'
 import {captureView} from './ui-lifecycle.js'
+import {ownDialog,releaseDialog,dialogOwnsKeyboard} from './ui-dialog.js'
 
 /* ── Supabase ── */
 export const sb = createClient(
@@ -285,12 +286,16 @@ export function applyBranding() {
   document.documentElement.dataset.theme = state.theme
   document.documentElement.style.setProperty('--primary',   CFG.primary_color   || '#126c5b')
   document.documentElement.style.setProperty('--secondary', CFG.secondary_color || '#e9b949')
-  document.querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', CFG.primary_color || '#126c5b')
-  if (CFG.shop_logo) {
-    const fav = document.getElementById('dynamic-favicon')
-    if (fav) { fav.href = CFG.shop_logo; fav.type = 'image/png' }
-  }
+  // Legacy root values above remain unchanged for the protected login.
+  // Only operational scopes consume the derived merchant accents.
+  const accent = globalThis.RetraSellBrand?.derive(CFG.primary_color, state.theme)
+  if (accent) for (const [name,value] of Object.entries(accent))
+    document.documentElement.style.setProperty('--merchant-'+name,value)
+  const secondary = globalThis.RetraSellBrand?.derive(CFG.secondary_color, state.theme)
+  if (secondary) document.documentElement.style.setProperty('--merchant-secondary-accent',secondary.accent)
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#0B1228')
+  const fav = document.getElementById('dynamic-favicon')
+  if (fav) { fav.href = '/brand/favicons/retrasell-favicon-gradient-32.png'; fav.type = 'image/png' }
 }
 
 export function currentTenant() {
@@ -373,6 +378,7 @@ export function showToast(message, type = 'info', options = {}) {
 function closeAppDialog(dialog, value) {
   if (!dialog || activeAppDialog !== dialog || dialog.busy) return
   dialog.keyHandler && document.removeEventListener('keydown', dialog.keyHandler, true)
+  releaseDialog(dialog.backdrop.querySelector('.modal'))
   dialog.backdrop.remove()
   activeAppDialog = null
   dialog.resolve(value)
@@ -398,7 +404,7 @@ function openAppDialog({
 
   return new Promise(resolve => {
     const backdrop = document.createElement('div')
-    backdrop.className = 'modal-backdrop app-dialog-backdrop'
+    backdrop.className = 'modal-backdrop app-dialog-backdrop'+(document.querySelector('.app-shell.rs-shop,.rs-onboarding')?' rs-shop':'')
     backdrop.dataset.noBackdropClose = ''
 
     const form = document.createElement('form')
@@ -494,6 +500,8 @@ function openAppDialog({
       },
     }
     activeAppDialog = dialog
+    // Login keeps its established independent dialog behavior and presentation.
+    if(backdrop.classList.contains('rs-shop'))ownDialog(form,{busy:()=>dialog.busy,escape:false})
     const cancelDialog = () => closeAppDialog(dialog, null)
     close.addEventListener('click', cancelDialog)
     cancel.addEventListener('click', cancelDialog)
@@ -1047,6 +1055,7 @@ async function submitPinPrompt() {
 
 function handlePinPromptKeyboard(event) {
   if (state.modal?.type !== 'pinPrompt' || !document.getElementById('pp-display')) return
+  if(!dialogOwnsKeyboard(document.querySelector('.pin-prompt')))return
   const key = event.key === 'Enter' || event.key === 'Return'
     ? '✓'
     : event.key === 'Backspace' || event.key === 'Delete'
@@ -1068,6 +1077,13 @@ document.addEventListener('keydown', handlePinPromptKeyboard)
 /** Add the global explicit close control after each module render. */
 export function normalizeModalControls(root = document) {
   root.querySelectorAll('.modal-backdrop > .modal').forEach(modal => {
+    const pin=modal.classList.contains('pin-prompt')
+    ownDialog(modal,{
+      close:()=>modal.querySelector('[data-close]')?.click(),
+      busy:()=>modal.dataset.uiBusy==='true'||modal.getAttribute('aria-busy')==='true'||(pin&&ppSubmitting),
+      escape:!pin&&!modal.parentElement.hasAttribute('data-no-backdrop-close'),
+      dirty:!pin&&!!modal.querySelector('input,textarea,select'),
+    })
     modal.setAttribute('role', modal.getAttribute('role') || 'dialog')
     modal.setAttribute('aria-modal', 'true')
     modal.querySelectorAll('button[data-close]').forEach(button => { button.type = 'button' })
@@ -1075,6 +1091,7 @@ export function normalizeModalControls(root = document) {
       .find(button => button.dataset.modalClose !== undefined || button.textContent.trim() === '×')
     if (existingClose) {
       existingClose.dataset.modalClose = ''
+      existingClose.dataset.uiManaged = ''
       existingClose.setAttribute('aria-label', existingClose.getAttribute('aria-label') || 'Close dialog')
       return
     }
@@ -1082,6 +1099,7 @@ export function normalizeModalControls(root = document) {
     close.type = 'button'
     close.className = 'modal-close-button'
     close.dataset.close = ''
+    close.dataset.uiManaged = ''
     close.dataset.modalClose = ''
     close.setAttribute('aria-label', 'Close dialog')
     close.title = 'Close'
