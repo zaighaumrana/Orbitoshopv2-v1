@@ -11,8 +11,9 @@ it uses approved Shop metadata without private Platform source. Internal paired
 Use native `supabase` from PATH, installed through the official Scoop bucket on
 Windows; no package runner or mandatory executable path is required.
 
-Support-v7 is source-approved (39 migrations/seven functions); v6 remains a supported
-historical source. Hosted activation and actual upgrades need separate owner action.
+Support-v8 is source-approved (40 migrations/seven functions/ten requirements);
+v7 and v6 remain supported historical sources. The Platform approval migration
+20261030141736 and the three metadata-consuming Platform bundles await activation. Hosted activation and actual upgrades need separate owner action.
 Preserve original pins, pairing, owner, credentials, journals and checkpoint history.
 
 The former ungated terminal Managed path and BYO apply without separate Master

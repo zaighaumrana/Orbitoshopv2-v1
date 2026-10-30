@@ -41,3 +41,8 @@ POS-AUD-02: quickAccepted records the accepted query/revision. Input immediately
 POS-AUD-03: Quick Item activation now uses the accepted Catalog record instead of data-attribute price JSON. The picker captures item ID, name, normalized prices, assigned icon_id and current view. A checked selection retains the same trusted icon identity and existing Cart key/quantity/variant/price fields through normal renders, without rereading Catalog or changing financial calculations. No icon-resolver/artwork change.
 
 Targeted reproduction: tests/pos-audit-corrections-browser.mjs (POS_EVIDENCE_DIR, PLAYWRIGHT_MODULE_PATH and CHROMIUM_EXECUTABLE_PATH). It reuses the existing actual-entry synthetic SDK helpers, holds Catalog responses and exercises the three regressions plus one combined journey, older responses/failure/clear/debounce, view/session departure, entry-load race and modal Cart rerender. tests/pos-prices.test.mjs covers malformed containers and no coercion. These are author local corrections, pending independent delta re-review; initial independent NOT READY verdict is preserved. No push or hosted operation is authorized.
+
+
+## 30 October 2026 — source approval scope
+
+Owner-authorized support-v8 source promotion supersedes the candidate-only release gate above. Exact package remains af64c402ff72fb4ef4d72b892786c53a000d45ecb4045c4f9a7e89db51cf5dd4 (40/7/10), with no Shop source or SVG change. Platform-only approval migration 20261030141736 and three Platform metadata-consuming bundles await separate hosted activation. See [the four-workflow approval handoff](POS_CANDIDATE_UPGRADE_GUIDE.md). Independent delta review and original NOT READY audit remain; no hosted acceptance, frontend build trigger, customer upgrade or merge occurs in this source task.

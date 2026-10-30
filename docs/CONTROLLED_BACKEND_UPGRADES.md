@@ -1,17 +1,21 @@
-# Controlled backend upgrades — support-v7
+# Controlled backend upgrades — support-v8
 
 28 October 2026: the primary operator experience is now Platform → existing BYO
 client → Controlled Backend Upgrade → Customer CLI instructions. Its ten inline
 stages supply current client commands, expected results and recovery. This document
 is the technical fallback; private Platform source is not a customer prerequisite.
 
-Release reference, updated 28 October 2026, Asia/Karachi. This is the technical fallback.
-Source approves support-v7: **39 migrations, seven functions**, fingerprint
-`c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada`, backend source
-`50b94931ecf743166136b2c562cbb6d2fbaebdc7`. V6 remains supported; v5 is unsupported.
+Release reference, updated 30 October 2026, Asia/Karachi. This is the technical fallback.
+Source approves support-v8: **40 migrations, seven functions / ten requirements**, fingerprint
+`af64c402ff72fb4ef4d72b892786c53a000d45ecb4045c4f9a7e89db51cf5dd4`, backend source
+`5a9fca79ee24d6902cbdbcbfe5a0759454025e04`. V7 and V6 remain supported; v5 is unsupported.
 Source promotion does not activate the hosted catalog or upgrade any Shop. The
 owner must confirm compatible Platform migrations/functions before using this procedure;
-each actual upgrade needs separate authorization.
+each actual upgrade needs separate authorization. Platform control-plane approval migration
+`20261030141736_promote_support_v8.sql` and the three metadata-consuming Platform
+function bundles remain pending hosted activation. A verified v7-to-v8 plan contains
+one Shop migration and zero changed Shop function packages. Preserve original journal
+paths for already approved/interrupted operations; the filenames below are new-operation examples.
 
 New empty-project BYO provisioning uses [BYO_GUIDED_SETUP.md](BYO_GUIDED_SETUP.md).
 Existing Shops use this controlled procedure: never repeat fresh setup, owner
@@ -33,13 +37,13 @@ $ShopRef = 'REPLACE_WITH_EXACT_20_LETTER_SHOP_REF'
 $ClientId = 123 # Replace with the actual Platform client ID
 $PlatformRef = 'ukbhyerxshteyetwomqy'
 $Private = 'C:\Private\RetraSell'
-$Journal = Join-Path $Private 'support-v7-upgrade.json'
-$Assessment = Join-Path $Private 'support-v7-assessment.json'
+$Journal = Join-Path $Private 'support-v8-upgrade.json'
+$Assessment = Join-Path $Private 'support-v8-assessment.json'
 node --version
 supabase --version
 supabase login
 supabase projects list --output json
-node scripts/release-preflight.mjs --expected-sha c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada
+node scripts/release-preflight.mjs --expected-sha af64c402ff72fb4ef4d72b892786c53a000d45ecb4045c4f9a7e89db51cf5dd4
 ```
 
 Expected: customer-owned account login, exact Shop project visibility and PASS
@@ -101,13 +105,13 @@ with the Master and authoritative evidence before declaring `--from-sha`. Drift 
 unknown provenance requires separately authorized repair/adoption. Runtime health
 alone is insufficient.
 
-Only for a **verified/reconciled v6 source**, use:
+Only for a **verified/reconciled v7 source**, use:
 
 ```powershell
-$FromSha = '64fcec36fa7a5e2565db2a6d3aa6ddbd8e6c1170eefd4a07a57ae6ba0c066a31'
+$FromSha = 'c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada'
 ```
 
-Do not use this value just because the example uses v6. Full Managed verification
+Do not use this value just because the example uses v7. Full Managed verification
 also can remain pending: provider downloads may omit packaged files and historical
 packages lack a complete canonical SQL/security baseline. Scoped and customer-
 reviewed evidence retain separate trust classifications.
@@ -240,7 +244,7 @@ Optional browser-only Shop-folder and final private-folder inputs generate
 noninteractive path assignments. Otherwise each block prompts independently. Paste
 only a full directory path (spaces/parentheses allowed), without cd/Set-Location;
 quotes are unnecessary. The default final folder is under the current user profile:
-RetraSell-BYO-Private/client-<ID>-support-v7. Accept it only if it matches your original
+RetraSell-BYO-Private/client-<ID>-support-v8. Accept it only if it matches your original
 work, or restore the exact original final folder. Windows permissions must restrict
 access to the customer administrator and required system administrators. Reports get
 unique names; the original journal is never created or overwritten by assessment.
@@ -270,10 +274,10 @@ private Platform source remains required only for internal paired CI, not custom
 Paired workflows preserve existing immutable peer SHAs and run on PRs targeting
 development and pushes to development. Merge Shop PR #3 before Platform PR #6 using
 merge commits, retaining approved backend source ancestry; never squash away
-50b94931ecf743166136b2c562cbb6d2fbaebdc7. Before that Shop merge, keep the reviewed
+5a9fca79ee24d6902cbdbcbfe5a0759454025e04. Before that Shop merge, keep the reviewed
 existing checkout/immutable tooling revision because development lacks M2 tools.
 Owner approval to commit/push and later separate approval to merge remain mandatory.
-No branch deletion is authorized. Existing support-v7 fingerprint and all historical
+No branch deletion is authorized. Existing support-v8 fingerprint and all historical
 packages/records remain unchanged. See the milestone final cleanup report and
 Platform docs/PR6_RELEASE_REPORTING_FIX.md for the complete transition handoff.
 

@@ -8,7 +8,7 @@ const root=resolve(import.meta.dirname,'..'),platform=resolve(root,'../orbito');
 const manifest=JSON.parse(readFileSync(join(root,'scripts/byo-release-manifest.json')));
 const help='--linked --project-ref --file --output-format --use-api --env-file';
 test('customer integrity needs no Platform input; one correct and one stale paired preflight',()=>{
- const result=customerReleasePreflight(root,manifest.sha256);assert.equal(result.release.migrations.length,39);assert.equal(result.release.functions.length,7);assert.equal(result.release.sha256,'c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada');
+ const result=customerReleasePreflight(root,manifest.sha256);assert.equal(result.release.migrations.length,40);assert.equal(result.release.functions.length,7);assert.equal(result.release.sha256,'af64c402ff72fb4ef4d72b892786c53a000d45ecb4045c4f9a7e89db51cf5dd4');
  assert.equal(pairedReleasePreflight(root,platform).sha256,manifest.sha256);
  assert.throws(()=>customerReleasePreflight(root,'0'.repeat(64)),/wrong or unapproved Shop checkout/);
  const temp=mkdtempSync(join(tmpdir(),'retrasell-stale-pair-'));
@@ -18,7 +18,7 @@ test('customer integrity needs no Platform input; one correct and one stale pair
   writeFileSync(join(releases,'active-shop-release.json'),JSON.stringify({release_id:'support-v6',sha256:old.sha256}));
   // Only selector/inventory is needed to exercise the known-incompatible early stop.
   writeFileSync(join(releases,'shop-release-support-v6.json'),JSON.stringify({sha256:old.sha256,migrations:old.migrations.map(({version,name})=>({version,name}))}));
-  assert.throws(()=>pairedReleasePreflight(root,temp),error=>/incompatible release workspaces/.test(error.message)&&/39 source migrations/.test(error.message)&&/38 packaged migrations/.test(error.message)&&/RETRASELL_PLATFORM_SOURCE/.test(error.message));
+  assert.throws(()=>pairedReleasePreflight(root,temp),error=>/incompatible release workspaces/.test(error.message)&&/40 source migrations/.test(error.message)&&/38 packaged migrations/.test(error.message)&&/RETRASELL_PLATFORM_SOURCE/.test(error.message));
  }finally{rmSync(temp,{recursive:true,force:true});}
 });
 test('native PATH discovery selects a compatible executable and keeps explicit override support',()=>{
