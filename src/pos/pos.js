@@ -79,6 +79,7 @@ const emptyPOS = () => ({
   collectionsReady:false,
   collectionPage:null,
   inventoryPage:null,
+  inventoryAccepted:null,
   quickPage:null,
 })
 let posState = emptyPOS()
@@ -107,6 +108,8 @@ async function load(verifiedConfig) {
   selectorGeneration++;quickGeneration++;clearTimeout(selectorTimer);clearTimeout(quickTimer)
   const current=()=>generation===posLoadGeneration&&view()&&navigation()
   const quickRevision=quickGeneration,quickQuery=posState.quickSearch
+  const stockRevision=selectorGeneration,stockQuery=posState.invSearch
+  posState.inventoryAccepted=null
   posState.quickAccepted=null
   const loadSession = SESSION
   dlog('POS.load', 'ENTRY')
@@ -125,12 +128,18 @@ async function load(verifiedConfig) {
   state.resources=Object.fromEntries(['inventory','quickItems'].map(k=>[k,{status:'loading'}]))
   render()
   const [inv, quickItems] = await Promise.all([
-    CFG.inventory_module_enabled ? stockPage(posState.invSearch,0,current) : {data:[],count:0},
+    CFG.inventory_module_enabled ? stockPage(stockQuery,0,()=>current()&&stockRevision===selectorGeneration&&stockQuery===posState.invSearch) : {data:[],count:0},
     quickPage(quickQuery,0,()=>current()&&quickRevision===quickGeneration&&quickQuery===posState.quickSearch),
   ].map(settleRead))
   if (!current() || SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== '/pos') return
   const reads=readStates({inventory:inv,quickItems})
-  posState.inventoryPage=inv.error?null:inv
+  if(stockRevision===selectorGeneration&&stockQuery===posState.invSearch){
+    posState.inventoryPage=inv.error?null:inv
+    posState.inventoryAccepted=inv.error?null:{query:stockQuery,revision:stockRevision}
+  }else{
+    // A newer stock search owns its results even while the entry read is pending.
+    reads.values.inventory=state.data.inventory;reads.resources.inventory=state.resources.inventory
+  }
   if(quickRevision===quickGeneration&&quickQuery===posState.quickSearch){
     posState.quickPage=quickItems.error?null:quickItems
     posState.quickAccepted=quickItems.error?null:{query:quickQuery,revision:quickRevision}
@@ -161,11 +170,12 @@ let selectorGeneration=0,quickGeneration=0,selectorTimer=null,quickTimer=null
 async function refreshStock(offset=0,revision=++selectorGeneration) {
   const view=captureView(),generation=posLoadGeneration,query=posState.invSearch,current=()=>view()&&ownsPOS()&&generation===posLoadGeneration&&revision===selectorGeneration&&query===posState.invSearch
   if(!current())return
-  state.resources.inventory={status:'loading'}
+  state.resources.inventory={status:'loading'};posState.inventoryAccepted=null;render()
   const status=document.querySelector('[data-stock-search-status]');if(status)status.textContent='Searching current stock…'
   const result=await settleRead(stockPage(query,offset,current,offset?posState.inventoryPage?.size||24:24))
   if(!current())return
   state.resources.inventory={status:result.error?'unavailable':'ready'}
+  posState.inventoryAccepted=result.error?null:{query,revision}
   state.data.inventory=result.error?null:result.data;posState.inventoryPage=result.error?null:result
   render()
 }
@@ -284,8 +294,17 @@ function render() {
 }
 
 /* ── POS View ── */
+function inventoryVisible(){
+  // Only a current, successful unfiltered exact count can establish zero stock.
+  const accepted=posState.inventoryAccepted
+  const empty=resourceReady(state.resources,'inventory')&&!posState.invSearch.trim()
+    &&accepted?.query===posState.invSearch&&accepted.revision===selectorGeneration
+    &&posState.inventoryPage?.count===0
+  return CFG.inventory_module_enabled&&!empty
+}
 function posView() {
   if(!resourceReady(state.resources,'config'))return resourceNotice('Shop configuration')
+  const showInventory=inventoryVisible()
   const tenant   = currentTenant()
   const subtotal = posState.cart.reduce((s,i) => s + i.soldPrice * i.qty, 0)
   const disc     = posState.cart.reduce((s,i) => s + (i.originalPrice - i.soldPrice) * i.qty, 0)
@@ -313,9 +332,9 @@ function posView() {
     </div>
     <div class="grid pos-layout rs-pos-workspace">
       <div class="rs-product-workspace">
-       <div class="rs-product-panels ${CFG.inventory_module_enabled?'':'rs-catalog-expanded'}">
+       <div class="rs-product-panels ${showInventory?'':'rs-catalog-expanded'}">
         ${quickItemsPanel()}
-        ${CFG.inventory_module_enabled && _inv ? (resourceReady(state.resources,'inventory')||(state.resources.inventory?.status==='loading'&&posState.inventoryPage))?_inv.inventoryPanel(posState):resourceNotice('Inventory',state.resources.inventory.status) : ''}
+        ${showInventory && _inv ? (resourceReady(state.resources,'inventory')||(state.resources.inventory?.status==='loading'&&posState.inventoryPage))?_inv.inventoryPanel(posState):resourceNotice('Inventory',state.resources.inventory.status) : ''}
        </div>
         ${recentRepairPanel()}
       </div>
@@ -424,13 +443,13 @@ function quickResultsCurrent(){
 function quickItemsPanel() {
   const ready=quickResultsCurrent()
   return `<section class="card rs-catalog-panel" aria-label="Catalog"><h2>Catalog</h2>
-    <label class="field"><span class="sr-only">Search catalog</span><input class="search" data-quick-search value="${escapeHTML(posState.quickSearch)}" placeholder="Search catalog…"></label>
+    <label class="field"><input class="search" aria-label="Search catalog" data-quick-search value="${escapeHTML(posState.quickSearch)}" placeholder="Search catalog…"></label>
     ${ready?`<div class="rs-product-list">${(state.data.quickItems||[]).map(item=>`
      <button class="secondary-button rs-product-item" data-qitem-id="${item.id}" data-qitem-name="${escapeHTML(item.name)}" ${quickPrices(item.prices).length?'':'disabled'}>
        ${iconHTML(item.icon_id,itemCategory(item.icon_id))}<span><strong>${escapeHTML(item.name)}</strong><small>${quickPrices(item.prices).map(p=>(p.name?escapeHTML(p.name)+' · ':'')+moneyHTML(p.price)).join(' / ')||'Price unavailable'}</small></span>
      </button>`).join('')}</div>${!(state.data.quickItems||[]).length?'<p class="muted">No catalog items match.</p>':''}${compactPages(posState.quickPage,'data-quick-page')}`:resourceNotice('Catalog',state.resources.quickItems?.status)}
     <p class="muted" role="status" data-quick-search-status>${state.resources.quickItems?.status==='loading'?'Searching current catalog…':''}</p>
-    <details class="rs-custom-item"><summary>Custom / one-off item</summary>${customItemEntry()}</details></section>`
+    <section class="rs-custom-item" data-ui-key="pos-custom-item" aria-labelledby="rs-custom-item-title"><h3 id="rs-custom-item-title">Custom / one-off item</h3>${customItemEntry()}</section></section>`
 }
 function compactPages(page,attribute){
  return pageControls(page,attribute).replace('rs-pagination"','rs-pagination rs-compact-pagination"').replace('>Previous<',' aria-label="Previous page">‹<').replace('>Next<',' aria-label="Next page">›<')
@@ -447,7 +466,7 @@ async function refreshQuick(offset=0,revision=++quickGeneration){
 
 function customItemEntry() {
   return `
-    <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:end">
+    <div class="rs-custom-form">
       <label class="field" style="margin:0"><span style="font-size:12px">Item Name</span>
         <input id="custom-item-name" placeholder="e.g. Screen Guard" style="font-size:13px"></label>
       <label class="field" style="margin:0"><span style="font-size:12px">Price</span>
@@ -1739,6 +1758,7 @@ function attachEvents() {
     }
     if (t.dataset.invSearch !== undefined) {
       posState.invSearch=t.value;const revision=++selectorGeneration;clearTimeout(selectorTimer)
+      posState.inventoryAccepted=null;state.resources.inventory={status:'loading'}
       // Invalidate immediately; the outgoing page cannot add an item for the old query.
       document.querySelectorAll('[data-inv-pos-add]').forEach(button=>button.disabled=true)
       selectorTimer=setTimeout(()=>{if(ownsPOS())void refreshStock(0,revision)},180)

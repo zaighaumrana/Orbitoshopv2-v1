@@ -1002,7 +1002,8 @@ input[type="number"] {
 .rs-shop .rs-item-icon{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:none;vertical-align:middle;margin-right:4px}
 .rs-shop .rs-icon-placeholder{border-radius:6px;background:var(--surface-2);color:var(--muted)}
 .rs-shop .rs-product-item .rs-item-icon{width:32px;height:32px}
-.rs-shop .rs-custom-item{margin-top:14px}.rs-shop .rs-custom-item summary{cursor:pointer;margin-bottom:10px}
+.rs-shop .rs-custom-item{margin-top:14px}.rs-shop .rs-custom-item h3{font-size:13px;margin:0 0 8px}
+.rs-shop .rs-custom-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(74px,90px) auto;gap:8px;align-items:end}.rs-shop .rs-custom-form .field{min-width:0}.rs-shop .rs-custom-form input{max-width:100%;min-width:0}
 .rs-shop .rs-compact-pagination{font-size:11px;gap:4px}.rs-shop .rs-compact-pagination button{padding:4px 10px;font-size:18px;min-height:36px}
 .rs-shop .rs-pos-workspace .cart{position:sticky;top:16px;min-width:0}
 .rs-shop .rs-cart-line{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:10px;padding:12px;border:0;border-radius:10px;background:var(--surface-2);margin-bottom:8px;align-items:start}
@@ -1011,4 +1012,4 @@ input[type="number"] {
 .rs-shop .rs-brand-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px;border-radius:10px;background:var(--surface-2)}
 .rs-shop .rs-brand-row .field{flex:1;min-width:150px}
 @media(max-width:1100px){.rs-shop .rs-pos-workspace{grid-template-columns:minmax(0,1fr) 300px}.rs-shop .rs-product-panels{grid-template-columns:minmax(0,1fr)}}
-@media(max-width:760px){.rs-shop .rs-pos-workspace{grid-template-columns:minmax(0,1fr)}.rs-shop .rs-pos-workspace .cart{position:static}.rs-shop .rs-product-list{max-height:400px}.rs-shop .rs-custom-item>div{grid-template-columns:minmax(0,1fr) auto!important}.rs-shop .rs-custom-item button{grid-column:1/-1}}
+@media(max-width:760px){.rs-shop .rs-pos-workspace{grid-template-columns:minmax(0,1fr)}.rs-shop .rs-pos-workspace .cart{position:static}.rs-shop .rs-product-list{max-height:400px}.rs-shop .rs-custom-form{grid-template-columns:minmax(0,1fr) minmax(74px,90px)}.rs-shop .rs-custom-item button{grid-column:1/-1}}

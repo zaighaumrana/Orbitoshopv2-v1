@@ -1825,3 +1825,15 @@ Linked project ukbhyerxshteyetwomqy verified; read-only inventory matches 29 his
 This is owner-authorized hosted acceptance preparation, not independently certified final release acceptance. Preserve the blocked report and original NOT READY audit; frontend independent delta review and hosted acceptance remain pending. Source publication uses [CF-Pages-Skip] on the existing branches; exact final SHAs, clean-tree/PR parity and provider skips are recorded externally.
 
 CI pin completion: the Platform promotion pins compatible Shop source f2be0cc54e6bc20dfa6d0688cc86f0129b23670f. This small nonempty Shop follow-up pins Platform b17daaee492442972f5f68b74501f1a2d758a691 and removes the candidate-only command. Sequencing avoids circular immutable commit references; no temporary-branch dependency or runtime/source release change. All three source-publication commits carry [CF-Pages-Skip].
+
+
+## 2026-10-31 — focused owner POS workspace UI correction
+Branch: feature/pos-operator-overhaul; starting local/remote/PR5 19b97640775e0e3ec51c81922ba121e4e5351f95, clean.
+
+Removed the redundant Catalog label: its sr-only class had no CSS definition. Search retains an explicit accessible name, placeholder and existing debounce/current-result guards. Replaced custom-item details/summary with an always-visible labeled compact responsive section below pagination; unchanged input IDs and financial handler preserve existing validation, Cart semantics and draft nodes.
+
+Catalog now expands only when Inventory is disabled or a current successful unfiltered bounded sellable-stock read has exact count zero. Accepted stock query/revision is invalidated during loading and input changes; entry results cannot overwrite newer accepted searches. Nonempty, filtered-empty, loading, failed and unknown reads retain Inventory and retry behavior. No additional query, reset, module disable or data deletion; authoritative updates restore dual panels. Cart markup/totals, checkout, custom financial handler, command APIs, queue placement and theme tokens are unchanged.
+
+Validation: 11 actual-entry compatibility groups, nine operator groups, six prior audit groups and eight icon/price/checkout units pass. Responsive checks cover six requested widths in both themes; screenshots inspected. A first harness attempt incorrectly required node identity across SPA route remount; the corrected test invokes the existing read-retry handler and verifies actual POS refresh preservation. Both attempts retained externally. One local production build is checked before publication; no broad suite or hosted financial record.
+
+Five focused files only: POS, CSS, compatibility harness, workspace guide and this history. Backend sources/releases/manifests and all 36 SVGs remain unchanged; Platform and BYO tooling untouched. Owner reports Managed v8 complete and BYO on hold; neither is acted on. Normal [CF-Pages-Skip] commit/push to existing PR5; exact SHA and provider skip evidence are in external pos overhaul/focused-pos-ui-2026-10-31. PR remains Draft/Open/unmerged. Hosted redeployment and owner visual acceptance require the next separate authorization.
