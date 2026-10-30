@@ -358,6 +358,7 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
 .modal-sm { width: min(480px, 100%); }
 .modal-md { width: min(600px, 100%); }
 .modal-lg { width: min(720px, 100%); }
+.modal-xl { width: min(1120px, 100%); }
 
 /* ── Short viewports (13" laptops etc): the width-based breakpoints above
    don't help here -- a 1440px-wide, 800px-tall laptop window is "desktop"
@@ -1013,3 +1014,11 @@ input[type="number"] {
 .rs-shop .rs-brand-row .field{flex:1;min-width:150px}
 @media(max-width:1100px){.rs-shop .rs-pos-workspace{grid-template-columns:minmax(0,1fr) 300px}.rs-shop .rs-product-panels{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:760px){.rs-shop .rs-pos-workspace{grid-template-columns:minmax(0,1fr)}.rs-shop .rs-pos-workspace .cart{position:static}.rs-shop .rs-product-list{max-height:400px}.rs-shop .rs-custom-form{grid-template-columns:minmax(0,1fr) minmax(74px,90px)}.rs-shop .rs-custom-item button{grid-column:1/-1}}
+
+/* Expanded POS selectors reuse the current bounded page and item actions. */
+.rs-shop .rs-pos-page-center{display:grid;justify-items:center;gap:4px;min-width:0;text-align:center}.rs-shop .rs-pos-page-center .secondary-button{font-size:12px;line-height:1.2;padding:5px 9px;min-height:32px}
+.rs-shop .rs-pos-selector-modal>.card{padding:0;margin:0;border:0;box-shadow:none;background:transparent;min-width:0}.rs-shop .rs-pos-selector-modal .rs-product-list{grid-template-columns:repeat(auto-fill,minmax(min(100%,170px),1fr));max-height:60vh;align-content:start}.rs-shop .rs-pos-selector-modal .rs-product-item{height:100%;min-height:82px}.rs-shop .rs-pos-selector-modal .rs-product-item>span{overflow-wrap:anywhere}.rs-shop .rs-pos-selector-modal .rs-pagination{margin-top:10px}
+
+.rs-shop .modal-backdrop:has(>.rs-pos-selector-modal){grid-template-columns:minmax(0,1fr);justify-items:center}
+
+.rs-shop .rs-pos-selector-modal h2{padding-right:38px;overflow-wrap:anywhere}

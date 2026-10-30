@@ -3,6 +3,8 @@ import {iconHTML,itemCategory,brandIcon} from '../catalog/icons.js'
 import {intakeBrands} from '../catalog/data.js'
 import {withPrintAttribution} from '../print/presentation.js'
 import {renderOperationalScreen} from '../ui-render.js'
+import {ownDialog} from '../ui-dialog.js'
+import {posPageControls} from '../features/pos/pagination.js'
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
 import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
 import { escapeHTML, safeImageURL } from "../html.js"
@@ -285,6 +287,9 @@ function render() {
     </div>
     ${renderModal()}`, {screen:'pos',view:'pos',modal:state.modal})
 
+  // Selector search is persisted POS state, not an unsaved financial draft.
+  const selector=document.querySelector('.rs-pos-selector-modal')
+  if(selector)ownDialog(selector,{close:()=>selector.querySelector('[data-close]')?.click(),dirty:false})
   normalizeModalControls(document.getElementById('app'))
 
   if (!_eventsAttached) {
@@ -440,16 +445,16 @@ function posView() {
 function quickResultsCurrent(){
  return resourceReady(state.resources,'quickItems')&&posState.quickAccepted?.query===posState.quickSearch&&posState.quickAccepted?.revision===quickGeneration
 }
-function quickItemsPanel() {
+function quickItemsPanel({expanded=false}={}) {
   const ready=quickResultsCurrent()
-  return `<section class="card rs-catalog-panel" aria-label="Catalog"><h2>Catalog</h2>
+  return `<section class="card rs-catalog-panel" aria-label="Catalog"><h2>${expanded?'Catalog — expanded view':'Catalog'}</h2>
     <label class="field"><input class="search" aria-label="Search catalog" data-quick-search value="${escapeHTML(posState.quickSearch)}" placeholder="Search catalog…"></label>
     ${ready?`<div class="rs-product-list">${(state.data.quickItems||[]).map(item=>`
      <button class="secondary-button rs-product-item" data-qitem-id="${item.id}" data-qitem-name="${escapeHTML(item.name)}" ${quickPrices(item.prices).length?'':'disabled'}>
        ${iconHTML(item.icon_id,itemCategory(item.icon_id))}<span><strong>${escapeHTML(item.name)}</strong><small>${quickPrices(item.prices).map(p=>(p.name?escapeHTML(p.name)+' · ':'')+moneyHTML(p.price)).join(' / ')||'Price unavailable'}</small></span>
-     </button>`).join('')}</div>${!(state.data.quickItems||[]).length?'<p class="muted">No catalog items match.</p>':''}${compactPages(posState.quickPage,'data-quick-page')}`:resourceNotice('Catalog',state.resources.quickItems?.status)}
+     </button>`).join('')}</div>${!(state.data.quickItems||[]).length?'<p class="muted">No catalog items match.</p>':''}${posPageControls(posState.quickPage,'data-quick-page','catalog',expanded)}`:resourceNotice('Catalog',state.resources.quickItems?.status)}
     <p class="muted" role="status" data-quick-search-status>${state.resources.quickItems?.status==='loading'?'Searching current catalog…':''}</p>
-    <section class="rs-custom-item" data-ui-key="pos-custom-item" aria-labelledby="rs-custom-item-title"><h3 id="rs-custom-item-title">Custom / one-off item</h3>${customItemEntry()}</section></section>`
+    ${expanded?'':`<section class="rs-custom-item" data-ui-key="pos-custom-item" aria-labelledby="rs-custom-item-title"><h3 id="rs-custom-item-title">Custom / one-off item</h3>${customItemEntry()}</section>`}</section>`
 }
 function compactPages(page,attribute){
  return pageControls(page,attribute).replace('rs-pagination"','rs-pagination rs-compact-pagination"').replace('>Previous<',' aria-label="Previous page">‹<').replace('>Next<',' aria-label="Next page">›<')
@@ -684,6 +689,12 @@ function renderModal() {
   if (!state.modal) return ''
   if (!modalEntitled(state.modal.type)) { state.modal = null; return '' }
   const { type } = state.modal
+  if(type==='pos-selector'){
+    const inventory=state.modal.selector==='inventory'
+    if(!can('pos',state.role)||(inventory&&(!CFG.inventory_module_enabled||!_inv))){state.modal=null;return ''}
+    const panel=inventory?_inv.inventoryPanel(posState,{expanded:true}):quickItemsPanel({expanded:true})
+    return `<div class="modal-backdrop"><div class="modal modal-xl rs-pos-selector-modal">${panel}<p class="muted" role="status" data-selector-cart-status>Cart: ${posState.cart.reduce((n,item)=>n+item.qty,0)} items</p><div class="modal-actions"><button type="button" class="secondary-button" data-close>Back to POS</button></div></div></div>`
+  }
     if(type==='repair-collection'&&state.modal.readStatus==='loading'&&(hasReadContract('repair_families')||posState.collectionPage?.mode==='exact-identifiers'))return `<div class="modal-backdrop"><div class="modal"><h2>Repair Collection</h2><input class="search" data-repair-search value="${escapeHTML(posState.repairSearch)}" placeholder="Search name, phone, device, IMEI, ticket #…">${resourceNotice('Repair collection','loading')}<button class="secondary-button" data-close>Close</button></div></div>`
   if(state.modal.readStatus&&state.modal.readStatus!=='ready')return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Selected '+(type==='shiftStats'?'shift':type==='repair'?'repair intake':'detail'),state.modal.readStatus==='loading'?'loading':'unavailable')}${state.modal.readError?`<p>${escapeHTML(state.modal.readError)}</p>`:''}<button class="secondary-button" data-action="retry-pos-detail">Retry detail</button><button class="secondary-button" data-close>Close</button></div></div>`
   const required=type==='udharList'?['udharAccounts']:type==='repair-collection'?['tickets']:['repair','create-sub-invoice','edit-components'].includes(type)?['tickets','repairComponents']:[]
@@ -1231,6 +1242,13 @@ function attachEvents() {
       '[data-pp-key]'
     )
     if (!el) return
+    if(el.dataset.action==='expand-pos-selector'){
+      const selector=el.dataset.selector
+      if(state.modal||!['catalog','inventory'].includes(selector))return
+      if(selector==='catalog'&&!quickResultsCurrent())return
+      if(selector==='inventory'&&(!CFG.inventory_module_enabled||!_inv||!resourceReady(state.resources,'inventory')))return
+      state.modal={type:'pos-selector',selector};render();return
+    }
     if(el.dataset.stockPage){const page=posState.inventoryPage;if(page)await refreshStock(el.dataset.stockPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
     if(el.dataset.quickPage){if(!quickResultsCurrent())return;const page=posState.quickPage;if(page)await refreshQuick(el.dataset.quickPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
     if(el.dataset.collectionPage){const page=posState.collectionPage;if(page&&state.modal?.readStatus==='ready')await openDeferredPOS('repair-collection',el.dataset.collectionPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
@@ -1252,7 +1270,7 @@ function attachEvents() {
     if (el.dataset.close !== undefined) {
       dlog('POS.click', `DATA-CLOSE branch firing -- state.modal was type=${state.modal?.type} -- about to call POS.render()`)
       if (state.modal?.type === 'pinPrompt') { cancelPinPrompt(render); return }
-      state.modal = null; render(); return
+      state.modal = state.modal?.type==='qitem-pick'?state.modal.returnTo||null:null; render(); return
     }
 
     /* Modal openers */
@@ -1611,7 +1629,7 @@ function attachEvents() {
         const pv=prices[0]
         posState.cart.push({productId:`qi-${quickItemId}-${Date.now()}`,name,variantName:pv.name,qty:1,originalPrice:pv.price,soldPrice:pv.price,discount:0,reason:'',isQuick:true,icon_id,quickItemId})
         render()
-      }else{state.modal={type:'qitem-pick',name,prices,quickItemId,icon_id,current:captureView()};render()}
+      }else{state.modal={type:'qitem-pick',name,prices,quickItemId,icon_id,current:captureView(),returnTo:state.modal?.type==='pos-selector'?state.modal:null};render()}
       return
     }
     if(el.dataset.pickPrice!==undefined){
@@ -1621,7 +1639,7 @@ function attachEvents() {
       if(!pv)return
       const {name,quickItemId,icon_id}=modal
       posState.cart.push({productId:`qi-${quickItemId}-${Date.now()}`,name,variantName:pv.name,qty:1,originalPrice:pv.price,soldPrice:pv.price,discount:0,reason:'',isQuick:true,icon_id,quickItemId})
-      state.modal=null;render();return
+      state.modal=modal.returnTo||null;render();return
     }
 
     /* ── Component tag picker ── */

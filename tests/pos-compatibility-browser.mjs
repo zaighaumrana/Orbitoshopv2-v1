@@ -25,6 +25,7 @@ try{
   if(location.search.includes('zeroStock=1'))window.fixtureRows.inventory=[{id:9,name:'Unsellable stock',sku:'ZERO',qty:0,price:200}];
   if(location.search.includes('stockHold=1'))window.fixtureHoldTable='inventory';
   if(location.search.includes('stockFailure=1'))window.fixtureReadFailures=['inventory'];
+  if(location.search.includes('expandedStock=1'))window.fixtureRows.inventory=Array.from({length:50},(_,n)=>({id:n+1,name:'Stock '+String(n+1).padStart(2,'0'),sku:'SKU-'+(n+1),qty:5,price:200+n,icon_id:'accessory.cover'}));
  });
  await page.goto(origin+'/pos?fixtureAuth=signed&fixtureRole=Cashier&legacy=1&inventoryOff=1');await page.locator('.rs-catalog-panel .rs-product-item').first().waitFor();
  assert.equal(await page.locator('.rs-inventory-panel').count(),0);assert.equal(await page.locator('.rs-catalog-expanded').count(),1);assert.equal(await page.evaluate(()=>window.resourceCalls.filter(c=>c.table==='inventory').length),0);
@@ -93,6 +94,50 @@ try{
  await page.evaluate(()=>{window.fixtureReadFailures=[];window.fixtureRows.inventory=[]});await page.getByRole('button',{name:'Retry reads',exact:true}).click();await page.locator('.rs-catalog-expanded').waitFor();
  assert.equal(await page.evaluate(()=>window.fixtureWrites.length),0);
  result.checks.push('Loading and failed stock stay explicit; successful retry alone proves zero; count stays bounded with no extra inventory query or business write');
+ // Expanded selectors reuse the current page/query and original item actions.
+ await page.goto(origin+'/pos?fixtureRole=Cashier&expandedStock=1');await page.locator('[data-inv-pos-add="1"]').waitFor();await page.setViewportSize({width:1440,height:1000});
+ for(const kind of ['catalog','inventory']){
+  const attr=kind==='catalog'?'quick':'stock',button=page.getByRole('button',{name:kind==='catalog'?'Expand Catalog':'Expand Inventory',exact:true});
+  const b=await button.boundingBox(),prev=await page.locator(`[data-${attr}-page="previous"]`).boundingBox(),next=await page.locator(`[data-${attr}-page="next"]`).boundingBox();assert.ok(prev.x+prev.width<=b.x+1&&b.x+b.width<=next.x+1);
+ }
+ const readsBeforeExpand=await page.evaluate(()=>window.resourceCalls.length);
+ await page.getByRole('button',{name:'Expand Catalog',exact:true}).focus();await page.keyboard.press('Enter');
+ let expanded=page.locator('.rs-pos-selector-modal');await expanded.waitFor();assert.ok((await expanded.boundingBox()).width>=1000);
+ assert.ok(await expanded.locator('.rs-product-list').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length>=4));
+ assert.equal(await page.evaluate(()=>window.resourceCalls.length),readsBeforeExpand);assert.equal(await page.locator('#custom-item-name').count(),1);
+ await expanded.locator('[data-qitem-id="1"]').click();await expanded.waitFor();assert.match(await expanded.locator('[data-selector-cart-status]').innerText(),/1 items/);assert.equal(await page.locator('.rs-cart-line').count(),1);
+ await expanded.locator('[data-quick-page="next"]').click();await expanded.locator('[data-qitem-id="28"]').waitFor();assert.equal(await expanded.locator('[data-qitem-name]').count(),3);
+ await expanded.locator('[data-quick-page="previous"]').click();await expanded.locator('[data-qitem-id="1"]').waitFor();
+ await expanded.getByRole('textbox',{name:'Search catalog'}).fill('Quick 26');await expanded.locator('[data-qitem-id="27"]').waitFor();
+ assert.equal(await page.locator('.rs-catalog-panel').first().locator('[data-quick-search]').inputValue(),'Quick 26');await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.querySelector('.rs-pos-selector-modal'));
+ assert.equal(await page.locator('[data-draft-warning]').count(),0);result.checks.push('Centered Expand controls open a wide item grid without new reads; Catalog search, paging, selection and Escape use existing POS state');
+ // A named variant uses the existing price picker then returns to the expanded Catalog.
+ await page.locator('[data-quick-search]').fill('');await page.locator('[data-qitem-id="1"]').waitFor();
+ await page.evaluate(()=>{window.fixtureRows.quick_items[0].prices=[{name:'A',price:100},{name:'B',price:200}];const retry=document.createElement('button');retry.dataset.action='retry-resources';document.getElementById('app').append(retry);retry.click();retry.remove()});
+ await page.locator('[data-qitem-id="1"]').waitFor();await page.getByRole('button',{name:'Expand Catalog',exact:true}).click();await page.locator('.rs-pos-selector-modal [data-qitem-id="1"]').click();await page.locator('[data-pick-price="1"]').click();await page.locator('.rs-pos-selector-modal').waitFor();assert.match(await page.locator('.cart').innerText(),/B/);assert.match(await page.locator('.rs-pos-selector-modal [data-selector-cart-status]').innerText(),/2 items/);
+ await page.locator('.rs-pos-selector-modal [data-qitem-id="1"]').click();await page.locator('[data-pick-price="0"]').waitFor();await page.keyboard.press('Escape');await page.locator('.rs-pos-selector-modal').waitFor();assert.equal(await page.locator('.rs-cart-line').count(),2);
+ await page.evaluate(()=>window.fixtureHoldTable='quick_items');await page.locator('.rs-pos-selector-modal [data-quick-search]').fill('no-match');await page.waitForFunction(()=>window.fixtureReleases.length===1);
+ assert.equal(await page.locator('.rs-pos-selector-modal [data-qitem-name]:enabled').count(),0);await page.evaluate(()=>window.fixtureReleases.shift()());await page.waitForFunction(()=>document.querySelector('.rs-pos-selector-modal')?.textContent.includes('No catalog items match.'));assert.equal(await page.locator('.rs-cart-line').count(),2);
+ await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.querySelector('.rs-pos-selector-modal'));result.checks.push('Expanded variant selection/cancel returns to Catalog with original prices/icons; held searches cannot add stale rows');
+ await page.getByRole('button',{name:'Expand Inventory',exact:true}).click();expanded=page.locator('.rs-pos-selector-modal');await expanded.locator('[data-inv-pos-add="1"]').click();await expanded.locator('[data-inv-pos-add="1"]').click();assert.equal(await page.locator('.rs-cart-line').count(),3);assert.match(await expanded.locator('[data-selector-cart-status]').innerText(),/4 items/);
+ await expanded.locator('[data-stock-page="next"]').click();await expanded.locator('[data-inv-pos-add="25"]').waitFor();await expanded.getByRole('textbox',{name:'Search inventory'}).fill('no-stock-match');await page.waitForFunction(()=>document.querySelector('.rs-pos-selector-modal [data-stock-search-status]')?.textContent.includes('No sellable'));
+ assert.equal(await page.locator('.rs-product-panels.rs-catalog-expanded').count(),0);await expanded.getByRole('textbox',{name:'Search inventory'}).fill('');await expanded.locator('[data-inv-pos-add="1"]').waitFor();await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.querySelector('.rs-pos-selector-modal'));
+ result.checks.push('Expanded Inventory retains stock paging/filter-empty panel and original repeated-add quantity semantics');
+ for(const kind of ['catalog','inventory']){
+  if(kind==='catalog'){await page.locator('[data-quick-search]').fill('');await page.locator('[data-qitem-id="1"]').waitFor();}
+  await page.getByRole('button',{name:kind==='catalog'?'Expand Catalog':'Expand Inventory',exact:true}).click();expanded=page.locator('.rs-pos-selector-modal');await expanded.waitFor();
+  for(const theme of ['light','dark']){
+   await page.evaluate(theme=>document.documentElement.setAttribute('data-theme',theme),theme);
+   for(const width of [320,390,768,1024,1280,1440]){
+    await page.setViewportSize({width,height:900});const g=await expanded.evaluate(el=>{const r=el.getBoundingClientRect(),list=el.querySelector('.rs-product-list');return {width:innerWidth,dialog:{x:r.x,right:r.right,width:r.width,height:r.height},scroll:document.documentElement.scrollWidth,listOverflow:list.scrollWidth-list.clientWidth}});
+    assert.ok(g.scroll<=width+1&&g.dialog.x>=0&&g.dialog.right<=width+1&&g.dialog.height<=900&&g.listOverflow<=1,JSON.stringify(g));result.geometry.push({kind,theme,...g});
+    if((theme==='light'&&width===1440)||(theme==='dark'&&width===320))await page.screenshot({path:path.join(out,`pos-expanded-${kind}-${theme}-${width}.png`),fullPage:true});
+   }
+  }
+  await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.querySelector('.rs-pos-selector-modal'));await page.setViewportSize({width:1440,height:1000});
+ }
+ result.checks.push('Both expanded selectors fit all six widths in light/dark with bounded internal scrolling; dialog closes without discarding persisted search');
+ assert.equal(await page.evaluate(()=>window.fixtureWrites.length),0);
  assert.deepEqual(result.errors,[]);assert.deepEqual(result.external,[]);result.result='PASS';console.log(JSON.stringify(result.checks,null,2));
 }catch(error){result.result='FAIL';result.error=error.stack;throw error}
 finally{if(browser)await browser.close();await server.close();fs.writeFileSync(path.join(out,'browser-compatibility-results.json'),JSON.stringify(result,null,2));}

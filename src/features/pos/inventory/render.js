@@ -13,16 +13,18 @@ import { escapeHTML } from "../../../html.js"
    before this split.
 ═══════════════════════════════════════════════════════════════════ */
 import { state, money, moneyHTML } from '../../../shared.js'
-import {pageControls} from '../../../bounded-read.js'
+import {posPageControls} from '../pagination.js'
+import {resourceNotice} from '../../../read-state.js'
 
-export function inventoryPanel(posState) {
+export function inventoryPanel(posState,{expanded=false}={}) {
   const invItems = (state.data.inventory||[]).filter(i=>Number(i.qty||0)>0)
   const filtered = invItems // Filtering, including SKU, is authoritative in the bounded backend query.
   return `
     <section class="card rs-inventory-panel" aria-label="Inventory">
-      <h2 style="margin-bottom:10px">Inventory</h2>
+      <h2 style="margin-bottom:10px">${expanded?'Inventory — expanded view':'Inventory'}</h2>
       <input aria-label="Search inventory" placeholder="Search stock…" value="${escapeHTML(posState.invSearch||'')}" data-inv-search
         style="width:100%;margin-bottom:10px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);font-size:14px">
+      ${state.resources.inventory?.status==='unavailable'?resourceNotice('Inventory','unavailable'):''}
       <div class="rs-product-list">
         ${filtered.slice(0,24).map(i=>`
           <button class="secondary-button rs-product-item"
@@ -32,8 +34,8 @@ export function inventoryPanel(posState) {
             <div style="font-size:11px;color:var(--muted)">${moneyHTML(i.price)} · ${i.qty} left</div></span>
           </button>`).join('')}
       </div>
-      <p class="muted" role="status" data-stock-search-status>${state.resources.inventory?.status==='loading'?'Searching current stock…':!filtered.length?'No sellable items on this page.':''}</p>
-      ${pageControls(posState.inventoryPage,'data-stock-page').replace('rs-pagination"','rs-pagination rs-compact-pagination"').replace('>Previous<',' aria-label="Previous stock page">‹<').replace('>Next<',' aria-label="Next stock page">›<')}
+      <p class="muted" role="status" data-stock-search-status>${state.resources.inventory?.status==='unavailable'?'':state.resources.inventory?.status==='loading'?'Searching current stock…':!filtered.length?'No sellable items on this page.':''}</p>
+      ${posPageControls(posState.inventoryPage,'data-stock-page','inventory',expanded,state.resources.inventory?.status==='ready')}
     </section>`
 }
 
