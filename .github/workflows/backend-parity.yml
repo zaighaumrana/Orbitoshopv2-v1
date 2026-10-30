@@ -23,7 +23,7 @@ jobs:
           repository: zaighaumrana/orbito
           # Immutable compatible Platform snapshot: valid before/during/after
           # merges and feature-branch retirement; private access is CI-only.
-          ref: b17daaee492442972f5f68b74501f1a2d758a691
+          ref: 90192296fe94b08746e219c09b37c09948a786a8
           path: orbito
           fetch-depth: 0
           persist-credentials: false
@@ -31,6 +31,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Verify approved support-v8 and supported historical releases
+      - name: Verify unpromoted support-v9 candidate and immutable supported releases
         working-directory: orbito
-        run: node scripts/release-parity.mjs
+        run: node scripts/release-parity.mjs --candidate support-v9
