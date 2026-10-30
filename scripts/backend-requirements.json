@@ -164,6 +164,17 @@
       "managed": "Same atomic forward migration and source ledger through the existing approved Managed plan",
       "byo": "Same atomic forward migration and source ledger through the existing customer-owned CLI journal",
       "verification": "Native local PostgreSQL four-path migration and denied-role probes; structural catalog capability; exact candidate parity"
+    },
+    {
+      "id": "icon-label-preferences",
+      "purpose": "Shop-owned editable icon labels and per-form offerings with stable trusted local artwork and retained assignments",
+      "migrations": [
+        "20261030233527"
+      ],
+      "functions": [],
+      "managed": "Same forward migration through the existing immutable Managed fresh plan or authorized Controlled Backend Upgrade",
+      "byo": "Same forward migration through the existing customer-owned BYO fresh and approved upgrade CLI journals",
+      "verification": "Local four-path forward SQL with role/lifecycle/Support consent denials, structural capability checks and exact candidate source parity"
     }
   ],
   "runtime": {
@@ -206,7 +217,8 @@
         "app_private.config_requests",
         "app_private.support_consents",
         "app_private.support_submissions",
-        "public.device_brands"
+        "public.device_brands",
+        "public.icon_preferences"
       ],
       "triggers": [
         "bridge_events_immutable"
@@ -217,7 +229,8 @@
         "service-only receipt acknowledgment",
         "owner-only consent",
         "separate source/call/ticket credentials",
-        "device_brands canonical role/module/lifecycle RLS plus restrictive support consent"
+        "device_brands canonical role/module/lifecycle RLS plus restrictive support consent",
+        "icon_preferences live role/lifecycle RLS, owner-only writes and restrictive Support consent"
       ]
     },
     "managed_support_handoff_configuration": [
@@ -268,7 +281,8 @@
         "20261022155952",
         "20261023012311",
         "20261025233743",
-        "20261029173151"
+        "20261029173151",
+        "20261030233527"
       ],
       "core_functions": [
         "account-admin",
@@ -291,7 +305,8 @@
         "owner-bootstrap",
         "support-durable-submissions",
         "bounded-operational-reads",
-        "catalog-icons-and-brands"
+        "catalog-icons-and-brands",
+        "icon-label-preferences"
       ],
       "configuration": [
         "runtime",
@@ -342,7 +357,8 @@
         "20261022155952",
         "20261023012311",
         "20261025233743",
-        "20261029173151"
+        "20261029173151",
+        "20261030233527"
       ],
       "core_functions": [
         "account-admin",
@@ -365,7 +381,8 @@
         "owner-bootstrap",
         "support-durable-submissions",
         "bounded-operational-reads",
-        "catalog-icons-and-brands"
+        "catalog-icons-and-brands",
+        "icon-label-preferences"
       ],
       "configuration": [
         "runtime",

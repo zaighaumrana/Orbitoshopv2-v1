@@ -62,7 +62,7 @@ export function catalogTabContent(adminState) {
         </div>
         <div style="display:flex;gap:8px">
           <input id="new-comp-input" class="search" placeholder="New component name" style="flex:1">
-          ${catalogAvailable()?iconSelector('newComponentIcon','',['repair','generic']):''}<button class="primary-button" data-action="add-quick-comp">Add</button>
+          ${catalogAvailable()?iconSelector('newComponentIcon','',['repair','generic'],'repair'):''}<button class="primary-button" data-action="add-quick-comp">Add</button>
         </div>
       </div>`
   }
@@ -73,7 +73,7 @@ export function catalogTabContent(adminState) {
       <div class="card" style="display:grid;gap:16px">
         <div class="toolbar"><h2>Quick Sale Items</h2><button class="primary-button" data-action="open-add-quick-item">+ Add Quick Item</button></div>
         ${items.map((item,i) => `
-          <div style="padding:12px;background:var(--surface-2);border-radius:8px;display:grid;gap:8px">
+          <div class="rs-quick-item-row" style="padding:12px;background:var(--surface-2);border-radius:8px;display:grid;gap:8px">
             <div style="display:flex;justify-content:space-between;align-items:center">
               ${iconHTML(item.icon_id,itemCategory(item.icon_id))}<strong>${escapeHTML(item.name)}</strong>${catalogAvailable()?`<button class="secondary-button" data-action="edit-catalog-icon" data-icon-kind="quick" data-record-id="${item.id}">Icon</button>`:''}
               <button type="button" data-remove-qitem="${i}"
@@ -90,7 +90,7 @@ export function catalogTabContent(adminState) {
                 </span>`
               }).join('')}
             </div>
-            <div style="display:flex;gap:8px">
+            <div class="rs-quick-variant-entry">
               <input class="search" placeholder="Brand/Variant name (optional)" id="qvariant-name-${i}" style="flex:2;min-width:0">
               <input type="number" step="any" min="0" placeholder="Price" id="qprice-input-${i}"
                 style="flex:1;min-width:0;border:1px solid var(--border);border-radius:6px;
@@ -133,13 +133,13 @@ function brandsContent(){
   <div class="rs-product-list">${(state.data.deviceBrands||[]).map(b=>`<div class="rs-brand-row">${iconHTML(b.icon_id,'brand')}<strong>${escapeHTML(b.display_name)}</strong><span class="badge">${b.enabled?'Active':'Inactive'}</span><button class="secondary-button" data-action="edit-device-brand" data-record-id="${b.id}">Edit</button></div>`).join('')||'<p class="muted">No brands match.</p>'}</div></section>`
 }
 export function catalogIconModalHTML(modal){
- return `<div class="modal-backdrop"><form class="modal modal-sm" data-form="catalog-icon"><h2>Assign icon</h2><p>${escapeHTML(modal.record.name)}</p>${iconSelector('icon_id',modal.record.icon_id||'',modal.kind==='component'?['repair','generic']:['accessory','repair','service','generic'])}${modalActions()}</form></div>`
+ return `<div class="modal-backdrop"><form class="modal modal-sm" data-form="catalog-icon"><h2>Assign icon</h2><p>${escapeHTML(modal.record.name)}</p>${iconSelector('icon_id',modal.record.icon_id||'',modal.kind==='component'?['repair','generic']:['accessory','repair','service','generic'],modal.kind==='component'?'repair':'catalog')}${modalActions()}</form></div>`
 }
 export function deviceBrandModalHTML(modal){
  const b=modal.record||{}
  return `<div class="modal-backdrop"><form class="modal modal-sm" data-form="device-brand"><h2>${b.id?'Edit':'Add'} Device Brand</h2>
  <label class="field"><span>Display name</span><input name="display_name" required maxlength="100" value="${escapeHTML(b.display_name||'')}"></label>
- ${iconSelector('icon_id',b.icon_id||'',['brand','generic'])}
+ ${iconSelector('icon_id',b.icon_id||'',['brand','generic'],'brands')}
  <label class="field"><span>Order</span><input name="sort_order" type="number" min="0" max="10000" step="1" required value="${b.sort_order||0}"></label>
  <label class="field"><span>Availability</span><select name="enabled"><option value="true" ${b.enabled!==false?'selected':''}>Active</option><option value="false" ${b.enabled===false?'selected':''}>Inactive</option></select></label>${modalActions()}</form></div>`
 }

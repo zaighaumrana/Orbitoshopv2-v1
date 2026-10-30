@@ -20,7 +20,7 @@ export function inventoryPanel(posState,{expanded=false}={}) {
   const invItems = (state.data.inventory||[]).filter(i=>Number(i.qty||0)>0)
   const filtered = invItems // Filtering, including SKU, is authoritative in the bounded backend query.
   return `
-    <section class="card rs-inventory-panel" aria-label="Inventory">
+    <section class="card rs-inventory-panel" data-ui-key="pos-inventory-panel" aria-label="Inventory">
       <h2>${expanded?'Inventory — expanded view':'Inventory'}</h2>
       <label class="field"><input class="search" aria-label="Search inventory" placeholder="Search stock…" value="${escapeHTML(posState.invSearch||'')}" data-inv-search></label>
       ${state.resources.inventory?.status==='unavailable'?resourceNotice('Inventory','unavailable'):''}

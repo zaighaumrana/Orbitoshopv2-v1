@@ -12,6 +12,9 @@ const hash=s=>createHash('sha256').update(s).digest('hex');
 const v7=JSON.parse(fs.readFileSync(path.join(platform,'supabase/releases/shop-release-support-v7.json')));
 const name=fs.readdirSync(path.join(shop,'supabase/migrations')).find(n=>n.includes('pos_catalog_icons_and_device_brands'));
 const migration={version:name.split('_')[0],name:name.slice(15,-4),sql:text('supabase/migrations/'+name)};migration.sha256=hash(migration.sql);
+const preferenceName=fs.readdirSync(path.join(shop,'supabase/migrations')).find(n=>n.includes('icon_label_preferences'));
+const preferenceMigration=preferenceName&&{version:preferenceName.split('_')[0],name:preferenceName.slice(15,-4),sql:text('supabase/migrations/'+preferenceName)};
+if(preferenceMigration)preferenceMigration.sha256=hash(preferenceMigration.sql);
 const {migrationEnvelope,planMigrations}=await import(pathToFileURL(path.join(shop,'scripts/byo-support-release.mjs')));
 const managed=fs.readFileSync(path.join(platform,'supabase/functions/_shared/managed-setup.ts'),'utf8');
 const snippet=managed.slice(managed.indexOf('export function managedMigrationQuery'),managed.indexOf('export async function managedPublicEnvironment'));
@@ -45,10 +48,35 @@ try{
   const broken={...migration,version:'20990101000000',sql:migration.sql+'\nselect missing_deliberate_test_function();'};broken.sha256=hash(broken.sql);
   sql(db,envelope(broken),{fail:true});assert.equal(sql(db,"select to_regclass('public.device_brands') is null"),'t');assert.equal(sql(db,"select count(*) from supabase_migrations.schema_migrations where version='20990101000000'"),'0');
   sql(db,envelope(migration));assert.equal(digest(db),before);sql(db,envelope(migration));assert.equal(sql(db,'select count(*) from public.device_brands'),'11');
+  if(preferenceMigration){
+   const brokenPrefs={...preferenceMigration,version:'20990101000001',sql:preferenceMigration.sql+'\nselect missing_deliberate_test_function();'};brokenPrefs.sha256=hash(brokenPrefs.sql);
+   sql(db,envelope(brokenPrefs),{fail:true});assert.equal(sql(db,"select to_regclass('public.icon_preferences') is null"),'t');
+   assert.equal(sql(db,"select count(*) from supabase_migrations.schema_migrations where version='20990101000001'"),'0');
+   sql(db,envelope(preferenceMigration));sql(db,envelope(preferenceMigration));assert.equal(digest(db),before);
+   assert.equal(sql(db,'select count(*) from public.icon_preferences'),'0');
+  }
   if(lifecycle==='fresh'){seed(db);before=digest(db)}
-  assert.equal(sql(db,"select count(*) from supabase_migrations.schema_migrations"),'40');
+  assert.equal(sql(db,"select count(*) from supabase_migrations.schema_migrations"),preferenceMigration?'41':'40');
   assert.equal(actor(db,1,"select public.get_app_config()->'read_contracts'->>'catalog_icons'"),'1');
   assert.equal(sql(db,"select public.shop_backend_capabilities()->'capabilities'->>'catalog-icons-and-brands'"),'true');
+  if(preferenceMigration){
+   assert.equal(actor(db,1,"select public.get_app_config()->'read_contracts'->>'icon_preferences'"),'1');
+   assert.equal(sql(db,"select public.shop_backend_capabilities()->'capabilities'->>'icon-label-preferences'"),'true');
+   sql(db,"insert into public.icon_preferences values('accessory.cable','Saved cable',array['catalog','inventory'])");
+   assert.match(actor(db,1,"update public.icon_preferences set display_name='Owner cable' returning display_name"),/Owner cable/);
+   for(const n of [3,4,5]){
+    assert.equal(actor(db,n,'select count(*) from public.icon_preferences'),'1');
+    assert.equal(actor(db,n,"with changed as(update public.icon_preferences set display_name='Denied' returning icon_id)select count(*) from changed"),'0');
+    actor(db,n,"insert into public.icon_preferences values('repair.battery','Denied',array['repair'])",{fail:true});
+   }
+   actor(db,1,'select count(*) from public.icon_preferences',{role:'anon',fail:true});
+   actor(db,1,'delete from public.icon_preferences',{fail:true});
+   for(const q of ["update public.icon_preferences set display_name='   '","update public.icon_preferences set icon_id='https://evil.invalid/x.svg'","update public.icon_preferences set enabled_contexts=array['brands']","update public.icon_preferences set enabled_contexts=array[null]::text[]"]){actor(db,1,q,{fail:true})}
+   assert.equal(actor(db,2,'select count(*) from public.icon_preferences'),'0');
+   actor(db,2,"insert into public.icon_preferences values('repair.battery','Denied',array['repair'])",{fail:true});
+   sql(db,'update public.shop_config set suspended=true where id=1');assert.equal(actor(db,1,'select count(*) from public.icon_preferences'),'0');actor(db,1,'select public.get_app_config()',{fail:true});sql(db,'update public.shop_config set suspended=false where id=1');
+   sql(db,envelope(preferenceMigration));assert.equal(sql(db,"select display_name from public.icon_preferences where icon_id='accessory.cable'"),'Saved cable');
+  }
   for(const n of [1,3,4,5])assert.equal(actor(db,n,'select count(*) from public.device_brands'),'11');
   for(const n of [1,3])assert.match(actor(db,n,"insert into public.device_brands(display_name) values('Local Custom') returning display_name"),/Local Custom/);
   for(const n of [2,4,5])actor(db,n,"insert into public.device_brands(display_name) values('Forbidden')",{fail:true});
@@ -60,7 +88,10 @@ insert into app_private.support_cases(ticket_id,source_id,client_binding,client_
 insert into app_private.support_consents(id,request_id,ticket_id,purpose,approved_by,expires_at,session_id,support_user_id,platform_actor) values('${uid(12)}','${uid(13)}','${uid(11)}','Local catalog authorization test','${uid(1)}',now()+interval '20 minutes','${uid(9)}','${uid(2)}','${uid(14)}');`);
   assert.equal(actor(db,2,'select count(*) from public.device_brands'),'11');
   assert.match(actor(db,2,"insert into public.device_brands(display_name) values('Consented Support') returning display_name"),/Consented Support/);
-  sql(db,'update app_private.support_consents set revoked_at=now()');assert.equal(actor(db,2,'select count(*) from public.device_brands'),'0');
+  if(preferenceMigration)assert.match(actor(db,2,"update public.icon_preferences set display_name='Consented cable' returning display_name"),/Consented cable/);
+  sql(db,'update app_private.support_consents set revoked_at=now()');
+  if(preferenceMigration){assert.equal(actor(db,2,'select count(*) from public.icon_preferences'),'0');actor(db,2,'select public.get_app_config()',{fail:true});}
+assert.equal(actor(db,2,'select count(*) from public.device_brands'),'0');
   actor(db,1,"insert into public.device_brands(display_name) values('  SAMSUNG  ')",{fail:true});
   actor(db,1,"update public.device_brands set icon_id='https://evil.invalid/x.svg'",{fail:true});
   actor(db,1,"update public.quick_items set icon_id='<svg onload=alert(1)>'",{fail:true});
@@ -71,8 +102,9 @@ insert into app_private.support_consents(id,request_id,ticket_id,purpose,approve
   // Check actual normalized uniqueness and historical preservation on inactivation.
   sql(db,"update public.device_brands set enabled=false,display_name='Merchant Apple' where icon_id='brand.apple'");sql(db,envelope(migration));assert.equal(sql(db,"select display_name from public.device_brands where icon_id='brand.apple'"),'Merchant Apple');assert.equal(digest(db),before);
   const history=JSON.parse(sql(db,'select jsonb_agg(to_jsonb(m) order by version) from supabase_migrations.schema_migrations m'));
-  assert.equal(planMigrations(history,{migrations:[...v7.migrations,migration]},'existing',1).length,0);
-  record.result='PASS';record.checks=['40 ordered ledger entries','atomic failed stage rolled back','same-stage replay safe','canonical Owner/Manager write; Cashier/Technician read only','anonymous and unconsented Support denied','module/lifecycle denial','duplicate and malicious icon denial','historical tickets and merchant customization preserved','capability and repeated assessment safe'];
+  assert.equal(planMigrations(history,{migrations:[...v7.migrations,migration,...(preferenceMigration?[preferenceMigration]:[])]},'existing',1).length,0);
+  record.result='PASS';record.checks=[preferenceMigration?'41 ordered ledger entries (v8 + preferences)':'40 ordered ledger entries','atomic failed stage rolled back','same-stage replay safe','canonical Owner/Manager write; Cashier/Technician read only','anonymous and unconsented Support denied','module/lifecycle denial','duplicate and malicious icon denial','historical tickets and merchant customization preserved','capability and repeated assessment safe'];
+  if(preferenceMigration)record.checks.push('Owner-only icon labels; form/category constraints; anonymous/staff/lifecycle/revoked Support denied; valid Support consent; preferences replay preserved');
   console.log(mode,lifecycle,'PASS');
  }
  result.result='PASS';

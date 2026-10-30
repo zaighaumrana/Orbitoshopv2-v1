@@ -1,4 +1,6 @@
+import {profileIcon} from '../profile-icon.js'
 import {catalogAvailable} from '../catalog/data.js'
+import {iconSettingsHTML,iconSettingsValues} from '../catalog/icon-settings.js'
 import {iconAllowed} from '../catalog/icons.js'
 import {renderOperationalScreen} from '../ui-render.js'
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
@@ -353,7 +355,7 @@ function render() {
                 ? `<button class="secondary-button" data-action="go-workshop">Workshop</button>`
                 : ''}
             ` : ''}
-            <button class="icon-button" data-action="my-account" title="My Account">👤</button>
+            <button class="icon-button" data-action="my-account" title="My Account" aria-label="My Account">${profileIcon}</button>
             <button class="icon-button" data-action="theme">
               ${state.theme === 'dark' ? 'Light' : 'Dark'}
             </button>
@@ -563,9 +565,9 @@ function settings() {
   if (state.role !== 'Business Owner' && state.role !== 'Orbito Support')
     return `<div class="card"><p class="muted">Settings are available to Business Owner only.</p></div>`
   const t = currentTenant()
-  const tabs = { branding:'Branding', contact:'Contact', receipt:'Receipt & Tax', staff:'Staff & Security', legal:'Legal & Privacy' }
+  const tabs = { branding:'Branding', contact:'Contact', receipt:'Receipt & Tax', staff:'Staff & Security', legal:'Legal & Privacy', icons:'Icons' }
   return `
-    ${tit('Business Settings','Branding, contact, receipt, staff.','')}
+    ${tit('Business Settings','Branding, contact, receipts, staff and icon choices.','')}
     <div class="settings-tabs">
       ${Object.entries(tabs).map(([k,l]) =>
         `<button class="settings-tab ${adminState.settingsTab===k?'active':''}" data-settings-tab="${k}">${l}</button>`
@@ -581,6 +583,7 @@ function catalog() {
 
 function settingsTabContent() {
   const t = currentTenant()
+  if (adminState.settingsTab === 'icons') return iconSettingsHTML(CFG.read_contracts?.icon_preferences===1)
   if (adminState.settingsTab === 'legal') return legalSettingsHTML(legalStatus, state.role === 'Business Owner')
 
   const platformFlags = `
@@ -1333,7 +1336,7 @@ function attachEvents() {
     if (el.dataset.action === 'add-quick-comp') {
       const val = document.getElementById('new-comp-input')?.value?.trim(); if (!val) return
       const { error } = await viewAwait(eventCurrent,()=>(sb.from('repair_components').insert({
-        name: val, ...(catalogAvailable()?{icon_id:document.querySelector('[name="newComponentIcon"]')?.value||null}:{}), sort_order: (state.data.repairComponents||[]).length + 1
+        name: val, ...(catalogAvailable()?{icon_id:document.querySelector('[name="newComponentIcon"]:checked')?.value||null}:{}), sort_order: (state.data.repairComponents||[]).length + 1
       })),()=>state.modal)
       if (error) { showBlockingError('Error: '+error.message); return }
       const input = document.getElementById('new-comp-input')
@@ -1512,6 +1515,22 @@ function attachEvents() {
     const type = form.dataset.form
     dlog('ADMIN.submit', `ENTRY form.dataset.form=${type}`)
 
+    if(type==='icon-settings'){
+      if(adminState.adminModule!=='settings'||!['Business Owner','Orbito Support'].includes(state.role)||CFG.read_contracts?.icon_preferences!==1||form.dataset.saving)return
+      form.dataset.saving='true'
+      const button=form.querySelector('button');button.disabled=true
+      try{
+        const rows=iconSettingsValues(form)
+        const result=await viewAwait(eventCurrent,()=>sb.from('icon_preferences').upsert(rows,{onConflict:'icon_id'}).select('icon_id'),()=>state.modal)
+        if(result.error)throw Error('Icon preferences could not be saved. Your edits are still here; retry after checking access.')
+        if(result.data?.length!==rows.length)throw Error('Icon preferences were not confirmed. Refresh Settings before retrying.')
+        const refreshed=await viewAwait(eventCurrent,()=>loadConfig(),()=>state.modal)
+        if(!refreshed)throw Error('Preferences were saved, but could not be refreshed. Reload Settings to confirm them.')
+        if(eventCurrent()){render();showToast('Icon preferences saved.','success')}
+      }catch(error){if(eventCurrent())showBlockingError(error.message)}
+      finally{if(eventCurrent()&&form.isConnected){delete form.dataset.saving;button.disabled=false}}
+      return
+    }
     if(type==='support-consent'){
       if(SESSION.employee?.role!=='Business Owner'||customerSupport.view.busy)return
       const nav=adminNavigationIsCurrent;customerSupport.view.busy=true;render()

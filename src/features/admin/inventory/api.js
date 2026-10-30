@@ -22,14 +22,16 @@ export async function handleInvDelete(el) {
   dlog('admin.inventory.handleInvDelete', `ENTRY id=${el.dataset.invDelete}`)
   const outcome = await confirmAction({
     title: 'Delete item?',
-    message: 'This action cannot be undone.',
+    message: 'This permanently deletes an unused item. Items with recorded stock or sales history must be retained.',
     confirmLabel: 'Delete',
     tone: 'danger',
     action: async () => {
       const { error } = await sb.from('inventory').delete().eq('id', Number(el.dataset.invDelete))
       if (error) {
         dlog('admin.inventory.handleInvDelete', `FAILED: ${error.message}`)
-        showBlockingError('Error: ' + error.message)
+        showBlockingError(error.code==='23503'
+          ? 'This item has stock or sales history and cannot be deleted. Use Adjust Stock when its actual quantity changes; zero-quantity items are hidden from POS.'
+          : 'Error: ' + error.message)
         return false
       }
       dlog('admin.inventory.handleInvDelete', 'SUCCEEDED')

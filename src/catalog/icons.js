@@ -1,6 +1,7 @@
 import registry from './registry-v1.json' with {type:'json'}
 import {artwork} from './artwork.js'
 import {escapeHTML} from '../html.js'
+import {iconLabel,iconOffered} from './icon-preferences.js'
 export {registry}
 export const metadata=new Map(registry.assets.map(a=>[a.id,a]))
 export {artwork}
@@ -25,14 +26,22 @@ export function itemCategory(id,allowed=['accessory','repair','service','generic
 }
 export function iconHTML(id,category='generic'){
  const icon=resolveIcon(id,category)
- return icon.svg?icon.svg.replace('<svg ','<svg class="rs-item-icon" aria-hidden="true" focusable="false" '):'<span class="rs-item-icon rs-icon-placeholder" aria-hidden="true">□</span>'
+ return icon.svg?icon.svg.replace('<svg ','<svg class="rs-item-icon" aria-hidden="true" focusable="false" '):'<span class="rs-item-icon rs-icon-placeholder" aria-hidden="true">â–¡</span>'
 }
-export function iconSelector(name,value='',categories=['accessory','repair','service','generic']){
- const unknown=value&&!iconAllowed(value,categories)
- return '<label class="field"><span>Icon</span><select name="'+escapeHTML(name)+'"><option value="">Generic fallback</option>'+
-  (unknown?'<option selected value="'+escapeHTML(value)+'">Keep existing assignment</option>':'')+
-  registry.assets.filter(a=>categories.includes(a.category)).map(a=>'<option value="'+a.id+'" '+(value===a.id?'selected':'')+'>'+escapeHTML(a.displayName)+'</option>').join('')+'</select></label>'
+export function iconSelector(name,value='',categories=['accessory','repair','service','generic'],context='catalog'){
+ const assets=registry.assets.filter(a=>categories.includes(a.category)&&(a.id===value||iconOffered(a,context)))
+ const current=metadata.get(value),label=value?(current?iconLabel(current):'Keep existing assignment'):'Generic fallback'
+ const choice=(id,text,category)=>`<label class="rs-icon-choice"><input type="radio" name="${escapeHTML(name)}" value="${escapeHTML(id)}" ${id===value?'checked':''}><span class="rs-icon-choice-content">${iconHTML(id,category)}<span>${escapeHTML(text)}</span></span></label>`
+ return `<div class="field"><span>Icon</span><details class="rs-icon-picker" data-ui-key="icon-picker-${escapeHTML(name)}"><summary aria-label="Choose icon"><span class="rs-icon-choice-content">${iconHTML(value,current?.category||'generic')}<span>${escapeHTML(label)}</span></span></summary><div class="rs-icon-options" role="group" aria-label="Icon choices">${choice('','Generic fallback','generic')}${value&&!assets.some(a=>a.id===value)?choice(value,'Keep existing assignment',current?.category||'generic'):''}${assets.map(a=>choice(a.id,iconLabel(a),a.category)).join('')}</div></details></div>`
 }
+// Native details + radios keep keyboard access and ordinary FormData submission.
+if(typeof document!=='undefined')document.addEventListener('change',event=>{
+ const picker=event.target.closest?.('.rs-icon-picker')
+ if(!picker||event.target.type!=='radio')return
+ const summary=picker.querySelector('summary')
+ summary.replaceChildren(event.target.closest('label').querySelector('.rs-icon-choice-content').cloneNode(true))
+ picker.open=false;summary.focus()
+})
 export function brandIcon(text,brands=[]){
  const normalized=normalizeBrand(text),configured=brands.find(b=>normalizeBrand(b.display_name)===normalized)
  if(configured)return configured.icon_id||'brand.generic_phone'

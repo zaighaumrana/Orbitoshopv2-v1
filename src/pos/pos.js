@@ -1,3 +1,4 @@
+import {profileIcon} from '../profile-icon.js'
 import {quickPrice,quickPrices} from '../catalog/prices.js'
 import {iconHTML,itemCategory,brandIcon} from '../catalog/icons.js'
 import {intakeBrands} from '../catalog/data.js'
@@ -272,7 +273,7 @@ function render() {
                 ? `<button class="secondary-button" data-action="go-workshop">Workshop</button>`
                 : ''}
             ` : ''}
-            <button class="icon-button" data-action="my-account" title="My Account">👤</button>
+            <button class="icon-button" data-action="my-account" title="My Account" aria-label="My Account">${profileIcon}</button>
             <button class="icon-button" data-action="theme">${state.theme==='dark'?'Light':'Dark'}</button>
             ${CFG.ems_enabled && !(SESSION.isAdmin || SESSION.employee?.role === 'Business Owner') ? `
               <button class="secondary-button" style="font-size:12px" data-action="ems-clock-out">
@@ -310,6 +311,9 @@ function inventoryVisible(){
 function posView() {
   if(!resourceReady(state.resources,'config'))return resourceNotice('Shop configuration')
   const showInventory=inventoryVisible()
+  const customOnly=showInventory&&quickResultsCurrent()&&!posState.quickSearch.trim()&&posState.quickPage?.count===0
+  const catalogPanel=quickItemsPanel({customOnly})
+  const stockPanel=showInventory&&_inv?(resourceReady(state.resources,'inventory')||(state.resources.inventory?.status==='loading'&&posState.inventoryPage))?_inv.inventoryPanel(posState):resourceNotice('Inventory',state.resources.inventory.status):''
   const tenant   = currentTenant()
   const subtotal = posState.cart.reduce((s,i) => s + i.soldPrice * i.qty, 0)
   const disc     = posState.cart.reduce((s,i) => s + (i.originalPrice - i.soldPrice) * i.qty, 0)
@@ -337,9 +341,8 @@ function posView() {
     </div>
     <div class="grid pos-layout rs-pos-workspace">
       <div class="rs-product-workspace">
-       <div class="rs-product-panels ${showInventory?'':'rs-catalog-expanded'}">
-        ${quickItemsPanel()}
-        ${showInventory && _inv ? (resourceReady(state.resources,'inventory')||(state.resources.inventory?.status==='loading'&&posState.inventoryPage))?_inv.inventoryPanel(posState):resourceNotice('Inventory',state.resources.inventory.status) : ''}
+       <div class="rs-product-panels ${showInventory?customOnly?'rs-inventory-expanded':'':'rs-catalog-expanded'}">
+        ${customOnly?stockPanel+catalogPanel:catalogPanel+stockPanel}
        </div>
         ${recentRepairPanel()}
       </div>
@@ -445,16 +448,20 @@ function posView() {
 function quickResultsCurrent(){
  return resourceReady(state.resources,'quickItems')&&posState.quickAccepted?.query===posState.quickSearch&&posState.quickAccepted?.revision===quickGeneration
 }
-function quickItemsPanel({expanded=false}={}) {
+function customItemSection(){
+ return `<section class="rs-custom-item" data-ui-key="pos-custom-item" aria-labelledby="rs-custom-item-title"><h3 id="rs-custom-item-title">Custom / one-off item</h3>${customItemEntry()}</section>`
+}
+function quickItemsPanel({expanded=false,customOnly=false}={}) {
+  if(customOnly)return `<section class="card rs-catalog-panel rs-catalog-custom-only" data-ui-key="pos-catalog-panel" aria-label="Custom / one-off item">${customItemSection()}</section>`
   const ready=quickResultsCurrent()
-  return `<section class="card rs-catalog-panel" aria-label="Catalog"><h2>${expanded?'Catalog — expanded view':'Catalog'}</h2>
+  return `<section class="card rs-catalog-panel" data-ui-key="pos-catalog-panel" aria-label="Catalog"><h2>${expanded?'Catalog — expanded view':'Catalog'}</h2>
     <label class="field"><input class="search" aria-label="Search catalog" data-quick-search value="${escapeHTML(posState.quickSearch)}" placeholder="Search catalog…"></label>
     ${ready?`<div class="rs-product-list">${(state.data.quickItems||[]).map(item=>`
      <button class="secondary-button rs-product-item" data-qitem-id="${item.id}" data-qitem-name="${escapeHTML(item.name)}" ${quickPrices(item.prices).length?'':'disabled'}>
        ${iconHTML(item.icon_id,itemCategory(item.icon_id))}<span><strong>${escapeHTML(item.name)}</strong><small>${quickPrices(item.prices).map(p=>(p.name?escapeHTML(p.name)+' · ':'')+moneyHTML(p.price)).join(' / ')||'Price unavailable'}</small></span>
      </button>`).join('')}</div>${!(state.data.quickItems||[]).length?'<p class="muted">No catalog items match.</p>':''}${posPageControls(posState.quickPage,'data-quick-page','catalog',expanded)}`:resourceNotice('Catalog',state.resources.quickItems?.status)}
     <p class="muted" role="status" data-quick-search-status>${state.resources.quickItems?.status==='loading'?'Searching current catalog…':''}</p>
-    ${expanded?'':`<section class="rs-custom-item" data-ui-key="pos-custom-item" aria-labelledby="rs-custom-item-title"><h3 id="rs-custom-item-title">Custom / one-off item</h3>${customItemEntry()}</section>`}</section>`
+    ${expanded?'':customItemSection()}</section>`
 }
 function compactPages(page,attribute){
  return pageControls(page,attribute).replace('rs-pagination"','rs-pagination rs-compact-pagination"').replace('>Previous<',' aria-label="Previous page">‹<').replace('>Next<',' aria-label="Next page">›<')
@@ -819,9 +826,9 @@ function renderModal() {
   }
 
   if (type === 'shiftStats') return `<div class="modal-backdrop">
-    <div class="modal modal-sm">
+    <div class="modal rs-receipt-preview-dialog">
       <h2>Shift Stats</h2>
-      <div class="shift-print-wrap">${buildShiftStats()}</div>
+      <div class="rs-receipt-preview-body"><div class="shift-print-wrap">${buildShiftStats()}</div></div>
       <div class="modal-actions">
         <button class="secondary-button" data-close>Close</button>
         <button class="primary-button" data-action="print-shift">Print / Save PDF</button>

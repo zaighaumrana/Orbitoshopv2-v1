@@ -26,3 +26,15 @@ test('all 36 approved V1.0.1 local SVG bytes and trusted renderers match the pro
  assert.equal(manifest.deliveryVersion,'1.0.1');assert.equal(manifest.assets.length,36);
  for(const a of manifest.assets){const bytes=readFileSync(new URL('../src/catalog/assets/'+a.registryPath,import.meta.url));assert.equal(createHash('sha256').update(bytes).digest('hex'),a.sha256);assert.equal(artwork[a.id],bytes.toString('utf8').trim());assert.equal(resolveIcon(a.id,metadata.get(a.id).category).id,a.id)}
 });
+
+
+test('Shop icon preferences filter offerings, escape labels and preserve saved hidden assignments',async()=>{
+ const {setIconPreferences}=await import('../src/catalog/icon-preferences.js');const {iconSelector}=await import('../src/catalog/icons.js');
+ try{
+  setIconPreferences([{icon_id:'accessory.cable',display_name:'Cable <script>unsafe</script>',enabled_contexts:['inventory']},{icon_id:'unknown.url',display_name:'Ignored',enabled_contexts:['catalog']}]);
+  assert.doesNotMatch(iconSelector('icon_id','',['accessory','generic'],'catalog'),/value="accessory.cable"/);
+  const inventory=iconSelector('icon_id','',['accessory','generic'],'inventory');assert.match(inventory,/Cable &lt;script&gt;unsafe&lt;\/script&gt;/);assert.doesNotMatch(inventory,/<script>/);
+  const retained=iconSelector('icon_id','accessory.cable');assert.match(retained,/value="accessory.cable" checked/);assert.match(retained,/value=""/);
+  setIconPreferences();assert.match(iconSelector('icon_id'),/value="accessory.cable"/);
+ }finally{setIconPreferences()}
+});
