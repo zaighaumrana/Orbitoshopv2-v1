@@ -21,17 +21,15 @@ export function inventoryPanel(posState,{expanded=false}={}) {
   const filtered = invItems // Filtering, including SKU, is authoritative in the bounded backend query.
   return `
     <section class="card rs-inventory-panel" aria-label="Inventory">
-      <h2 style="margin-bottom:10px">${expanded?'Inventory — expanded view':'Inventory'}</h2>
-      <input aria-label="Search inventory" placeholder="Search stock…" value="${escapeHTML(posState.invSearch||'')}" data-inv-search
-        style="width:100%;margin-bottom:10px;border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--surface);color:var(--text);font-size:14px">
+      <h2>${expanded?'Inventory — expanded view':'Inventory'}</h2>
+      <label class="field"><input class="search" aria-label="Search inventory" placeholder="Search stock…" value="${escapeHTML(posState.invSearch||'')}" data-inv-search></label>
       ${state.resources.inventory?.status==='unavailable'?resourceNotice('Inventory','unavailable'):''}
       <div class="rs-product-list">
         ${filtered.slice(0,24).map(i=>`
           <button class="secondary-button rs-product-item"
             ${state.resources.inventory?.status==='ready'?'':'disabled'}
             data-inv-pos-add="${i.id}" data-inv-pos-name="${escapeHTML(i.name)}" data-inv-pos-price="${i.price}">
-            ${iconHTML(i.icon_id,itemCategory(i.icon_id))}<span><div style="font-weight:600">${escapeHTML(i.name)}</div>
-            <div style="font-size:11px;color:var(--muted)">${moneyHTML(i.price)} · ${i.qty} left</div></span>
+            ${iconHTML(i.icon_id,itemCategory(i.icon_id))}<span><strong>${escapeHTML(i.name)}</strong><small>${moneyHTML(i.price)} · ${i.qty} left</small></span>
           </button>`).join('')}
       </div>
       <p class="muted" role="status" data-stock-search-status>${state.resources.inventory?.status==='unavailable'?'':state.resources.inventory?.status==='loading'?'Searching current stock…':!filtered.length?'No sellable items on this page.':''}</p>

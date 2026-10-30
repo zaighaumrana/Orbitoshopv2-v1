@@ -1022,3 +1022,23 @@ input[type="number"] {
 .rs-shop .modal-backdrop:has(>.rs-pos-selector-modal){grid-template-columns:minmax(0,1fr);justify-items:center}
 
 .rs-shop .rs-pos-selector-modal h2{padding-right:38px;overflow-wrap:anywhere}
+
+/* Stable selector frames; only expanded tiles adapt to sparse results. */
+.rs-shop .rs-product-panels{align-items:stretch;--rs-pos-list-height:clamp(240px,45vh,480px)}
+.rs-shop .rs-product-panels>:is(.rs-catalog-panel,.rs-inventory-panel){display:flex;flex-direction:column}
+.rs-shop .rs-product-panels .rs-product-list{height:var(--rs-pos-list-height);max-height:none;flex:none;align-content:start}
+.rs-shop .rs-product-panels :is(.rs-catalog-panel,.rs-inventory-panel)>h2{margin:0}
+.rs-shop .modal.rs-pos-selector-modal{height:calc(var(--dialog-height,100dvh) - max(12px,env(safe-area-inset-top)) - max(12px,env(safe-area-inset-bottom)));grid-template-rows:minmax(0,1fr) auto auto;overflow:hidden}
+.rs-shop .rs-pos-selector-modal>:is(.rs-catalog-panel,.rs-inventory-panel){display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.rs-shop .rs-pos-selector-modal .rs-product-list{flex:1;min-height:0;max-height:none;overflow:auto;grid-auto-rows:minmax(82px,max-content)}
+.rs-shop .rs-pos-selector-modal .rs-product-list:not(:has(>.rs-product-item:nth-child(5))){grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));grid-auto-rows:minmax(110px,max-content)}
+.rs-shop .rs-pos-selector-modal .rs-product-list:not(:has(>.rs-product-item:nth-child(5)))>.rs-product-item{min-height:110px}
+.rs-shop .rs-pos-selector-modal h2{padding-right:56px;min-height:44px}
+.rs-shop .rs-pos-selector-modal .modal-close-button{width:44px;height:44px;min-width:44px;min-height:44px;top:10px;right:10px;padding:0;font-size:28px;line-height:1;font-weight:500;color:var(--text);background:var(--surface-2);border:1px solid var(--border)}
+.rs-shop .rs-pos-selector-modal .modal-close-button:hover,.rs-shop .rs-pos-selector-modal .modal-close-button:focus-visible{background:var(--surface-2);color:var(--text);border-color:var(--primary)}
+
+.rs-shop .rs-product-list{scrollbar-gutter:stable}
+
+.rs-shop .rs-product-panels .rs-product-list{grid-auto-rows:max-content}
+
+.rs-shop .rs-pos-selector-modal>:is(.rs-catalog-panel,.rs-inventory-panel){overflow:visible}
