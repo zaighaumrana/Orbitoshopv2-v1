@@ -74,7 +74,7 @@ export function catalogTabContent(adminState) {
         <div class="toolbar"><h2>Quick Sale Items</h2><button class="primary-button" data-action="open-add-quick-item">+ Add Quick Item</button></div>
         ${items.map((item,i) => `
           <div class="rs-quick-item-row" style="padding:12px;background:var(--surface-2);border-radius:8px;display:grid;gap:8px">
-            <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="rs-quick-item-header">
               ${iconHTML(item.icon_id,itemCategory(item.icon_id))}<strong>${escapeHTML(item.name)}</strong>${catalogAvailable()?`<button class="secondary-button" data-action="edit-catalog-icon" data-icon-kind="quick" data-record-id="${item.id}">Icon</button>`:''}
               <button type="button" data-remove-qitem="${i}"
                 style="color:var(--danger);background:none;border:none;font-size:18px;cursor:pointer">×</button>
@@ -113,7 +113,7 @@ export function qiVariantRowHTML() {
 export function addQuickItemModalHTML() {
   return `<div class="modal-backdrop"><form class="modal modal-sm" data-form="add-quick-item">
     <h2>Add Quick Item</h2>
-    <div class="form-grid">
+    <div class="form-grid rs-quick-item-fields">
       ${fld('Item Name','itemName')}
       ${catalogAvailable()?iconSelector('icon_id'):''}
     </div>
