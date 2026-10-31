@@ -1102,3 +1102,7 @@ input[type="number"] {
 .rs-shop .modal-backdrop:has(>[data-form="add-quick-item"]){grid-template-columns:minmax(0,1fr)}
 .rs-shop .modal[data-form="add-quick-item"] [data-modal-close]{width:44px;height:44px;font-size:24px;top:8px;right:8px}
 .rs-shop .modal[data-form="add-quick-item"]>h2{padding-right:44px}
+
+/* Variant picker changes width only; row heights, gaps and vertical spacing stay native. */
+.rs-shop .modal-backdrop:has(>.rs-variant-picker){grid-template-columns:minmax(0,1fr)}
+.rs-shop .modal.rs-variant-picker{width:min(600px,100%)}

@@ -957,7 +957,7 @@ function renderModal() {
 
   if (type === 'qitem-pick') {
     const { name, prices } = state.modal
-    return `<div class="modal-backdrop"><div class="modal modal-xs">
+    return `<div class="modal-backdrop"><div class="modal modal-xs rs-variant-picker">
       <h2>${escapeHTML(name)}</h2><p class="muted">Select price:</p>
       <div style="display:grid;gap:8px;margin-top:8px">
         ${(prices||[]).map((p,i)=>`<button class="secondary-button" style="font-size:16px;min-height:48px" data-pick-price="${i}">${p.name ? `${escapeHTML(p.name)} — ${moneyHTML(p.price)}` : moneyHTML(p.price)}</button>`).join('')}
