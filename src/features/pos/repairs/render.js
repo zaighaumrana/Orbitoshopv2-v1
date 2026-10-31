@@ -103,10 +103,12 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
           <input name="customerPhone" type="tel" inputmode="numeric" pattern="[0-9]*"
             data-numeric="digits" data-numeric-message="Numbers only" autocomplete="tel"
             required value="${dInfo.customerPhone||''}"></label>
+        <div class="rs-repair-brand-row">
         <label class="field"><span>Device Brand *</span>
           <input name="deviceBrand" list="rs-device-brands" autocomplete="off" required value="${dInfo.deviceBrand||''}" aria-describedby="rs-brand-help"></label>
         <datalist id="rs-device-brands">${brandChoices(state.data.deviceBrands??null).flatMap(b=>[b.display_name,...(b.aliases||[])]).map(name=>`<option value="${escapeHTML(name)}"></option>`).join('')}</datalist>
         <p id="rs-brand-help" class="muted">${state.data.brandChoicesUnavailable?'Brand choices unavailable. Type the brand manually; retry choices by reopening the form.':'Search a brand or type your own. Custom text is retained.'}</p>
+        </div>
         <label class="field"><span>Device Model *</span>
           <input name="deviceModel" required value="${dInfo.deviceModel||''}"></label>
         <label class="field" style="grid-column:1/-1"><span>IMEI / Serial <small class="muted">(letters and numbers allowed)</small></span>
