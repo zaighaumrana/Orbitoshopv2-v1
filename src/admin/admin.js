@@ -1,3 +1,4 @@
+import {retirementAvailable} from '../inventory-state.js'
 import {profileIcon} from '../profile-icon.js'
 import {catalogAvailable} from '../catalog/data.js'
 import {iconSettingsHTML,iconSettingsValues} from '../catalog/icon-settings.js'
@@ -68,6 +69,7 @@ const adminState = {
   adminModule:      'dashboard',
   settingsTab:      'branding',
   catalogTab:       'quickitems',
+  inventoryStatus: 'active',
   componentTab:'quicktap',
   receiptsExpanded: null,
   filter:           '',
@@ -183,7 +185,7 @@ async function load(verifiedConfig) {
   const [tickets, sales, employees, udharAccounts, financial, financialToday, returns_, inv, quickItems, repairComponents, deviceBrands, archive] = await Promise.all([
     needs.tickets ? pagedFamilies?repairFamilyPage({search:adminState.filter,current}):legacyFamilyPage({search:adminState.filter,current}) : skip,
     needs.sales ? mod==='receipts'?verifiedLegacyMembers('sales',current):readPreview(()=>sb.from('sales').select(mod==='dashboard'?'id,invoice_number,customer_name,payment_method,total_bill,created_at':'id,invoice_number,customer_name,payment_method,total_bill,created_at,items_sold').order('created_at',{ascending:false}).order('id',{ascending:false}),mod==='dashboard'?8:15,current) : skip,
-    needs.employees ? adminPage(mod,adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab,adminState.filter,0,current) : skip,
+    needs.employees ? adminPage(mod,mod==='inventory'?adminState.inventoryStatus:adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab,adminState.filter,0,current) : skip,
     needs.udhar ? sb.rpc('get_unified_udhar_accounts') : skip,
     needs.financial ? sb.rpc('get_financial_report', {
       p_from: null, p_to: null, p_actor_only: false,
@@ -192,9 +194,9 @@ async function load(verifiedConfig) {
       p_from: todayStart.toISOString(), p_to: todayEnd.toISOString(), p_actor_only: false,
     }) : { data: {} },
     needs.returns ? sb.from('returns').select('*').order('id', { ascending: false }) : skip,
-    needs.inventory ? adminPage(mod,adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab,adminState.filter,0,current) : skip,
-    needs.quickItems ? adminPage(mod,adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab,adminState.filter,0,current) : skip,
-    needs.repairComponents ? adminPage(mod,adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab,adminState.filter,0,current) : skip,
+    needs.inventory ? adminPage(mod,mod==='inventory'?adminState.inventoryStatus:adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab,adminState.filter,0,current) : skip,
+    needs.quickItems ? adminPage(mod,mod==='inventory'?adminState.inventoryStatus:adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab,adminState.filter,0,current) : skip,
+    needs.repairComponents ? adminPage(mod,mod==='inventory'?adminState.inventoryStatus:adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab,adminState.filter,0,current) : skip,
     needs.deviceBrands ? adminPage(mod,'brands',adminState.filter,0,current):skip,
     needs.archive?receiptArchivePage(adminState,{current}):skip,
   ].map(settleRead))
@@ -206,7 +208,7 @@ async function load(verifiedConfig) {
     for(const key of ['tickets','sales']){reads.values[key]=[];reads.resources[key]={status:'ready'}}
   }
   state.data=reads.values;state.resources=reads.resources
-  const resource=flatResource(mod,adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab)
+  const resource=flatResource(mod,mod==='inventory'?adminState.inventoryStatus:adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab)
   if(resource)adminState._page={inventory:inv,employees,quickItems,repairComponents,deviceBrands}[resource]
   if(mod==='repairs'&&tickets.rootIds&&!tickets.error)adminState._page={...tickets,data:tickets.rootIds}
   if(pagedReceipts&&!archive.error)adminState._page=adminState._receiptPage=archive
@@ -249,7 +251,7 @@ function pagedAdminResource(){
   if(adminState.adminModule==='repairs'&&adminState._page?.mode==='exact-identifiers')return 'tickets'
   if(adminState.adminModule==='repairs'&&CFG.repair_module_enabled&&hasReadContract('repair_families'))return 'tickets'
   if(adminState.adminModule==='receipts'&&hasReadContract('receipt_archive'))return 'archive'
-  return flatResource(adminState.adminModule,adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab)
+  return flatResource(adminState.adminModule,adminState.adminModule==='inventory'?adminState.inventoryStatus:adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab)
 }
 function queueAdminSearch(){
   const key=pagedAdminResource()
@@ -257,13 +259,13 @@ function queueAdminSearch(){
   const revision=++flatGeneration;clearTimeout(flatTimer)
   state.resources[key]={status:'loading'}
   document.querySelector('.content')?.setAttribute('aria-busy','true')
-  document.querySelectorAll('[data-inv-edit],[data-inv-adjust],[data-inv-delete],[data-emp-id],[data-remove-qitem],[data-add-qprice],[data-remove-qprice],[data-remove-quick],[data-view-ticket],[data-ticket-id],[data-sale-id],[data-receipt-idx],[data-admin-page]').forEach(button=>button.disabled=true)
+  document.querySelectorAll('[data-inv-edit],[data-inv-adjust],[data-inv-retire],[data-inv-delete],[data-emp-id],[data-remove-qitem],[data-add-qprice],[data-remove-qprice],[data-remove-quick],[data-view-ticket],[data-ticket-id],[data-sale-id],[data-receipt-idx],[data-admin-page]').forEach(button=>button.disabled=true)
   flatTimer=setTimeout(()=>{if(ownsAdmin())void loadFlatPage(0,revision)},180)
 }
 async function loadFlatPage(offset=0,revision=++flatGeneration) {
-  const view=captureView(),mod=adminState.adminModule,tab=adminState.catalogTab,subtab=adminState.componentTab,query=adminState.filter
+  const view=captureView(),mod=adminState.adminModule,tab=mod==='inventory'?adminState.inventoryStatus:adminState.catalogTab,subtab=adminState.componentTab,query=adminState.filter
   const receiptQuery=JSON.stringify([adminState.receiptSearch,adminState.receiptType,adminState.receiptDateFrom,adminState.receiptDateTo])
-  const key=pagedAdminResource(),current=()=>view()&&ownsAdmin()&&revision===flatGeneration&&adminState.filter===query&&adminState.catalogTab===tab&&adminState.componentTab===subtab&&receiptQuery===JSON.stringify([adminState.receiptSearch,adminState.receiptType,adminState.receiptDateFrom,adminState.receiptDateTo])
+  const key=pagedAdminResource(),current=()=>view()&&ownsAdmin()&&revision===flatGeneration&&adminState.filter===query&&(mod==='inventory'?adminState.inventoryStatus:adminState.catalogTab)===tab&&adminState.componentTab===subtab&&receiptQuery===JSON.stringify([adminState.receiptSearch,adminState.receiptType,adminState.receiptDateFrom,adminState.receiptDateTo])
   if(!key||!current())return
   state.resources[key]={status:'loading'}
   document.querySelector('.content')?.setAttribute('aria-busy','true')
@@ -514,7 +516,7 @@ function repairs() {
 function inventory() {
   if (!CFG.inventory_module_enabled) return `<div class="card"><p class="muted">Inventory module is disabled. Enable it in Settings.</p></div>`
   if (!_inv) return `<div class="card"><p class="muted">Loading inventory module…</p></div>`
-  return _inv.adminInventoryPage({ filter: adminState.filter, tit })
+  return _inv.adminInventoryPage({ filter: adminState.filter, tit, status:adminState.inventoryStatus })
 }
 
 function reports() {
@@ -773,7 +775,7 @@ function renderModal() {
 
   if (type === 'add-comp-tag') return addCompTagModalHTML(state.modal)
 
-  if (type === 'inv-add' || type === 'inv-edit' || type === 'inv-adjust') {
+  if (type === 'inv-add' || type === 'inv-edit' || type === 'inv-adjust' || type === 'inv-retire') {
     return _inv ? _inv.inventoryModalHTML(type, id) : ''
   }
 
@@ -842,15 +844,15 @@ function attachEvents() {
       'button,[data-modal],[data-close],[data-action],' +
       '[data-settings-tab],[data-catalog-tab],[data-kpi-target],[data-pp-key],' +
       '[data-remove-quick],[data-remove-qitem],[data-add-qprice],[data-remove-qprice],' +
-      '[data-inv-edit],[data-inv-adjust],[data-inv-delete],[data-settle-id],[data-view-ticket],' +
+      '[data-inv-edit],[data-inv-adjust],[data-inv-retire],[data-inv-delete],[data-settle-id],[data-view-ticket],' +
       '[data-mark-not-needed],[data-subinv-comp-remove],[data-add-draft-comp-name],[data-tag-select]'
     )
     if (!el) return
     if(el.dataset.adminPage){const page=adminState._page;if(page)await loadFlatPage(el.dataset.adminPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
     const pagedResource=pagedAdminResource()
     if(pagedResource&&!resourceReady(state.resources,pagedResource)&&(el.dataset.viewTicket||el.dataset.ticketId||el.dataset.saleId||el.dataset.receiptIdx!==undefined))return
-    const activeFlat=flatResource(adminState.adminModule,adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab)
-    if(activeFlat&&!resourceReady(state.resources,activeFlat)&&(el.dataset.invEdit||el.dataset.invAdjust||el.dataset.invDelete||el.dataset.empId||el.dataset.removeQitem!==undefined||el.dataset.addQprice!==undefined||el.dataset.removeQprice!==undefined||el.dataset.removeQuick!==undefined))return
+    const activeFlat=flatResource(adminState.adminModule,adminState.adminModule==='inventory'?adminState.inventoryStatus:adminState.componentTab==='brands'&&adminState.catalogTab==='components'?'brands':adminState.catalogTab)
+    if(activeFlat&&!resourceReady(state.resources,activeFlat)&&(el.dataset.invEdit||el.dataset.invAdjust||el.dataset.invRetire||el.dataset.invDelete||el.dataset.empId||el.dataset.removeQitem!==undefined||el.dataset.addQprice!==undefined||el.dataset.removeQprice!==undefined||el.dataset.removeQuick!==undefined))return
     if(el.dataset.action==='support-consent-revoke'){
       if(SESSION.employee?.role!=='Business Owner'||customerSupport.view.busy)return
       const nav=adminNavigationIsCurrent;customerSupport.view.busy=true
@@ -873,7 +875,7 @@ function attachEvents() {
     if (el.dataset.ppKey !== undefined) { handlePpKey(el.dataset.ppKey); return }
     if (el.dataset.close !== undefined) {
       dlog('ADMIN.click', `DATA-CLOSE branch firing -- state.modal was type=${state.modal?.type} -- about to call ADMIN.render()`)
-      if (state.modal?.type === 'pinPrompt') { cancelPinPrompt(render); return }
+      if (state.modal?.type === 'pinPrompt') { const back=state.modal.stockReturnTo;cancelPinPrompt(()=>{if(back)state.modal=back;render()}); return }
       state.modal = null; render(); return
     }
     if (['paper-resupply','paper-refresh'].includes(el.dataset.action)) {
@@ -1397,12 +1399,15 @@ function attachEvents() {
       await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
     }
 
-    if ((el.dataset.invEdit||el.dataset.invAdjust) && _inv) {
-      const id=el.dataset.invEdit||el.dataset.invAdjust
+    if ((el.dataset.invEdit||el.dataset.invAdjust||el.dataset.invRetire) && _inv) {
+      const id=el.dataset.invEdit||el.dataset.invAdjust||el.dataset.invRetire
       const selected=await viewAwait(eventCurrent,()=>sb.from('inventory').select('*').eq('id',id).single(),()=>state.modal)
       if(selected.error||!selected.data){showBlockingError('Complete selected item unavailable. Retry reads.');return}
       state.data.inventory=state.data.inventory.map(item=>String(item.id)===String(id)?selected.data:item)
-      if(el.dataset.invEdit)_inv.handleInvEdit(el);else _inv.handleInvAdjust(el)
+      if(selected.data.retired_at){showBlockingError('This item is permanently retired.');return}
+      const pending=retirementAvailable()?_inv.pendingStockDraft(id):null
+      if(pending&&(el.dataset.invAdjust||el.dataset.invRetire))state.modal={type:pending.stock_action==='retire'?'inv-retire':'inv-adjust',id,stockDraft:pending,pendingStock:true}
+      else if(el.dataset.invRetire){if(!retirementAvailable())return;state.modal={type:'inv-retire',id}}else if(el.dataset.invEdit)_inv.handleInvEdit(el);else _inv.handleInvAdjust(el)
       render();return
     }
     if (el.dataset.invDelete && _inv) {
@@ -1490,6 +1495,9 @@ function attachEvents() {
   // Change
   listenOwned(app,'change',ownsAdmin,async (e,eventCurrent)=>{
     const t = e.target
+    if(t.dataset.inventoryStatus!==undefined&&adminState.adminModule==='inventory'&&retirementAvailable()&&['active','retired'].includes(t.value)){
+      const {navigate}=await viewAwait(eventCurrent,()=>import('../router.js'),()=>state.modal);navigate('/admin/inventory?status='+t.value);return
+    }
     if (t.dataset.action === 'admin-module') {
       adminState.filter = ''
       const { navigate } = await viewAwait(eventCurrent,()=>(import('../router.js')),()=>state.modal)
@@ -1640,7 +1648,21 @@ function attachEvents() {
       showToast('Override PIN updated.', 'success'); return
     }
 
-    if ((type === 'inv-add' || type === 'inv-edit' || type === 'inv-adjust') && CFG.inventory_module_enabled && _inv) {
+    if(['inv-adjust','inv-retire'].includes(type)&&CFG.inventory_module_enabled&&_inv&&retirementAvailable()){
+      if(state.modal?.stockBusy)return
+      try{_inv.validateStockChange(data)}catch(error){showBlockingError(error.message);return}
+      const selected=state.modal;selected.stockDraft={...data}
+      const renderPin=()=>{if(eventCurrent()){if(!state.modal)state.modal=selected;render()}}
+      openPinPrompt('inventory',async verified=>{
+        if(!verified||!eventCurrent())return
+        state.modal=selected;selected.stockBusy=true;render()
+        try{const result=await viewAwait(eventCurrent,()=>_inv.submitInventoryChange(data,eventCurrent),()=>state.modal);if(result.ok){state.modal=null;await viewAwait(eventCurrent,()=>load(),()=>state.modal)}}
+        finally{if(eventCurrent()){selected.stockBusy=false;selected.pendingStock=!!_inv.pendingStockDraft(selected.id);render()}}
+      },renderPin)
+      state.modal.stockReturnTo=selected
+      return
+    }
+    if ((type === 'inv-add' || type === 'inv-edit' || type === 'inv-adjust' || type === 'inv-retire') && CFG.inventory_module_enabled && _inv) {
       const fn = type === 'inv-add' ? _inv.submitInvAdd
         : type === 'inv-edit' ? _inv.submitInvEdit : _inv.submitInvAdjust
       const { ok } = await viewAwait(eventCurrent,()=>(fn(data)),()=>state.modal)
@@ -1701,6 +1723,7 @@ export async function initAdmin(sess, module, query, isCurrent = () => true,veri
   if (module) adminState.adminModule = module
   const saved=readAdminView(history,location,sess)
   if(saved){Object.assign(adminState,saved.values);restoreScroll=saved.scroll}
+  if (module === 'inventory') adminState.inventoryStatus=safeAdminState({inventoryStatus:query?.status}).inventoryStatus||saved?.values.inventoryStatus||'active'
   if (module === 'settings') adminState.settingsTab = safeAdminState({settingsTab:query?.tab}).settingsTab || saved?.values.settingsTab || 'branding'
   if (module === 'catalog') adminState.catalogTab = safeAdminState({catalogTab:query?.tab}).catalogTab || saved?.values.catalogTab || 'quickitems'
   await load(verifiedConfig)

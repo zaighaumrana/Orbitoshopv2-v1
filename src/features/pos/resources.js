@@ -1,11 +1,11 @@
+import {retirementAvailable} from '../../inventory-state.js'
 import {iconColumns} from '../../catalog/data.js'
 import {sb,CFG} from '../../shared.js'
 import {readPage,readComplete,searchColumns} from '../../bounded-read.js'
 
 export const inventoryColumns='id,name,sku,category,qty,price'
 export function stockPage(search,offset,current,size=24) {
-  return readPage(()=>searchColumns(sb.from('inventory').select(iconColumns(inventoryColumns),{count:'exact'})
-    .gt('qty',0),['name','sku','category'],search).order('name').order('id'),{offset,size,current})
+  return readPage(()=>{let query=sb.from('inventory').select(iconColumns(inventoryColumns),{count:'exact'}).gt('qty',0);if(retirementAvailable())query=query.is('retired_at',null);return searchColumns(query,['name','sku','category'],search).order('name').order('id')},{offset,size,current})
 }
 export function quickPage(search,offset,current,size=25) {
   return readPage(()=>searchColumns(sb.from('quick_items').select(iconColumns('id,name,prices,sort_order'),{count:'exact'}),['name'],search)

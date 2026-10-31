@@ -175,6 +175,19 @@
       "managed": "Same forward migration through the existing immutable Managed fresh plan or authorized Controlled Backend Upgrade",
       "byo": "Same forward migration through the existing customer-owned BYO fresh and approved upgrade CLI journals",
       "verification": "Local four-path forward SQL with role/lifecycle/Support consent denials, structural capability checks and exact candidate source parity"
+    },
+    {
+      "id": "inventory-retirement",
+      "purpose": "PIN-bound audited stock changes and permanent retirement with retained financial history, immutable replay journal and no browser deletion bypass",
+      "migrations": [
+        "20261031003158"
+      ],
+      "functions": [
+        "verify-pin"
+      ],
+      "managed": "Same forward SQL and exact verify-pin package through established release-pinned fresh and Controlled Backend Upgrade plans",
+      "byo": "Same forward SQL and exact verify-pin package through approved customer fresh setup and separately cleared original upgrade journal",
+      "verification": "Native PostgreSQL Managed/BYO fresh and v9-upgrade PIN/role/consent/concurrency/rollback/replay/historical-return checks plus immutable source parity"
     }
   ],
   "runtime": {
@@ -209,7 +222,8 @@
         "public.support_delivery_claim(uuid)",
         "public.support_delivery_finish(uuid,uuid,text,uuid,text)",
         "public.get_repair_family_page(text,text,text,integer,integer)",
-        "public.get_receipt_archive_page(text,text,timestamptz,timestamptz,integer,integer)"
+        "public.get_receipt_archive_page(text,text,timestamptz,timestamptz,integer,integer)",
+        "public.change_inventory_stock(uuid,integer,text,integer,integer,text)"
       ],
       "tables": [
         "app_private.bridge_events",
@@ -218,10 +232,13 @@
         "app_private.support_consents",
         "app_private.support_submissions",
         "public.device_brands",
-        "public.icon_preferences"
+        "public.icon_preferences",
+        "app_private.inventory_change_requests"
       ],
       "triggers": [
-        "bridge_events_immutable"
+        "bridge_events_immutable",
+        "inventory_protect_retirement",
+        "inventory_change_requests_immutable"
       ],
       "security": [
         "canonical live actor",
@@ -230,7 +247,8 @@
         "owner-only consent",
         "separate source/call/ticket credentials",
         "device_brands canonical role/module/lifecycle RLS plus restrictive support consent",
-        "icon_preferences live role/lifecycle RLS, owner-only writes and restrictive Support consent"
+        "icon_preferences live role/lifecycle RLS, owner-only writes and restrictive Support consent",
+        "Inventory purpose PIN claim, active roles/module/consent checks, immutable request intent and irreversible retired metadata, no direct quantity/retirement/deletion writes"
       ]
     },
     "managed_support_handoff_configuration": [
@@ -282,7 +300,8 @@
         "20261023012311",
         "20261025233743",
         "20261029173151",
-        "20261030233527"
+        "20261030233527",
+        "20261031003158"
       ],
       "core_functions": [
         "account-admin",
@@ -306,7 +325,8 @@
         "support-durable-submissions",
         "bounded-operational-reads",
         "catalog-icons-and-brands",
-        "icon-label-preferences"
+        "icon-label-preferences",
+        "inventory-retirement"
       ],
       "configuration": [
         "runtime",
@@ -358,7 +378,8 @@
         "20261023012311",
         "20261025233743",
         "20261029173151",
-        "20261030233527"
+        "20261030233527",
+        "20261031003158"
       ],
       "core_functions": [
         "account-admin",
@@ -382,7 +403,8 @@
         "support-durable-submissions",
         "bounded-operational-reads",
         "catalog-icons-and-brands",
-        "icon-label-preferences"
+        "icon-label-preferences",
+        "inventory-retirement"
       ],
       "configuration": [
         "runtime",

@@ -1,3 +1,4 @@
+import {retirementAvailable} from '../../inventory-state.js'
 import {iconColumns,deviceBrands} from '../../catalog/data.js'
 import {sb} from '../../shared.js'
 import {legacyMembers} from '../../backend-reads.js'
@@ -17,8 +18,7 @@ export function adminPage(module,tab,search,offset,current,size=25) {
   }
   const [table,columns,searchable,order]=specs[key]||[]
   if(!table)throw Error('This screen has no flat resource.')
-  return readPage(()=>searchColumns(sb.from(table).select(key==='employees'?columns:iconColumns(columns),{count:'exact'}),searchable,search)
-    .order(order).order('id'),{offset,size,current})
+  return readPage(()=>{const retirement=key==='inventory'&&retirementAvailable();let query=sb.from(table).select(key==='employees'?columns:iconColumns(columns)+(retirement?',retired_at,retirement_reason':''),{count:'exact'});if(retirement)query=tab==='retired'?query.not('retired_at','is',null):query.is('retired_at',null);return searchColumns(query,searchable,search).order(order).order('id')},{offset,size,current})
 }
 export async function verifiedLegacyMembers(table,current) {
   return legacyMembers(table,current)

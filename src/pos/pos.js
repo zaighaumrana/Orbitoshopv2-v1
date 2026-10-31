@@ -312,7 +312,7 @@ function posView() {
   if(!resourceReady(state.resources,'config'))return resourceNotice('Shop configuration')
   const showInventory=inventoryVisible()
   const customOnly=showInventory&&quickResultsCurrent()&&!posState.quickSearch.trim()&&posState.quickPage?.count===0
-  const catalogPanel=quickItemsPanel({customOnly})
+  const catalogPanel=customOnly?'':quickItemsPanel()
   const stockPanel=showInventory&&_inv?(resourceReady(state.resources,'inventory')||(state.resources.inventory?.status==='loading'&&posState.inventoryPage))?_inv.inventoryPanel(posState):resourceNotice('Inventory',state.resources.inventory.status):''
   const tenant   = currentTenant()
   const subtotal = posState.cart.reduce((s,i) => s + i.soldPrice * i.qty, 0)
@@ -341,8 +341,9 @@ function posView() {
     </div>
     <div class="grid pos-layout rs-pos-workspace">
       <div class="rs-product-workspace">
+       ${customItemSection()}
        <div class="rs-product-panels ${showInventory?customOnly?'rs-inventory-expanded':'':'rs-catalog-expanded'}">
-        ${customOnly?stockPanel+catalogPanel:catalogPanel+stockPanel}
+        ${catalogPanel+stockPanel}
        </div>
         ${recentRepairPanel()}
       </div>
@@ -449,10 +450,9 @@ function quickResultsCurrent(){
  return resourceReady(state.resources,'quickItems')&&posState.quickAccepted?.query===posState.quickSearch&&posState.quickAccepted?.revision===quickGeneration
 }
 function customItemSection(){
- return `<section class="rs-custom-item" data-ui-key="pos-custom-item" aria-labelledby="rs-custom-item-title"><h3 id="rs-custom-item-title">Custom / one-off item</h3>${customItemEntry()}</section>`
+ return `<section class="card rs-custom-item rs-custom-bar" data-ui-key="pos-custom-item" aria-labelledby="rs-custom-item-title"><h3 id="rs-custom-item-title">Custom item</h3>${customItemEntry()}</section>`
 }
-function quickItemsPanel({expanded=false,customOnly=false}={}) {
-  if(customOnly)return `<section class="card rs-catalog-panel rs-catalog-custom-only" data-ui-key="pos-catalog-panel" aria-label="Custom / one-off item">${customItemSection()}</section>`
+function quickItemsPanel({expanded=false}={}) {
   const ready=quickResultsCurrent()
   return `<section class="card rs-catalog-panel" data-ui-key="pos-catalog-panel" aria-label="Catalog"><h2>${expanded?'Catalog — expanded view':'Catalog'}</h2>
     <label class="field"><input class="search" aria-label="Search catalog" data-quick-search value="${escapeHTML(posState.quickSearch)}" placeholder="Search catalog…"></label>
@@ -461,7 +461,7 @@ function quickItemsPanel({expanded=false,customOnly=false}={}) {
        ${iconHTML(item.icon_id,itemCategory(item.icon_id))}<span><strong>${escapeHTML(item.name)}</strong><small>${quickPrices(item.prices).map(p=>(p.name?escapeHTML(p.name)+' · ':'')+moneyHTML(p.price)).join(' / ')||'Price unavailable'}</small></span>
      </button>`).join('')}</div>${!(state.data.quickItems||[]).length?'<p class="muted">No catalog items match.</p>':''}${posPageControls(posState.quickPage,'data-quick-page','catalog',expanded)}`:resourceNotice('Catalog',state.resources.quickItems?.status)}
     <p class="muted" role="status" data-quick-search-status>${state.resources.quickItems?.status==='loading'?'Searching current catalog…':''}</p>
-    ${expanded?'':customItemSection()}</section>`
+    </section>`
 }
 function compactPages(page,attribute){
  return pageControls(page,attribute).replace('rs-pagination"','rs-pagination rs-compact-pagination"').replace('>Previous<',' aria-label="Previous page">‹<').replace('>Next<',' aria-label="Next page">›<')
@@ -934,7 +934,7 @@ function renderModal() {
                 <input type="number" name="qty_${item.saleLineId}" min="0" max="${item.remainingQuantity}" step="1" value="0"
                   data-return-qty="${item.saleLineId}"></label>
               ${item.itemKind==='inventory'?`<label class="field"><span>Return to sellable stock?</span>
-                <select name="restock_${item.saleLineId}"><option value="true">Yes</option><option value="false">No — damaged/non-sellable</option></select>
+                <select name="restock_${item.saleLineId}" ${item.inventoryRetired?'disabled':''}>${item.inventoryRetired?'<option value="false">No — item permanently retired</option>':'<option value="true">Yes</option><option value="false">No — damaged/non-sellable</option>'}</select>
               </label>`:''}
             </div>
           </div>`).join('') : '<div class="empty">All quantities on this invoice have already been returned.</div>'}

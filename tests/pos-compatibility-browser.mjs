@@ -43,10 +43,10 @@ try{
  const catalogSearch=page.getByRole('textbox',{name:'Search catalog',exact:true});
  assert.equal(await catalogSearch.count(),1);assert.equal((await catalogSearch.locator('..').innerText()).trim(),'');
  assert.equal(await page.locator('details.rs-custom-item').count(),0);
- assert.equal(await page.getByRole('heading',{name:'Custom / one-off item',exact:true}).isVisible(),true);
+ assert.equal(await page.getByRole('heading',{name:'Custom item',exact:true}).isVisible(),true);
  for(const selector of ['#custom-item-name','#custom-item-price','[data-action="add-custom-item"]'])assert.equal(await page.locator(selector).isVisible(),true);
- const customTop=(await page.locator('.rs-custom-item').boundingBox()).y,pages=await page.locator('.rs-catalog-panel .rs-pagination').boundingBox();assert.ok(customTop>=pages.y+pages.height);
- result.checks.push('Search keeps its accessible name without a visible label; custom form is open below Catalog pagination');
+ const customFrame=await page.locator('.rs-custom-bar').boundingBox(),panels=await page.locator('.rs-product-panels').boundingBox();assert.ok(customFrame.y+customFrame.height<=panels.y&&Math.abs(customFrame.width-panels.width)<2);
+ result.checks.push('Search keeps its accessible name without a visible label; shared Custom item bar is above both selectors');
  await page.locator('[data-qitem-id="1"]').click();
  await page.locator('[data-action="toggle-open-repairs"]').click();await page.locator('.rs-repair-card').waitFor();
  await page.locator('#custom-item-name').fill('Partial custom draft');await page.locator('#custom-item-price').fill('123.45');

@@ -654,7 +654,7 @@ export function can(mod, role) {
 
 export function modalEntitled(type) {
   if (type === 'leave-request') return CFG.ems_enabled === true
-  if (['inv-add','inv-edit','inv-adjust'].includes(type)) return CFG.inventory_module_enabled === true
+  if (['inv-add','inv-edit','inv-adjust','inv-retire'].includes(type)) return CFG.inventory_module_enabled === true
   if (['repair','repair-collection','ticket-payment','ticketDetail','edit-components','mark-not-needed','create-sub-invoice','repair-adjustment','repair-cancellation','add-comp-tag','comp-tag-picker'].includes(type)) return CFG.repair_module_enabled === true
   return true
 }
@@ -980,6 +980,7 @@ export function cancelPinPrompt(renderFn = ppRenderFn) {
 export function pinPromptHTML(purpose) {
   const label = {
     admin:    'Admin password required',
+    inventory:'PIN required for this stock change',
     settle:   'Admin PIN to settle credit',
     return:   'Admin PIN to process return',
     discount: 'PIN required to apply discount',

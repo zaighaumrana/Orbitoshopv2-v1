@@ -1045,7 +1045,6 @@ input[type="number"] {
 
 /* A confirmed empty Catalog leaves the stock selector full-width and keeps custom entry. */
 .rs-shop .rs-product-panels.rs-inventory-expanded{grid-template-columns:minmax(0,1fr)}
-.rs-shop .rs-catalog-custom-only .rs-custom-item{margin-top:0}
 
 .rs-shop .rs-profile-icon{display:block;color:var(--muted);flex-shrink:0}
 
@@ -1106,3 +1105,16 @@ input[type="number"] {
 /* Variant picker changes width only; row heights, gaps and vertical spacing stay native. */
 .rs-shop .modal-backdrop:has(>.rs-variant-picker){grid-template-columns:minmax(0,1fr)}
 .rs-shop .modal.rs-variant-picker{width:min(600px,100%)}
+
+/* One shared custom sale row, independent of either selector's contents. */
+.rs-shop .rs-custom-item.rs-custom-bar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;margin:0;align-items:end;padding:12px 16px}
+.rs-shop .rs-custom-bar h3{margin:0 0 12px;white-space:nowrap}
+.rs-shop .rs-custom-bar .rs-custom-form{margin:0;min-width:0}
+@media(max-width:760px){.rs-shop .rs-custom-item.rs-custom-bar{grid-template-columns:minmax(0,1fr);gap:8px}.rs-shop .rs-custom-bar h3{margin:0}}
+
+.rs-shop .modal.rs-stock-change{width:min(600px,100%)}
+.rs-shop .modal-backdrop:has(>.rs-stock-change){grid-template-columns:minmax(0,1fr)}
+.rs-shop .rs-stock-change fieldset{display:grid;gap:14px}
+
+.rs-shop .rs-stock-change [data-modal-close]{width:44px;height:44px;font-size:24px;top:8px;right:8px}
+.rs-shop .rs-stock-change>h2{padding-right:44px;overflow-wrap:anywhere}

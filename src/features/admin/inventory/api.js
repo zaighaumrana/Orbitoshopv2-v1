@@ -1,3 +1,5 @@
+import {retirementAvailable} from '../../../inventory-state.js'
+import {onPrivateReset,authorityIdentity,captureAuthority} from '../../../ui-authority.js'
 import {catalogAvailable} from '../../../catalog/data.js'
 /* ═══════════════════════════════════════════════════════════════════
    features/admin/inventory/api.js
@@ -90,4 +92,36 @@ export async function submitInvAdjust(data) {
   pendingInventoryRequests.delete(key)
   showTransactionSuccess('Stock adjustment completed.')
   return { ok:true }
+}
+
+
+const stockRequests=new Map()
+if(typeof onPrivateReset==='function')onPrivateReset(()=>stockRequests.clear())
+export function validateStockChange(data){
+ if(String(data.id??'').trim()===''||String(data.expected_quantity??'').trim()===''||(data.stock_action!=='retire'&&String(data.quantity??'').trim()===''))throw Error('Enter a whole quantity; empty fields are not zero.')
+ const id=Number(data.id),action=data.stock_action,quantity=action==='retire'?0:Number(data.quantity),expected=Number(data.expected_quantity),reason=String(data.reason||'').trim()
+ if(!Number.isSafeInteger(id)||id<=0||!['add','remove','set','retire'].includes(action)||!Number.isSafeInteger(quantity)||quantity<0||quantity>2147483647||(['add','remove'].includes(action)&&!quantity)||!Number.isSafeInteger(expected)||expected<0||!reason||reason.length>500)throw Error('Choose an action, enter a whole quantity and give a reason (up to 500 characters).')
+ if(action==='remove'&&quantity>expected)throw Error('You cannot remove more stock than is currently available.')
+ return {p_inventory_id:id,p_action:action,p_quantity:quantity,p_expected_quantity:expected,p_reason:reason}
+}
+export function pendingStockDraft(id){const request=stockRequests.get(authorityIdentity()+':'+Number(id));if(!request)return null;const p=request.payload;return {id:p.p_inventory_id,stock_action:p.p_action,quantity:p.p_quantity,expected_quantity:p.p_expected_quantity,reason:p.p_reason}}
+export async function submitInventoryChange(data,owns=()=>true){
+ const authority=captureAuthority(),current=()=>authority()&&owns()
+ if(!current()||!retirementAvailable())return {ok:false}
+ let payload
+ try{payload=validateStockChange(data)}catch(error){showBlockingError(error.message);return {ok:false}}
+ const key=authorityIdentity()+':'+payload.p_inventory_id,previous=stockRequests.get(key)
+ if(previous&&JSON.stringify(previous.payload)!==JSON.stringify(payload)){showBlockingError('The original stock change is unconfirmed. Retry its original values before making a different change.');return {ok:false}}
+ const request=previous||{request_id:crypto.randomUUID(),payload};stockRequests.set(key,request)
+ const clear=()=>{if(stockRequests.get(key)===request)stockRequests.delete(key)}
+ let response
+ try{response=await sb.rpc('change_inventory_stock',{p_request_id:request.request_id,...request.payload})}
+ catch{if(!current())return {ok:false,detached:true};showBlockingError('Stock result is unconfirmed. Retry these original values; request '+request.request_id+'.');return {ok:false}}
+ if(!current()){if(authority()&&(!response.error&&response.data?.requestId===request.request_id||response.error?.code&&/^(22|23|40|42|P0)/.test(response.error.code)))clear();return {ok:false,detached:true}}
+ if(response.error){
+  if(response.error.code&&/^(22|23|40|42|P0)/.test(response.error.code))clear()
+  showBlockingError(response.error.message||'Stock result is unconfirmed. Retry the original request.');return {ok:false}
+ }
+ if(response.data?.requestId!==request.request_id){showBlockingError('Stock confirmation is incomplete. Retry the original request.');return {ok:false}}
+ clear();showTransactionSuccess(payload.p_action==='retire'?'Item permanently retired. History is preserved.':'Stock updated.');return {ok:true}
 }
