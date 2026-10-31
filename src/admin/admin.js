@@ -1657,6 +1657,7 @@ function attachEvents() {
         if(!verified||!eventCurrent())return
         state.modal=selected;selected.stockBusy=true;render()
         try{const result=await viewAwait(eventCurrent,()=>_inv.submitInventoryChange(data,eventCurrent),()=>state.modal);if(result.ok){state.modal=null;await viewAwait(eventCurrent,()=>load(),()=>state.modal)}}
+        catch(error){if(eventCurrent())showBlockingError(error?.message||'Stock confirmation is unavailable. Retry the original values.')}
         finally{if(eventCurrent()){selected.stockBusy=false;selected.pendingStock=!!_inv.pendingStockDraft(selected.id);render()}}
       },renderPin)
       state.modal.stockReturnTo=selected
