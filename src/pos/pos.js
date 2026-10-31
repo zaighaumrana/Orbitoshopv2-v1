@@ -1,5 +1,11 @@
+import {profileIcon} from '../profile-icon.js'
+import {quickPrice,quickPrices} from '../catalog/prices.js'
+import {iconHTML,itemCategory,brandIcon} from '../catalog/icons.js'
+import {intakeBrands} from '../catalog/data.js'
 import {withPrintAttribution} from '../print/presentation.js'
 import {renderOperationalScreen} from '../ui-render.js'
+import {ownDialog} from '../ui-dialog.js'
+import {posPageControls} from '../features/pos/pagination.js'
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
 import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
 import { escapeHTML, safeImageURL } from "../html.js"
@@ -69,10 +75,14 @@ const emptyPOS = () => ({
   splitCredit:     0,
   checkoutRequestId: null,
   invSearch:       '',
+  quickSearch: '',
+  quickAccepted:null,
+  queueExpanded:false,queueStatus:'idle',queuePage:null,queueRows:[],queueGeneration:0,
   repairSearch:    '',
   collectionsReady:false,
   collectionPage:null,
   inventoryPage:null,
+  inventoryAccepted:null,
   quickPage:null,
 })
 let posState = emptyPOS()
@@ -91,15 +101,19 @@ onPrivateReset(() => {
   for(const operation of cartOperations.values())operation.detached=true
   posLoadGeneration++;posNavigationIsCurrent=()=>false
   posState=emptyPOS();SESSION={};placingOrder=false;checkoutInFlight=false;resetDraft()
-  selectorGeneration++;clearTimeout(selectorTimer)
+  selectorGeneration++;quickGeneration++;clearTimeout(selectorTimer);clearTimeout(quickTimer)
   collectionGeneration++;clearTimeout(collectionTimer)
 })
 
 /* ── Load ── */
 async function load(verifiedConfig) {
   const generation=++posLoadGeneration,view=captureView(),navigation=posNavigationIsCurrent
-  selectorGeneration++;quickGeneration++;clearTimeout(selectorTimer)
+  selectorGeneration++;quickGeneration++;clearTimeout(selectorTimer);clearTimeout(quickTimer)
   const current=()=>generation===posLoadGeneration&&view()&&navigation()
+  const quickRevision=quickGeneration,quickQuery=posState.quickSearch
+  const stockRevision=selectorGeneration,stockQuery=posState.invSearch
+  posState.inventoryAccepted=null
+  posState.quickAccepted=null
   const loadSession = SESSION
   dlog('POS.load', 'ENTRY')
   const configReady=await loadConfig(false,verifiedConfig)
@@ -113,15 +127,29 @@ async function load(verifiedConfig) {
     if(!current())return
   }
   posState.collectionsReady=false
+  posState.queueGeneration++;posState.queueExpanded=false;posState.queueRows=[];posState.queuePage=null;posState.queueStatus='idle'
   state.resources=Object.fromEntries(['inventory','quickItems'].map(k=>[k,{status:'loading'}]))
   render()
   const [inv, quickItems] = await Promise.all([
-    CFG.inventory_module_enabled ? stockPage(posState.invSearch,0,current) : {data:[],count:0},
-    quickPage('',0,current),
+    CFG.inventory_module_enabled ? stockPage(stockQuery,0,()=>current()&&stockRevision===selectorGeneration&&stockQuery===posState.invSearch) : {data:[],count:0},
+    quickPage(quickQuery,0,()=>current()&&quickRevision===quickGeneration&&quickQuery===posState.quickSearch),
   ].map(settleRead))
   if (!current() || SESSION !== loadSession || state.role !== loadSession.employee?.role || window.location.pathname !== '/pos') return
   const reads=readStates({inventory:inv,quickItems})
-  posState.inventoryPage=inv.error?null:inv;posState.quickPage=quickItems.error?null:quickItems
+  if(stockRevision===selectorGeneration&&stockQuery===posState.invSearch){
+    posState.inventoryPage=inv.error?null:inv
+    posState.inventoryAccepted=inv.error?null:{query:stockQuery,revision:stockRevision}
+  }else{
+    // A newer stock search owns its results even while the entry read is pending.
+    reads.values.inventory=state.data.inventory;reads.resources.inventory=state.resources.inventory
+  }
+  if(quickRevision===quickGeneration&&quickQuery===posState.quickSearch){
+    posState.quickPage=quickItems.error?null:quickItems
+    posState.quickAccepted=quickItems.error?null:{query:quickQuery,revision:quickRevision}
+  }else{
+    // A search can settle while the entry inventory read is still pending.
+    reads.values.quickItems=state.data.quickItems;reads.resources.quickItems=state.resources.quickItems
+  }
   state.data={...reads.values,tickets:[],sales:[],udharAccounts:null,shiftFinancial:null,returns:[],repairComponents:[],employees:[]};state.resources=reads.resources
   applyBranding()
   dlog('POS.load', 'DATA READY (queries resolved) -- calling render()')
@@ -141,15 +169,16 @@ async function load(verifiedConfig) {
   }
 }
 
-let selectorGeneration=0,quickGeneration=0,selectorTimer=null
+let selectorGeneration=0,quickGeneration=0,selectorTimer=null,quickTimer=null
 async function refreshStock(offset=0,revision=++selectorGeneration) {
   const view=captureView(),generation=posLoadGeneration,query=posState.invSearch,current=()=>view()&&ownsPOS()&&generation===posLoadGeneration&&revision===selectorGeneration&&query===posState.invSearch
   if(!current())return
-  state.resources.inventory={status:'loading'}
+  state.resources.inventory={status:'loading'};posState.inventoryAccepted=null;render()
   const status=document.querySelector('[data-stock-search-status]');if(status)status.textContent='Searching current stock…'
   const result=await settleRead(stockPage(query,offset,current,offset?posState.inventoryPage?.size||24:24))
   if(!current())return
   state.resources.inventory={status:result.error?'unavailable':'ready'}
+  posState.inventoryAccepted=result.error?null:{query,revision}
   state.data.inventory=result.error?null:result.data;posState.inventoryPage=result.error?null:result
   render()
 }
@@ -158,7 +187,11 @@ async function openDeferredPOS(type,offset=0) {
   const view=captureView(),modal={type,readStatus:'loading'},current=()=>view()&&ownsPOS()&&state.modal===modal&&revision===collectionGeneration
   state.modal=modal;render()
   try {
-    if(type==='repair')state.data.repairComponents=(await intakeComponents(current)).data
+    if(type==='repair'){
+      const [components,brands]=await Promise.all([intakeComponents(current),settleRead(intakeBrands(current).then(data=>({data})))])
+      if(!current())return
+      state.data.repairComponents=components.data;state.data.deviceBrands=brands.error?[]:brands.data;state.data.brandChoicesUnavailable=!!brands.error
+    }
     if(type==='repair-collection'){
       const result=await (hasReadContract('repair_families')?repairFamilyPage({search:posState.repairSearch,context:'collection',offset,current}):legacyFamilyPage({search:posState.repairSearch,context:'collection',offset,size:offset?posState.collectionPage?.size||25:25,current,exactOnly:posState.collectionPage?.mode==='exact-identifiers'}))
       if(!current())return
@@ -240,7 +273,7 @@ function render() {
                 ? `<button class="secondary-button" data-action="go-workshop">Workshop</button>`
                 : ''}
             ` : ''}
-            <button class="icon-button" data-action="my-account" title="My Account">👤</button>
+            <button class="icon-button" data-action="my-account" title="My Account" aria-label="My Account">${profileIcon}</button>
             <button class="icon-button" data-action="theme">${state.theme==='dark'?'Light':'Dark'}</button>
             ${CFG.ems_enabled && !(SESSION.isAdmin || SESSION.employee?.role === 'Business Owner') ? `
               <button class="secondary-button" style="font-size:12px" data-action="ems-clock-out">
@@ -255,6 +288,9 @@ function render() {
     </div>
     ${renderModal()}`, {screen:'pos',view:'pos',modal:state.modal})
 
+  // Selector search is persisted POS state, not an unsaved financial draft.
+  const selector=document.querySelector('.rs-pos-selector-modal')
+  if(selector)ownDialog(selector,{close:()=>selector.querySelector('[data-close]')?.click(),dirty:false})
   normalizeModalControls(document.getElementById('app'))
 
   if (!_eventsAttached) {
@@ -264,8 +300,20 @@ function render() {
 }
 
 /* ── POS View ── */
+function inventoryVisible(){
+  // Only a current, successful unfiltered exact count can establish zero stock.
+  const accepted=posState.inventoryAccepted
+  const empty=resourceReady(state.resources,'inventory')&&!posState.invSearch.trim()
+    &&accepted?.query===posState.invSearch&&accepted.revision===selectorGeneration
+    &&posState.inventoryPage?.count===0
+  return CFG.inventory_module_enabled&&!empty
+}
 function posView() {
   if(!resourceReady(state.resources,'config'))return resourceNotice('Shop configuration')
+  const showInventory=inventoryVisible()
+  const customOnly=showInventory&&quickResultsCurrent()&&!posState.quickSearch.trim()&&posState.quickPage?.count===0
+  const catalogPanel=customOnly?'':quickItemsPanel()
+  const stockPanel=showInventory&&_inv?(resourceReady(state.resources,'inventory')||(state.resources.inventory?.status==='loading'&&posState.inventoryPage))?_inv.inventoryPanel(posState):resourceNotice('Inventory',state.resources.inventory.status):''
   const tenant   = currentTenant()
   const subtotal = posState.cart.reduce((s,i) => s + i.soldPrice * i.qty, 0)
   const disc     = posState.cart.reduce((s,i) => s + (i.originalPrice - i.soldPrice) * i.qty, 0)
@@ -291,17 +339,20 @@ function posView() {
         <button class="secondary-button" data-action="open-udhar">₨ Credits</button>
       </div>
     </div>
-    <div class="grid pos-layout">
-      <div class="grid" style="align-content:start;gap:12px">
-        ${quickItemsPanel()}
-        ${CFG.inventory_module_enabled && _inv ? (resourceReady(state.resources,'inventory')||(state.resources.inventory?.status==='loading'&&posState.inventoryPage))?_inv.inventoryPanel(posState):resourceNotice('Inventory',state.resources.inventory.status) : ''}
+    <div class="grid pos-layout rs-pos-workspace">
+      <div class="rs-product-workspace">
+       ${customItemSection()}
+       <div class="rs-product-panels ${showInventory?customOnly?'rs-inventory-expanded':'':'rs-catalog-expanded'}">
+        ${catalogPanel+stockPanel}
+       </div>
         ${recentRepairPanel()}
       </div>
       <aside class="card cart">
         <h2>Cart</h2>
         ${posState.cart.length ? posState.cart.map(item => `
-          <div class="cart-line" data-ui-key="cart:${escapeHTML(item.productId)}">
-            <div>
+          <div class="cart-line rs-cart-line" data-ui-key="cart:${escapeHTML(item.productId)}">
+            ${iconHTML(item.icon_id,item.isTicket?'brand':itemCategory(item.icon_id))}
+            <div class="rs-cart-description">
               <strong>${escapeHTML(item.name)}</strong><br>
               ${item.variantName ? `<small class="muted">&nbsp;&nbsp;${escapeHTML(item.variantName)}</small><br>` : ''}
               <small class="muted">
@@ -318,11 +369,12 @@ function posView() {
               </div>
             ` : `
               <div class="qty-controls">
-                <button data-qty="${item.productId}" data-delta="-1">−</button>
+                <button aria-label="Decrease quantity of ${escapeHTML(item.name)}" data-qty="${item.productId}" data-delta="-1">−</button>
                 <strong>${item.qty}</strong>
-                <button data-qty="${item.productId}" data-delta="1">+</button>
+                <button aria-label="Increase quantity of ${escapeHTML(item.name)}" data-qty="${item.productId}" data-delta="1">+</button>
               </div>
               <button class="secondary-button" data-modal="override" data-id="${item.productId}">Price</button>`}
+            <strong class="rs-line-total">${moneyHTML(item.soldPrice * item.qty)}</strong>
           </div>`).join('') : `<div class="empty">No items in cart.</div>`}
 
         <div class="totals">
@@ -394,34 +446,39 @@ function posView() {
     </div>`
 }
 
-function quickItemsPanel() {
-  if(!resourceReady(state.resources,'quickItems'))return resourceNotice('Quick items',state.resources.quickItems.status)+`<div class="card"><h2>Custom Item</h2>${customItemEntry()}</div>`
-  if (!(state.data.quickItems||[]).length) return `
-    <div class="card">
-      <h2 style="margin-bottom:12px">Custom Item</h2>
-      ${customItemEntry()}
-    </div>`
-  return `
-    <div class="card">
-      <h2 style="margin-bottom:12px">Quick Items</h2>
-      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px">
-        ${state.data.quickItems.map(item=>`
-          <button class="secondary-button" style="font-size:15px;padding:11px 18px;border-radius:10px;font-weight:500"
-            data-qitem-id="${item.id}" data-qitem-name="${escapeHTML(item.name)}" data-qitem-prices='${escapeHTML(JSON.stringify(item.prices))}'>
-            ${escapeHTML(item.name)}
-          </button>`).join('')}
-      </div>
-      ${pageControls(posState.quickPage,'data-quick-page')}
-      <div style="border-top:1px solid var(--border);padding-top:12px">
-        <p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Custom / One-off Item</p>
-        ${customItemEntry()}
-      </div>
-    </div>`
+function quickResultsCurrent(){
+ return resourceReady(state.resources,'quickItems')&&posState.quickAccepted?.query===posState.quickSearch&&posState.quickAccepted?.revision===quickGeneration
+}
+function customItemSection(){
+ return `<section class="card rs-custom-item rs-custom-bar" data-ui-key="pos-custom-item" aria-labelledby="rs-custom-item-title"><h3 id="rs-custom-item-title">Custom item</h3>${customItemEntry()}</section>`
+}
+function quickItemsPanel({expanded=false}={}) {
+  const ready=quickResultsCurrent()
+  return `<section class="card rs-catalog-panel" data-ui-key="pos-catalog-panel" aria-label="Catalog"><h2>${expanded?'Catalog — expanded view':'Catalog'}</h2>
+    <label class="field"><input class="search" aria-label="Search catalog" data-quick-search value="${escapeHTML(posState.quickSearch)}" placeholder="Search catalog…"></label>
+    ${ready?`<div class="rs-product-list">${(state.data.quickItems||[]).map(item=>`
+     <button class="secondary-button rs-product-item" data-qitem-id="${item.id}" data-qitem-name="${escapeHTML(item.name)}" ${quickPrices(item.prices).length?'':'disabled'}>
+       ${iconHTML(item.icon_id,itemCategory(item.icon_id))}<span><strong>${escapeHTML(item.name)}</strong><small>${quickPrices(item.prices).map(p=>(p.name?escapeHTML(p.name)+' · ':'')+moneyHTML(p.price)).join(' / ')||'Price unavailable'}</small></span>
+     </button>`).join('')}</div>${!(state.data.quickItems||[]).length?'<p class="muted">No catalog items match.</p>':''}${posPageControls(posState.quickPage,'data-quick-page','catalog',expanded)}`:resourceNotice('Catalog',state.resources.quickItems?.status)}
+    <p class="muted" role="status" data-quick-search-status>${state.resources.quickItems?.status==='loading'?'Searching current catalog…':''}</p>
+    </section>`
+}
+function compactPages(page,attribute){
+ return pageControls(page,attribute).replace('rs-pagination"','rs-pagination rs-compact-pagination"').replace('>Previous<',' aria-label="Previous page">‹<').replace('>Next<',' aria-label="Next page">›<')
+}
+async function refreshQuick(offset=0,revision=++quickGeneration){
+ const view=captureView(),query=posState.quickSearch,generation=posLoadGeneration,current=()=>view()&&ownsPOS()&&generation===posLoadGeneration&&revision===quickGeneration&&query===posState.quickSearch
+ if(!current())return
+ state.resources.quickItems={status:'loading'};posState.quickAccepted=null;render()
+ const result=await settleRead(quickPage(query,offset,current))
+ if(!current())return
+ posState.quickAccepted=result.error?null:{query,revision}
+ state.data.quickItems=result.error?null:result.data;state.resources.quickItems={status:result.error?'unavailable':'ready'};posState.quickPage=result.error?null:result;render()
 }
 
 function customItemEntry() {
   return `
-    <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:end">
+    <div class="rs-custom-form">
       <label class="field" style="margin:0"><span style="font-size:12px">Item Name</span>
         <input id="custom-item-name" placeholder="e.g. Screen Guard" style="font-size:13px"></label>
       <label class="field" style="margin:0"><span style="font-size:12px">Price</span>
@@ -434,26 +491,19 @@ function customItemEntry() {
 
 /* Main screen — only 3 most recent PENDING (balance_due > 0) tickets */
 function recentRepairPanel() {
-  if(CFG.repair_module_enabled&&!posState.collectionsReady)return `<div class="card"><h2>Recent Repair Tickets</h2><p class="muted">Load repair collection when needed.</p><button class="secondary-button" data-action="open-repair-collection">View repair tickets</button></div>`
-  if(!resourceReady(state.resources,'tickets'))return resourceNotice('Repairs',state.resources.tickets.status)
-  if (!CFG.repair_module_enabled) return `
-    <div class="card"><h2>Quick Sale</h2>
-      <p class="muted" style="font-size:13px">Add items using the cart panel.</p>
-    </div>`
-  const pending = (state.data.tickets||[])
-    .filter(t => !t.parent_ticket_id) // only show parent/original tickets on this quick panel
-    .filter(t => combinedBalance(t).total > 0 || !t.is_locked)
-    .sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
-    .slice(0, 3)
-
-  return `
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h2 style="margin:0">${posState.collectionPage?'Matching Repair Tickets':'Recent Repair Tickets'}</h2>
-        <button class="secondary-button" style="font-size:12px" data-action="open-repair-collection">View All</button>
-      </div>
-      ${pending.length ? pending.map(t => repairRowHTML(t)).join('') : `<div class="empty">No pending tickets.</div>`}
-    </div>`
+ if(!CFG.repair_module_enabled)return ''
+ return `<section class="card rs-open-repairs" aria-label="Open repair tickets">
+  <button type="button" class="secondary-button rs-queue-toggle" data-action="toggle-open-repairs" aria-expanded="${posState.queueExpanded}" aria-controls="rs-open-queue">${posState.queueExpanded?'▾':'▸'} Open repair tickets</button>
+  ${posState.queueExpanded?`<div id="rs-open-queue">
+   ${posState.queueStatus==='loading'?'<p role="status">Loading open, undelivered repairs…</p>':posState.queueStatus==='unavailable'?'<p role="alert">Open repairs unavailable. No empty result is implied.</p><button class="secondary-button" data-action="retry-open-repairs">Retry queue</button>':`<div class="rs-repair-queue">${posState.queueRows.map(t=>`<button class="secondary-button rs-repair-card" data-collect-ticket="${t.id}">${iconHTML(brandIcon(t.device_brand),'brand')}<span><strong>${escapeHTML(t.customer_name)}</strong><small>${escapeHTML(t.ticket_number)} · ${escapeHTML(t.device_brand)} ${escapeHTML(t.device_model)}</small><small>${escapeHTML(t.status)}</small></span></button>`).join('')||'<p class="muted">No open, undelivered repairs.</p>'}</div>${compactPages(posState.queuePage,'data-queue-page')}`}
+  </div>`:''}</section>`
+}
+async function loadOpenQueue(offset=0){
+ const revision=++posState.queueGeneration,view=captureView(),owner=posState,current=()=>view()&&ownsPOS()&&posState===owner&&posState.queueExpanded&&revision===posState.queueGeneration
+ posState.queueStatus='loading';render()
+ const result=await settleRead(readPage(()=>sb.from('tickets').select('id,ticket_number,customer_name,device_brand,device_model,status,created_at',{count:'exact'}).is('parent_ticket_id',null).in('status',['Pending','In Progress','Ready']).order('created_at',{ascending:false}).order('id',{ascending:false}),{offset,size:12,current}))
+ if(!current())return
+ posState.queueStatus=result.error?'unavailable':'ready';posState.queueRows=result.error?[]:result.data;posState.queuePage=result.error?null:result;render()
 }
 
 /* Combined balance across a parent ticket and any sub-invoices under it */
@@ -646,6 +696,12 @@ function renderModal() {
   if (!state.modal) return ''
   if (!modalEntitled(state.modal.type)) { state.modal = null; return '' }
   const { type } = state.modal
+  if(type==='pos-selector'){
+    const inventory=state.modal.selector==='inventory'
+    if(!can('pos',state.role)||(inventory&&(!CFG.inventory_module_enabled||!_inv))){state.modal=null;return ''}
+    const panel=inventory?_inv.inventoryPanel(posState,{expanded:true}):quickItemsPanel({expanded:true})
+    return `<div class="modal-backdrop"><div class="modal modal-xl rs-pos-selector-modal">${panel}<p class="muted" role="status" data-selector-cart-status>Cart: ${posState.cart.reduce((n,item)=>n+item.qty,0)} items</p><div class="modal-actions"><button type="button" class="secondary-button" data-close>Back to POS</button></div></div></div>`
+  }
     if(type==='repair-collection'&&state.modal.readStatus==='loading'&&(hasReadContract('repair_families')||posState.collectionPage?.mode==='exact-identifiers'))return `<div class="modal-backdrop"><div class="modal"><h2>Repair Collection</h2><input class="search" data-repair-search value="${escapeHTML(posState.repairSearch)}" placeholder="Search name, phone, device, IMEI, ticket #…">${resourceNotice('Repair collection','loading')}<button class="secondary-button" data-close>Close</button></div></div>`
   if(state.modal.readStatus&&state.modal.readStatus!=='ready')return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Selected '+(type==='shiftStats'?'shift':type==='repair'?'repair intake':'detail'),state.modal.readStatus==='loading'?'loading':'unavailable')}${state.modal.readError?`<p>${escapeHTML(state.modal.readError)}</p>`:''}<button class="secondary-button" data-action="retry-pos-detail">Retry detail</button><button class="secondary-button" data-close>Close</button></div></div>`
   const required=type==='udharList'?['udharAccounts']:type==='repair-collection'?['tickets']:['repair','create-sub-invoice','edit-components'].includes(type)?['tickets','repairComponents']:[]
@@ -770,9 +826,9 @@ function renderModal() {
   }
 
   if (type === 'shiftStats') return `<div class="modal-backdrop">
-    <div class="modal modal-sm">
+    <div class="modal rs-receipt-preview-dialog">
       <h2>Shift Stats</h2>
-      <div class="shift-print-wrap">${buildShiftStats()}</div>
+      <div class="rs-receipt-preview-body"><div class="shift-print-wrap">${buildShiftStats()}</div></div>
       <div class="modal-actions">
         <button class="secondary-button" data-close>Close</button>
         <button class="primary-button" data-action="print-shift">Print / Save PDF</button>
@@ -878,7 +934,7 @@ function renderModal() {
                 <input type="number" name="qty_${item.saleLineId}" min="0" max="${item.remainingQuantity}" step="1" value="0"
                   data-return-qty="${item.saleLineId}"></label>
               ${item.itemKind==='inventory'?`<label class="field"><span>Return to sellable stock?</span>
-                <select name="restock_${item.saleLineId}"><option value="true">Yes</option><option value="false">No — damaged/non-sellable</option></select>
+                <select name="restock_${item.saleLineId}" ${item.inventoryRetired?'disabled':''}>${item.inventoryRetired?'<option value="false">No — item permanently retired</option>':'<option value="true">Yes</option><option value="false">No — damaged/non-sellable</option>'}</select>
               </label>`:''}
             </div>
           </div>`).join('') : '<div class="empty">All quantities on this invoice have already been returned.</div>'}
@@ -901,7 +957,7 @@ function renderModal() {
 
   if (type === 'qitem-pick') {
     const { name, prices } = state.modal
-    return `<div class="modal-backdrop"><div class="modal modal-xs">
+    return `<div class="modal-backdrop"><div class="modal modal-xs rs-variant-picker">
       <h2>${escapeHTML(name)}</h2><p class="muted">Select price:</p>
       <div style="display:grid;gap:8px;margin-top:8px">
         ${(prices||[]).map((p,i)=>`<button class="secondary-button" style="font-size:16px;min-height:48px" data-pick-price="${i}">${p.name ? `${escapeHTML(p.name)} — ${moneyHTML(p.price)}` : moneyHTML(p.price)}</button>`).join('')}
@@ -1193,9 +1249,19 @@ function attachEvents() {
       '[data-pp-key]'
     )
     if (!el) return
+    if(el.dataset.action==='expand-pos-selector'){
+      const selector=el.dataset.selector
+      if(state.modal||!['catalog','inventory'].includes(selector))return
+      if(selector==='catalog'&&!quickResultsCurrent())return
+      if(selector==='inventory'&&(!CFG.inventory_module_enabled||!_inv||!resourceReady(state.resources,'inventory')))return
+      state.modal={type:'pos-selector',selector};render();return
+    }
     if(el.dataset.stockPage){const page=posState.inventoryPage;if(page)await refreshStock(el.dataset.stockPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
-    if(el.dataset.quickPage){const page=posState.quickPage;if(!page)return;const revision=++quickGeneration,current=()=>eventCurrent()&&revision===quickGeneration;state.resources.quickItems={status:'loading'};render();const result=await settleRead(quickPage('',el.dataset.quickPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size),current,page.size));if(!current())return;state.data.quickItems=result.error?null:result.data;state.resources.quickItems={status:result.error?'unavailable':'ready'};posState.quickPage=result.error?null:result;render();return}
+    if(el.dataset.quickPage){if(!quickResultsCurrent())return;const page=posState.quickPage;if(page)await refreshQuick(el.dataset.quickPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
     if(el.dataset.collectionPage){const page=posState.collectionPage;if(page&&state.modal?.readStatus==='ready')await openDeferredPOS('repair-collection',el.dataset.collectionPage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
+    if(el.dataset.action==='toggle-open-repairs'){posState.queueExpanded=!posState.queueExpanded;posState.queueGeneration++;if(posState.queueExpanded)await loadOpenQueue();else render();return}
+    if(el.dataset.action==='retry-open-repairs'){await loadOpenQueue(posState.queuePage?.offset||0);return}
+    if(el.dataset.queuePage){const page=posState.queuePage;if(page)await loadOpenQueue(el.dataset.queuePage==='next'?page.nextOffset:Math.max(0,page.offset-page.size));return}
     if (placingOrder) return
     if (!CFG.repair_module_enabled && (el.dataset.ticketId || el.dataset.collectTicket || ['open-repair-collection','edit-cart-repair','place-order'].includes(el.dataset.action))) return
     if (el.dataset.action === 'go-workshop' && !can('workshop', state.role)) return
@@ -1211,7 +1277,7 @@ function attachEvents() {
     if (el.dataset.close !== undefined) {
       dlog('POS.click', `DATA-CLOSE branch firing -- state.modal was type=${state.modal?.type} -- about to call POS.render()`)
       if (state.modal?.type === 'pinPrompt') { cancelPinPrompt(render); return }
-      state.modal = null; render(); return
+      state.modal = state.modal?.type==='qitem-pick'?state.modal.returnTo||null:null; render(); return
     }
 
     /* Modal openers */
@@ -1440,7 +1506,12 @@ function attachEvents() {
 
     /* ── Quick collect from main screen row or repair collection modal ── */
     if (el.dataset.collectTicket) {
-      const ticket = state.data.tickets.find(t => String(t.id) === String(el.dataset.collectTicket))
+      let ticket = (state.data.tickets||[]).find(t => String(t.id) === String(el.dataset.collectTicket))
+      if(posState.queueRows.some(t=>String(t.id)===String(el.dataset.collectTicket))){
+        const selected=await viewAwait(eventCurrent,()=>completeTicketSelection(el.dataset.collectTicket,eventCurrent),()=>state.modal)
+        if(!eventCurrent())return
+        state.data.tickets=selected.data;ticket=selected.data.find(t=>String(t.id)===String(el.dataset.collectTicket))
+      }
       if (!ticket) return
       state.modal = null; render()
       openCollectTicket(ticket); return
@@ -1555,22 +1626,27 @@ function attachEvents() {
 
     /* ── Quick items ── */
     if (el.dataset.qitemName) {
-      if(!resourceReady(state.resources,'quickItems'))return
-      const raw = JSON.parse(el.dataset.qitemPrices||'[]'), name = el.dataset.qitemName
-      const quickItemId = Number(el.dataset.qitemId)
-      const prices = raw.map(p => (typeof p === 'object' && p !== null) ? p : { name:'', price:p })
-      if (prices.length === 1) {
-        const pv = prices[0]
-        posState.cart.push({ productId:`qi-${quickItemId}-${Date.now()}`, name, variantName: pv.name||'', qty:1, originalPrice:pv.price, soldPrice:pv.price, discount:0, reason:'', isQuick:true, quickItemId })
+      if(el.disabled||!quickResultsCurrent())return
+      const item=(state.data.quickItems||[]).find(i=>String(i.id)===el.dataset.qitemId)
+      if(!item)return
+      const prices=quickPrices(item.prices)
+      if(!prices.length)return
+      const {name,icon_id}=item,quickItemId=item.id
+      if(prices.length===1){
+        const pv=prices[0]
+        posState.cart.push({productId:`qi-${quickItemId}-${Date.now()}`,name,variantName:pv.name,qty:1,originalPrice:pv.price,soldPrice:pv.price,discount:0,reason:'',isQuick:true,icon_id,quickItemId})
         render()
-      } else { state.modal = { type:'qitem-pick', name, prices, quickItemId }; render() }
+      }else{state.modal={type:'qitem-pick',name,prices,quickItemId,icon_id,current:captureView(),returnTo:state.modal?.type==='pos-selector'?state.modal:null};render()}
       return
     }
-    if (el.dataset.pickPrice !== undefined) {
-      const { name, prices, quickItemId } = state.modal
-      const pv = prices[Number(el.dataset.pickPrice)]
-      posState.cart.push({ productId:`qi-${quickItemId}-${Date.now()}`, name, variantName: pv.name||'', qty:1, originalPrice:pv.price, soldPrice:pv.price, discount:0, reason:'', isQuick:true, quickItemId })
-      state.modal = null; render(); return
+    if(el.dataset.pickPrice!==undefined){
+      const modal=state.modal,index=Number(el.dataset.pickPrice)
+      if(modal?.type!=='qitem-pick'||!modal.current()||!Number.isInteger(index)||index<0)return
+      const pv=quickPrice(modal.prices[index])
+      if(!pv)return
+      const {name,quickItemId,icon_id}=modal
+      posState.cart.push({productId:`qi-${quickItemId}-${Date.now()}`,name,variantName:pv.name,qty:1,originalPrice:pv.price,soldPrice:pv.price,discount:0,reason:'',isQuick:true,icon_id,quickItemId})
+      state.modal=modal.returnTo||null;render();return
     }
 
     /* ── Component tag picker ── */
@@ -1698,8 +1774,16 @@ function attachEvents() {
     if (t.dataset.split === 'cash') posState.splitCash = Number(t.value)||0
     if (t.dataset.split === 'digital') posState.splitDigital = Number(t.value)||0
     if (t.dataset.split === 'credit') posState.splitCredit = Number(t.value)||0
+    if(t.dataset.quickSearch!==undefined){
+      posState.quickSearch=t.value;const revision=++quickGeneration,view=captureView()
+      posState.quickAccepted=null;state.resources.quickItems={status:'loading'};clearTimeout(quickTimer)
+      const status=document.querySelector('[data-quick-search-status]');if(status)status.textContent='Searching current catalog…'
+      document.querySelectorAll('[data-qitem-name]').forEach(button=>button.disabled=true)
+      quickTimer=setTimeout(()=>{if(view()&&ownsPOS()&&revision===quickGeneration)void refreshQuick(0,revision)},180)
+    }
     if (t.dataset.invSearch !== undefined) {
       posState.invSearch=t.value;const revision=++selectorGeneration;clearTimeout(selectorTimer)
+      posState.inventoryAccepted=null;state.resources.inventory={status:'loading'}
       // Invalidate immediately; the outgoing page cannot add an item for the old query.
       document.querySelectorAll('[data-inv-pos-add]').forEach(button=>button.disabled=true)
       selectorTimer=setTimeout(()=>{if(ownsPOS())void refreshStock(0,revision)},180)

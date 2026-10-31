@@ -90,7 +90,7 @@ test('altered URL, fingerprints, plan, binding and original request are rejected
 
 test('both clearance formats complete the mocked original approved flow; expired, revoked and unauthorized clearance fail closed',async()=>{
  for(const key of [modern,jwt()])await customer({key},async({run,stats,journal})=>{
-  const result=await run();assert.equal(result.state,'verification_required');assert.equal(result.verification.full_source_verified,false);assert.equal(result.verification.evidence_strength,'customer-reported');assert.equal(Object.keys(result.steps).length,plan.steps.length);assert.equal(stats.writes,plan.steps.length);assert.equal(stats.claims,2);assert.equal(JSON.parse(readFileSync(journal,'utf8')).request_id,request);
+  const result=await run();assert.equal(result.state,'verification_required');assert.equal(result.verification.full_source_verified,false);assert.equal(result.verification.evidence_strength,'customer-reported');assert.equal(Object.keys(result.steps).length,plan.steps.length);assert.equal(stats.writes,plan.steps.length);assert.equal(stats.claims,Math.ceil(plan.steps.length/2));assert.equal(JSON.parse(readFileSync(journal,'utf8')).request_id,request);
  });
  for(const denied of [401,403,409])await customer({denied},async({run,stats,journal})=>{
   await assert.rejects(run(),error=>/clearance or pending-operation gate/.test(error.message)&&!error.message.includes('private provider detail'));assert.equal(stats.writes,0);assert.equal(stats.commands,0);const j=JSON.parse(readFileSync(journal,'utf8'));assert.equal(j.request_id,request);assert.equal(j.state,'claiming');

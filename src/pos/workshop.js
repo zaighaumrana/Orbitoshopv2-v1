@@ -1,3 +1,4 @@
+import {profileIcon} from '../profile-icon.js'
 import {renderOperationalScreen} from '../ui-render.js'
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
 import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
@@ -174,7 +175,7 @@ function render() {
               <button class="secondary-button" data-action="go-pos">POS</button>
               <button class="secondary-button" data-action="go-admin">Admin</button>
             ` : ''}
-            <button class="icon-button" data-action="my-account" title="My Account">👤</button>
+            <button class="icon-button" data-action="my-account" title="My Account" aria-label="My Account">${profileIcon}</button>
             <button class="icon-button" data-action="theme">
               ${state.theme === 'dark' ? 'Light' : 'Dark'}
             </button>

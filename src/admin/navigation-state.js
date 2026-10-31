@@ -1,6 +1,6 @@
 // Safe presentation state only. Free text, record IDs, modal and transaction
 // drafts are excluded. Live main/router gates remain authoritative.
-const tabs={settingsTab:['branding','contact','receipt','staff','legal'],catalogTab:['quickitems','components']}
+const tabs={inventoryStatus:['active','retired'],settingsTab:['branding','contact','receipt','staff','legal','icons'],catalogTab:['quickitems','components']}
 export function safeAdminState(input={}){
  const out={}
  for(const [name,values] of Object.entries(tabs))if(values.includes(input[name]))out[name]=input[name]

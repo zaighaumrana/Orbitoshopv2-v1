@@ -1,3 +1,4 @@
+import {setIconPreferences} from './catalog/icon-preferences.js'
 import { escapeHTML } from "./html.js"
 import { SHORT_BRAND_NAME } from './config/brand.js'
 import { helpLink } from './legal/links.js'
@@ -238,6 +239,7 @@ export function resetClientEntitlements() {
   invalidateConfigReads()
   for (const key of entitlementKeys) CFG[key] = false
   CFG.read_contracts={}
+  setIconPreferences()
   state.modal = null
   try { sessionStorage.removeItem('retailos_collect_ticket') } catch {}
 }
@@ -258,9 +260,10 @@ export function loadConfig(publicOnly = false,verifiedConfig) {
     if(generation!==configGeneration||!current())return false
     for(const key of entitlementKeys)CFG[key]=!error&&data?.[key]===true
     CFG.read_contracts=!publicOnly&&!error&&data?.read_contracts&&typeof data.read_contracts==='object'?data.read_contracts:{}
+    setIconPreferences(CFG.read_contracts.icon_preferences===1?data?.icon_preferences:[])
     verifiedConfigScope=null
     if(error||!data){state.modal=null;console.warn('Config unavailable; optional modules disabled.');return false}
-    for(const [key,value] of Object.entries(data))if(!['workshop_enabled','read_contracts'].includes(key)&&!entitlementKeys.includes(key))CFG[key]=value
+    for(const [key,value] of Object.entries(data))if(!['workshop_enabled','read_contracts','icon_preferences'].includes(key)&&!entitlementKeys.includes(key))CFG[key]=value
     verifiedConfigScope=publicOnly?'public':'app'
     return true
   })()
@@ -651,7 +654,7 @@ export function can(mod, role) {
 
 export function modalEntitled(type) {
   if (type === 'leave-request') return CFG.ems_enabled === true
-  if (['inv-add','inv-edit','inv-adjust'].includes(type)) return CFG.inventory_module_enabled === true
+  if (['inv-add','inv-edit','inv-adjust','inv-retire'].includes(type)) return CFG.inventory_module_enabled === true
   if (['repair','repair-collection','ticket-payment','ticketDetail','edit-components','mark-not-needed','create-sub-invoice','repair-adjustment','repair-cancellation','add-comp-tag','comp-tag-picker'].includes(type)) return CFG.repair_module_enabled === true
   return true
 }
@@ -977,6 +980,7 @@ export function cancelPinPrompt(renderFn = ppRenderFn) {
 export function pinPromptHTML(purpose) {
   const label = {
     admin:    'Admin password required',
+    inventory:'PIN required for this stock change',
     settle:   'Admin PIN to settle credit',
     return:   'Admin PIN to process return',
     discount: 'PIN required to apply discount',

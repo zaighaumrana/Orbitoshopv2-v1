@@ -358,6 +358,7 @@ th { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: upp
 .modal-sm { width: min(480px, 100%); }
 .modal-md { width: min(600px, 100%); }
 .modal-lg { width: min(720px, 100%); }
+.modal-xl { width: min(1120px, 100%); }
 
 /* ── Short viewports (13" laptops etc): the width-based breakpoints above
    don't help here -- a 1440px-wide, 800px-tall laptop window is "desktop"
@@ -988,3 +989,139 @@ input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* POS operator workspace: scoped to authenticated POS; financial/event nodes retained. */
+.rs-shop .rs-pos-workspace{grid-template-columns:minmax(0,1fr) minmax(300px,360px);align-items:start;gap:16px}
+.rs-shop .rs-product-workspace{display:grid;gap:16px;min-width:0}
+.rs-shop .rs-product-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start;min-width:0}
+.rs-shop .rs-product-panels.rs-catalog-expanded{grid-template-columns:minmax(0,1fr)}
+.rs-shop .rs-product-panels>.card{min-width:0;margin:0}
+.rs-shop .rs-product-list{display:grid;gap:8px;margin:12px 0;max-height:54vh;overflow-y:auto;padding:3px}
+.rs-shop .rs-product-item{display:flex;align-items:center;gap:10px;text-align:left;width:100%;padding:12px;white-space:normal;min-width:0}
+.rs-shop .rs-product-item>span:last-child{min-width:0;overflow-wrap:anywhere}
+.rs-shop .rs-product-item small,.rs-shop .rs-repair-card small{display:block;color:var(--muted);margin-top:4px}
+.rs-shop .rs-item-icon{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;flex:none;vertical-align:middle;margin-right:4px}
+.rs-shop .rs-icon-placeholder{border-radius:6px;background:var(--surface-2);color:var(--muted)}
+.rs-shop .rs-product-item .rs-item-icon{width:32px;height:32px}
+.rs-shop .rs-custom-item{margin-top:14px}.rs-shop .rs-custom-item h3{font-size:13px;margin:0 0 8px}
+.rs-shop .rs-custom-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(74px,90px) auto;gap:8px;align-items:end}.rs-shop .rs-custom-form .field{min-width:0}.rs-shop .rs-custom-form input{max-width:100%;min-width:0}
+.rs-shop .rs-compact-pagination{font-size:11px;gap:4px}.rs-shop .rs-compact-pagination button{padding:4px 10px;font-size:18px;min-height:36px}
+.rs-shop .rs-pos-workspace .cart{position:sticky;top:16px;min-width:0}
+.rs-shop .rs-cart-line{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:10px;padding:12px;border:0;border-radius:10px;background:var(--surface-2);margin-bottom:8px;align-items:start}
+.rs-shop .rs-cart-description{min-width:0;overflow-wrap:anywhere}.rs-shop .rs-cart-line .qty-controls{grid-column:2;justify-self:start}.rs-shop .rs-cart-line>button{grid-column:3;grid-row:2}.rs-shop .rs-line-total{grid-column:3;grid-row:1;white-space:nowrap}.rs-shop .rs-cart-line .cart-ticket-actions{grid-column:2/-1;display:flex;flex-wrap:wrap;gap:6px}
+.rs-shop .rs-queue-toggle{width:100%;text-align:left;font-weight:600}.rs-shop .rs-repair-queue{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin-top:12px}.rs-shop .rs-repair-card{display:flex;gap:8px;text-align:left;white-space:normal;overflow-wrap:anywhere}
+.rs-shop .rs-brand-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px;border-radius:10px;background:var(--surface-2)}
+.rs-shop .rs-brand-row .field{flex:1;min-width:150px}
+@media(max-width:1100px){.rs-shop .rs-pos-workspace{grid-template-columns:minmax(0,1fr) 300px}.rs-shop .rs-product-panels{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:760px){.rs-shop .rs-pos-workspace{grid-template-columns:minmax(0,1fr)}.rs-shop .rs-pos-workspace .cart{position:static}.rs-shop .rs-product-list{max-height:400px}.rs-shop .rs-custom-form{grid-template-columns:minmax(0,1fr) minmax(74px,90px)}.rs-shop .rs-custom-item button{grid-column:1/-1}}
+
+/* Expanded POS selectors reuse the current bounded page and item actions. */
+.rs-shop .rs-pos-page-center{display:grid;justify-items:center;gap:4px;min-width:0;text-align:center}.rs-shop .rs-pos-page-center .secondary-button{font-size:12px;line-height:1.2;padding:5px 9px;min-height:32px}
+.rs-shop .rs-pos-selector-modal>.card{padding:0;margin:0;border:0;box-shadow:none;background:transparent;min-width:0}.rs-shop .rs-pos-selector-modal .rs-product-list{grid-template-columns:repeat(auto-fill,minmax(min(100%,170px),1fr));max-height:60vh;align-content:start}.rs-shop .rs-pos-selector-modal .rs-product-item{height:100%;min-height:82px}.rs-shop .rs-pos-selector-modal .rs-product-item>span{overflow-wrap:anywhere}.rs-shop .rs-pos-selector-modal .rs-pagination{margin-top:10px}
+
+.rs-shop .modal-backdrop:has(>.rs-pos-selector-modal){grid-template-columns:minmax(0,1fr);justify-items:center}
+
+.rs-shop .rs-pos-selector-modal h2{padding-right:38px;overflow-wrap:anywhere}
+
+/* Stable selector frames; only expanded tiles adapt to sparse results. */
+.rs-shop .rs-product-panels{align-items:stretch;--rs-pos-list-height:clamp(240px,45vh,480px)}
+.rs-shop .rs-product-panels>:is(.rs-catalog-panel,.rs-inventory-panel){display:flex;flex-direction:column}
+.rs-shop .rs-product-panels .rs-product-list{height:var(--rs-pos-list-height);max-height:none;flex:none;align-content:start}
+.rs-shop .rs-product-panels :is(.rs-catalog-panel,.rs-inventory-panel)>h2{margin:0}
+.rs-shop .modal.rs-pos-selector-modal{height:calc(var(--dialog-height,100dvh) - max(12px,env(safe-area-inset-top)) - max(12px,env(safe-area-inset-bottom)));grid-template-rows:minmax(0,1fr) auto auto;overflow:hidden}
+.rs-shop .rs-pos-selector-modal>:is(.rs-catalog-panel,.rs-inventory-panel){display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.rs-shop .rs-pos-selector-modal .rs-product-list{flex:1;min-height:0;max-height:none;overflow:auto;grid-auto-rows:minmax(82px,max-content)}
+.rs-shop .rs-pos-selector-modal .rs-product-list:not(:has(>.rs-product-item:nth-child(5))){grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));grid-auto-rows:minmax(110px,max-content)}
+.rs-shop .rs-pos-selector-modal .rs-product-list:not(:has(>.rs-product-item:nth-child(5)))>.rs-product-item{min-height:110px}
+.rs-shop .rs-pos-selector-modal h2{padding-right:56px;min-height:44px}
+.rs-shop .rs-pos-selector-modal .modal-close-button{width:44px;height:44px;min-width:44px;min-height:44px;top:10px;right:10px;padding:0;font-size:28px;line-height:1;font-weight:500;color:var(--text);background:var(--surface-2);border:1px solid var(--border)}
+.rs-shop .rs-pos-selector-modal .modal-close-button:hover,.rs-shop .rs-pos-selector-modal .modal-close-button:focus-visible{background:var(--surface-2);color:var(--text);border-color:var(--primary)}
+
+.rs-shop .rs-product-list{scrollbar-gutter:stable}
+
+.rs-shop .rs-product-panels .rs-product-list{grid-auto-rows:max-content}
+
+.rs-shop .rs-pos-selector-modal>:is(.rs-catalog-panel,.rs-inventory-panel){overflow:visible}
+
+/* A confirmed empty Catalog leaves the stock selector full-width and keeps custom entry. */
+.rs-shop .rs-product-panels.rs-inventory-expanded{grid-template-columns:minmax(0,1fr)}
+
+.rs-shop .rs-profile-icon{display:block;color:var(--muted);flex-shrink:0}
+
+/* Icon choices stay inside their form, with bounded scrolling instead of an OS dropdown. */
+.rs-shop .rs-icon-picker{min-width:0;border:1px solid var(--border);border-radius:8px;background:var(--surface)}
+.rs-shop .rs-icon-picker summary{cursor:pointer;min-height:42px;padding:8px;list-style:none}
+.rs-shop .rs-icon-picker summary::after{content:'▾';float:right;margin-left:8px}
+.rs-shop .rs-icon-choice-content{display:inline-flex;gap:10px;align-items:center;min-width:0;overflow-wrap:anywhere}
+.rs-shop .rs-icon-choice-content .rs-item-icon{width:28px;height:28px;flex-shrink:0}
+.rs-shop .rs-icon-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:6px;padding:8px;max-height:min(300px,40dvh);overflow:auto;overscroll-behavior:contain;border-top:1px solid var(--border)}
+.rs-shop .rs-icon-choice{display:flex;gap:6px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:6px;cursor:pointer;min-width:0}
+.rs-shop .rs-icon-choice:has(:checked){background:var(--surface-2);outline:2px solid var(--primary)}
+.rs-shop .rs-icon-choice:focus-within{outline:2px solid var(--primary)}
+.rs-shop .rs-icon-settings{display:grid;gap:12px}
+.rs-shop .rs-icon-settings fieldset{border:0;padding:0;margin:0;min-width:0}
+.rs-shop .rs-icon-settings-legend{font-weight:600;margin-bottom:12px}
+.rs-shop .rs-icon-settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(350px,100%),1fr));gap:12px}
+.rs-shop .rs-icon-settings-row{display:grid;grid-template-columns:48px minmax(0,1fr);gap:12px;padding:12px;border:1px solid var(--border);border-radius:8px}
+.rs-shop .rs-icon-preview{display:flex;align-items:center;justify-content:center}
+.rs-shop .rs-icon-preview .rs-item-icon{width:40px;height:40px}
+.rs-shop .rs-icon-contexts{grid-column:2;display:flex;gap:8px 16px;flex-wrap:wrap;font-size:12px}
+.rs-shop .rs-icon-contexts label{display:flex;gap:6px;align-items:center}
+
+.rs-shop .rs-icon-choice input[type="radio"],.rs-shop .rs-icon-contexts input[type="checkbox"]{width:16px;min-width:16px;height:16px;margin:0;flex:0 0 16px}
+.rs-shop .rs-quick-item-row{min-width:0}
+.rs-shop .rs-quick-item-header{display:grid;grid-template-columns:32px minmax(0,1fr) auto 24px;gap:8px;align-items:center}
+.rs-shop .rs-quick-item-header>strong{min-width:0;overflow-wrap:anywhere;text-align:left}
+.rs-shop .rs-quick-item-header>[data-remove-qitem]{grid-column:4}
+.rs-shop .rs-quick-variant-entry{display:grid;grid-template-columns:minmax(0,2fr) minmax(70px,1fr) auto;gap:8px}
+.rs-shop .rs-quick-variant-entry input{width:100%;min-width:0}
+@media(max-width:480px){.rs-shop .rs-quick-variant-entry{grid-template-columns:minmax(0,1fr) auto}.rs-shop .rs-quick-variant-entry input:first-child{grid-column:1/-1}}
+
+.rs-shop [data-form="add-quick-item"] .form-grid{align-items:start}
+.rs-shop [data-form="add-quick-item"] [name="itemName"]{height:44px}
+.rs-shop .rs-icon-picker summary{display:flex;align-items:center;gap:8px;height:42px;min-height:42px}
+.rs-shop .rs-icon-picker summary::after{float:none;margin-left:auto;flex-shrink:0}
+.rs-shop .rs-icon-picker summary .rs-icon-choice-content{flex:1;overflow:hidden}
+.rs-shop .rs-icon-picker summary .rs-icon-choice-content>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs-shop .rs-icon-picker summary .rs-item-icon{width:24px;height:24px}
+.rs-shop .rs-icon-choice{min-height:64px}
+.rs-shop .rs-icon-options .rs-icon-choice-content{flex:1;display:grid;grid-template-columns:28px minmax(0,1fr);text-align:left}
+
+/* Full-width icon choices keep the Quick Item form balanced when opened. */
+.rs-shop .modal[data-form="add-quick-item"]{width:min(640px,100%)}
+.rs-shop [data-form="add-quick-item"] .rs-quick-item-fields{grid-template-columns:minmax(0,1fr)}
+.rs-shop .rs-icon-options{display:block;max-height:none;overflow:visible}
+.rs-shop .rs-icon-filter{display:block;width:100%;margin-bottom:10px}
+.rs-shop .rs-icon-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:8px;max-height:min(264px,32dvh);overflow:auto;overscroll-behavior:contain;padding:3px}
+.rs-shop .rs-icon-grid .rs-icon-choice{min-height:76px;margin:0;padding:10px}
+.rs-shop .rs-icon-grid .rs-icon-choice[hidden]{display:none}
+.rs-shop .rs-icon-grid .rs-icon-choice-content{font-size:13px;line-height:1.4}
+.rs-shop .rs-icon-picker summary{font-size:14px}
+
+.rs-shop .modal-backdrop:has(>[data-form="add-quick-item"]){grid-template-columns:minmax(0,1fr)}
+.rs-shop .modal[data-form="add-quick-item"] [data-modal-close]{width:44px;height:44px;font-size:24px;top:8px;right:8px}
+.rs-shop .modal[data-form="add-quick-item"]>h2{padding-right:44px}
+
+/* Variant picker changes width only; row heights, gaps and vertical spacing stay native. */
+.rs-shop .modal-backdrop:has(>.rs-variant-picker){grid-template-columns:minmax(0,1fr)}
+.rs-shop .modal.rs-variant-picker{width:min(600px,100%)}
+
+/* One shared custom sale row, independent of either selector's contents. */
+.rs-shop .rs-custom-item.rs-custom-bar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;margin:0;align-items:end;padding:12px 16px}
+.rs-shop .rs-custom-bar h3{margin:0 0 12px;white-space:nowrap}
+.rs-shop .rs-custom-bar .rs-custom-form{margin:0;min-width:0}
+@media(max-width:760px){.rs-shop .rs-custom-item.rs-custom-bar{grid-template-columns:minmax(0,1fr);gap:8px}.rs-shop .rs-custom-bar h3{margin:0}}
+
+.rs-shop .modal.rs-stock-change{width:min(600px,100%)}
+.rs-shop .modal-backdrop:has(>.rs-stock-change){grid-template-columns:minmax(0,1fr)}
+.rs-shop .rs-stock-change fieldset{display:grid;gap:14px}
+
+.rs-shop .rs-stock-change [data-modal-close]{width:44px;height:44px;font-size:24px;top:8px;right:8px}
+.rs-shop .rs-stock-change>h2{padding-right:44px;overflow-wrap:anywhere}
+
+/* Repair helper shares the input track. Keep these rules in the versioned app CSS. */
+.rs-shop .rs-repair-workspace-dialog .rs-repair-brand-row{grid-column:1/-1;display:grid;grid-template-columns:subgrid;row-gap:6px}
+.rs-shop .rs-repair-workspace-dialog .rs-repair-brand-row>.field{grid-column:1;grid-row:1/span 2;grid-template-rows:subgrid}
+.rs-shop .rs-repair-workspace-dialog .rs-repair-brand-row input{align-self:center}
+.rs-shop .rs-repair-workspace-dialog .rs-repair-brand-row>p{grid-column:2;grid-row:2;align-self:center;margin:0;font-size:inherit;overflow-wrap:anywhere}
+@media(max-width:820px){.rs-shop .rs-repair-workspace-dialog .rs-repair-brand-row>p{grid-column:1;grid-row:3}}

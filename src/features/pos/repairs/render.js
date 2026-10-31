@@ -1,3 +1,4 @@
+import {iconHTML,brandChoices,brandIcon} from '../../../catalog/icons.js'
 import {withPrintAttribution} from '../../../print/presentation.js'
 import { escapeHTML, safeImageURL } from '../../../html.js'
 /* ═══════════════════════════════════════════════════════════════════
@@ -36,7 +37,7 @@ export function repairRowHTML(t, family = null) {
   return `
     <div class="list-row" style="margin-bottom:6px">
       <div>
-        <strong>${escapeHTML(t.customer_name)}</strong>
+        ${iconHTML(brandIcon(t.device_brand),'brand')}<strong>${escapeHTML(t.customer_name)}</strong>
         <span class="badge warn" style="margin-left:6px">${escapeHTML(t.status)}</span><br>
         <small class="muted">${escapeHTML(t.invoice_number || t.ticket_number)} · ${escapeHTML(t.device_brand)} ${escapeHTML(t.device_model)}</small>
         ${matchedChild ? `<br><small style="color:var(--primary)">Matched additional invoice: ${escapeHTML(matchedChild.invoice_number || matchedChild.ticket_number)}</small>` : ''}
@@ -102,8 +103,12 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
           <input name="customerPhone" type="tel" inputmode="numeric" pattern="[0-9]*"
             data-numeric="digits" data-numeric-message="Numbers only" autocomplete="tel"
             required value="${dInfo.customerPhone||''}"></label>
+        <div class="rs-repair-brand-row">
         <label class="field"><span>Device Brand *</span>
-          <input name="deviceBrand" required value="${dInfo.deviceBrand||''}"></label>
+          <input name="deviceBrand" list="rs-device-brands" autocomplete="off" required value="${dInfo.deviceBrand||''}" aria-describedby="rs-brand-help"></label>
+        <datalist id="rs-device-brands">${brandChoices(state.data.deviceBrands??null).flatMap(b=>[b.display_name,...(b.aliases||[])]).map(name=>`<option value="${escapeHTML(name)}"></option>`).join('')}</datalist>
+        <p id="rs-brand-help" class="muted">${state.data.brandChoicesUnavailable?'Brand choices unavailable. Type the brand manually; retry choices by reopening the form.':'Search a brand or type your own. Custom text is retained.'}</p>
+        </div>
         <label class="field"><span>Device Model *</span>
           <input name="deviceModel" required value="${dInfo.deviceModel||''}"></label>
         <label class="field" style="grid-column:1/-1"><span>IMEI / Serial <small class="muted">(letters and numbers allowed)</small></span>
@@ -119,7 +124,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
         ${comps.map(c => `
           <button type="button" class="secondary-button" style="font-size:13px;padding:6px 14px"
-            data-pick-comp="${escapeHTML(c.name)}">${escapeHTML(c.name)}</button>`).join('')}
+            data-pick-comp="${escapeHTML(c.name)}">${iconHTML(c.icon_id,'repair')}${escapeHTML(c.name)}</button>`).join('')}
       </div>
 
       <div class="rs-compound" style="margin-bottom:12px;align-items:end">

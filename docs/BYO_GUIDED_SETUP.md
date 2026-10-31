@@ -14,9 +14,12 @@ acknowledgments are not installation receipts. The customer-side journal remains
 authoritative for local operations; Platform cannot read it. This document replaces
 the older branch/manual deployment sequence in `BYO_SETUP.md`.
 
-The current source-approved fresh release is support-v7 (39 migrations, seven
-functions), fingerprint c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada.
-Hosted activation and customer installation are separate owner operations. Support-v6
+The current source-approved fresh release is support-v8 (40 migrations, seven
+functions), fingerprint af64c402ff72fb4ef4d72b892786c53a000d45ecb4045c4f9a7e89db51cf5dd4.
+Hosted activation and customer installation are separate owner operations. The new
+Platform control-plane approval migration 20261030141736 and the three selector-
+consuming Platform bundles must be activated before v8 operations; see
+[the source approval handoff](POS_CANDIDATE_UPGRADE_GUIDE.md). Support-v6
 remains a supported historical source. Never repin an unresolved operation or use
 a database reset as recovery.
 
@@ -211,3 +214,6 @@ an existing custom folder/journal instead of generating replacement history.
 Customer source preflight is sufficient; developer paired-repository parity is not
 part of the customer stages. Technical upgrade reference:
 [CONTROLLED_BACKEND_UPGRADES.md](CONTROLLED_BACKEND_UPGRADES.md).
+
+
+30 October 2026 candidate notice: support-v8 POS Catalog work is unpromoted. Use the approved source for this operational procedure; see [candidate gates and recovery](POS_CANDIDATE_UPGRADE_GUIDE.md). Do not install from the POS feature source or bypass its intentionally failing approved-release preflight.

@@ -44,7 +44,7 @@ export function resourceFixture(){
      if(op==='maybeSingle'){single=true;maybe=true}
      if(['update','insert','upsert','delete'].includes(op))mutation={kind:op,values:a[0]};
     }
-    if(mutation){window.fixtureWrites.push({table,...mutation});rows=mutation.values?[{id:900001,...mutation.values}]:[]}
+    if(mutation){window.fixtureWrites.push({table,...mutation});rows=Array.isArray(mutation.values)?structuredClone(mutation.values):mutation.values?[{id:900001,...mutation.values}]:[];if(table==='icon_preferences')window.fixtureRows.icon_preferences=structuredClone(rows)}
     rows.sort((x,y)=>{for(const [column,options] of orders){const a=field(x,column),b=field(y,column);if(a<b)return options?.ascending===false?1:-1;if(a>b)return options?.ascending===false?-1:1}return 0});
     const count=rows.length;rows=rows.slice(offset,offset+size);
     if(projection!=='*'&&!projection.includes('*')&&!projection.includes('(')){const columns=projection.split(',').map(c=>c.trim());rows=rows.map(row=>Object.fromEntries(columns.map(c=>[c,row[c]])))}

@@ -1,8 +1,8 @@
 {
-  "release_id": "support-v7",
+  "release_id": "support-v10",
   "review_status": "approved-shared",
-  "sha256": "c4d210d009de9c57acf0c9af7fc41053632a95439ea24a68aa6e22f724d6bada",
-  "migrations": 39,
+  "sha256": "26885074b7035280985f5f33c42b395541fccbffe3fde94ed589969fd913b305",
+  "migrations": 42,
   "functions": 7,
-  "backend_source_commit": "50b94931ecf743166136b2c562cbb6d2fbaebdc7"
+  "backend_source_commit": "f78c5342fbc568a45feccdf5947fb49c774e474f"
 }
