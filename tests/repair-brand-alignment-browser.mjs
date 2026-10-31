@@ -1,4 +1,4 @@
-import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';import {pathToFileURL} from 'node:url';
+import {execFileSync} from 'node:child_process';import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';import {pathToFileURL} from 'node:url';
 const shop=path.resolve(import.meta.dirname,'..'),out=process.env.POS_EVIDENCE_DIR;if(!out)throw Error('Set POS_EVIDENCE_DIR to an owned external evidence directory.');fs.mkdirSync(out,{recursive:true});
 const {createServer}=await import(pathToFileURL(path.join(shop,'node_modules/vite/dist/node/index.js')));
 const {chromium}=await import(pathToFileURL(process.env.PLAYWRIGHT_MODULE_PATH).href);
@@ -12,6 +12,7 @@ try{
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH});
  const context=await browser.newContext({viewport:{width:1440,height:1000}});
  await context.route('**/*',r=>r.request().url().startsWith(origin+'/')?r.continue():r.request().url()==='https://challenges.cloudflare.com/turnstile/v0/api.js'?r.fulfill({contentType:'application/javascript',body:'/* fixture */'}):(result.external.push(r.request().url()),r.abort()));
+ if(process.env.REPAIR_STALE_BRAND_CSS)await context.route('**/brand/retrasell-shop.css',r=>r.fulfill({contentType:'text/css',body:execFileSync('git',['show',process.env.REPAIR_STALE_BRAND_CSS+':public/brand/retrasell-shop.css'],{cwd:shop,encoding:'utf8'})}));
  await context.addInitScript({content:fixture+';fixture();'});await context.addInitScript(resourceFixture);
  await context.addInitScript(()=>{
   const old=window.fixtureSDK.rpc;window.fixtureSDK.rpc=async(name,args)=>{const r=await old(name,args);if(name==='get_app_config'&&r.data)r.data={...r.data,read_contracts:{...r.data.read_contracts,catalog_icons:1}};return r};
@@ -25,10 +26,10 @@ try{
   const g=await page.evaluate(()=>{
    const box=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height,cy:r.y+r.height/2}};
    const form=document.querySelector('[data-form="repair"]'),field=n=>form.querySelector('[name="'+n+'"]'),help=form.querySelector('#rs-brand-help'),input=field('deviceBrand');
-   return {brand:box(input),helper:box(help),label:box(input.closest('label').querySelector('span')),name:box(field('customerName')),phone:box(field('customerPhone')),model:box(field('deviceModel')),imei:box(field('imei')),note:box(field('technicianNote')),panel:box(input.closest('.rs-repair-panel')),modal:box(form),body:box(form.querySelector('.rs-repair-workspace')),helperText:help.textContent,color:getComputedStyle(help).color,expectedColor:getComputedStyle(help).getPropertyValue('--muted').trim(),scroll:document.documentElement.scrollWidth,width:innerWidth,described:input.getAttribute('aria-describedby'),list:input.getAttribute('list'),required:input.required,helpBorder:getComputedStyle(help).borderWidth};
+   return {brand:box(input),helper:box(help),label:box(input.closest('label').querySelector('span')),name:box(field('customerName')),phone:box(field('customerPhone')),model:box(field('deviceModel')),imei:box(field('imei')),note:box(field('technicianNote')),panel:box(input.closest('.rs-repair-panel')),modal:box(form),body:box(form.querySelector('.rs-repair-workspace')),helperText:help.textContent,font:getComputedStyle(help).fontSize,parentFont:getComputedStyle(help.parentElement).fontSize,color:getComputedStyle(help).color,expectedColor:getComputedStyle(help).getPropertyValue('--muted').trim(),scroll:document.documentElement.scrollWidth,width:innerWidth,described:input.getAttribute('aria-describedby'),list:input.getAttribute('list'),required:input.required,helpBorder:getComputedStyle(help).borderWidth};
   });
   result.geometry.push({mode,variant,width,theme,...g});
-  assert.equal(g.described,'rs-brand-help');assert.equal(g.list,'rs-device-brands');assert.equal(g.required,true);assert.equal(g.helpBorder,'0px');
+  assert.equal(g.described,'rs-brand-help');assert.equal(g.list,'rs-device-brands');assert.equal(g.required,true);assert.equal(g.helpBorder,'0px');assert.equal(g.font,g.parentFont,'Keep original helper text size');
   assert.equal(g.helperText,variant==='unavailable'?'Brand choices unavailable. Type the brand manually; retry choices by reopening the form.':'Search a brand or type your own. Custom text is retained.');
   assert.ok(g.scroll<=width+1&&g.modal.x>=-1&&g.modal.right<=width+1,JSON.stringify(g));
   assert.ok(g.helper.x>=g.panel.x&&g.helper.right<=g.panel.right+1&&g.model.y>=Math.max(g.brand.bottom,g.helper.bottom)-1&&g.imei.y>=g.model.bottom&&g.note.y>=g.imei.bottom,JSON.stringify(g));
