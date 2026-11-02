@@ -181,40 +181,25 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
         </div>`}
 
           </div>
-          <div class="rs-repair-finance-part rs-repair-payments"><h3>Payments received</h3>
-      <div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:8px">
-
-        ${draft.payments.length ? draft.payments.map((p,i) => `
-          <div style="display:flex;justify-content:space-between;align-items:center;
-                      padding:6px 10px;background:var(--surface-2);border-radius:6px;margin-bottom:6px;font-size:13px">
-            <span>${moneyHTML(p.amount)} · ${escapeHTML(p.method)}</span>
-            <button type="button" data-draft-payment-remove="${i}"
-              style="color:var(--danger);background:none;border:none;font-size:16px;cursor:pointer">×</button>
-          </div>`).join('') : `<p class="muted" style="font-size:13px">No payment recorded yet.</p>`}
-        <div class="rs-repair-payment-entry" style="margin-top:8px">
-          <input type="number" step="any" min="0" placeholder="Amount" id="draft-pay-amount"
-            style="flex:1;border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text)">
-          <select id="draft-pay-method"
-            style="border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text)">
-            ${['Cash','Raast','JazzCash','EasyPaisa','Bank Transfer'].map(m => `<option>${m}</option>`).join('')}
-          </select>
-          <button type="button" class="secondary-button" data-action="draft-add-payment">+ Add</button>
-        </div>
-      </div>
-
-          </div>
-          <div class="rs-repair-finance-part"><h3>Balance</h3>
-      <div style="display:grid;gap:6px;padding:12px;background:var(--surface-2);border-radius:8px;margin-bottom:12px">
+                    <div class="rs-repair-finance-part"><h3>Balance</h3>
+      <div style="display:grid;gap:8px;padding:12px;background:var(--surface-2);border-radius:8px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;font-size:14px">
           <span>Quote Total</span><strong data-draft-total>${moneyHTML(total)}</strong>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:14px;color:var(--success)">
-          <span>Paid So Far</span><strong data-draft-paid>${moneyHTML(paid)}</strong>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;
-                    border-top:1px solid var(--border);padding-top:6px">
+        ${draft.payments.map((p,i) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--success)">
+          <span style="display:flex;align-items:center;gap:6px">
+            <button type="button" data-draft-payment-remove="${i}" aria-label="Remove advance payment" title="Remove advance"
+              style="color:var(--danger);background:none;border:none;font-size:18px;line-height:1;cursor:pointer;padding:0 2px">×</button>
+            Advance (${escapeHTML(p.method)})
+          </span>
+          <strong>− ${moneyHTML(p.amount)}</strong>
+        </div>`).join('')}
+        ${draft.payments.length ? `
+        <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;border-top:1px solid var(--border);padding-top:6px">
           <span>Remaining Balance</span><span data-draft-balance>${moneyHTML(balance)}</span>
-        </div>
+        </div>` : `
+        <p class="muted" style="font-size:13px;margin:0">Any advance payment is asked for in the next step.</p>`}
       </div>
 
           </div>
@@ -222,7 +207,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
       </div>
       <div class="modal-actions rs-repair-actions">
         <button type="button" class="secondary-button" data-close>Cancel</button>
-        <button class="primary-button">${isEditing ? 'Save Ticket Changes' : 'Create & Add to Cart'}</button>
+        <button class="primary-button">Continue to Cart</button>
       </div>
     </form>
   </div>`
@@ -246,6 +231,89 @@ export function compTagPickerHTML(name) {
         <button type="button" class="secondary-button" data-close>Cancel</button>
       </div>
     </div>
+  </div>`
+}
+
+export function advancePromptHTML(modal = {}) {
+  const draft        = getDraft()
+  const total        = calcDraftTotal(draft)
+  const existing     = draft.payments || []
+  const existingPaid = calcDraftPaid(draft)
+  const hasExisting  = existing.length > 0
+  const step         = modal.step || 'ask'
+  const method       = modal.method || 'Cash'
+  const amount       = Math.max(0, Number(modal.amount) || 0)
+  const remaining    = Math.max(0, total - amount)
+  const tooHigh      = amount > total + 0.001
+  const methods      = ['Cash','Raast','JazzCash','EasyPaisa','Bank Transfer']
+  const row = (label, value, style = '') =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;font-size:14px;${style}"><span>${label}</span>${value}</div>`
+  const box = rows =>
+    `<div style="display:grid;gap:8px;padding:12px;background:var(--surface-2);border-radius:8px;margin:12px 0">${rows.join('')}</div>`
+  const strong = v => `<strong>${v}</strong>`
+  const totalRow = row('Quote Total', strong(moneyHTML(total)))
+  const existingList = existing.map(p => `${moneyHTML(p.amount)} · ${escapeHTML(p.method)}`).join(' + ')
+  let body = ''
+
+  if (step === 'ask' && !hasExisting) {
+    body = `<h2>Advance Payment</h2>
+      <p class="muted" style="font-size:14px">Did the customer pay an advance for this repair?</p>
+      ${box([totalRow, row('Balance Due', strong(moneyHTML(total)), 'font-weight:700;border-top:1px solid var(--border);padding-top:6px')])}
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" data-action="advance-no">No</button>
+        <button type="button" class="primary-button" data-action="advance-yes">Yes</button>
+      </div>`
+  } else if (step === 'ask') {
+    body = `<h2>Replace Current Advance?</h2>
+      <p class="muted" style="font-size:14px">This ticket already has an advance recorded. Do you want to replace it?</p>
+      ${box([
+        totalRow,
+        row('Current Advance', strong(moneyHTML(existingPaid)), 'color:var(--success)'),
+        row('Balance Due', strong(moneyHTML(Math.max(0, total - existingPaid))), 'font-weight:700;border-top:1px solid var(--border);padding-top:6px'),
+      ])}
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" data-action="advance-no">No, Keep It</button>
+        <button type="button" class="primary-button" data-action="advance-yes">Yes, Replace It</button>
+      </div>`
+  } else if (step === 'amount') {
+    body = `<h2>${hasExisting ? 'Replace Advance' : 'Advance Received'}</h2>
+      ${hasExisting ? `
+      <div style="padding:10px 12px;border:1px dashed var(--border);border-radius:8px;margin-top:8px">
+        <div class="muted" style="font-size:13px">Current advance (will be replaced)</div>
+        <div><strong>${moneyHTML(existingPaid)}</strong> <span class="muted" style="font-size:13px">${existingList}</span></div>
+      </div>` : ''}
+      <div style="display:grid;gap:10px;margin-top:12px">
+        <label class="field"><span>${hasExisting ? 'New advance amount' : 'Advance amount'}</span>
+          <input id="advance-amount" class="search" type="number" step="any" min="0" inputmode="decimal" autofocus
+            placeholder="0" data-advance-amount value="${modal.amount === '' || modal.amount == null ? '' : escapeHTML(String(modal.amount))}"></label>
+        <label class="field"><span>Payment method</span>
+          <select class="tenant-switcher" data-advance-method>
+            ${methods.map(m => `<option ${m === method ? 'selected' : ''}>${m}</option>`).join('')}
+          </select></label>
+      </div>
+      ${box([
+        totalRow,
+        row('Paid So Far', `<strong data-adv-paid>${moneyHTML(amount)}</strong>`, 'color:var(--success)'),
+        row('Remaining Balance', `<strong data-adv-remaining>${moneyHTML(remaining)}</strong>`, 'font-weight:700;border-top:1px solid var(--border);padding-top:6px'),
+      ])}
+      <p class="inline-notice" data-adv-warning role="alert" style="display:${tooHigh ? 'block' : 'none'}">The advance cannot be more than the quote total.</p>
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" data-action="advance-back">Back</button>
+        <button type="button" class="primary-button" data-action="advance-continue">${hasExisting ? 'Replace Advance' : 'Add to Cart'}</button>
+      </div>`
+  } else {
+    body = `<h2>Are You Sure?</h2>
+      <p style="font-size:14px">You are replacing the current advance of <strong>${moneyHTML(existingPaid)}</strong> with
+        <strong>${moneyHTML(amount)}</strong> (${escapeHTML(method)}). The remaining balance will be <strong>${moneyHTML(remaining)}</strong>.</p>
+      <p class="muted" style="font-size:13px">The payment is recorded when the order is placed.</p>
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" data-action="advance-back">Go Back</button>
+        <button type="button" class="primary-button" data-action="advance-confirm">Yes, Replace It</button>
+      </div>`
+  }
+
+  return `<div class="modal-backdrop" data-no-backdrop-close>
+    <div class="modal rs-advance-prompt">${body}</div>
   </div>`
 }
 
