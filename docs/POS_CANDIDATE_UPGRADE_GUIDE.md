@@ -1,3 +1,9 @@
+## Current Platform integration status — 2026-11-02
+
+Paired Platform PR #7 merged into `development` with merge commit `3b85d51ceaa287d306dbc9d5f14ba83734b70ff1`; its post-merge backend parity run succeeded, and the Platform feature branch was retired after verification. Shop PR #5 remains merged. Hosted acceptance remains **PENDING / UNTESTED**; this merge does not certify hosted scenarios or change Shop backend/provisioning behavior.
+
+---
+
 # Support-v8 source approval and activation handoff — 30 October 2026
 
 > Current integration checkpoint — 31 October 2026: owner accepted the final Shop UI at bd925040a9d50bf1fed1f69b44c9b2ee9a3ae7a7 and authorized PR #5 to development with full history. Both Shop Pages production branches are now development. Use reviewed development source or an explicitly approved immutable revision after integration; the feature branch is being retired. The dated candidate/v8 source-only sections below are historical, including their former production-branch references, and are not current installation instructions. Approved immutable release is support-v10 (26885074b7035280985f5f33c42b395541fccbffe3fde94ed589969fd913b305); use INVENTORY_RETIREMENT_UPGRADE.md and the established Managed/BYO routes. Final merge/deployment/retirement verification is recorded externally in pos overhaul/repair-brand-alignment-2026-10-31. Platform source and customer backends are unchanged by this integration.

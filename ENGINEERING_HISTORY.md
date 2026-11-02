@@ -1929,3 +1929,20 @@ Owner explicitly accepted the hosted correction at bd925040a9d50bf1fed1f69b44c9b
 Pre-merge inspection finds clean Shop/Platform trees, no unresolved reviews or merge conflicts, only the Shop checkout using the target feature branch, and a separate legal worktree on its own branch. Shop CI pins Platform 7b4a5f745abaeaa9405dc523e514dcc6877b614b; Platform CI pins Shop 9f027251c04489ad82a32552aea72752dbe6a36c. Runtime/provisioning/upgrade consumers use approved v10 artifacts and immutable backend f78c5342fbc568a45feccdf5947fb49c774e474f, not the retiring branch name. Dated specs/acceptance records and former feature names are historical provenance. Added current integration notes to the Shop POS guides rather than rewriting that history.
 
 Authorized next actions are normal merge-commit integration to development, verification of both merged-source frontend deployments, then non-force retirement of the fully merged Shop branch. Preserve v8-v10 hashes, source ancestry, all backend/provisioning/pin/journal/financial contracts, the legal worktree and Platform PR #7/branch/source. No hosted database/function change. Exact final merge SHA, deployment IDs and retirement evidence belong in the external final report; do not infer completion from this preflight entry.
+
+## 2026-11-02 — Platform PR #7 integration handoff
+Branch: development
+### Purpose
+Keep the Shop candidate upgrade guide aligned with the paired Platform development merge and preserve the hosted acceptance limitation.
+### Changed
+Recorded Platform PR #7 merge commit `3b85d51ceaa287d306dbc9d5f14ba83734b70ff1`, successful post-merge Backend release parity run #37, and Platform feature-branch retirement. Shop PR #5 remains merged at `8614a604416a4782cca83981b1eeffc3d1c63c87`; the immutable Platform CI pin remains unchanged.
+### Decisions
+Hosted acceptance remains PENDING / UNTESTED. The Platform development merge does not imply a Shop deployment, migration, upgrade, or hosted acceptance. No Shop application code or release package changed.
+### Validation
+Shop PR #5 merge and immutable Platform-pin ancestry verified. Runbook `git diff --check` passed.
+### Deployment / DB impact
+Documentation only; the commit carries `[CF-Pages-Skip]`. No hosted changes.
+### Deferred / deliberately unchanged
+Hosted acceptance and customer upgrade remain separate gates.
+### Git
+Shop `development` includes only requested runbook/history documentation updates in this task.
