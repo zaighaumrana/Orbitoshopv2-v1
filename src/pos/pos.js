@@ -39,7 +39,7 @@ import {
   insertNewTicketFromCart, collectTicketPayment,
 } from '../features/pos/repairs/api.js'
 import {
-  combinedBalance, repairRowHTML, compTagPickerHTML, ticketSlipPreview,
+  combinedBalance, repairRowHTML, compTagPickerHTML, advancePromptHTML, ticketSlipPreview,
   repairTicketFormHTML, repairCollectionHTML,
 } from '../features/pos/repairs/render.js'
 import {
@@ -855,6 +855,11 @@ function renderModal() {
       isEditing: Boolean(state.modal._editingCartProductId),
     }) + compTagPickerHTML(state.modal.name)
   }
+  if (type === 'repair-advance') {
+    return repairTicketFormHTML(state.modal._info, {
+      isEditing: Boolean(state.modal._editingCartProductId),
+    }) + advancePromptHTML(state.modal)
+  }
   if (type === 'repair-collection') return repairCollectionHTML(posState.repairSearch,posState.collectionPage)
   if (type === 'ticket-payment')  return ticketPaymentModalHTML(state.modal)
 
@@ -996,6 +1001,57 @@ function captureRepairFormInfo() {
   const info = form ? Object.fromEntries(new FormData(form).entries()) : (state.modal?._info || {})
   if (state.modal) state.modal._info = info
   return info
+}
+
+/* ── Repair form → cart. Shared by every answer in the advance-payment prompt. ── */
+function commitRepairToCart(data, editingProductId) {
+  const draft = getDraft()
+  const total = calcDraftTotal(draft)
+  const paid  = calcDraftPaid(draft)
+  if (paid > total + 0.001) { showBlockingError('Initial payment cannot exceed the repair invoice.'); return false }
+  const draftData = snapshotDraft(draft)
+  const cartValues = {
+    name:          `Repair: ${data.deviceBrand} ${data.deviceModel} (${data.customerName})`,
+    qty:           1,
+    soldPrice:     Math.max(0, total - paid),
+    originalPrice: Math.max(0, total - paid),
+    discount:      0,
+    reason:        '',
+    isTicket:      true,
+    isNewTicket:   true,
+    customerName:  data.customerName,
+    customerPhone: data.customerPhone,
+    deviceBrand:   data.deviceBrand,
+    deviceModel:   data.deviceModel,
+    imei:          data.imei||'',
+    technicianNote:data.technicianNote||'',
+    draftData,
+  }
+  // Nothing is saved to the backend here; it happens when "Place Order" is clicked.
+  if (editingProductId) {
+    const updated = updateCartRepairDraft(posState.cart, editingProductId, cartValues)
+    if (!updated) { showBlockingError('Repair draft is no longer in the cart.'); return false }
+  } else {
+    posState.cart = posState.cart.filter(i => !i.isTicket)
+    posState.cart.push({
+      ...cartValues,
+      productId: `new-ticket-${Date.now()}`,
+      requestId: crypto.randomUUID(),
+    })
+  }
+  posState.cartIsNewTicket = true
+  resetDraft()
+  state.modal = null
+  render()
+  return true
+}
+
+/* Replace the draft's advance with the one typed in the prompt, then send the ticket to the cart. */
+function applyAdvanceAndCommit(modal) {
+  const draft = getDraft()
+  const previous = draft.payments
+  draft.payments = [{ amount: Number(modal.amount), method: modal.method || 'Cash' }]
+  if (!commitRepairToCart(modal._info, modal._editingCartProductId)) draft.payments = previous
 }
 
 function retailReturnSelection(context) {
@@ -1281,7 +1337,7 @@ function attachEvents() {
     if (el.dataset.close !== undefined) {
       dlog('POS.click', `DATA-CLOSE branch firing -- state.modal was type=${state.modal?.type} -- about to call POS.render()`)
       if (state.modal?.type === 'pinPrompt') { cancelPinPrompt(render); return }
-            if (state.modal?.type === 'comp-tag-picker') {
+            if (state.modal?.type === 'comp-tag-picker' || state.modal?.type === 'repair-advance') {
         state.modal = { type:'repair', _info:state.modal._info, _editingCartProductId:state.modal._editingCartProductId }
         render(); return
       }
@@ -1711,14 +1767,36 @@ function attachEvents() {
       captureRepairFormInfo()
       getDraft().payments.splice(Number(el.dataset.draftPaymentRemove), 1); render(); return
     }
-    if (el.dataset.action === 'draft-add-payment') {
-      const amount = Number(document.getElementById('draft-pay-amount')?.value||0)
-      const method = document.getElementById('draft-pay-method')?.value||'Cash'
-      if (!amount||amount<=0) { showBlockingError('Enter a payment amount.'); return }
-      captureRepairFormInfo()
-      getDraft().payments.push({ amount, method })
-      document.getElementById('draft-pay-amount').value = ''
-      render(); return
+        /* ── Advance-payment prompt (opens after the repair form is submitted) ── */
+    if (el.dataset.action === 'advance-no') {
+      const m = state.modal
+      if (m?.type !== 'repair-advance' || m.step !== 'ask') return
+      commitRepairToCart(m._info, m._editingCartProductId); return
+    }
+    if (el.dataset.action === 'advance-yes') {
+      const m = state.modal
+      if (m?.type !== 'repair-advance' || m.step !== 'ask') return
+      state.modal = { ...m, step:'amount' }; render(); return
+    }
+    if (el.dataset.action === 'advance-back') {
+      const m = state.modal
+      if (m?.type !== 'repair-advance') return
+      state.modal = { ...m, step: m.step === 'confirm' ? 'amount' : 'ask' }; render(); return
+    }
+    if (el.dataset.action === 'advance-continue') {
+      const m = state.modal
+      if (m?.type !== 'repair-advance' || m.step !== 'amount') return
+      const amount = Number(m.amount) || 0
+      const total  = calcDraftTotal(getDraft())
+      if (amount <= 0) { showBlockingError('Enter the advance amount.'); return }
+      if (amount > total + 0.001) { showBlockingError('Initial payment cannot exceed the repair invoice.'); return }
+      if (getDraft().payments.length) { state.modal = { ...m, step:'confirm' }; render(); return }
+      applyAdvanceAndCommit(m); return
+    }
+    if (el.dataset.action === 'advance-confirm') {
+      const m = state.modal
+      if (m?.type !== 'repair-advance' || m.step !== 'confirm') return
+      applyAdvanceAndCommit(m); return
     }
     if (el.dataset.action === 'draft-set-override') {
       captureRepairFormInfo()
@@ -1814,6 +1892,10 @@ function attachEvents() {
     if (t.dataset.draftLabour !== undefined) {
       getDraft().labour = Number(t.value)||0; _refreshDraftTotals()
     }
+    if (t.dataset.advanceAmount !== undefined && state.modal?.type === 'repair-advance') {
+      state.modal.amount = t.value
+      _refreshAdvancePrompt()
+    }
     if (t.dataset.subinvCompPrice !== undefined || t.dataset.subinvLabour !== undefined) {
       updateSubInvDraftTotal()
     }
@@ -1832,6 +1914,7 @@ function attachEvents() {
       'custom-tag-text':  'confirm-draft-custom-tag',
       'custom-comp-name': 'add-custom-draft-comp',
       'intake-custom-comp-name': 'add-intake-custom-comp',
+      'advance-amount':   'advance-continue',
     }
     const action = map[e.target.id]
     if (!action) return
@@ -1847,6 +1930,7 @@ function attachEvents() {
     if (t.dataset.action === 'payment') {
       posState.checkoutPayment = t.value; posState.cashTendered = 0; render(); return
     }
+    if (t.dataset.advanceMethod !== undefined && state.modal?.type === 'repair-advance') { state.modal.method = t.value; return }
     if (t.dataset.split === 'method') { posState.splitMethod = t.value; return }
     if (t.dataset.udhar === 'name')  { posState.udharName  = t.value; return }
     if (t.dataset.udhar === 'phone') { posState.udharPhone = t.value; return }
@@ -1874,43 +1958,12 @@ function attachEvents() {
       if (!data.deviceBrand?.trim())  { showBlockingError('Device brand is required.'); return }
       if (!data.deviceModel?.trim())  { showBlockingError('Device model is required.'); return }
 
-      const total = calcDraftTotal(draft)
-      const paid  = calcDraftPaid(draft)
-      const draftData = snapshotDraft(draft)
-      const cartValues = {
-        name:          `Repair: ${data.deviceBrand} ${data.deviceModel} (${data.customerName})`,
-        qty:           1,
-        soldPrice:     Math.max(0, total - paid),
-        originalPrice: Math.max(0, total - paid),
-        discount:      0,
-        reason:        '',
-        isTicket:      true,
-        isNewTicket:   true,
-        customerName:  data.customerName,
-        customerPhone: data.customerPhone,
-        deviceBrand:   data.deviceBrand,
-        deviceModel:   data.deviceModel,
-        imei:          data.imei||'',
-        technicianNote:data.technicianNote||'',
-        draftData,
+            // Ask about the advance first; the cart line is created from the answer (commitRepairToCart).
+      state.modal = {
+        type:'repair-advance', step:'ask',
+        _info:data, _editingCartProductId:editingProductId,
+        amount:'', method:'Cash',
       }
-
-      // Don't actually save to DB yet — just add to cart as "new ticket"
-      // Saving happens when "Place Order" is clicked
-      if (editingProductId) {
-        const updated = updateCartRepairDraft(posState.cart, editingProductId, cartValues)
-        if (!updated) { showBlockingError('Repair draft is no longer in the cart.'); return }
-      } else {
-        posState.cart = posState.cart.filter(i => !i.isTicket)
-        posState.cart.push({
-          ...cartValues,
-          productId: `new-ticket-${Date.now()}`,
-          requestId: crypto.randomUUID(),
-        })
-      }
-      posState.cartIsNewTicket = true
-      resetDraft()
-      state.modal = null
       render(); return
     }
 
@@ -1991,6 +2044,20 @@ function attachEvents() {
     }
   },error=>showBlockingError(error?.message||'Unable to confirm the result. Refresh reads before retrying.'))
 
+}
+
+/* ── Live refresh of the advance prompt while the operator types the amount ── */
+function _refreshAdvancePrompt() {
+  try {
+    const total  = calcDraftTotal(getDraft())
+    const amount = Math.max(0, Number(state.modal?.amount) || 0)
+    const paidEl = document.querySelector('[data-adv-paid]')
+    const remEl  = document.querySelector('[data-adv-remaining]')
+    const warnEl = document.querySelector('[data-adv-warning]')
+    if (paidEl) paidEl.textContent = money(amount)
+    if (remEl)  remEl.textContent  = money(Math.max(0, total - amount))
+    if (warnEl) warnEl.style.display = amount > total + 0.001 ? 'block' : 'none'
+  } catch {}
 }
 
 /* ── Live draft total refresh (no full re-render — just update the display) ── */
