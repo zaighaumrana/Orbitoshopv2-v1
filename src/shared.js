@@ -655,7 +655,7 @@ export function can(mod, role) {
 export function modalEntitled(type) {
   if (type === 'leave-request') return CFG.ems_enabled === true
   if (['inv-add','inv-edit','inv-adjust','inv-retire'].includes(type)) return CFG.inventory_module_enabled === true
-  if (['repair','repair-collection','ticket-payment','ticketDetail','edit-components','mark-not-needed','create-sub-invoice','repair-adjustment','repair-cancellation','add-comp-tag','comp-tag-picker'].includes(type)) return CFG.repair_module_enabled === true
+  if (['repair','repair-collection','ticket-payment','ticketDetail','edit-components','mark-not-needed','create-sub-invoice','repair-adjustment','repair-cancellation','add-comp-tag','comp-tag-picker','repair-advance'].includes(type)) return CFG.repair_module_enabled === true
   return true
 }
 
