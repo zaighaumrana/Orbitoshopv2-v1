@@ -1106,6 +1106,10 @@ input[type="number"] {
 .rs-shop .modal-backdrop:has(>.rs-variant-picker){grid-template-columns:minmax(0,1fr)}
 .rs-shop .modal.rs-variant-picker{width:min(600px,100%)}
 
+/* Component tag picker: same 600px width as receipt/variant dialogs; stacks over the repair form. */
+.rs-shop .modal-backdrop:has(>.rs-comp-tag-picker){grid-template-columns:minmax(0,1fr);background:transparent}
+.rs-shop .modal.rs-comp-tag-picker{width:min(600px,100%)}
+
 /* One shared custom sale row, independent of either selector's contents. */
 .rs-shop .rs-custom-item.rs-custom-bar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;margin:0;align-items:end;padding:12px 16px}
 .rs-shop .rs-custom-bar h3{margin:0 0 12px;white-space:nowrap}
