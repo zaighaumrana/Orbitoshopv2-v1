@@ -230,7 +230,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
 
 export function compTagPickerHTML(name) {
   return `<div class="modal-backdrop" data-no-backdrop-close>
-    <div class="modal modal-xs">
+   <div class="modal rs-comp-tag-picker">
       <h2>${escapeHTML(name)}</h2>
       <p class="muted" style="font-size:13px">What's the issue?</p>
       <div style="display:grid;gap:8px;margin-top:10px">
