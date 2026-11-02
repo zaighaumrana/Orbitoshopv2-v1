@@ -850,7 +850,11 @@ function renderModal() {
       isEditing: Boolean(state.modal._editingCartProductId),
     })
   }
-  if (type === 'comp-tag-picker') return compTagPickerHTML(state.modal.name)
+    if (type === 'comp-tag-picker') {
+    return repairTicketFormHTML(state.modal._info, {
+      isEditing: Boolean(state.modal._editingCartProductId),
+    }) + compTagPickerHTML(state.modal.name)
+  }
   if (type === 'repair-collection') return repairCollectionHTML(posState.repairSearch,posState.collectionPage)
   if (type === 'ticket-payment')  return ticketPaymentModalHTML(state.modal)
 
@@ -1277,6 +1281,10 @@ function attachEvents() {
     if (el.dataset.close !== undefined) {
       dlog('POS.click', `DATA-CLOSE branch firing -- state.modal was type=${state.modal?.type} -- about to call POS.render()`)
       if (state.modal?.type === 'pinPrompt') { cancelPinPrompt(render); return }
+            if (state.modal?.type === 'comp-tag-picker') {
+        state.modal = { type:'repair', _info:state.modal._info, _editingCartProductId:state.modal._editingCartProductId }
+        render(); return
+      }
       state.modal = state.modal?.type==='qitem-pick'?state.modal.returnTo||null:null; render(); return
     }
 
