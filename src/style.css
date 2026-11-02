@@ -1110,6 +1110,22 @@ input[type="number"] {
 .rs-shop .modal-backdrop:has(>.rs-comp-tag-picker){grid-template-columns:minmax(0,1fr);background:transparent}
 .rs-shop .modal.rs-comp-tag-picker{width:min(600px,100%)}
 
+/* Repair form: Labour/quote and Balance share the finance row 50/50 (payments moved to the advance prompt).
+   Extra selector depth is needed because brand/retrasell-shop.css loads after this file. */
+.rs-shop .rs-repair-workspace-dialog .rs-repair-finance{grid-template-columns:repeat(2,minmax(0,1fr))}
+.rs-shop .rs-repair-workspace-dialog .rs-repair-finance-part:last-child{grid-column:auto}
+.rs-shop .rs-repair-workspace-dialog .rs-repair-finance-part+.rs-repair-finance-part{padding-inline-start:16px;border-inline-start:1px solid var(--divider)}
+@media(max-width:820px){
+  .rs-shop .rs-repair-workspace-dialog .rs-repair-finance{grid-template-columns:minmax(0,1fr)}
+  .rs-shop .rs-repair-workspace-dialog .rs-repair-finance-part+.rs-repair-finance-part{padding:12px 0 0;border-inline-start:0;border-top:1px solid var(--divider)}
+}
+
+/* Advance-payment prompt: same 600px width as the other dialogs, stacked over the repair form. */
+.rs-shop .modal-backdrop:has(>.rs-advance-prompt){grid-template-columns:minmax(0,1fr);background:transparent}
+.rs-shop .modal.rs-advance-prompt{width:min(600px,100%)}
+.rs-shop .rs-advance-prompt .modal-actions .primary-button,
+.rs-shop .rs-advance-prompt .modal-actions .secondary-button{flex:1;min-height:48px;font-size:15px}
+
 /* One shared custom sale row, independent of either selector's contents. */
 .rs-shop .rs-custom-item.rs-custom-bar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;margin:0;align-items:end;padding:12px 16px}
 .rs-shop .rs-custom-bar h3{margin:0 0 12px;white-space:nowrap}
