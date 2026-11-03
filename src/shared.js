@@ -878,6 +878,11 @@ export function myAccountModalHTML(session) {
       <div class="modal-actions">
         <button type="button" class="secondary-button" data-close>Close</button>
       </div>
+    ` : isOwnerLike ? `
+      <p class="muted" style="font-size:13px">Owners change their password in Settings → Security.</p>
+      <div class="modal-actions">
+        <button type="button" class="secondary-button" data-close>Close</button>
+      </div>
     ` : `<form data-form="change-password">
       <p class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Change Password</p>
       <div class="form-grid">
