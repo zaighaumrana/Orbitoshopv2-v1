@@ -26,6 +26,10 @@ const ICON = {
 const item = (action, icon, label, { danger = false, keepOpen = false, role = 'menuitem', checked } = {}) =>
   `<button type="button" role="${role}"${checked === undefined ? '' : ` aria-checked="${checked}"`} class="rs-menu-item${danger ? ' is-danger' : ''}" data-action="${action}"${keepOpen ? ' data-keep-open' : ''}>${icon}<span>${label}</span>${role === 'menuitemcheckbox' ? '<span class="rs-switch" aria-hidden="true"></span>' : ''}</button>`
 
+// Menu item that moves to another in-app route (handled in the click listener below).
+const navItem = (path, icon, label) =>
+  `<button type="button" role="menuitem" class="rs-menu-item" data-nav="${path}">${icon}<span>${label}</span></button>`
+
 export function accountMenuHTML({ session, shop = '', leave = false, clockOut = false } = {}) {
   const emp = session?.employee || {}
   const name = emp.name || ''
@@ -36,7 +40,9 @@ export function accountMenuHTML({ session, shop = '', leave = false, clockOut = 
   const initials = (name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => Array.from(w)[0]).join('') || '?').toUpperCase()
 
   const account = [
-    item('my-account', ICON.user, 'My Account'),
+    ownerLike
+      ? navItem('/admin/settings?tab=security', ICON.user, 'My Account')
+      : item('my-account', ICON.user, 'My Account'),
     !ownerLike && !support ? item('change-password', ICON.key, 'Change Password') : '',
     ems && leave ? item('open-leave-request', ICON.calendar, 'Request Leave') : '',
     state.installPrompt ? item('install', ICON.download, 'Install App') : '',
@@ -116,6 +122,13 @@ if (!window.__rsAccountMenu) {
     if (!open) return
     const menuItem = target.closest('#rs-account-panel .rs-menu-item')
     if (menuItem) {
+      const path = menuItem.getAttribute('data-nav')
+      if (path) {
+        event.stopPropagation()
+        setOpen(false)
+        import('./router.js').then(({ navigate }) => navigate(path))
+        return
+      }
       if (!menuItem.hasAttribute('data-keep-open')) setOpen(false, { focusTrigger: true })
       return
     }
