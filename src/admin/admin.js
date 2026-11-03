@@ -568,9 +568,9 @@ function settings() {
   if (state.role !== 'Business Owner' && state.role !== 'Orbito Support')
     return `<div class="card"><p class="muted">Settings are available to Business Owner only.</p></div>`
   const t = currentTenant()
-  const tabs = { branding:'Branding', contact:'Contact', receipt:'Receipt & Tax', staff:'Staff & Security', legal:'Legal & Privacy', icons:'Icons' }
+  const tabs = { branding:'Branding', contact:'Contact', receipt:'Receipt & Tax', staff:'Security', legal:'Legal & Privacy', icons:'Icons' }
   return `
-    ${tit('Business Settings','Branding, contact, receipts, staff and icon choices.','')}
+    ${tit('Business Settings','Branding, contact, receipts, security and icon choices.','')}
     <div class="settings-tabs">
       ${Object.entries(tabs).map(([k,l]) =>
         `<button class="settings-tab ${adminState.settingsTab===k?'active':''}" data-settings-tab="${k}">${l}</button>`
@@ -646,13 +646,27 @@ function settingsTabContent() {
       <div style="display:grid;gap:16px">
         <div class="card" style="display:grid;gap:14px">
           <h2>Owner Login</h2>
-          <p class="muted" style="font-size:13px">${CFG.onboarding_version === 2 ? 'The invited Business Owner identity is reserved and cannot be changed here.' : 'The owner email stays synchronized with Supabase Auth.'} Owners change their own password from My Account.</p>
+          <p class="muted" style="font-size:13px">${CFG.onboarding_version === 2 ? 'The invited Business Owner identity is reserved and cannot be changed here.' : 'The owner email stays synchronized with Supabase Auth.'} Change your password in the card below.</p>
           <form class="form-grid" data-form="owner-login">
             ${fld('Owner Email','owner_email',SESSION.employee?.role === 'Business Owner' ? SESSION.employee.email : '','email').replace('<input ', `<input ${CFG.onboarding_version === 2 ? 'readonly ' : ''}`)}
             <div class="modal-actions" style="grid-column:1/-1">
               <button class="primary-button" ${CFG.onboarding_version === 2 ? 'disabled' : ''}>Save Owner Login</button>
             </div>
           </form>
+        </div>
+        <div class="card" style="display:grid;gap:14px">
+          <h2>Change Password</h2>
+          ${SESSION.isSupportAdmin ? `
+          <p class="muted" style="font-size:13px">This support session was issued through ${escapeHTML(SHORT_BRAND_NAME)} platform authentication. The client-project support identity has no reusable password.</p>
+          ` : `
+          <p class="muted" style="font-size:13px">Confirm your current password, then choose a new one.</p>
+          <form class="form-grid" data-form="change-password">
+            <label class="field"><span>Current Password</span><input name="oldPassword" type="password" required autocomplete="current-password"></label>
+            <label class="field"><span>New Password</span><input name="newPassword" type="password" required autocomplete="new-password"></label>
+            <label class="field"><span>Confirm New Password</span><input name="confirmPassword" type="password" required autocomplete="new-password"></label>
+            <div id="change-password-error" class="hidden" style="grid-column:1/-1;color:var(--danger);font-size:13px"></div>
+            <div class="modal-actions" style="grid-column:1/-1"><button class="primary-button">Update Password</button></div>
+          </form>`}
         </div>
         <div class="card" style="display:grid;gap:14px">
           <h2>Override PIN</h2>
@@ -667,14 +681,6 @@ function settingsTabContent() {
             </div>
           </form>
         </div>
-        <div class="card" style="padding:14px">
-          <p class="muted" style="font-size:13px">
-            To manage employees, go to the
-            <button type="button" class="secondary-button"
-              style="font-size:12px;padding:3px 10px;margin:0 4px"
-              data-action="go-employees-tab">Employees tab</button>
-          </p>
-        </div>
       </div>`
   }
 
@@ -688,7 +694,7 @@ function renderModal() {
   const { type, id } = state.modal
   if(type==='catalog-icon')return catalogIconModalHTML(state.modal)
   if(type==='device-brand')return deviceBrandModalHTML(state.modal)
-  if(!['myAccount','pinPrompt'].includes(type)&&Object.values(state.resources||{}).some(r=>r.status!=='ready'&&r.status!=='disabled'))return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Required detail')}<button type="button" data-close>Close</button></div></div>`
+  if(!['myAccount','changePassword','pinPrompt'].includes(type)&&Object.values(state.resources||{}).some(r=>r.status!=='ready'&&r.status!=='disabled'))return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Required detail')}<button type="button" data-close>Close</button></div></div>`
 
   if (type === 'pinPrompt') return `<div class="modal-backdrop">${pinPromptHTML(state.modal.purpose)}</div>`
 
