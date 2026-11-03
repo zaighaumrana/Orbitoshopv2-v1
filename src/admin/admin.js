@@ -568,7 +568,7 @@ function settings() {
   if (state.role !== 'Business Owner' && state.role !== 'Orbito Support')
     return `<div class="card"><p class="muted">Settings are available to Business Owner only.</p></div>`
   const t = currentTenant()
-  const tabs = { branding:'Branding', contact:'Contact', receipt:'Receipt & Tax', staff:'Security', legal:'Legal & Privacy', icons:'Icons' }
+  const tabs = { branding:'Branding', contact:'Contact', receipt:'Receipt & Tax', security:'Security', legal:'Legal & Privacy', icons:'Icons' }
   return `
     ${tit('Business Settings','Branding, contact, receipts, security and icon choices.','')}
     <div class="settings-tabs">
@@ -641,7 +641,7 @@ function settingsTabContent() {
       <div class="modal-actions" style="grid-column:1/-1"><button class="primary-button">Save Receipt Settings</button></div>
     </form>`
 
-  if (adminState.settingsTab === 'staff') {
+  if (adminState.settingsTab === 'security') {
     return `
       <div style="display:grid;gap:16px">
         <div class="card" style="display:grid;gap:14px">
