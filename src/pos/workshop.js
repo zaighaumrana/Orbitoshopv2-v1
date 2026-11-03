@@ -1,4 +1,5 @@
 import {profileIcon} from '../profile-icon.js'
+import {accountMenuHTML, changePasswordModalHTML} from '../account-menu.js'
 import {renderOperationalScreen} from '../ui-render.js'
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
 import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
@@ -175,7 +176,7 @@ function render() {
               <button class="secondary-button" data-action="go-pos">POS</button>
               <button class="secondary-button" data-action="go-admin">Admin</button>
             ` : ''}
-            <button class="icon-button" data-action="my-account" title="My Account" aria-label="My Account">${profileIcon}</button>
+            ${accountMenuHTML({ session: SESSION, shop: tenant.name, leave: true, clockOut: true })}
             <button class="icon-button" data-action="theme">
               ${state.theme === 'dark' ? 'Light' : 'Dark'}
             </button>
@@ -366,6 +367,7 @@ function renderModal() {
   if (type === 'leave-request') return leaveRequestHTML()
 
   if (type === 'myAccount') return myAccountModalHTML(SESSION)
+   if (type === 'changePassword') return changePasswordModalHTML(SESSION)
 
   if (type === 'pinPrompt') {
     return `<div class="modal-backdrop">${pinPromptHTML(state.modal.purpose)}</div>`
@@ -584,6 +586,9 @@ function attachEvents() {
     }
     if (el.dataset.action === 'my-account') {
       state.modal = { type: 'myAccount' }; render(); return
+    }
+    if (el.dataset.action === 'change-password') {
+      state.modal = { type: 'changePassword' }; render(); return
     }
     if (el.dataset.action === 'theme') {
       state.theme = state.theme === 'dark' ? 'light' : 'dark'
