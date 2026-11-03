@@ -22,8 +22,8 @@ test('customer release planner supports fresh and additive exact histories, and 
  assert.match(migrationEnvelope(r.migrations.at(-1)),/pg_advisory_xact_lock\(71390461\)/);assert.match(migrationEnvelope(r.migrations.at(-1)),/schema_migrations/);
 });
 test('safe navigation retains only approved non-sensitive view values for the same verified user, role and URL',()=>{
- const state={adminModule:'receipts',receiptType:'repair',receiptDateFrom:'2026-10-01',filter:'private customer',receiptSearch:'phone',modal:{type:'checkout'},settingsTab:'staff'};
- assert.deepEqual(safeAdminState(state),{settingsTab:'staff',receiptDateFrom:'2026-10-01',receiptType:'repair'});
+ const state={adminModule:'receipts',receiptType:'repair',receiptDateFrom:'2026-10-01',filter:'private customer',receiptSearch:'phone',modal:{type:'checkout'},settingsTab:'security'};
+ assert.deepEqual(safeAdminState(state),{settingsTab:'security',receiptDateFrom:'2026-10-01',receiptType:'repair'});
  const history={state:{},replaceState(s){this.state=s}},location={pathname:'/admin/receipts',search:'?view=summary'},session={authUserId:id,employee:{role:'Business Owner'}};
  saveAdminView(history,location,session,state,250);assert.equal(readAdminView(history,location,session).scroll,250);
  assert.equal(readAdminView(history,location,{...session,authUserId:sid}),null);assert.equal(readAdminView(history,{...location,search:''},session),null);assert.ok(!JSON.stringify(history.state).includes('private customer'));
