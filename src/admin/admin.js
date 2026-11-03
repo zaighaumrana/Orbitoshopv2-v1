@@ -1,5 +1,6 @@
 import {retirementAvailable} from '../inventory-state.js'
 import {profileIcon} from '../profile-icon.js'
+import {accountMenuHTML, changePasswordModalHTML} from '../account-menu.js'
 import {catalogAvailable} from '../catalog/data.js'
 import {iconSettingsHTML,iconSettingsValues} from '../catalog/icon-settings.js'
 import {iconAllowed} from '../catalog/icons.js'
@@ -357,7 +358,7 @@ function render() {
                 ? `<button class="secondary-button" data-action="go-workshop">Workshop</button>`
                 : ''}
             ` : ''}
-            <button class="icon-button" data-action="my-account" title="My Account" aria-label="My Account">${profileIcon}</button>
+            ${accountMenuHTML({ session: SESSION, shop: tenant.name })}
             <button class="icon-button" data-action="theme">
               ${state.theme === 'dark' ? 'Light' : 'Dark'}
             </button>
@@ -692,6 +693,7 @@ function renderModal() {
   if (type === 'pinPrompt') return `<div class="modal-backdrop">${pinPromptHTML(state.modal.purpose)}</div>`
 
   if (type === 'myAccount') return myAccountModalHTML(SESSION)
+   if (type === 'changePassword') return changePasswordModalHTML(SESSION)
 
   if (type === 'addQuickItem') return addQuickItemModalHTML()
 
@@ -1164,6 +1166,9 @@ function attachEvents() {
     }
     if (el.dataset.action === 'my-account') {
       state.modal = { type: 'myAccount' }; render(); return
+    }
+    if (el.dataset.action === 'change-password') {
+      state.modal = { type: 'changePassword' }; render(); return
     }
     if (el.dataset.action === 'open-password-resets') {
       const requests = await viewAwait(eventCurrent,()=>(listPendingResetRequests()),()=>state.modal)
