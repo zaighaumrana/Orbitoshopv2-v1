@@ -1,9 +1,11 @@
 // Safe presentation state only. Free text, record IDs, modal and transaction
 // drafts are excluded. Live main/router gates remain authoritative.
-const tabs={inventoryStatus:['active','retired'],settingsTab:['branding','contact','receipt','staff','legal','icons'],catalogTab:['quickitems','components']}
+const tabs={inventoryStatus:['active','retired'],settingsTab:['branding','contact','receipt','security','legal','icons'],catalogTab:['quickitems','components']}
+// Old bookmarks and saved history entries used ?tab=staff; keep them working.
+const legacy={settingsTab:{staff:'security'}}
 export function safeAdminState(input={}){
  const out={}
- for(const [name,values] of Object.entries(tabs))if(values.includes(input[name]))out[name]=input[name]
+ for(const [name,values] of Object.entries(tabs)){const value=legacy[name]?.[input[name]]||input[name];if(values.includes(value))out[name]=value}
  for(const name of ['receiptDateFrom','receiptDateTo'])if(/^\d{4}-\d{2}-\d{2}$/.test(input[name]||''))out[name]=input[name]
  if(['all','retail','repair'].includes(input.receiptType))out.receiptType=input.receiptType
  return out
