@@ -1,4 +1,5 @@
 import {profileIcon} from '../profile-icon.js'
+import {accountMenuHTML, changePasswordModalHTML} from '../account-menu.js'
 import {quickPrice,quickPrices} from '../catalog/prices.js'
 import {iconHTML,itemCategory,brandIcon} from '../catalog/icons.js'
 import {intakeBrands} from '../catalog/data.js'
@@ -273,7 +274,7 @@ function render() {
                 ? `<button class="secondary-button" data-action="go-workshop">Workshop</button>`
                 : ''}
             ` : ''}
-            <button class="icon-button" data-action="my-account" title="My Account" aria-label="My Account">${profileIcon}</button>
+            ${accountMenuHTML({ session: SESSION, shop: tenant.name, leave: true, clockOut: true })}
             <button class="icon-button" data-action="theme">${state.theme==='dark'?'Light':'Dark'}</button>
             ${CFG.ems_enabled && !(SESSION.isAdmin || SESSION.employee?.role === 'Business Owner') ? `
               <button class="secondary-button" style="font-size:12px" data-action="ems-clock-out">
@@ -710,6 +711,7 @@ function renderModal() {
   if (type === 'leave-request') return leaveRequestHTML()
 
   if (type === 'myAccount') return myAccountModalHTML(SESSION)
+  if (type === 'changePassword') return changePasswordModalHTML(SESSION)
 
   if (type === 'pinPrompt') return `<div class="modal-backdrop">${pinPromptHTML(state.modal.purpose)}</div>`
 
@@ -1503,8 +1505,11 @@ function attachEvents() {
       return
     }
 
-    if (el.dataset.action === 'my-account') {
+     if (el.dataset.action === 'my-account') {
       state.modal = { type: 'myAccount' }; render(); return
+    }
+    if (el.dataset.action === 'change-password') {
+      state.modal = { type: 'changePassword' }; render(); return
     }
     if (el.dataset.action === 'theme') {
       state.theme = state.theme==='dark'?'light':'dark'
