@@ -1,5 +1,4 @@
 import {retirementAvailable} from '../inventory-state.js'
-import {profileIcon} from '../profile-icon.js'
 import {accountMenuHTML, changePasswordModalHTML} from '../account-menu.js'
 import {catalogAvailable} from '../catalog/data.js'
 import {iconSettingsHTML,iconSettingsValues} from '../catalog/icon-settings.js'
@@ -25,7 +24,7 @@ import {
   money, moneyHTML, fld, modalActions, statusBadge,
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   logBillEvent,
-  myAccountModalHTML, handleChangePasswordSubmit,
+  handleChangePasswordSubmit,
   generateTempPassword, listPendingResetRequests, resolvePasswordReset,
   invokeAccountAdmin,
   showTransactionSuccess, showBlockingError, showToast, confirmAction, requestInput, runInstallPrompt,
@@ -687,12 +686,11 @@ function renderModal() {
   const { type, id } = state.modal
   if(type==='catalog-icon')return catalogIconModalHTML(state.modal)
   if(type==='device-brand')return deviceBrandModalHTML(state.modal)
-  if(!['myAccount','changePassword','leave-request','pinPrompt'].includes(type)&&Object.values(state.resources||{}).some(r=>r.status!=='ready'&&r.status!=='disabled'))return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Required detail')}<button type="button" data-close>Close</button></div></div>`
+  if(!['changePassword','leave-request','pinPrompt'].includes(type)&&Object.values(state.resources||{}).some(r=>r.status!=='ready'&&r.status!=='disabled'))return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Required detail')}<button type="button" data-close>Close</button></div></div>`
 
   if (type === 'pinPrompt') return `<div class="modal-backdrop">${pinPromptHTML(state.modal.purpose)}</div>`
 
-  if (type === 'myAccount') return myAccountModalHTML(SESSION)
-   if (type === 'changePassword') return changePasswordModalHTML(SESSION)
+  if (type === 'changePassword') return changePasswordModalHTML(SESSION)
     if (type === 'leave-request') return leaveRequestHTML()
 
   if (type === 'addQuickItem') return addQuickItemModalHTML()
@@ -1164,9 +1162,6 @@ function attachEvents() {
     if (el.dataset.action === 'install' && state.installPrompt) {
       await viewAwait(eventCurrent,()=>(runInstallPrompt()),()=>state.modal); render(); return
     }
-    if (el.dataset.action === 'my-account') {
-      state.modal = { type: 'myAccount' }; render(); return
-    }
     if (el.dataset.action === 'change-password') {
       state.modal = { type: 'changePassword' }; render(); return
     }
@@ -1220,14 +1215,6 @@ function attachEvents() {
         action: async () => { await viewAwait(eventCurrent,()=>(_clearSession()),()=>state.modal); return true },
       })),()=>state.modal)
       return
-    }
-
-    if (el.dataset.action === 'go-employees-tab') {
-      adminState.adminModule = 'employees'
-      adminState.settingsTab = 'branding'
-      adminState.catalogTab  = 'quickitems'
-      const { navigate } = await viewAwait(eventCurrent,()=>(import('../router.js')),()=>state.modal)
-      navigate('/admin/employees'); return
     }
 
     if (el.dataset.action === 'edit-employee') {
