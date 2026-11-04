@@ -1,4 +1,3 @@
-import {profileIcon} from '../profile-icon.js'
 import {accountMenuHTML, changePasswordModalHTML} from '../account-menu.js'
 import {renderOperationalScreen} from '../ui-render.js'
 import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
@@ -20,7 +19,7 @@ import {
   sb, state, CFG, loadConfig, applyBranding, currentTenant,
   _clearSession, can, modalEntitled, money, moneyHTML, fld, modalActions,
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
-  myAccountModalHTML, handleChangePasswordSubmit,
+  handleChangePasswordSubmit,
   showTransactionSuccess, showBlockingError, showToast, confirmAction, runInstallPrompt,
 } from '../shared.js'
 import {
@@ -354,8 +353,7 @@ function renderModal() {
 
   if (type === 'leave-request') return leaveRequestHTML()
 
-  if (type === 'myAccount') return myAccountModalHTML(SESSION)
-   if (type === 'changePassword') return changePasswordModalHTML(SESSION)
+  if (type === 'changePassword') return changePasswordModalHTML(SESSION)
 
   if (type === 'pinPrompt') {
     return `<div class="modal-backdrop">${pinPromptHTML(state.modal.purpose)}</div>`
@@ -571,9 +569,6 @@ function attachEvents() {
     }
     if (el.dataset.action === 'install' && state.installPrompt) {
       await viewAwait(eventCurrent,()=>(runInstallPrompt()),()=>state.modal); render(); return
-    }
-    if (el.dataset.action === 'my-account') {
-      state.modal = { type: 'myAccount' }; render(); return
     }
     if (el.dataset.action === 'change-password') {
       state.modal = { type: 'changePassword' }; render(); return
