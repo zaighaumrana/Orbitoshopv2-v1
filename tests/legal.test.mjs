@@ -88,7 +88,7 @@ test('canonical Markdown is safe; login has no document links and Help is separa
   assert.doesNotMatch(helpLink(), /doc=terms|doc=privacy|doc=dpa/)
   assert.doesNotMatch(read('src/auth.js'),/legalLinks|helpLink|legal\.html|PLACEHOLDER/)
   assert.match(read('src/auth.js'), /escapeHTML\(PROJECT_ATTRIBUTION\)/)
-  assert.match(read('src/shared.js').split('export function myAccountModalHTML')[1].split('/** Shared handler')[0], /\$\{helpLink\(\)\}/)
+  assert.match(read('src/account-menu.js'), /legal\.html\?doc=guide[\s\S]*Help &amp; User Guide/)
   assert.doesNotMatch(read('src/legal/page.js'),/shared\.js|supabase|turnstile|ghost-fibers/)
   assert.match(read('legal.html'),/src\/legal\/page.js/)
   assert.match(read('vite.config.js'),/legal: 'legal.html'/)
