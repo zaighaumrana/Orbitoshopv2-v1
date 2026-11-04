@@ -842,7 +842,7 @@ function renderModal() {
       isEditing: Boolean(state.modal._editingCartProductId),
     })
   }
-    if (type === 'comp-tag-picker') {
+   if (type === 'comp-tag-picker') {
     return repairTicketFormHTML(state.modal._info, {
       isEditing: Boolean(state.modal._editingCartProductId),
     }) + compTagPickerHTML(state.modal.name)
@@ -1329,7 +1329,7 @@ function attachEvents() {
     if (el.dataset.close !== undefined) {
       dlog('POS.click', `DATA-CLOSE branch firing -- state.modal was type=${state.modal?.type} -- about to call POS.render()`)
       if (state.modal?.type === 'pinPrompt') { cancelPinPrompt(render); return }
-            if (state.modal?.type === 'comp-tag-picker' || state.modal?.type === 'repair-advance') {
+      if (state.modal?.type === 'comp-tag-picker' || state.modal?.type === 'repair-advance') {
         state.modal = { type:'repair', _info:state.modal._info, _editingCartProductId:state.modal._editingCartProductId }
         render(); return
       }
@@ -1495,7 +1495,7 @@ function attachEvents() {
       return
     }
 
-     if (el.dataset.action === 'change-password') {
+    if (el.dataset.action === 'change-password') {
       state.modal = { type: 'changePassword' }; render(); return
     }
     if (el.dataset.action === 'theme') {
@@ -1761,7 +1761,7 @@ function attachEvents() {
       captureRepairFormInfo()
       getDraft().payments.splice(Number(el.dataset.draftPaymentRemove), 1); render(); return
     }
-        /* ── Advance-payment prompt (opens after the repair form is submitted) ── */
+    /* ── Advance-payment prompt (opens after the repair form is submitted) ── */
     if (el.dataset.action === 'advance-no') {
       const m = state.modal
       if (m?.type !== 'repair-advance' || m.step !== 'ask') return
@@ -1951,7 +1951,7 @@ function attachEvents() {
       if (!data.deviceBrand?.trim())  { showBlockingError('Device brand is required.'); return }
       if (!data.deviceModel?.trim())  { showBlockingError('Device model is required.'); return }
 
-            // Ask about the advance first; the cart line is created from the answer (commitRepairToCart).
+      // Ask about the advance first; the cart line is created from the answer (commitRepairToCart).
       state.modal = {
         type:'repair-advance', step:'ask',
         _info:data, _editingCartProductId:editingProductId,
