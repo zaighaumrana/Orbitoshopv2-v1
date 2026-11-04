@@ -16,7 +16,7 @@ import {
 } from '../features/ems/index.js'
 
 import {
-  sb, state, CFG, loadConfig, applyBranding, currentTenant,
+  sb, state, loadConfig, applyBranding, currentTenant,
   _clearSession, can, modalEntitled, money, moneyHTML, fld, modalActions,
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
   handleChangePasswordSubmit,
