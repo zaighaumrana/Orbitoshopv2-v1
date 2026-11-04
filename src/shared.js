@@ -1,7 +1,6 @@
 import {setIconPreferences} from './catalog/icon-preferences.js'
 import { escapeHTML } from "./html.js"
 import { SHORT_BRAND_NAME } from './config/brand.js'
-import { helpLink } from './legal/links.js'
 import { createClient } from '@supabase/supabase-js'
 import { dlog, dstack, initializeSupportConsole, revokeSupportConsole } from './debuglog.js'
 import { installNumericInputValidation } from './numeric-input.js'
@@ -850,53 +849,6 @@ export async function verifyStepUpPin(pin, purpose) {
 
 export async function verifyCurrentStepUpPin(pin) {
   return verifyStepUpPin(pin, ppPurpose)
-}
-
-/** Shared "My Account" modal — used by pos.js, workshop.js and admin.js. */
-export function myAccountModalHTML(session) {
-  const isOwnerLike = session.isAdmin || session.employee?.role === 'Business Owner'
-  const isSupport = session.isSupportAdmin === true
-  return `<div class="modal-backdrop"><div class="modal" style="max-width:420px">
-    <h2>My Account</h2>
-    <div class="legal-links">${helpLink()}</div>
-    ${state.installPrompt ? `
-      <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">
-        <button type="button" class="secondary-button" data-action="install" style="width:100%">⬇ Install App</button>
-      </div>
-    ` : ''}
-    ${CFG.ems_enabled && !isOwnerLike ? `
-      <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">
-        <p class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Employee Self-Service</p>
-        <button type="button" class="secondary-button" data-action="open-leave-request" style="width:100%">📋 Request Leave</button>
-      </div>
-    ` : ''}
-    ${isSupport ? `
-      <p class="muted" style="font-size:13px">
-        This support session was issued through ${escapeHTML(SHORT_BRAND_NAME)} platform authentication.
-        The client-project support identity has no reusable password.
-      </p>
-      <div class="modal-actions">
-        <button type="button" class="secondary-button" data-close>Close</button>
-      </div>
-    ` : isOwnerLike ? `
-      <p class="muted" style="font-size:13px">Owners change their password in Settings → Security.</p>
-      <div class="modal-actions">
-        <button type="button" class="secondary-button" data-close>Close</button>
-      </div>
-    ` : `<form data-form="change-password">
-      <p class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Change Password</p>
-      <div class="form-grid">
-        <label class="field"><span>Current Password</span><input name="oldPassword" type="password" required autocomplete="current-password"></label>
-        <label class="field"><span>New Password</span><input name="newPassword" type="password" required autocomplete="new-password"></label>
-        <label class="field"><span>Confirm New Password</span><input name="confirmPassword" type="password" required autocomplete="new-password"></label>
-      </div>
-      <div id="change-password-error" class="hidden" style="color:var(--danger);font-size:13px;margin:8px 0"></div>
-      <div class="modal-actions">
-        <button type="button" class="secondary-button" data-close>Close</button>
-        <button class="primary-button">Update Password</button>
-      </div>
-    </form>`}
-  </div></div>`
 }
 
 /** Shared handler for the change-password form. Returns {ok,error}. */
