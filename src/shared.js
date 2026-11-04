@@ -1,6 +1,5 @@
 import {setIconPreferences} from './catalog/icon-preferences.js'
 import { escapeHTML } from "./html.js"
-import { SHORT_BRAND_NAME } from './config/brand.js'
 import { createClient } from '@supabase/supabase-js'
 import { dlog, dstack, initializeSupportConsole, revokeSupportConsole } from './debuglog.js'
 import { installNumericInputValidation } from './numeric-input.js'
