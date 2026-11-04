@@ -1,4 +1,3 @@
-import {profileIcon} from '../profile-icon.js'
 import {accountMenuHTML, changePasswordModalHTML} from '../account-menu.js'
 import {quickPrice,quickPrices} from '../catalog/prices.js'
 import {iconHTML,itemCategory,brandIcon} from '../catalog/icons.js'
@@ -27,7 +26,7 @@ import {
   _clearSession, can, modalEntitled,
   money, moneyHTML, fld, modalActions,
   openPinPrompt, pinPromptHTML, handlePpKey, cancelPinPrompt, normalizeModalControls,
-  myAccountModalHTML, handleChangePasswordSubmit,
+  handleChangePasswordSubmit,
   matchesInvoiceSearch,
   showTransactionSuccess, showBlockingError, showToast, confirmAction, runInstallPrompt,
 } from '../shared.js'
@@ -702,7 +701,6 @@ function renderModal() {
 
   if (type === 'leave-request') return leaveRequestHTML()
 
-  if (type === 'myAccount') return myAccountModalHTML(SESSION)
   if (type === 'changePassword') return changePasswordModalHTML(SESSION)
 
   if (type === 'pinPrompt') return `<div class="modal-backdrop">${pinPromptHTML(state.modal.purpose)}</div>`
@@ -1497,10 +1495,7 @@ function attachEvents() {
       return
     }
 
-     if (el.dataset.action === 'my-account') {
-      state.modal = { type: 'myAccount' }; render(); return
-    }
-    if (el.dataset.action === 'change-password') {
+     if (el.dataset.action === 'change-password') {
       state.modal = { type: 'changePassword' }; render(); return
     }
     if (el.dataset.action === 'theme') {
