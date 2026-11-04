@@ -1524,7 +1524,9 @@ function attachEvents() {
     if (el.dataset.action === 'logout') {
       await viewAwait(eventCurrent,()=>(confirmAction({
         title: 'Log out?',
-        message: 'Are you sure you want to log out?',
+        message: posState.cart.length
+          ? `Your cart has ${posState.cart.length} item${posState.cart.length === 1 ? '' : 's'} that will be cleared if you log out.\n\nLog out anyway?`
+          : 'Are you sure you want to log out?',
         confirmLabel: 'Log out',
         tone: 'danger',
         action: async () => { await viewAwait(eventCurrent,()=>(_clearSession()),()=>state.modal); return true },
