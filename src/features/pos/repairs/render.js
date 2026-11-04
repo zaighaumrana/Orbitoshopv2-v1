@@ -181,7 +181,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
         </div>`}
 
           </div>
-                    <div class="rs-repair-finance-part"><h3>Balance</h3>
+          <div class="rs-repair-finance-part"><h3>Balance</h3>
       <div style="display:grid;gap:8px;padding:12px;background:var(--surface-2);border-radius:8px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;font-size:14px">
           <span>Quote Total</span><strong data-draft-total>${moneyHTML(total)}</strong>
@@ -215,7 +215,7 @@ export function repairTicketFormHTML(formInfo = {}, { isEditing = false } = {}) 
 
 export function compTagPickerHTML(name) {
   return `<div class="modal-backdrop" data-no-backdrop-close>
-   <div class="modal rs-comp-tag-picker">
+    <div class="modal rs-comp-tag-picker">
       <h2>${escapeHTML(name)}</h2>
       <p class="muted" style="font-size:13px">What's the issue?</p>
       <div style="display:grid;gap:8px;margin-top:10px">
