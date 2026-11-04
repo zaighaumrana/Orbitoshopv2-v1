@@ -130,9 +130,6 @@ body:has(.app-shell.rs-shop,.rs-onboarding){background:#F5F7FC}
 .rs-shop .rs-repair-panel .form-grid{gap:10px}
 .rs-shop .rs-repair-panel .field{min-width:0}
 .rs-shop .rs-repair-panel .field:has([name="technicianNote"]){margin-top:10px}
-.rs-shop .rs-repair-payment-entry{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.rs-shop .rs-repair-payment-entry>input{flex:1 1 100px;min-width:0}
-.rs-shop .rs-repair-payment-entry>select{flex:1 1 110px;min-width:0}
 .rs-shop .rs-repair-actions{padding:12px 16px;margin:0;border-top:1px solid var(--divider);background:var(--surface)}
 @media(max-width:820px){.rs-shop .rs-repair-workspace{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:767px){.rs-shop .top-brand .logo{width:56px;height:48px}.rs-shop .rs-repair-workspace{padding:12px;gap:12px}.rs-shop .rs-repair-header{padding-left:16px}.rs-shop .rs-repair-panel{padding:12px}}
@@ -141,7 +138,5 @@ body:has(.app-shell.rs-shop,.rs-onboarding){background:#F5F7FC}
 .rs-shop .rs-repair-finance-part{min-width:0}
 .rs-shop .rs-repair-finance-part>h3{font-size:14px;margin-bottom:12px}
 .rs-shop .rs-repair-finance-part>div{margin-bottom:0!important}
-.rs-shop .rs-repair-payments{padding-inline:16px;border-inline:1px solid var(--divider)}
-.rs-shop .rs-repair-payments>div{border-top:0!important;padding-top:0!important}
-@media(max-width:1000px){.rs-shop .rs-repair-finance{grid-template-columns:repeat(2,minmax(0,1fr))}.rs-shop .rs-repair-finance-part:last-child{grid-column:1/-1}.rs-shop .rs-repair-payments{padding-inline-end:0;border-inline-end:0}}
-@media(max-width:820px){.rs-shop .rs-repair-finance{grid-template-columns:minmax(0,1fr)}.rs-shop .rs-repair-payments{padding:12px 0;border-inline:0;border-block:1px solid var(--divider)}}
+@media(max-width:1000px){.rs-shop .rs-repair-finance{grid-template-columns:repeat(2,minmax(0,1fr))}.rs-shop .rs-repair-finance-part:last-child{grid-column:1/-1}}
+@media(max-width:820px){.rs-shop .rs-repair-finance{grid-template-columns:minmax(0,1fr)}}
