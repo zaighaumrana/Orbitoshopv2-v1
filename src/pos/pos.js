@@ -1880,8 +1880,7 @@ function attachEvents() {
     if (t.dataset.returnQty !== undefined) refreshRetailReturnPreview()
     if (t.dataset.draftCompPrice !== undefined) {
       const idx = Number(t.dataset.draftCompPrice)
-      const draft = getDraft()
-      if (draft.components[idx]) { draft.components[idx].price = Number(t.value)||0; _refreshDraftTotals() }
+      if (!data.customerName?.trim()) { showBlockingError('Customer name is required.'); return }
     }
     if (t.dataset.draftLabour !== undefined) {
       getDraft().labour = Number(t.value)||0; _refreshDraftTotals()
