@@ -42,7 +42,7 @@ export function accountMenuHTML({ session, shop = '', leave = false, clockOut = 
   const account = [
     ownerLike
       ? navItem('/admin/settings?tab=security', ICON.user, 'My Account')
-      : item('my-account', ICON.user, 'My Account'),
+      : '',
     !ownerLike && !support ? item('change-password', ICON.key, 'Change Password') : '',
     ems && leave ? item('open-leave-request', ICON.calendar, 'Request Leave') : '',
     state.installPrompt ? item('install', ICON.download, 'Install App') : '',
