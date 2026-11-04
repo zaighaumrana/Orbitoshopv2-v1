@@ -22,7 +22,7 @@ try{
  await page.goto(origin+'/pos?fixtureAuth=signed&fixtureRole=Business%20Owner');await page.locator('.rs-catalog-panel svg').first().waitFor();
  await page.locator('[data-qitem-id="1"]').click();await page.locator('[data-action="toggle-open-repairs"]').click();await page.locator('.rs-repair-card svg').waitFor();
  for(const theme of ['light','dark']){
-  if(theme==='dark')await page.locator('[data-action="theme"]').click();
+  if(theme==='dark'){await page.locator('#rs-account-trigger').click();await page.locator('[data-action="theme"]').click();await page.keyboard.press('Escape');}
   await page.screenshot({path:path.join(out,'pos-svg-'+theme+'.png'),fullPage:true});
   const metrics=await page.evaluate(async()=>{
    const {registry,iconHTML}=await import('/src/catalog/icons.js');
