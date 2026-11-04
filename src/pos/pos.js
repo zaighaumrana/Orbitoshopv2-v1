@@ -266,7 +266,6 @@ function render() {
           </div>
           </div>
           <div class="top-actions">
-            <span class="chip"><strong style="font-size:12px">${escapeHTML(SESSION.employee.name)}</strong></span>
             <span class="chip"><i class="dot ${state.online?'':'offline'}"></i>${state.online?'Online':'Offline'}</span>
             ${(SESSION.isAdmin || SESSION.employee?.role === 'Business Owner') ? `
               <button class="secondary-button" data-action="go-admin">Admin</button>
@@ -275,13 +274,6 @@ function render() {
                 : ''}
             ` : ''}
             ${accountMenuHTML({ session: SESSION, shop: tenant.name, leave: true, clockOut: true })}
-            <button class="icon-button" data-action="theme">${state.theme==='dark'?'Light':'Dark'}</button>
-            ${CFG.ems_enabled && !(SESSION.isAdmin || SESSION.employee?.role === 'Business Owner') ? `
-              <button class="secondary-button" style="font-size:12px" data-action="ems-clock-out">
-                🕐 Clock Out
-              </button>
-            ` : ''}
-            <button class="icon-button" data-action="logout" style="color:var(--danger)">Logout</button>
           </div>
         </header>
         <section class="content">${posView()}</section>
