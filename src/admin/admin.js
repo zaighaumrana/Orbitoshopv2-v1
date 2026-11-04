@@ -691,7 +691,7 @@ function renderModal() {
   if (type === 'pinPrompt') return `<div class="modal-backdrop">${pinPromptHTML(state.modal.purpose)}</div>`
 
   if (type === 'changePassword') return changePasswordModalHTML(SESSION)
-    if (type === 'leave-request') return leaveRequestHTML()
+  if (type === 'leave-request') return leaveRequestHTML()
 
   if (type === 'addQuickItem') return addQuickItemModalHTML()
 
