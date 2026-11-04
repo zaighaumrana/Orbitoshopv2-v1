@@ -1623,6 +1623,8 @@ function attachEvents() {
         return
       }
       state.modal = null
+      form.reset()
+      errEl?.classList.add('hidden')
       showToast('Password updated.', 'success')
       render(); return
     }
