@@ -14,6 +14,7 @@ import { settingsUpdates } from '../settings-data.js'
 import { managedFeatures } from '../onboarding-state.js'
 import { escapeHTML, safeImageURL } from "../html.js"
 import { SHORT_BRAND_NAME } from '../config/brand.js'
+import { leaveRequestHTML, submitLeaveRequest } from '../features/ems/index.js'
 import { readLegalStatus } from '../legal/api.js'
 import { legalSettingsHTML } from '../legal/acceptance.js'
 import { rememberAdditionalWorkInput, submitAdditionalWorkDraft } from '../features/repairs/additional-work.js'
@@ -345,10 +346,6 @@ function render() {
                 .join('')}
             </select>
             <span class="chip">
-              <strong style="font-size:12px">${escapeHTML(SESSION.employee.name)}</strong>
-              <span class="muted" style="font-size:11px"> · ${escapeHTML(state.role)}</span>
-            </span>
-            <span class="chip">
               <i class="dot ${state.online ? '' : 'offline'}"></i>
               ${state.online ? 'Online' : 'Offline'}
             </span>
@@ -358,11 +355,7 @@ function render() {
                 ? `<button class="secondary-button" data-action="go-workshop">Workshop</button>`
                 : ''}
             ` : ''}
-            ${accountMenuHTML({ session: SESSION, shop: tenant.name })}
-            <button class="icon-button" data-action="theme">
-              ${state.theme === 'dark' ? 'Light' : 'Dark'}
-            </button>
-            <button class="icon-button" data-action="logout" style="color:var(--danger)">Logout</button>
+            ${accountMenuHTML({ session: SESSION, shop: tenant.name, leave: true, clockOut: true })}
           </div>
         </header>
         <section class="content">${pageContent()}</section>
@@ -694,12 +687,13 @@ function renderModal() {
   const { type, id } = state.modal
   if(type==='catalog-icon')return catalogIconModalHTML(state.modal)
   if(type==='device-brand')return deviceBrandModalHTML(state.modal)
-  if(!['myAccount','changePassword','pinPrompt'].includes(type)&&Object.values(state.resources||{}).some(r=>r.status!=='ready'&&r.status!=='disabled'))return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Required detail')}<button type="button" data-close>Close</button></div></div>`
+  if(!['myAccount','changePassword','leave-request','pinPrompt'].includes(type)&&Object.values(state.resources||{}).some(r=>r.status!=='ready'&&r.status!=='disabled'))return `<div class="modal-backdrop"><div class="modal">${resourceNotice('Required detail')}<button type="button" data-close>Close</button></div></div>`
 
   if (type === 'pinPrompt') return `<div class="modal-backdrop">${pinPromptHTML(state.modal.purpose)}</div>`
 
   if (type === 'myAccount') return myAccountModalHTML(SESSION)
    if (type === 'changePassword') return changePasswordModalHTML(SESSION)
+    if (type === 'leave-request') return leaveRequestHTML()
 
   if (type === 'addQuickItem') return addQuickItemModalHTML()
 
@@ -1176,6 +1170,22 @@ function attachEvents() {
     if (el.dataset.action === 'change-password') {
       state.modal = { type: 'changePassword' }; render(); return
     }
+    if (el.dataset.action === 'ems-clock-out') {
+      const { handleClockOut } = await viewAwait(eventCurrent,()=>(import('../features/ems/index.js')),()=>state.modal)
+      handleClockOut(SESSION, async () => {
+        await viewAwait(eventCurrent,()=>(confirmAction({
+          title: 'Log out?',
+          message: 'Your shift is clocked out. Log out now?',
+          confirmLabel: 'Log out',
+          tone: 'danger',
+          action: async () => { await viewAwait(eventCurrent,()=>(_clearSession()),()=>state.modal); return true },
+        })),()=>state.modal)
+      })
+      return
+    }
+    if (el.dataset.action === 'open-leave-request') {
+      state.modal = { type: 'leave-request' }; render(); return
+    }
     if (el.dataset.action === 'open-password-resets') {
       const requests = await viewAwait(eventCurrent,()=>(listPendingResetRequests()),()=>state.modal)
       state.modal = { type: 'passwordResets', requests }
@@ -1595,6 +1605,14 @@ function attachEvents() {
       if (error) { showBlockingError('Error: ' + error.message); return }
       state.modal = null
       await viewAwait(eventCurrent,()=>(load()),()=>state.modal); return
+    }
+
+    if (type === 'leave-request') {
+      const result = await viewAwait(eventCurrent,()=>(submitLeaveRequest(SESSION, data)),()=>state.modal)
+      if (!result.ok) { showBlockingError('Error: ' + result.error); return }
+      state.modal = null
+      showToast('Leave request submitted.', 'success')
+      render(); return
     }
 
     if (type === 'change-password') {
