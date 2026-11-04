@@ -166,9 +166,6 @@ function render() {
           </div>
           <div class="top-actions">
             <span class="chip">
-              <strong style="font-size:12px">${escapeHTML(SESSION.employee.name)}</strong>
-            </span>
-            <span class="chip">
               <i class="dot ${state.online ? '' : 'offline'}"></i>
               ${state.online ? 'Online' : 'Offline'}
             </span>
@@ -177,15 +174,6 @@ function render() {
               <button class="secondary-button" data-action="go-admin">Admin</button>
             ` : ''}
             ${accountMenuHTML({ session: SESSION, shop: tenant.name, leave: true, clockOut: true })}
-            <button class="icon-button" data-action="theme">
-              ${state.theme === 'dark' ? 'Light' : 'Dark'}
-            </button>
-            ${CFG.ems_enabled && !isAdmin ? `
-              <button class="secondary-button" style="font-size:12px"
-                data-action="ems-clock-out">🕐 Clock Out</button>
-            ` : ''}
-            <button class="icon-button" data-action="logout"
-              style="color:var(--danger)">Logout</button>
           </div>
         </header>
         <section class="content">${workshopView()}</section>
