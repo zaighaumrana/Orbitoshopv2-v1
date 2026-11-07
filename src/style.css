@@ -1186,3 +1186,77 @@ input[type="number"] {
   .rs-shop .rs-account-menu{position:static}
   .rs-shop .rs-account-panel{inset-inline:12px;inset-block-start:calc(100% + 6px);width:auto}
 }
+
+/* ── Register shift dialogs and the Admin Shifts page (src/shift, src/admin/pages/shifts.js) ── */
+.rs-shop .modal-backdrop:has(>.rs-shift-dialog){grid-template-columns:minmax(0,1fr)}
+.rs-shop .modal.rs-shift-dialog{width:min(600px,100%);max-height:min(92dvh,840px);display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.rs-shop .rs-shift-dialog h2{margin:0}
+.rs-shop .rs-shift-lede{margin:0;font-size:15px;line-height:1.5}
+.rs-shop .rs-shift-hint{margin:0;font-size:13px;line-height:1.5}
+.rs-shop .rs-shift-form{display:grid;gap:12px}
+.rs-shop .rs-shift-scroll{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain}
+.rs-shop .rs-shift-error{color:var(--danger);font-size:13px}
+.rs-shop .rs-shift-dialog .modal-actions .primary-button,
+.rs-shop .rs-shift-dialog .modal-actions .secondary-button{flex:1;min-height:48px;font-size:15px}
+
+.rs-shop .rs-shift-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.rs-shop .rs-shift-card{display:grid;gap:6px;align-content:start;padding:12px;border:1px solid var(--divider);border-radius:12px;background:var(--surface-2)}
+.rs-shop .rs-shift-card.is-wide{grid-column:1/-1}
+.rs-shop .rs-shift-card h3{margin:0 0 2px;font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.rs-shop .rs-shift-card h3 small{font-size:11px;font-weight:500;letter-spacing:0;text-transform:none}
+.rs-shop .rs-shift-row{display:flex;justify-content:space-between;gap:12px;font-size:14px}
+.rs-shop .rs-shift-row.is-sub{padding-inline-start:12px;color:var(--muted);font-size:13px}
+.rs-shop .rs-shift-row.is-total{margin-top:4px;padding-top:8px;border-top:1px solid var(--divider);font-size:16px}
+.rs-shop .rs-shift-row.is-total strong{color:var(--primary)}
+
+.rs-shop .rs-shift-count{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--divider)}
+.rs-shop .rs-shift-diff{margin:0;font-size:13px;color:var(--muted)}
+.rs-shop .rs-shift-diff[data-state="ok"]{color:var(--success)}
+.rs-shop .rs-shift-diff[data-state="short"]{color:var(--danger)}
+.rs-shop .rs-shift-diff[data-state="over"]{color:var(--primary)}
+@media (max-width:600px){.rs-shop .rs-shift-stats{grid-template-columns:minmax(0,1fr)}}
+
+.rs-shop .rs-shifts-page{display:grid;gap:16px}
+.rs-shop .rs-shifts-note{margin:0;font-size:13px}
+.rs-shop .rs-shifts-group{display:grid;gap:12px}
+.rs-shop .rs-shifts-group header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.rs-shop .rs-shifts-group h2{margin:0;font-size:16px}
+.rs-shop .rs-shifts-actions{display:flex;gap:8px;flex-wrap:wrap}
+.rs-shop .rs-shifts-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+
+/* ── Register shift dialogs and the Admin Shifts page (src/shift, src/admin/pages/shifts.js) ── */
+.rs-shop .modal-backdrop:has(>.rs-shift-dialog){grid-template-columns:minmax(0,1fr)}
+.rs-shop .modal.rs-shift-dialog{width:min(600px,100%);max-height:min(92dvh,840px);display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.rs-shop .rs-shift-dialog h2{margin:0}
+.rs-shop .rs-shift-lede{margin:0;font-size:15px;line-height:1.5}
+.rs-shop .rs-shift-hint{margin:0;font-size:13px;line-height:1.5}
+.rs-shop .rs-shift-form{display:grid;gap:12px}
+.rs-shop .rs-shift-scroll{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain}
+.rs-shop .rs-shift-error{color:var(--danger);font-size:13px}
+.rs-shop .rs-shift-dialog .modal-actions .primary-button,
+.rs-shop .rs-shift-dialog .modal-actions .secondary-button{flex:1;min-height:48px;font-size:15px}
+
+.rs-shop .rs-shift-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.rs-shop .rs-shift-card{display:grid;gap:6px;align-content:start;padding:12px;border:1px solid var(--divider);border-radius:12px;background:var(--surface-2)}
+.rs-shop .rs-shift-card.is-wide{grid-column:1/-1}
+.rs-shop .rs-shift-card h3{margin:0 0 2px;font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.rs-shop .rs-shift-card h3 small{font-size:11px;font-weight:500;letter-spacing:0;text-transform:none}
+.rs-shop .rs-shift-row{display:flex;justify-content:space-between;gap:12px;font-size:14px}
+.rs-shop .rs-shift-row.is-sub{padding-inline-start:12px;color:var(--muted);font-size:13px}
+.rs-shop .rs-shift-row.is-total{margin-top:4px;padding-top:8px;border-top:1px solid var(--divider);font-size:16px}
+.rs-shop .rs-shift-row.is-total strong{color:var(--primary)}
+
+.rs-shop .rs-shift-count{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--divider)}
+.rs-shop .rs-shift-diff{margin:0;font-size:13px;color:var(--muted)}
+.rs-shop .rs-shift-diff[data-state="ok"]{color:var(--success)}
+.rs-shop .rs-shift-diff[data-state="short"]{color:var(--danger)}
+.rs-shop .rs-shift-diff[data-state="over"]{color:var(--primary)}
+@media (max-width:600px){.rs-shop .rs-shift-stats{grid-template-columns:minmax(0,1fr)}}
+
+.rs-shop .rs-shifts-page{display:grid;gap:16px}
+.rs-shop .rs-shifts-note{margin:0;font-size:13px}
+.rs-shop .rs-shifts-group{display:grid;gap:12px}
+.rs-shop .rs-shifts-group header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.rs-shop .rs-shifts-group h2{margin:0;font-size:16px}
+.rs-shop .rs-shifts-actions{display:flex;gap:8px;flex-wrap:wrap}
+.rs-shop .rs-shifts-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}

@@ -634,7 +634,7 @@ export async function runInstallPrompt() {
 
 /* ── Access control ── */
 export const ACCESS = {
-  'Business Owner': ['dashboard','repairs','inventory','reports','receipts','employees','ems','settings','catalog','pos','workshop','billing-usage','customer-support'],
+  'Business Owner': ['dashboard','repairs','inventory','reports','receipts','employees','ems','settings','catalog','pos','workshop','billing-usage','customer-support','shifts'],
   'Orbito Support': ['dashboard','repairs','inventory','reports','receipts','employees','ems','settings','catalog','pos','workshop'],
   'Manager':        ['dashboard','repairs','inventory','reports','receipts','employees','ems','catalog','customer-support'],
   'Cashier':        ['pos'],

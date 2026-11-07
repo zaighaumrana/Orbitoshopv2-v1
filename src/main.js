@@ -8,6 +8,7 @@ import { takeSupportHandoff, startSupportHandoff } from './support-handoff.js'
 import {RECOVERY_KEY} from './platform/support-recovery.js'
 import {invalidateUIAuthority} from './ui-authority.js'
 import {routeModule} from './route-module.js'
+import {setShiftSession} from './shift/shift-flow.js'
 const loadPOS=routeModule(()=>import('./pos/pos.js'),'pos')
 const loadWorkshop=routeModule(()=>import('./pos/workshop.js'),'workshop')
 const loadAdmin=routeModule(()=>import('./admin/admin.js'),'admin')
@@ -115,7 +116,7 @@ function setupRoutes(session,initialConfig) {
     await initWorkshop(session,navigation.isCurrent,takeInitialConfig())
   })
 
-  const adminModules = ['dashboard','repairs','inventory','reports','employees','receipts','ems','settings','catalog','billing-usage','customer-support']
+  const adminModules = ['dashboard','repairs','inventory','reports','employees','receipts','ems','settings','catalog','billing-usage','customer-support','shifts']
 
   adminModules.forEach(mod => {
     registerRoute(`/admin/${mod}`, async (_params, query, navigation) => {
@@ -195,6 +196,7 @@ async function onLoginSuccess(session) {
   const generation = ++applicationGeneration
   const role = canonicalRole(session)
   state.role = role
+  setShiftSession(session)
   dlog('main.onLoginSuccess', `canonical role=${role}`)
   const configReady = await loadConfig(false)
   if (generation !== applicationGeneration || state.role !== role) return
