@@ -1946,3 +1946,37 @@ Documentation only; the commit carries `[CF-Pages-Skip]`. No hosted changes.
 Hosted acceptance and customer upgrade remain separate gates.
 ### Git
 Shop `development` includes only requested runbook/history documentation updates in this task.
+
+## 2026-11-05 — Repair advance-payment prompt and component picker fixes
+Branch: development
+### Purpose
+Adding a custom component hid the repair form behind a narrow dialog, and closing that dialog discarded the whole ticket. Separately, the owner wanted the advance payment asked for as its own step after the repair form instead of inside it.
+### Changed
+The component picker now renders over the repair form, is 600px wide, and Cancel/× returns to the form. The form's Payments section is gone. "Continue to Cart" opens a Yes/No advance prompt; Yes takes amount and method with live Paid So Far / Remaining. A modified ticket that already has an advance is asked "Replace Current Advance?" and must confirm before it is replaced. Labour/quote and Balance now share the row 50/50, and the Balance panel lists an existing advance with a remove ×. Dead payment selectors were removed from the brand stylesheet. Detail: `docs/ADVANCE_PAYMENT_PROMPT.md`.
+### Decisions
+The advance stays in `draft.payments` and reaches the backend only through the existing `create_repair_ticket` tenders at Place Order; confirming a prompt writes nothing. Replacing stores a single new payment. Prompts ignore outside clicks and Escape; × returns to the form. Over-payment is blocked in the UI and still rejected by the backend.
+### Validation
+Owner reports build, `tests/legal.test.mjs` and the browser checklist (new, modify, replace, validation, phone width, dark mode) passed; environment not stated. Assistant review of a `967a74c` snapshot: diffs matched, syntax and lint clean (no undefined names), CSS parsed, Node-only suite identical before and after. Later tidy commits were confirmed only by owner Git/build/legal checks. Edited browser scripts were not executed.
+### Deployment / DB impact
+Front end only; no migration, function, Platform or package change. Deployed state was not inspected. Pages production branches were recorded as `development`, so pushed commits without `[CF-Pages-Skip]` may already be live.
+### Deferred / deliberately unchanged
+Payment object shape, tender mapping and backend validation. Legacy drafts holding several payments are replaced as a group.
+### Git
+`development` matched `origin/development` at `d52d9dc` with a clean tree (owner-supplied). Work was committed 2026-11-03 to 2026-11-04 UTC; `git log` gives the exact sequence.
+
+## 2026-11-05 — Header account menu, password relocation and Security tab
+Branch: development
+### Purpose
+POS, Workshop and Admin each duplicated name chip, My Account, Light/Dark, Clock Out and Logout buttons. Employees without Settings access could only change a password through the My Account modal. Managers working in the Admin view had no Clock Out or leave-request handling.
+### Changed
+New `src/account-menu.js`: one dropdown (identity, Account, Preferences, Session) replaces the old header controls in all three views. Employees get a Change Password popup; the owner's password form moved to Settings → Security, and the owner's My Account opens that tab. The Settings tab key `staff` became `security` with a legacy `?tab=staff` alias, and the Employees pointer card was removed. Admin gained Clock Out and Request Leave handlers. POS logout names the cart items that will be cleared. The My Account modal, `my-account` action and related unused imports were removed. Detail: `docs/ACCOUNT_MENU_AND_SECURITY.md`.
+### Decisions
+Menu items reuse existing actions so each view keeps its handlers. Open state is module state written into markup because the shell renderer strips unknown attributes. The menu closes and refocuses its trigger before a view opens a dialog. Phones get a full-width dropdown because the header's backdrop blur would anchor a fixed sheet to the header. `Admin` is not a stored role: the database allows Business Owner, Manager, Cashier, Technician and Orbito Support, and `isAdmin` means Owner or Support. Password change uses Supabase Auth directly and refuses Orbito Support.
+### Validation
+Owner reports build, `tests/legal.test.mjs` and the browser checklist (menu in all views, employee and owner password change, Security tab and URLs, EMS actions, logout warning) passed; environment not stated. Assistant snapshot review as above. Updated tests: legal Help-link check, menu-first logout/theme steps, `security` tab; browser scripts not executed.
+### Deployment / DB impact
+Front end only; no migration, function, Platform or package change. Deployed state not inspected (see previous entry).
+### Deferred / deliberately unchanged
+Shift Stats is unchanged: a browser-local-midnight report unrelated to EMS. A server-side shift model is planned and needs a Shop backend change plus a paired Platform (sister) repository change. No forced password change for temporary passwords. `helpLink()` and `profile-icon.js` retained.
+### Git
+Same state as the previous entry: `development` at `d52d9dc`, in sync with `origin/development`.
