@@ -1,6 +1,6 @@
 # Repair advance-payment prompt and component picker — current 5 November 2026
 
-> Checkpoint — 5 November 2026: implemented on `development`. When this document was written (owner-supplied Git output), `development` matched `origin/development` at `d52d9dc` with a clean working tree. The owner reports that `npm run build` and `node --test tests/legal.test.mjs` pass and that the browser checklist covering this work passed (owner report; the environment used was not stated). This is a Shop front-end change only: no migration, database function or Platform change. Deployment and hosted acceptance are **not** established by this document.
+> Checkpoint — 5 November 2026: implemented on `development`. When this document was written (owner-supplied Git output), `development` matched `origin/development` at `d52d9dc` with a clean working tree. The owner reports that `npm run build` and `node --test tests/legal.test.mjs` pass and that the browser checklist covering this work passed on the official Cloudflare Pages deployment (hosted verified, owner report; the commit that deployment was built from was not recorded). This is a Shop front-end change only: no migration, database function or Platform change. Hosted verification rests on the owner's report; no deployment inspection was made while writing this document.
 
 ## Purpose
 
@@ -65,7 +65,7 @@ The finance row is two equal columns (Labour and quote | Balance) with a divider
 
 ## Validation
 
-- Owner reports (environment not stated): build and `tests/legal.test.mjs` pass at `d52d9dc`; the browser checklist for the component picker, advance prompt (new, modify, replace, validation, mobile and dark mode), header, passwords, EMS and logout warning passed.
+- Owner reports: build and `tests/legal.test.mjs` pass at `d52d9dc` (local). Hosted verified (owner report, official Cloudflare Pages deployment, run before the cleanup commits; the deployed commit was not recorded): the browser checklist for the component picker, advance prompt (new, modify, replace, validation, mobile and dark mode), header, passwords, EMS and logout warning passed. After the cleanup commits the owner re-ran the header menu in all three views, employee Change Password and owner My Account → Security on the same deployment; all passed (owner report).
 - Assistant review of a repository snapshot taken at `967a74c`: every changed file diffed against the specified edits; all changed JavaScript parses; lint found no undefined names; both stylesheets parse; the Node-only suite gave identical results before and after (the failures present in both are caused by missing development packages in the review sandbox). The later tidy-up commits (`19480fe` to `d52d9dc`: unused names and indentation) were confirmed only by the owner's Git status, leftover search, build and legal test.
 - `tests/helpers/m3-owner-acceptance.mjs` was edited to seed the extra payment through draft state and to drop the DOM balance assertion. That script and the other edited browser scripts were **not executed**.
 

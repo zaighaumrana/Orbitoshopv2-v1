@@ -1956,9 +1956,9 @@ The component picker now renders over the repair form, is 600px wide, and Cancel
 ### Decisions
 The advance stays in `draft.payments` and reaches the backend only through the existing `create_repair_ticket` tenders at Place Order; confirming a prompt writes nothing. Replacing stores a single new payment. Prompts ignore outside clicks and Escape; × returns to the form. Over-payment is blocked in the UI and still rejected by the backend.
 ### Validation
-Owner reports build, `tests/legal.test.mjs` and the browser checklist (new, modify, replace, validation, phone width, dark mode) passed; environment not stated. Assistant review of a `967a74c` snapshot: diffs matched, syntax and lint clean (no undefined names), CSS parsed, Node-only suite identical before and after. Later tidy commits were confirmed only by owner Git/build/legal checks. Edited browser scripts were not executed.
+Owner reports build and `tests/legal.test.mjs` pass. Hosted verified (owner report): the browser checklist (new, modify, replace, validation, phone width, dark mode) passed on the official Cloudflare Pages deployment, run before the cleanup commits; the deployed commit was not recorded. Assistant review of a `967a74c` snapshot: diffs matched, syntax and lint clean (no undefined names), CSS parsed, Node-only suite identical before and after. Later tidy commits were confirmed only by owner Git/build/legal checks. Edited browser scripts were not executed.
 ### Deployment / DB impact
-Front end only; no migration, function, Platform or package change. Deployed state was not inspected. Pages production branches were recorded as `development`, so pushed commits without `[CF-Pages-Skip]` may already be live.
+Front end only; no migration, function, Platform or package change. Deployed to the official Cloudflare Pages deployment per the owner's report (the owner verified the changes there); the deployed commit was not recorded and no deployment inspection was made.
 ### Deferred / deliberately unchanged
 Payment object shape, tender mapping and backend validation. Legacy drafts holding several payments are replaced as a group.
 ### Git
@@ -1973,9 +1973,9 @@ New `src/account-menu.js`: one dropdown (identity, Account, Preferences, Session
 ### Decisions
 Menu items reuse existing actions so each view keeps its handlers. Open state is module state written into markup because the shell renderer strips unknown attributes. The menu closes and refocuses its trigger before a view opens a dialog. Phones get a full-width dropdown because the header's backdrop blur would anchor a fixed sheet to the header. `Admin` is not a stored role: the database allows Business Owner, Manager, Cashier, Technician and Orbito Support, and `isAdmin` means Owner or Support. Password change uses Supabase Auth directly and refuses Orbito Support.
 ### Validation
-Owner reports build, `tests/legal.test.mjs` and the browser checklist (menu in all views, employee and owner password change, Security tab and URLs, EMS actions, logout warning) passed; environment not stated. Assistant snapshot review as above. Updated tests: legal Help-link check, menu-first logout/theme steps, `security` tab; browser scripts not executed.
+Owner reports build and `tests/legal.test.mjs` pass. Hosted verified (owner report): the browser checklist (menu in all views, employee and owner password change, Security tab and URLs, EMS actions, logout warning) passed on the official Cloudflare Pages deployment; after the cleanup commits the owner re-ran the header menu in all views, employee Change Password and owner My Account → Security, which passed. Assistant snapshot review as above. Updated tests: legal Help-link check, menu-first logout/theme steps, `security` tab; browser scripts not executed.
 ### Deployment / DB impact
-Front end only; no migration, function, Platform or package change. Deployed state not inspected (see previous entry).
+Front end only; no migration, function, Platform or package change. Deployed to Cloudflare Pages per the owner's report (see previous entry).
 ### Deferred / deliberately unchanged
 Shift Stats is unchanged: a browser-local-midnight report unrelated to EMS. A server-side shift model is planned and needs a Shop backend change plus a paired Platform (sister) repository change. No forced password change for temporary passwords. `helpLink()` and `profile-icon.js` retained.
 ### Git
