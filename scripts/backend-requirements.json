@@ -188,6 +188,19 @@
       "managed": "Same forward SQL and exact verify-pin package through established release-pinned fresh and Controlled Backend Upgrade plans",
       "byo": "Same forward SQL and exact verify-pin package through approved customer fresh setup and separately cleared original upgrade journal",
       "verification": "Native PostgreSQL Managed/BYO fresh and v9-upgrade PIN/role/consent/concurrency/rollback/replay/historical-return checks plus immutable source parity"
+    },
+    {
+      "id": "register-shifts",
+      "purpose": "Server-held register shifts for Owner and Cashier operators: opening cash, server-computed cash/online/credit summary, counted-cash close with PIN-bound cashier shortfall approval, manager force-close and bounded history, with immutable closed shifts and no browser writes",
+      "migrations": [
+        "20261108120000"
+      ],
+      "functions": [
+        "verify-pin"
+      ],
+      "managed": "Same forward SQL and exact verify-pin package through the release-pinned fresh provisioning plan; the existing-shop upgrade path is deliberately not extended for this release (owner-directed scope)",
+      "byo": "Same forward SQL and exact verify-pin package through approved customer fresh setup",
+      "verification": "Native PostgreSQL fresh-install capability, role/RLS/grant, idempotency, concurrency, PIN-consumption, immutability and paging checks in tests/register-shifts-sql.mjs"
     }
   ],
   "runtime": {
@@ -223,7 +236,13 @@
         "public.support_delivery_finish(uuid,uuid,text,uuid,text)",
         "public.get_repair_family_page(text,text,text,integer,integer)",
         "public.get_receipt_archive_page(text,text,timestamptz,timestamptz,integer,integer)",
-        "public.change_inventory_stock(uuid,integer,text,integer,integer,text)"
+        "public.change_inventory_stock(uuid,integer,text,integer,integer,text)",
+        "public.open_register_shift(uuid,numeric)",
+        "public.get_my_open_register_shift()",
+        "public.get_register_shift_summary(uuid)",
+        "public.close_register_shift(uuid,uuid,numeric,text)",
+        "public.force_close_register_shift(uuid,uuid,text)",
+        "public.list_register_shifts(uuid,integer,timestamptz,uuid)"
       ],
       "tables": [
         "app_private.bridge_events",
@@ -233,12 +252,14 @@
         "app_private.support_submissions",
         "public.device_brands",
         "public.icon_preferences",
-        "app_private.inventory_change_requests"
+        "app_private.inventory_change_requests",
+        "public.register_shifts"
       ],
       "triggers": [
         "bridge_events_immutable",
         "inventory_protect_retirement",
-        "inventory_change_requests_immutable"
+        "inventory_change_requests_immutable",
+        "register_shifts_protect"
       ],
       "security": [
         "canonical live actor",
@@ -248,7 +269,8 @@
         "separate source/call/ticket credentials",
         "device_brands canonical role/module/lifecycle RLS plus restrictive support consent",
         "icon_preferences live role/lifecycle RLS, owner-only writes and restrictive Support consent",
-        "Inventory purpose PIN claim, active roles/module/consent checks, immutable request intent and irreversible retired metadata, no direct quantity/retirement/deletion writes"
+        "Inventory purpose PIN claim, active roles/module/consent checks, immutable request intent and irreversible retired metadata, no direct quantity/retirement/deletion writes",
+        "register_shifts operator-scoped RLS with Owner/Manager/Support read, no browser writes, immutable closed shifts, shift-close PIN claim for a cashier closing short, restrictive Support consent"
       ]
     },
     "managed_support_handoff_configuration": [
@@ -301,7 +323,8 @@
         "20261025233743",
         "20261029173151",
         "20261030233527",
-        "20261031003158"
+        "20261031003158",
+        "20261108120000"
       ],
       "core_functions": [
         "account-admin",
@@ -326,7 +349,8 @@
         "bounded-operational-reads",
         "catalog-icons-and-brands",
         "icon-label-preferences",
-        "inventory-retirement"
+        "inventory-retirement",
+        "register-shifts"
       ],
       "configuration": [
         "runtime",
@@ -379,7 +403,8 @@
         "20261025233743",
         "20261029173151",
         "20261030233527",
-        "20261031003158"
+        "20261031003158",
+        "20261108120000"
       ],
       "core_functions": [
         "account-admin",
@@ -404,7 +429,8 @@
         "bounded-operational-reads",
         "catalog-icons-and-brands",
         "icon-label-preferences",
-        "inventory-retirement"
+        "inventory-retirement",
+        "register-shifts"
       ],
       "configuration": [
         "runtime",
