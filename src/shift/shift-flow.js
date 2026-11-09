@@ -2,7 +2,7 @@
 //   • Opening: the first financial action on the POS asks whether to start register operations.
 //   • Closing: logging out asks whether the shop is closing; Yes shows the day's figures and a cash count.
 // STAGE 1: dialogs and rules are real; data comes from ./shift-store.js (browser-local preview).
-import { currentTenant, money, showToast, showBlockingError, verifyStepUpPin } from '../shared.js'
+import { money, showToast, showBlockingError, verifyStepUpPin } from '../shared.js'
 import { escapeHTML as esc } from '../html.js'
 import { ownDialog } from '../ui-dialog.js'
 import { onPrivateReset } from '../ui-authority.js'
@@ -145,12 +145,13 @@ function stepHTML(dlg) {
   const { ctx } = dlg
   switch (dlg.step) {
     case 'start-ask': return `${X}
-      <h2>Start register operations?</h2>
-      <p class="rs-shift-lede">To record sales, repairs, returns or credit, the register has to be open. Do you want to start now?</p>
-      <p class="muted rs-shift-hint">If you choose No you can still look around the app, but anything involving money stays locked.</p>
+      <h2>Ready to Start Work?</h2>
+      <p class="rs-shift-lede">To start selling and handling payments, you need to open the register first.</p>
+      <p class="rs-shift-lede">Choose Yes to open the register and start working.</p>
+      <p class="rs-shift-lede">Choose No to continue using the app without making sales or handling money.</p>
       <div class="modal-actions">
-        <button type="button" class="secondary-button" data-sf="start-no">No</button>
-        <button type="button" class="primary-button" data-sf="start-yes">Yes</button>
+        <button type="button" class="secondary-button" data-sf="start-no">No, Not Now</button>
+        <button type="button" class="primary-button" data-sf="start-yes">Yes, Open Register</button>
       </div>`
     case 'start-cash': return `${X}
       <h2>Cash in the register</h2>
@@ -172,12 +173,12 @@ function stepHTML(dlg) {
         </div>
       </form>`
     case 'close-ask': return `${X}
-      <h2>Closing shop operations?</h2>
-      <p class="rs-shift-lede">Choose Yes if you are finished for the day and want to close the register and count the cash.</p>
-      <p class="muted rs-shift-hint">Choose No if this is only a break. The register stays open and you can log in again later.</p>
+      <h2>Are you done for today?</h2>
+      <p class="rs-shift-lede">Choose Yes if you're finishing work for today. You'll need to count the cash and close the register.</p>
+      <p class="rs-shift-lede">Choose No if you're taking a break or stepping away. You can come back and continue working later.</p>
       <div class="modal-actions">
-        <button type="button" class="secondary-button" data-sf="close-no">No</button>
-        <button type="button" class="primary-button" data-sf="close-yes">Yes</button>
+        <button type="button" class="secondary-button" data-sf="close-no">No, I'll Be Back</button>
+        <button type="button" class="primary-button" data-sf="close-yes">Yes, I'm Done for Today</button>
       </div>`
     case 'close-summary': return `${X}
       <h2>Close the register</h2>
@@ -221,7 +222,7 @@ function stepHTML(dlg) {
     case 'close-receipt': return `${X}
       <h2>Register closed</h2>
       <p class="muted rs-shift-hint">Preview figures: placeholder totals until the server version is connected.</p>
-      <div class="rs-shift-scroll"><div class="shift-print-wrap">${slipHTML(ctx.closed, currentTenant().name)}</div></div>
+      <div class="rs-shift-scroll"><div class="rs-shift-slip">${slipHTML(ctx.closed)}</div></div>
       <div class="modal-actions">
         <button type="button" class="secondary-button" data-sf="receipt-done">Close</button>
         <button type="button" class="primary-button" data-sf="receipt-print">Print</button>
@@ -231,6 +232,7 @@ function stepHTML(dlg) {
 }
 
 function render(dlg) {
+  dlg.modal.dataset.step = dlg.step
   dlg.modal.innerHTML = stepHTML(dlg)
   queueMicrotask(() => {
     if (active !== dlg) return
@@ -331,7 +333,7 @@ function finalizeClose(dlg, { approvedBy = null } = {}) {
 
 async function printSlip(dlg) {
   const { printThermal } = await import('../print/print.js')
-  printThermal(slipHTML(dlg.ctx.closed, currentTenant().name))
+  printThermal(slipHTML(dlg.ctx.closed))
 }
 
 function finishLogout(dlg) {

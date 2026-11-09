@@ -1187,18 +1187,22 @@ input[type="number"] {
   .rs-shop .rs-account-panel{inset-inline:12px;inset-block-start:calc(100% + 6px);width:auto}
 }
 
-/* ── Register shift dialogs and the Admin Shifts page (src/shift, src/admin/pages/shifts.js) ── */
+/* ── Register shift dialogs and the Admin Shift Stats page (src/shift, src/admin/pages/shifts.js) ── */
 .rs-shop .modal-backdrop:has(>.rs-shift-dialog){grid-template-columns:minmax(0,1fr)}
-.rs-shop .modal.rs-shift-dialog{width:min(600px,100%);max-height:min(92dvh,840px);display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.rs-shop .modal.rs-shift-dialog{width:min(600px,100%);max-height:min(92dvh,860px);display:flex;flex-direction:column;gap:12px;overflow:hidden}
 .rs-shop .rs-shift-dialog h2{margin:0}
 .rs-shop .rs-shift-lede{margin:0;font-size:15px;line-height:1.5}
 .rs-shop .rs-shift-hint{margin:0;font-size:13px;line-height:1.5}
 .rs-shop .rs-shift-form{display:grid;gap:12px}
 .rs-shop .rs-shift-scroll{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain}
 .rs-shop .rs-shift-error{color:var(--danger);font-size:13px}
-.rs-shop .rs-shift-dialog .modal-actions .primary-button,
-.rs-shop .rs-shift-dialog .modal-actions .secondary-button{flex:1;min-height:48px;font-size:15px}
 
+/* Action rows: one grid row, equal widths and heights by construction, wrapping to the next line when space runs out. */
+.rs-shop .rs-shift-dialog .modal-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:12px;align-items:stretch;justify-content:stretch;margin:0}
+.rs-shop .rs-shift-dialog .modal-actions>button{width:100%;min-height:48px;margin:0;padding:10px 16px;display:inline-flex;align-items:center;justify-content:center;text-align:center;line-height:1.25;font-size:15px;box-sizing:border-box}
+
+/* Stats: mobile layout (unchanged) */
+.rs-shop .rs-shift-stats-wrap{container:rs-shift/inline-size}
 .rs-shop .rs-shift-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .rs-shop .rs-shift-card{display:grid;gap:6px;align-content:start;padding:12px;border:1px solid var(--divider);border-radius:12px;background:var(--surface-2)}
 .rs-shop .rs-shift-card.is-wide{grid-column:1/-1}
@@ -1208,51 +1212,48 @@ input[type="number"] {
 .rs-shop .rs-shift-row.is-sub{padding-inline-start:12px;color:var(--muted);font-size:13px}
 .rs-shop .rs-shift-row.is-total{margin-top:4px;padding-top:8px;border-top:1px solid var(--divider);font-size:16px}
 .rs-shop .rs-shift-row.is-total strong{color:var(--primary)}
+@media (max-width:600px){.rs-shop .rs-shift-stats{grid-template-columns:minmax(0,1fr)}}
 
-.rs-shop .rs-shift-count{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--divider)}
+/* Stats: wide desktop layout, driven by the width the panel actually has (works in the dialog and in Admin). */
+@container rs-shift (min-width:760px){
+  .rs-shop .rs-shift-stats{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:"reg online returns" "reg credit sales" "rep rep rep";gap:14px}
+  .rs-shop .rs-shift-card.is-register{grid-area:reg}
+  .rs-shop .rs-shift-card.is-online{grid-area:online}
+  .rs-shop .rs-shift-card.is-credit{grid-area:credit}
+  .rs-shop .rs-shift-card.is-returns{grid-area:returns}
+  .rs-shop .rs-shift-card.is-sales{grid-area:sales}
+  .rs-shop .rs-shift-card.is-repairs{grid-area:rep;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 24px}
+  .rs-shop .rs-shift-card.is-repairs h3{grid-column:1/-1}
+  .rs-shop .rs-shift-card.is-repairs .rs-shift-row{flex-direction:column;align-items:flex-start;gap:2px}
+  .rs-shop .rs-shift-card.is-repairs .rs-shift-row strong{font-size:20px}
+}
+
+/* Cash count: stacked on mobile; on desktop a single bar that wraps cleanly when it runs out of room. */
+.rs-shop .rs-shift-count{display:grid;gap:12px;padding-top:14px;border-top:1px solid var(--divider)}
 .rs-shop .rs-shift-diff{margin:0;font-size:13px;color:var(--muted)}
 .rs-shop .rs-shift-diff[data-state="ok"]{color:var(--success)}
 .rs-shop .rs-shift-diff[data-state="short"]{color:var(--danger)}
 .rs-shop .rs-shift-diff[data-state="over"]{color:var(--primary)}
-@media (max-width:600px){.rs-shop .rs-shift-stats{grid-template-columns:minmax(0,1fr)}}
+@media (min-width:900px){
+  .rs-shop .modal.rs-shift-dialog[data-step="close-summary"]{width:min(1180px,100%);padding:24px 28px}
+  .rs-shop .rs-shift-dialog[data-step="close-summary"] .rs-shift-count{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 24px}
+  .rs-shop .rs-shift-dialog[data-step="close-summary"] .rs-shift-count .field{flex:0 1 320px}
+  .rs-shop .rs-shift-dialog[data-step="close-summary"] .rs-shift-count .rs-shift-diff{flex:1 1 240px;align-self:center}
+  .rs-shop .rs-shift-dialog[data-step="close-summary"] .rs-shift-count .rs-shift-error{flex:1 0 100%}
+  .rs-shop .rs-shift-dialog[data-step="close-summary"] .rs-shift-count .modal-actions{flex:0 1 420px;margin-inline-start:auto}
+}
 
-.rs-shop .rs-shifts-page{display:grid;gap:16px}
-.rs-shop .rs-shifts-note{margin:0;font-size:13px}
-.rs-shop .rs-shifts-group{display:grid;gap:12px}
-.rs-shop .rs-shifts-group header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.rs-shop .rs-shifts-group h2{margin:0;font-size:16px}
-.rs-shop .rs-shifts-actions{display:flex;gap:8px;flex-wrap:wrap}
-.rs-shop .rs-shifts-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+/* Slip preview: same classes the thermal print window uses, so the preview matches the paper. */
+.rs-shop .rs-shift-slip{width:min(380px,100%);margin-inline:auto;background:#fff;color:#172026;border:1px solid #d9e1e8;padding:18px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;line-height:1.7}
+.rs-shop .rs-shift-slip .c{text-align:center}
+.rs-shop .rs-shift-slip .b{font-weight:700}
+.rs-shop .rs-shift-slip .lg{font-size:15px;font-weight:700}
+.rs-shop .rs-shift-slip .sm{font-size:11px;color:#667}
+.rs-shop .rs-shift-slip .row{display:flex;justify-content:space-between;gap:10px}
+.rs-shop .rs-shift-slip .ln{border-top:1px dashed #172026;margin:8px 0}
+.rs-shop .rs-shift-slip img{max-width:140px;max-height:50px;object-fit:contain}
 
-/* ── Register shift dialogs and the Admin Shifts page (src/shift, src/admin/pages/shifts.js) ── */
-.rs-shop .modal-backdrop:has(>.rs-shift-dialog){grid-template-columns:minmax(0,1fr)}
-.rs-shop .modal.rs-shift-dialog{width:min(600px,100%);max-height:min(92dvh,840px);display:flex;flex-direction:column;gap:12px;overflow:hidden}
-.rs-shop .rs-shift-dialog h2{margin:0}
-.rs-shop .rs-shift-lede{margin:0;font-size:15px;line-height:1.5}
-.rs-shop .rs-shift-hint{margin:0;font-size:13px;line-height:1.5}
-.rs-shop .rs-shift-form{display:grid;gap:12px}
-.rs-shop .rs-shift-scroll{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain}
-.rs-shop .rs-shift-error{color:var(--danger);font-size:13px}
-.rs-shop .rs-shift-dialog .modal-actions .primary-button,
-.rs-shop .rs-shift-dialog .modal-actions .secondary-button{flex:1;min-height:48px;font-size:15px}
-
-.rs-shop .rs-shift-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.rs-shop .rs-shift-card{display:grid;gap:6px;align-content:start;padding:12px;border:1px solid var(--divider);border-radius:12px;background:var(--surface-2)}
-.rs-shop .rs-shift-card.is-wide{grid-column:1/-1}
-.rs-shop .rs-shift-card h3{margin:0 0 2px;font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
-.rs-shop .rs-shift-card h3 small{font-size:11px;font-weight:500;letter-spacing:0;text-transform:none}
-.rs-shop .rs-shift-row{display:flex;justify-content:space-between;gap:12px;font-size:14px}
-.rs-shop .rs-shift-row.is-sub{padding-inline-start:12px;color:var(--muted);font-size:13px}
-.rs-shop .rs-shift-row.is-total{margin-top:4px;padding-top:8px;border-top:1px solid var(--divider);font-size:16px}
-.rs-shop .rs-shift-row.is-total strong{color:var(--primary)}
-
-.rs-shop .rs-shift-count{display:grid;gap:8px;padding-top:12px;border-top:1px solid var(--divider)}
-.rs-shop .rs-shift-diff{margin:0;font-size:13px;color:var(--muted)}
-.rs-shop .rs-shift-diff[data-state="ok"]{color:var(--success)}
-.rs-shop .rs-shift-diff[data-state="short"]{color:var(--danger)}
-.rs-shop .rs-shift-diff[data-state="over"]{color:var(--primary)}
-@media (max-width:600px){.rs-shop .rs-shift-stats{grid-template-columns:minmax(0,1fr)}}
-
+/* Admin → Shift Stats */
 .rs-shop .rs-shifts-page{display:grid;gap:16px}
 .rs-shop .rs-shifts-note{margin:0;font-size:13px}
 .rs-shop .rs-shifts-group{display:grid;gap:12px}

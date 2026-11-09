@@ -20,6 +20,7 @@ const ICON = {
   moon:     svg('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'),
   clock:    svg('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
   logout:   svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>'),
+  stats:    svg('<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>'),
   chevron:  svg('<path d="m6 9 6 6 6-6"/>', 14, 'rs-account-chevron'),
 }
 
@@ -43,6 +44,7 @@ export function accountMenuHTML({ session, shop = '', leave = false, clockOut = 
     ownerLike
       ? navItem('/admin/settings?tab=security', ICON.user, 'My Account')
       : '',
+    ownerLike && !support ? navItem('/admin/shifts', ICON.stats, 'Shift Stats') : '',
     !ownerLike && !support ? item('change-password', ICON.key, 'Change Password') : '',
     ems && leave ? item('open-leave-request', ICON.calendar, 'Request Leave') : '',
     state.installPrompt ? item('install', ICON.download, 'Install App') : '',

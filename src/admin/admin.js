@@ -8,6 +8,7 @@ import {captureView,listenOwned,viewAwait} from '../ui-lifecycle.js'
 import {settleRead,readStates,resourceReady,resourceNotice} from '../read-state.js'
 import { createSupportClient } from '../platform/support.js'
 import { supportPage } from './pages/support.js'
+import { shiftsPage, shiftsAction } from './pages/shifts.js'
 import {readAdminView,saveAdminView,safeAdminState} from './navigation-state.js'
 import { settingsUpdates } from '../settings-data.js'
 import { managedFeatures } from '../onboarding-state.js'
@@ -60,6 +61,7 @@ const ADMIN_MODULES = [
   ['reports',   '▧', 'Reports'],
   ['employees', '♙', 'Employees'],
   ['receipts',  '◉', 'Receipts'],
+  ['shifts',    '◔', 'Shift Stats'],
   ['ems',       '⏱', 'EMS'],
   ['settings',  '◐', 'Settings'],
   ['billing-usage', '▧', 'Billing & Usage'],
@@ -375,6 +377,7 @@ function render() {
 function pageContent() {
   const failed=Object.entries(state.resources||{}).filter(([,r])=>r.status!=='ready'&&r.status!=='disabled')
   if(failed.length)return adminShell(resourceNotice('Current '+adminState.adminModule+' data',failed.some(([,r])=>r.status==='loading')?'loading':'unavailable'))
+  if (adminState.adminModule === 'shifts') return adminShell(shiftsPage(SESSION.employee?.role))
   if (adminState.adminModule === 'customer-support') return adminShell(supportPage(customerSupport.view,SESSION.employee?.role==='Business Owner'))
   if (adminState.adminModule === 'billing-usage') return adminShell(billingUsagePage(billingResult, resupplyBusy, Date.now(), paperObservation))
   const pages = { dashboard, repairs, inventory, catalog, reports, employees, receipts, settings }
@@ -858,6 +861,9 @@ function attachEvents() {
       const nav=adminNavigationIsCurrent;customerSupport.view.busy=true
       try{await viewAwait(eventCurrent,()=>(customerSupport.consents('revoke',{p_consent:el.dataset.consentId})),()=>state.modal)}catch(error){if(nav())customerSupport.view.error=error.message}
       finally{if(nav()){customerSupport.view.busy=false;render()}}return
+    }
+    if (el.dataset.action?.startsWith('shifts-')) {
+      if (await shiftsAction(el, render)) return
     }
     if (el.dataset.action?.startsWith('customer-support-')) {
       if (!can('customer-support',state.role)||customerSupport.view.busy)return

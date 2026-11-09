@@ -1,7 +1,7 @@
-// Admin → Shifts (Business Owner). One subsection per operator, with a detail view and reprint.
+// Admin → Shift Stats (Business Owner). One subsection per operator, with a detail view and reprint.
 // STAGE 1: reads the browser-local preview store; Stage 4 switches it to the server ledger.
 import { escapeHTML as esc } from '../../html.js'
-import { moneyHTML as m, confirmAction, currentTenant, showToast } from '../../shared.js'
+import { moneyHTML as m, confirmAction, showToast } from '../../shared.js'
 import { onPrivateReset } from '../../ui-authority.js'
 import * as store from '../../shift/shift-store.js'
 import { statsHTML, slipHTML, roleLabel, fmtDateTime, fmtDuration, statusLabel, differenceBadge } from '../../shift/shift-report.js'
@@ -49,7 +49,7 @@ function shiftRow(shift) {
 function listHTML(shifts, usingSamples) {
   const groups = groupByOperator(shifts)
   return `<div class="rs-shifts-page">
-    <p class="muted rs-shifts-note" role="note">Preview: shifts on this page are stored in this browser only until the server version is connected.${usingSamples ? ' The rows below are samples; close a register on the POS to see your own.' : ''}</p>
+    <p class="muted rs-shifts-note" role="note">Preview: the shift stats on this page are stored in this browser only until the server version is connected.${usingSamples ? ' The rows below are samples; close a register on the POS to see your own.' : ''}</p>
     ${groups.map(group => `<section class="card rs-shifts-group" aria-label="${esc(group.name)}">
       <header>
         <h2>${esc(group.name || 'Unnamed')} <span class="badge">${esc(roleLabel(group.role))}</span></h2>
@@ -67,7 +67,7 @@ function detailHTML(shift) {
   const open = !shift.endedAt
   return `<div class="rs-shifts-page">
     <div class="rs-shifts-actions">
-      <button type="button" class="secondary-button" data-action="shifts-back">← All shifts</button>
+      <button type="button" class="secondary-button" data-action="shifts-back">← All shift stats</button>
       ${open ? '' : `<button type="button" class="primary-button" data-action="shifts-reprint" data-shift-id="${esc(shift.id)}">Reprint</button>`}
       ${open && !shift.sample ? `<button type="button" class="secondary-button" data-action="shifts-force-close" data-shift-id="${esc(shift.id)}">Force close</button>` : ''}
     </div>
@@ -89,7 +89,7 @@ function detailHTML(shift) {
 }
 
 export function shiftsPage(role) {
-  if (role !== 'Business Owner') return '<div class="card"><p class="muted">Shifts are available to the Business Owner.</p></div>'
+  if (role !== 'Business Owner') return '<div class="card"><p class="muted">Shift Stats are available to the Business Owner.</p></div>'
   const real = store.listShifts()
   const all = real.length ? real : store.listSamples()
   if (view.selectedId) {
@@ -110,7 +110,7 @@ export async function shiftsAction(el, render) {
     const shift = store.getShift(id)
     if (!shift?.endedAt) return true
     const { printThermal } = await import('../../print/print.js')
-    printThermal(slipHTML(shift, currentTenant().name))
+    printThermal(slipHTML(shift))
     return true
   }
   if (action === 'shifts-force-close') {

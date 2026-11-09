@@ -645,6 +645,7 @@ export function can(mod, role) {
   if (mod === 'inventory' && !CFG.inventory_module_enabled) { dlog('shared.can', `DENY mod=${mod} role=${role} -- inventory_module_enabled=false`); return false }
   if (mod === 'workshop'  && !CFG.technician_module_enabled) { dlog('shared.can', `DENY mod=${mod} role=${role} -- technician_module_enabled=false`); return false }
   if (mod === 'ems' && !CFG.ems_enabled) return false
+  if (mod === 'shifts') return role === 'Business Owner'
   const allowed = ACCESS[role]?.includes(mod) ?? false
   dlog('shared.can', `mod=${mod} role=${role} -> ${allowed}`)
   return allowed
