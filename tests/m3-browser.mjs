@@ -239,7 +239,7 @@ try{
   // Logout returns to the protected surface and removes operational scoping.
   await page.locator('#rs-account-trigger').click();await page.locator('[data-action="logout"]').click();await page.getByRole('button',{name:'Log out',exact:true}).click();await page.locator('#login-form').waitFor();assert.equal(await page.locator('.rs-shop').count(),0);
   result.sessionResult='PASS: local logout clears operational shell, modal and authority-owned state';
-  await page.goto(origin+'/admin/dashboard?fixtureAuth=signed&fixtureRole=Manager');await page.locator('.app-shell').waitFor();assert.equal(await page.locator('[data-action="go-pos"],[data-action="go-workshop"]').count(),0);assert.equal(await page.locator('[data-action="admin-module"] option[value="settings"]').count(),0);
+  await page.goto(origin+'/admin/dashboard?fixtureAuth=signed&fixtureRole=Manager');await page.locator('.app-shell').waitFor();assert.equal(await page.locator('[data-action="go-pos"],[data-action="go-workshop"]').count(),0);assert.equal(await page.locator('#rs-module-panel [data-module="settings"]').count(),0);
   result.managerResult='PASS: Manager keeps Admin and receives no POS, Workshop or branding entry';
   await page.goto(origin+'/admin/dashboard?fixtureAuth=signed&fixtureRole=Business%20Owner');await page.locator('.app-shell').waitFor();
   const cdp=await context.newCDPSession(page);const manifest=await cdp.send('Page.getAppManifest');result.browserManifest={url:manifest.url,errors:manifest.errors,data:JSON.parse(manifest.data)};assert.equal(result.browserManifest.data.name,'RetraSell POS');await cdp.detach();

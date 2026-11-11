@@ -5,8 +5,8 @@ import { state, CFG } from './shared.js'
 import { profileIcon } from './profile-icon.js'
 import { onPrivateReset } from './ui-authority.js'
 
-let open = false
-onPrivateReset(() => { open = false })
+let openKey = null   // which menu is open: 'account' | 'modules' | null
+onPrivateReset(() => { openKey = null })
 
 const svg = (paths, size = 18, cls = 'rs-menu-icon') =>
   `<svg class="${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${paths}</svg>`
@@ -21,6 +21,7 @@ const ICON = {
   clock:    svg('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
   logout:   svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>'),
   stats:    svg('<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>'),
+  check:    svg('<path d="m5 12 5 5 9-10"/>', 18, 'rs-menu-icon rs-menu-check'),
   chevron:  svg('<path d="m6 9 6 6 6-6"/>', 14, 'rs-account-chevron'),
 }
 
@@ -51,8 +52,8 @@ export function accountMenuHTML({ session, shop = '', leave = false, clockOut = 
     `<a role="menuitem" class="rs-menu-item" href="/legal.html?doc=guide" target="_blank" rel="noopener">${ICON.help}<span>Help &amp; User Guide</span></a>`,
   ].join('')
 
-  return `<div class="rs-account-menu" id="rs-account-menu" data-open="${open}">
-    <button type="button" id="rs-account-trigger" class="icon-button rs-account-trigger" data-action="account-menu" aria-haspopup="menu" aria-expanded="${open}" aria-controls="rs-account-panel" aria-label="Account menu" title="Account menu">${profileIcon}${ICON.chevron}</button>
+  return `<div class="rs-account-menu" id="rs-account-menu" data-rs-menu="account" data-open="${openKey === 'account'}">
+    <button type="button" id="rs-account-trigger" class="icon-button rs-account-trigger" data-action="account-menu" data-rs-menu-trigger aria-haspopup="menu" aria-expanded="${openKey === 'account'}" aria-controls="rs-account-panel" aria-label="Account menu" title="Account menu">${profileIcon}${ICON.chevron}</button>
     <div class="rs-account-panel" id="rs-account-panel">
       <div class="rs-menu-identity">
         <span class="rs-menu-avatar" aria-hidden="true">${escapeHTML(initials)}</span>
@@ -69,6 +70,22 @@ export function accountMenuHTML({ session, shop = '', leave = false, clockOut = 
         ${ems && clockOut ? item('ems-clock-out', ICON.clock, 'Clock out') : ''}
         ${item('logout', ICON.logout, 'Log out', { danger: true })}
       </div>
+    </div>
+  </div>`
+}
+
+/** Admin section switcher. Reuses the person menu's panel and item styles so both dropdowns look the same. */
+export function moduleMenuHTML({ modules = [], current = '' } = {}) {
+  const active = modules.find(m => m.key === current) || modules[0]
+  const isOpen = openKey === 'modules'
+  const items = modules.map(m => {
+    const here = m.key === current
+    return `<button type="button" role="menuitem" class="rs-menu-item" data-action="admin-module-pick" data-module="${escapeHTML(m.key)}"${here ? ' aria-current="page"' : ''}><span>${escapeHTML(m.label)}</span>${here ? ICON.check : ''}</button>`
+  }).join('')
+  return `<div class="rs-account-menu rs-module-menu" id="rs-module-menu" data-rs-menu="modules" data-open="${isOpen}">
+    <button type="button" id="rs-module-trigger" class="rs-module-trigger" data-rs-menu-trigger aria-haspopup="menu" aria-expanded="${isOpen}" aria-controls="rs-module-panel" aria-label="Switch section"><span>${escapeHTML(active?.label || '')}</span>${ICON.chevron}</button>
+    <div class="rs-account-panel rs-module-panel" id="rs-module-panel">
+      <div role="menu" aria-label="Sections">${items}</div>
     </div>
   </div>`
 }
@@ -92,60 +109,67 @@ export function changePasswordModalHTML() {
   </div></div>`
 }
 
-/* ── Open / close behaviour: one set of listeners for all three views ── */
-function apply(focusTrigger = false) {
-  const root = document.getElementById('rs-account-menu')
-  if (!root) return
-  root.dataset.open = String(open)
-  const trigger = root.querySelector('#rs-account-trigger')
-  trigger?.setAttribute('aria-expanded', String(open))
-  if (focusTrigger) trigger?.focus({ preventScroll: true })
+/* ── Open / close behaviour: one set of listeners shared by every menu (person menu, Admin section switcher) ── */
+const menuRoot = key => document.querySelector(`[data-rs-menu="${key}"]`)
+
+function apply() {
+  for (const root of document.querySelectorAll('[data-rs-menu]')) {
+    const isOpen = root.dataset.rsMenu === openKey
+    root.dataset.open = String(isOpen)
+    root.querySelector('[data-rs-menu-trigger]')?.setAttribute('aria-expanded', String(isOpen))
+  }
 }
 
-function setOpen(next, { focusTrigger = false, focusFirst = false } = {}) {
-  open = next
-  apply(focusTrigger)
-  if (open && focusFirst) document.querySelector('#rs-account-panel .rs-menu-item')?.focus({ preventScroll: true })
+function setOpen(key, { focusTrigger = false, focusFirst = false } = {}) {
+  const previous = openKey
+  openKey = key
+  apply()
+  if (focusTrigger && previous) menuRoot(previous)?.querySelector('[data-rs-menu-trigger]')?.focus({ preventScroll: true })
+  if (key && focusFirst) menuRoot(key)?.querySelector('.rs-menu-item')?.focus({ preventScroll: true })
 }
 
 if (!window.__rsAccountMenu) {
   window.__rsAccountMenu = true
 
   // Capture phase: the menu closes (and focus returns to the trigger) BEFORE a view's own
-  // handler opens a dialog, so the dialog remembers the trigger as its opener.
+  // handler opens a dialog or navigates, so the dialog remembers the trigger as its opener.
   document.addEventListener('click', event => {
     const target = event.target
     if (!(target instanceof Element)) return
-    if (target.closest('#rs-account-trigger')) {
+    const trigger = target.closest('[data-rs-menu-trigger]')
+    if (trigger) {
+      const key = trigger.closest('[data-rs-menu]')?.dataset.rsMenu
+      if (!key) return
       event.stopPropagation()
-      setOpen(!open, { focusFirst: !open && event.detail === 0 })
+      setOpen(openKey === key ? null : key, { focusFirst: openKey !== key && event.detail === 0 })
       return
     }
-    if (!open) return
-    const menuItem = target.closest('#rs-account-panel .rs-menu-item')
-    if (menuItem) {
+    if (!openKey) return
+    const root = menuRoot(openKey)
+    const menuItem = target.closest('.rs-menu-item')
+    if (menuItem && root?.contains(menuItem)) {
       const path = menuItem.getAttribute('data-nav')
       if (path) {
         event.stopPropagation()
-        setOpen(false)
+        setOpen(null)
         import('./router.js').then(({ navigate }) => navigate(path))
         return
       }
-      if (!menuItem.hasAttribute('data-keep-open')) setOpen(false, { focusTrigger: true })
+      if (!menuItem.hasAttribute('data-keep-open')) setOpen(null, { focusTrigger: true })
       return
     }
-    if (!target.closest('#rs-account-menu')) setOpen(false)
+    if (!root?.contains(target)) setOpen(null)
   }, true)
 
   document.addEventListener('keydown', event => {
-    if (!open) return
-    const panel = document.getElementById('rs-account-panel')
+    if (!openKey) return
+    const panel = menuRoot(openKey)?.querySelector('.rs-account-panel')
     if (!panel) return
     if (event.key === 'Escape') {
       event.preventDefault(); event.stopPropagation()
-      setOpen(false, { focusTrigger: true }); return
+      setOpen(null, { focusTrigger: true }); return
     }
-    if (event.key === 'Tab') { setOpen(false); return }
+    if (event.key === 'Tab') { setOpen(null); return }
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
     const items = [...panel.querySelectorAll('.rs-menu-item')]
     if (!items.length) return

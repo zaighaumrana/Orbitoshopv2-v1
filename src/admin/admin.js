@@ -1,5 +1,5 @@
 import {retirementAvailable} from '../inventory-state.js'
-import {accountMenuHTML, changePasswordModalHTML} from '../account-menu.js'
+import {accountMenuHTML, changePasswordModalHTML, moduleMenuHTML} from '../account-menu.js'
 import {catalogAvailable} from '../catalog/data.js'
 import {iconSettingsHTML,iconSettingsValues} from '../catalog/icon-settings.js'
 import {iconAllowed} from '../catalog/icons.js'
@@ -341,11 +341,10 @@ function render() {
           </div>
           </div>
           <div class="top-actions">
-            <select class="tenant-switcher compact-select" data-action="admin-module">
-              ${ADMIN_MODULES.filter(([k]) => can(k, state.role))
-                .map(([k,,l]) => `<option value="${k}" ${k === adminState.adminModule ? 'selected' : ''}>${l}</option>`)
-                .join('')}
-            </select>
+            ${moduleMenuHTML({
+              current: adminState.adminModule,
+              modules: ADMIN_MODULES.filter(([k]) => can(k, state.role)).map(([key,,label]) => ({ key, label })),
+            })}
             <span class="chip">
               <i class="dot ${state.online ? '' : 'offline'}"></i>
               ${state.online ? 'Online' : 'Offline'}
@@ -861,6 +860,12 @@ function attachEvents() {
       const nav=adminNavigationIsCurrent;customerSupport.view.busy=true
       try{await viewAwait(eventCurrent,()=>(customerSupport.consents('revoke',{p_consent:el.dataset.consentId})),()=>state.modal)}catch(error){if(nav())customerSupport.view.error=error.message}
       finally{if(nav()){customerSupport.view.busy=false;render()}}return
+    }
+    if (el.dataset.action === 'admin-module-pick') {
+      adminState.filter = ''
+      const { navigate } = await viewAwait(eventCurrent,()=>(import('../router.js')),()=>state.modal)
+      navigate(`/admin/${el.dataset.module}`)
+      return
     }
     if (el.dataset.action?.startsWith('shifts-')) {
       if (await shiftsAction(el, render)) return
@@ -1511,12 +1516,6 @@ function attachEvents() {
     const t = e.target
     if(t.dataset.inventoryStatus!==undefined&&adminState.adminModule==='inventory'&&retirementAvailable()&&['active','retired'].includes(t.value)){
       const {navigate}=await viewAwait(eventCurrent,()=>import('../router.js'),()=>state.modal);navigate('/admin/inventory?status='+t.value);return
-    }
-    if (t.dataset.action === 'admin-module') {
-      adminState.filter = ''
-      const { navigate } = await viewAwait(eventCurrent,()=>(import('../router.js')),()=>state.modal)
-      navigate(`/admin/${t.value}`)
-      return
     }
     if (t.dataset.receiptType !== undefined) {
       adminState.receiptType = t.value

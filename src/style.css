@@ -1187,8 +1187,26 @@ input[type="number"] {
   .rs-shop .rs-account-panel{inset-inline:12px;inset-block-start:calc(100% + 6px);width:auto}
 }
 
+/* Admin section switcher (src/account-menu.js): the person menu's panel and items, reused for the module list. */
+.rs-shop .rs-module-trigger{display:inline-flex;align-items:center;justify-content:space-between;gap:10px;min-width:190px;padding:11px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;font-weight:500;line-height:1.2;cursor:pointer}
+.rs-shop .rs-module-trigger>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rs-shop .rs-module-trigger:hover,
+.rs-shop .rs-account-menu[data-open="true"] .rs-module-trigger{background:var(--surface-2);border-color:var(--primary)}
+.rs-shop .rs-module-panel [role="menu"]{display:grid;gap:2px}
+.rs-shop .rs-module-panel .rs-menu-item{min-height:46px;padding:11px 12px}
+.rs-shop .rs-module-panel .rs-menu-item[aria-current="page"]{background:var(--surface-2);color:var(--primary);font-weight:600}
+.rs-shop .rs-menu-check{margin-inline-start:auto;color:var(--primary)}
+@media (min-width:769px){
+  .rs-shop .rs-module-panel{inset-inline-start:0;inset-inline-end:auto}
+}
+@media (max-width:768px){
+  .rs-shop .rs-module-trigger{min-width:0;max-width:170px;padding:9px 10px;font-size:13px}
+}
+
 /* ── Register shift dialogs and the Admin Shift Stats page (src/shift, src/admin/pages/shifts.js) ── */
-.rs-shop .modal-backdrop:has(>.rs-shift-dialog){grid-template-columns:minmax(0,1fr)}
+/* The backdrop is itself the .rs-shop element, so it is targeted without a .rs-shop ancestor.
+   Only the wide stats step needs a full-width grid track; the small popups keep their current size. */
+.modal-backdrop.rs-shift-backdrop:has(>.rs-shift-dialog[data-step="close-summary"]){grid-template-columns:minmax(0,1fr)}
 .rs-shop .modal.rs-shift-dialog{width:min(600px,100%);max-height:min(92dvh,860px);display:flex;flex-direction:column;gap:12px;overflow:hidden}
 .rs-shop .rs-shift-dialog h2{margin:0}
 .rs-shop .rs-shift-lede{margin:0;font-size:15px;line-height:1.5}
@@ -1217,6 +1235,8 @@ input[type="number"] {
 /* Stats: wide desktop layout, driven by the width the panel actually has (works in the dialog and in Admin). */
 @container rs-shift (min-width:760px){
   .rs-shop .rs-shift-stats{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:"reg online returns" "reg credit sales" "rep rep rep";gap:14px}
+  .rs-shop .rs-shift-card{padding:10px 14px;gap:4px}
+  .rs-shop .rs-shift-row.is-total{margin-top:2px;padding-top:6px}
   .rs-shop .rs-shift-card.is-register{grid-area:reg}
   .rs-shop .rs-shift-card.is-online{grid-area:online}
   .rs-shop .rs-shift-card.is-credit{grid-area:credit}

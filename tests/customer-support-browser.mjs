@@ -34,7 +34,7 @@ try{
  const page=await context.newPage();page.setDefaultTimeout(20000);page.on('pageerror',e=>errors.push(e.message));
  await page.goto(origin+'/__support_fixture',{waitUntil:'domcontentloaded',timeout:60000});
  await page.evaluate(async()=>{history.replaceState(null,'','/admin/customer-support');const {initAdmin}=await import('/src/admin/admin.js');await initAdmin({employee:{name:'Synthetic Owner',role:'Business Owner'},isAdmin:true},'customer-support');});
- await page.getByRole('heading',{name:'Help & Support'}).waitFor();assert.equal(await page.locator('select[data-action="admin-module"] option[value="customer-support"]').count(),1);
+ await page.getByRole('heading',{name:'Help & Support'}).waitFor();assert.equal(await page.locator('#rs-module-panel [data-module="customer-support"]').count(),1);
  await page.locator('[data-support-field="subject"]').fill('Scanner <img src=x onerror=alert(1)>');await page.locator('[data-support-field="message"]').fill('Disconnects after checkout.');
  await page.getByRole('button',{name:'Submit request',exact:true}).click();await page.getByRole('button',{name:'Retry original request',exact:true}).waitFor();
  assert.equal(await page.locator('[data-support-field="subject"]').getAttribute('readonly'),'');
@@ -50,7 +50,7 @@ try{
  await page.locator('[data-action="customer-support-detail"]').first().focus();await page.keyboard.press('Enter');await page.locator('.support-detail').getByText('Customer punctuation: \u00b7 \u2019 \u2013',{exact:true}).waitFor();assert.equal(await page.locator('[data-action="customer-support-detail"]').first().getAttribute('aria-pressed'),'true');
  assert.ok((await page.evaluate(()=>window.fixtureCalls.filter(c=>c.action==='list').map(c=>c.offset))).includes(50));
  await page.evaluate(async()=>{const {initAdmin}=await import('/src/admin/admin.js');await initAdmin({employee:{name:'Synthetic Manager',role:'Manager'}},'customer-support');});
- assert.equal(await page.locator('select[data-action="admin-module"] option[value="customer-support"]').count(),1);
+ assert.equal(await page.locator('#rs-module-panel [data-module="customer-support"]').count(),1);
  assert.equal(await page.locator('[data-form="support-consent"]').count(),0);
  // Presentation fixtures use the real renderer/CSS with no transport or customer data.
  await page.evaluate(async()=>{
