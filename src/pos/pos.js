@@ -1880,7 +1880,8 @@ function attachEvents() {
     if (t.dataset.returnQty !== undefined) refreshRetailReturnPreview()
     if (t.dataset.draftCompPrice !== undefined) {
       const idx = Number(t.dataset.draftCompPrice)
-      if (!data.customerName?.trim()) { showBlockingError('Customer name is required.'); return }
+      const draft = getDraft()
+      if (draft.components[idx]) { draft.components[idx].price = Number(t.value)||0; _refreshDraftTotals() }
     }
     if (t.dataset.draftLabour !== undefined) {
       getDraft().labour = Number(t.value)||0; _refreshDraftTotals()
@@ -1945,7 +1946,6 @@ function attachEvents() {
       if (placingOrder || state.modal?.type !== 'repair' || !form.isConnected) return
       const editingProductId = state.modal?._editingCartProductId
       dlog('POS.submit', `repair branch -- ${editingProductId ? 'updating' : 'adding'} cart draft (no DB write yet)`)
-      const draft = getDraft()
       if (!data.customerName?.trim()) { showBlockingError('Customer name is required.'); return }
       if (!data.customerPhone?.trim()) { showBlockingError('Customer phone is required.'); return }
       if (!data.deviceBrand?.trim())  { showBlockingError('Device brand is required.'); return }
