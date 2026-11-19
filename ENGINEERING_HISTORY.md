@@ -1980,3 +1980,61 @@ Front end only; no migration, function, Platform or package change. Deployed to 
 Shift Stats is unchanged: a browser-local-midnight report unrelated to EMS. A server-side shift model is planned and needs a Shop backend change plus a paired Platform (sister) repository change. No forced password change for temporary passwords. `helpLink()` and `profile-icon.js` retained.
 ### Git
 Same state as the previous entry: `development` at `d52d9dc`, in sync with `origin/development`.
+
+
+
+## 2026-11-10 — Register shifts: server-side backend
+Branch: development
+### Purpose
+Replace the browser-local, browser-midnight Shift Stats report with a real server-held register shift, under the owner's explicit Option A: this is a disposable-dev-shop-only addition and the existing Managed/BYO upgrade path is deliberately not extended for it.
+### Changed
+One additive migration (`20261108120000_register_shifts.sql`): table `public.register_shifts` (one open shift per operator, RLS-scoped, immutable once closed), five RPCs (open, get-my-open, get-summary, close, force-close, paged history), and `app_private.register_shift_summary` computing register cash / online channels / credit (udhar) / returns / sales and repairs from the existing `payments`, `credit_approvals`, `returns`, `refunds`, `sales`, `sale_lines` and `tickets` tables. New PIN purpose `shift-close`, claimed per-close and consumed on use. `shop_backend_capabilities()` and `get_app_config()` re-created with one new capability/contract each, every prior line preserved. `scripts/backend-requirements.json` and `scripts/backend-inventory.ts` updated to declare and recognize the new optional capability. Detail: `docs/REGISTER_SHIFTS_BACKEND.md`.
+### Decisions
+A Cashier closing short needs a written reason and a fresh PIN bound to that exact close; an Owner closing short needs neither (recorded as their own adjustment). Online payments and unpaid credit never count as register cash. The Stage 1 browser-local preview UI is left wired to its own local store; this backend is not yet called by anything.
+### Validation
+`tests/register-shifts-sql.mjs`: 67/67 against a disposable native PostgreSQL 16 instance applying all 43 real migrations in order, covering authorization, idempotency, a genuine concurrent-open race, row security, the summary's money maths on seeded fixtures, PIN claim/consumption/rejection, force-close, and keyset paging. Lint clean; build succeeds (145 modules). No test regresses against the pre-change baseline.
+### Deployment / DB impact
+Not applied to any live Supabase project. Registered afterward as an unapproved Platform candidate (`support-v11`); see the sister `orbito` repository's `docs/SUPPORT_V11_ACTIVATION_PREP.md`.
+### Deferred / deliberately unchanged
+Wiring the UI to these RPCs, removing the preview store, the Manager's force-close entry point in Employees, Fresh-vs-Upgrade path separation — all unstarted.
+### Git
+`development` at `74a7d38...`, the backend-only commit this release package's candidate hash was built from.
+
+## 2026-11-12 — Admin dropdown and Shift Stats popup width fix
+Branch: development
+### Purpose
+Two narrow front-end issues reported against the Stage 1/3 UI: the Admin section list used the browser's native `<select>` instead of matching the Person menu's dropdown, and the "Close the register" popup never actually widened to the desktop layout because its width rule targeted a `.rs-shop` ancestor that doesn't exist — the popup's backdrop *is* the `.rs-shop` element.
+### Changed
+`src/account-menu.js` generalized to drive two menus (Person menu and a new Admin section switcher, `moduleMenuHTML`) from one shared open/close engine; `src/admin/admin.js` swaps the `<select>` for the switcher. `src/style.css`: the switcher reuses the Person menu's panel and item styles, and the Shift Stats popup width rule now targets `.modal-backdrop.rs-shift-backdrop:has(>[data-step="close-summary"])` directly.
+### Validation
+Confirmed with a real-DOM selector-match test that the old rule never matched and the new one does, then a 22-check simulated click-through of both menus (opening/closing, one-at-a-time, keyboard navigation, re-render state survival) and the existing 59-check Shift Stats suite, both passing. Lint clean; build succeeds; no new unit-test failures relative to baseline. Owner reports real-browser verification passed.
+### Deployment / DB impact
+Front end only.
+### Git
+`development` at `9417a3c...`.
+
+## 2026-11-14 — Fix repair component price handler regression
+Branch: development
+### Purpose
+A prior tidy-up snippet, applied by the owner from an earlier turn, landed at the wrong handler: the repair form's component-price input handler had its body replaced by an unrelated validation check referencing an undefined variable, so typing a component price no longer updated the quote.
+### Changed
+`src/pos/pos.js`: restored the price-handler body (`draft.components[idx].price = ...; _refreshDraftTotals()`), and removed the now-duplicated unused `getDraft()` call left behind at the submit handler.
+### Validation
+Lint: 0 errors (was 1 `no-undef`). Matches the pre-regression file exactly apart from the one intended line removal. Owner reports real-browser verification passed (typing a component price updates the quote; empty customer name is still rejected).
+### Deployment / DB impact
+Front end only.
+### Git
+`development` at `cd3e01e...`, tagged `development-frontend-stable-2026-11-10` as the verified recovery point for all frontend work through this commit.
+
+## 2026-11-17 — Register support-v11 candidate in backend release catalog
+Branch: development
+### Purpose
+Pair Shop's side of registering the `support-v11` Platform candidate (see `orbito`'s `docs/SUPPORT_V11_ACTIVATION_PREP.md`).
+### Changed
+Added one entry to `scripts/backend-release-catalog.json`, keyed by the release's sha256, mirroring the manifest shape of every existing entry: migration and function manifests, `approved_for_new: false`, `supported: false`, `review_status: candidate-local`.
+### Validation
+Data-only addition; no code path reads this file at request time. Confirmed via `git status --short` showing only this one file before commit.
+### Deployment / DB impact
+None. No capability, migration, or availability changes for any shop.
+### Git
+`development` at `bff63c451ea11950b2dd7d17ccb7cbe73d742cc1`, confirmed matching `origin/development` and independently reproduced from a fresh GitHub clone.
